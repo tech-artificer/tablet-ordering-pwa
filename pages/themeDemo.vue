@@ -1,29 +1,16 @@
 <template>
     <div class="min-h-screen bg-background text-text p-8">
-        <!-- Theme Selector -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold mb-4">Dynamic Theme System</h1>
-
-            <div class="flex gap-4 mb-6">
-                <button
-                    v-for="(theme, key) in themes"
-                    :key="key"
-                    :class="[
-                        'px-4 py-2 rounded-lg border-2 transition-all',
-                        currentThemeName === key
-                            ? 'border-primary bg-primary text-white'
-                            : 'border-border bg-surface text-text hover:border-primary'
-                    ]"
-                    @click="setTheme(key)"
-                >
-                    {{ theme.name }}
-                </button>
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold mb-4">
+                    Dynamic Theme System
+                </h1>
+            </div>
+            <div>
+                <CommonLink name="Back" to="/" class="bg-surface border border-border px-4 py-2 rounded"/>
             </div>
         </div>
-
-        <!-- Demo Content -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Card 1 -->
             <div class="bg-surface border border-border rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-primary mb-2">Primary Card</h3>
                 <p class="text-text-secondary mb-4">
@@ -34,7 +21,6 @@
                 </button>
             </div>
 
-            <!-- Card 2 -->
             <div class="bg-surface border border-border rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-secondary mb-2">Secondary Card</h3>
                 <p class="text-text-secondary mb-4">
@@ -45,7 +31,6 @@
                 </button>
             </div>
 
-            <!-- Card 3 -->
             <div class="bg-surface border border-border rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-text mb-2">Status Colors</h3>
                 <div class="space-y-2 mb-4">
@@ -65,7 +50,6 @@
             </div>
         </div>
 
-        <!-- Current Theme Info -->
         <div class="mt-8 bg-surface border border-border rounded-lg p-6">
             <h3 class="text-xl font-semibold mb-4">Current Theme: {{ currentTheme.name }}</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -83,5 +67,5 @@
 </template>
 
 <script setup lang="ts">
-    const { currentTheme, currentThemeName, themes, setTheme } = useTheme()
+    const { currentTheme } = useTheme()
 </script>

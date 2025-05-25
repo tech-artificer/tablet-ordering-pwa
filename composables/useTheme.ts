@@ -101,9 +101,9 @@ export const useTheme = () => {
             root.setAttribute('data-theme', theme.name)
         }
     }
-    onMounted(() => {
-        applyThemeToDocument(currentTheme.value)
-    })
+    // onMounted(() => {
+    //     applyThemeToDocument(currentTheme.value)
+    // })
     watch(currentTheme, (newTheme) => {
         applyThemeToDocument(newTheme)
     })
