@@ -1,15 +1,15 @@
 <template>
-    <div class="p-2">
-        <el-container class="py-2 rounded-sm">
-            <el-header class="text-lg font-bold border-b border-border ">{{ title }} <span class="text-text-secondary text-sm font-normal">{{ description }}</span></el-header>
-            <el-main>
-                <slot name="main"/>
-            </el-main>
-            <el-footer v-if="footer" class="border-t border-border">
-                <slot name="footer"/>
-            </el-footer>
-        </el-container>
-    </div>
+    <el-container class="py-2 rounded-md bg-surface border border-border">
+        <el-header class="text-lg font-bold ">{{ title }}
+            <span class="text-gray-400 text-sm font-normal">{{ description }}</span>
+        </el-header>
+        <el-main>
+            <slot name="main"/>
+        </el-main>
+        <el-footer v-if="footer" class="border-t border-border">
+            <slot name="footer"/>
+        </el-footer>
+    </el-container>
 </template>
 <script setup>
 defineProps({
