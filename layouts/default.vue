@@ -1,5 +1,8 @@
 <template>
     <div>
-        default
+        <TheHeader />
+        <main>
+            <slot />
+        </main>
     </div>
 </template>

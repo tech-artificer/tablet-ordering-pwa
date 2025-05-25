@@ -1,5 +1,5 @@
 <template>
     <div>
-        index
+        <NuxtLink to="/themeDemo">Theme Demo</NuxtLink>
     </div>
 </template>
