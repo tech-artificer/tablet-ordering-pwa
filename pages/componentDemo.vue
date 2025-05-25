@@ -10,7 +10,7 @@
                 <CommonLink name="Back" to="/" class="bg-surface border border-border px-4 py-2 rounded"/>
             </div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-rows-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
             <CommonContainer title="<CommonButton/>">
                 <template #main>
                     <div>
