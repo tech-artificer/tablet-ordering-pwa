@@ -1,7 +1,7 @@
 <template>
     <CommonContainer title="COMPONENT DEMO LIST">
         <template #main>
-            <div class="grid grid-cols-4 gap-2">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
                 <CommonLink
                     to="/componentDemo"
                     name="Component Demo"
