@@ -1,0 +1,19 @@
+{
+    "env": {
+        "browser": true,
+        "node": true
+    },
+    "extends": [
+        "@nuxtjs/eslint-config-typescript"
+    ],
+    "rules": {
+        "quotes": [1, "double"],
+        "indent": [2, 4],
+        "vue/html-indent": [2, 4],
+        "comma-dangle": [2, {
+            "arrays": "only-multiline",
+            "objects": "only-multiline"
+        }
+    ]
+    }
+}

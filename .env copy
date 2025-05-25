@@ -1,0 +1,8 @@
+NUXT_APP_BASE_URL=/
+# APP_ENV = local or production
+APP_ENV=local
+
+API_URL=https://tap-to-order.test
+
+BULK_UPLOAD_ENABLED=true
+DEPLOYCHECK=false
