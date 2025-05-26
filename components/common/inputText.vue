@@ -13,7 +13,6 @@
         :parser="parser"
         :suffix-icon="suffixIcon"
     >
-        <!-- example <template #prepend>Http://</template> -->
         <template
             v-if="prepend"
             #prepend

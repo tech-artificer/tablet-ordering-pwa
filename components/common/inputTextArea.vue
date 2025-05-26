@@ -14,7 +14,6 @@
         :suffix-icon="suffixIcon"
         class="w-full"
     >
-        <!-- example <template #prepend>Http://</template> -->
         <template
             v-if="prepend"
             #prepend

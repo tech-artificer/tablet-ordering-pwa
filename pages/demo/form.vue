@@ -19,6 +19,14 @@
             <DemoInputPassword/>
             <DemoTextArea/>
             <DemoLink/>
+            <DemoSelect/>
+            <DemoInputNumber/>
+            <DemoInputTag/>
+            <DemoInputRates/>
+            <DemoIcon/>
+        </div>
+        <div class="grid grid-rows-1 justify-between mt-2">
+            <DemoImages/>
         </div>
     </div>
 </template>
