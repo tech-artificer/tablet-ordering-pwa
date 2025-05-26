@@ -1,5 +1,7 @@
 <template>
-    <label>
-        <slot/>
-    </label>
+    <div>
+        <label>
+            <slot/>
+        </label>
+    </div>
 </template>
