@@ -11,7 +11,7 @@
             </div>
         </div>
         <div class="grid grid-rows-1 md:grid-cols-2 gap-2 justify-between">
-            <DemoCard/>
+            Advance demo 
         </div>
     </div>
 </template>

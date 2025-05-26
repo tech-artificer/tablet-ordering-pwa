@@ -13,8 +13,8 @@
                     class="text-white bg-gray-500 px-4 py-2"
                 />
                 <CommonLink
-                    to="/demo/form"
-                    name="Form Demo"
+                    to="/demo/advance"
+                    name="Advance Demo"
                     class="text-white bg-gray-500 px-4 py-2"
                 />
             </div>
