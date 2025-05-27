@@ -5,14 +5,15 @@ export default defineNuxtConfig({
     ssr: false,
     css: ['~/assets/css/main.css'],
     modules: [
-        '@pinia/nuxt',
-        'pinia-plugin-persistedstate',
-        '@nuxtjs/tailwindcss',
-        '@nuxt/icon',
-        '@nuxt/image',
-        '@nuxt/eslint',
-        '@element-plus/nuxt',
-        'nuxt-charts'
+      '@pinia/nuxt',
+      'pinia-plugin-persistedstate',
+      '@nuxtjs/tailwindcss',
+      '@nuxt/icon',
+      '@nuxt/image',
+      '@nuxt/eslint',
+      '@element-plus/nuxt',
+      'nuxt-charts',
+      '@vite-pwa/nuxt'
     ],
     runtimeConfig: {
         public: {
