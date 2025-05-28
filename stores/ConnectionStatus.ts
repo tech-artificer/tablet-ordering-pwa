@@ -3,27 +3,46 @@ import { defineStore } from "pinia"
 export const useConnectionStatus = defineStore('connection-status', {
     state: () => ({
         isOnline: navigator.onLine,
+        isReallyOnline: navigator.onLine,
         showNotification: false,
         offlineProgress: 0,
         progressInterval: null
     }),
+
     actions: {
-        updateOnlineStatus() {
-            const wasOffline = !this.isOnline
+        async checkInternet() {
+            try {
+                await fetch('https://www.google.com/favicon.ico', {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                })
+                return true
+            } catch {
+                return false
+            }
+        },
+
+        async updateOnlineStatus() {
+            const wasReallyOnline = this.isReallyOnline
             this.isOnline = navigator.onLine
-            this.showNotification = true
 
-            setTimeout(() => {
-                this.showNotification = false
-            }, 3000)
+            if (this.isOnline) {
+                this.isReallyOnline = await this.checkInternet()
+            } else {
+                this.isReallyOnline = false
+            }
+            if (wasReallyOnline !== this.isReallyOnline) {
+                this.showNotification = true
+                setTimeout(() => {
+                    this.showNotification = false
+                }, 3000)
+            }
 
-            if (!this.isOnline) {
+            if (!this.isReallyOnline) {
                 this.startOfflineProgress()
             } else {
                 this.stopOfflineProgress()
-                if (wasOffline) {
-                    this.showConnectedNotification()
-                }
             }
         },
 
@@ -40,13 +59,6 @@ export const useConnectionStatus = defineStore('connection-status', {
                 this.progressInterval = null
             }
             this.offlineProgress = 0
-        },
-
-        showConnectedNotification() {
-            this.showNotification = true
-            setTimeout(() => {
-                this.showNotification = false
-            }, 3000)
         }
     }
 })

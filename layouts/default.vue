@@ -2,13 +2,13 @@
     <div>
         <CommonSlideDown
             :show-notification="showNotification"
-            :is-online="isOnline"
+            :is-really-online="isReallyOnline"
         />
         <main :class="{ 'mt-16': showNotification }">
             <slot />
         </main>
         <CommonSlideUp
-            :is-online="isOnline"
+            :is-really-online="isReallyOnline"
         />
     </div>
 </template>
@@ -22,12 +22,11 @@ const connectionStatus = useConnectionStatus()
 
 const {
     showNotification,
-    isOnline
+    isReallyOnline
 } = storeToRefs(connectionStatus)
 
 const {
     updateOnlineStatus,
-    startOfflineProgress,
     stopOfflineProgress
 } = connectionStatus
 
@@ -35,8 +34,9 @@ onMounted(() => {
     window.addEventListener('online', updateOnlineStatus)
     window.addEventListener('offline', updateOnlineStatus)
 
-    if (!isOnline.value) {
-        startOfflineProgress()
+    // Check internet on initial load
+    if (navigator.onLine) {
+        updateOnlineStatus()
     }
 })
 

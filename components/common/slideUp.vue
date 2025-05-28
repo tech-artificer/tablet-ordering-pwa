@@ -1,7 +1,7 @@
 <template>
     <Transition name="slide-up">
         <div
-            v-if="!isOnline"
+            v-if="!isReallyOnline"
             class="fixed bottom-0 left-0 right-0 bg-red-500 h-2 z-40"
         >
             <div
@@ -20,7 +20,7 @@ const connectionStatus = useConnectionStatus()
 const { offlineProgress } = storeToRefs(connectionStatus)
 
 defineProps({
-    isOnline: {
+    isReallyOnline: {
         type: Boolean,
         required: true
     }

@@ -4,10 +4,10 @@
             v-if="showNotification"
             :class="[
                 'fixed top-0 left-0 right-0 z-50 p-4 text-white text-center transition-all duration-500',
-                isOnline ? 'bg-green-500' : 'bg-red-500'
+                isReallyOnline ? 'bg-green-500' : 'bg-red-500'
             ]"
         >
-            {{ isOnline ? '🟢 Connected to internet' : '🔴 You are offline' }}
+            {{ isReallyOnline ? '🟢 Connected to internet' : '🔴 No internet connection' }}
         </div>
     </Transition>
 </template>
@@ -18,7 +18,7 @@ defineProps({
         type: Boolean,
         required: true
     },
-    isOnline: {
+    isReallyOnline: {
         type: Boolean,
         required: true
     }
@@ -37,18 +37,5 @@ defineProps({
 
 .slide-down-leave-to {
     transform: translateY(-100%);
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
-}
-
-.animate-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>
