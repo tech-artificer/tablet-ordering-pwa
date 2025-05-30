@@ -24,16 +24,11 @@
 <script setup>
 // PWA Setup
 useHead({
-    title: 'My PWA App',
+    title: 'Tap To Order',
     meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'A simple PWA built with Nuxt 3' },
-        // PWA Meta Tags
-        { name: 'theme-color', content: '#000000' },
-        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
-        { name: 'apple-mobile-web-app-title', content: 'My PWA App' },
-        { name: 'msapplication-TileColor', content: '#000000' },
     ],
     link: [
         // Manifest

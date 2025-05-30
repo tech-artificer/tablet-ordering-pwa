@@ -29,7 +29,7 @@ export const useMyDeviceStore = defineStore('device', {
         }
         console.log('No valid device found, creating new device...')
         if (deviceData) {
-            this.device = { ...this.device, ...deviceData } as Device
+            Object.assign(this.device, deviceData)
         }
         await this.storeDevice()
             return this.device
@@ -40,11 +40,11 @@ export const useMyDeviceStore = defineStore('device', {
             }
             this.isLoading = true
             try {
-                const { data } = await useMainApi('/api/devices', {
+                const response = await useMainApiO('/api/devices', {
                     method: 'POST',
                     body: this.device,
                 })
-                this.device = data
+                this.device = response
                 console.log('Device stored successfully:', this.device)
             } catch (error) {
                 console.error('Error storing device:', error)
@@ -54,7 +54,7 @@ export const useMyDeviceStore = defineStore('device', {
             }
         },
         updateDevice(updates: Partial<Device>) {
-            this.device = { ...this.device, ...updates } as Device
+            Object.assign(this.device, updates)
         },
         clearDevice() {
             this.device = {} as Device

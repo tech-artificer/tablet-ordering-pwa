@@ -1,8 +1,8 @@
 import { ofetch } from "ofetch"
 import { useRuntimeConfig } from "nuxt/app"
-const config = useRuntimeConfig()
 
-export function useMainApiO (url: string, params: object) {
+export function useMainApiO(url: string, params?: RequestInit) {
+    const config = useRuntimeConfig()
     const ofetchApi = ofetch.create({
         baseURL: config.public.MAIN_API_URL,
         headers: {

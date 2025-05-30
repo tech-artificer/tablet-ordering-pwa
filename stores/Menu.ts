@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 interface Menu {
     id: number,
     name: string,
+    barcode: string,
     price: number,
     description: string,
     image: string,
@@ -24,10 +25,10 @@ export const useMenuStore = defineStore('menu', {
         async getAllMenus() {
             this.isLoading = true
             try {
-                const { data } = await useMainApi('/api/pos/menus', {
+                const response = await useMainApiO('/api/pos/menus', {
                     method: 'GET',
                 })
-                this.menus = data.value
+                this.menus = Array.isArray(response) ? response : response.data || []
                 console.log('Menus fetched successfully:', this.menus)
             } catch (error) {
                 console.error('Error fetching menus:', error)

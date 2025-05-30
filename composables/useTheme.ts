@@ -46,7 +46,9 @@ export const themes: Record<string, ThemeConfig> = {
 }
 
 export const useTheme = () => {
-    const currentThemeName = useState<string>('theme', () => 'woosooWarm')
+    const { public: { NUXT_PUBLIC_APP_THEME } } = useRuntimeConfig()
+    const defaultTheme = NUXT_PUBLIC_APP_THEME || 'woosooWarm'
+    const currentThemeName = useState<string>('theme', () => defaultTheme)
     const currentTheme = computed(() => themes[currentThemeName.value] || themes.woosooWarm)
     const setTheme = (themeName: string) => {
         if (themes[themeName]) {
