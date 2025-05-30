@@ -34,13 +34,13 @@ export default defineNuxtConfig({
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         disable: false,
         manifest: {
-            name: 'Tap To Order',
-            short_name: 'Tap To Order',
-            description: 'Tap To Order',
-            theme_color: '#ffffff',
-            background_color: '#ffffff',
-            display: 'standalone',
-            orientation: 'portrait-primary',
+            name: process.env.NUXT_PUBLIC_APP_NAME,
+            short_name: process.env.NUXT_PUBLIC_APP_NAME,
+            description: process.env.NUXT_PUBLIC_APP_DESCRIPTION,
+            theme_color: process.env.NUXT_PUBLIC_THEME_COLOR,
+            background_color: process.env.NUXT_PUBLIC_BACKGROUND_COLOR,
+            display: process.env.NUXT_PUBLIC_DISPLAY_NAME,
+            orientation: process.env.NUXT_PUBLIC_ORIENTATION,
             icons: [
                 {
                     src: '/icons/android-launchericon-48-48.png',
@@ -83,7 +83,14 @@ export default defineNuxtConfig({
     },
     runtimeConfig: {
         public: {
-            defaultTheme: 'light'
+            APP_NAME: process.env.APP_NAME,
+            APP_SHORT_NAME: process.env.APP_SHORT_NAME,
+            APP_DESCRIPTION: process.env.APP_DESCRIPTION,
+            MAIN_API_URL: process.env.MAIN_API_URL,
+            defaultTheme: process.env.NUXT_PUBLIC_APP_THEME,
         }
-    }
+    },
+    build: {
+        transpile: ['pinia-plugin-persistedstate']
+    },
 })

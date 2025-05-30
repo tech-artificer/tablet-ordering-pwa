@@ -2,7 +2,13 @@ NUXT_APP_BASE_URL=/
 # APP_ENV = local or production
 APP_ENV=local
 
-API_URL=https://tap-to-order.test
+MAIN_API_URL=http://admin-panel.test
 
-BULK_UPLOAD_ENABLED=true
-DEPLOYCHECK=false
+NUXT_PUBLIC_APP_NAME="Tap To Order"
+NUXT_PUBLIC_APP_DESCRIPTION="Tap To Order is a web application that allows users to order food from restaurants."
+NUXT_PUBLIC_APP_SHORT_NAME="Tap To Order"
+NUXT_PUBLIC_APP_THEME="light"
+DISPLAY_NAME="standalone"
+ORIENTATION="portrait-primary"
+THEME_COLOR="#ffffff"
+BACKGROUND_COLOR="#ffffff"
