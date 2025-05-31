@@ -1,18 +1,155 @@
 :root {
-    /* Default light theme variables */
-    --color-primary: #3b82f6;
-    --color-secondary: #64748b;
-    --color-accent: #8b5cf6;
-    --color-background: #ffffff;
-    --color-surface: #f8fafc;
-    --color-text: #0f172a;
-    --color-textSecondary: #64748b;
-    --color-border: #e2e8f0;
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
+    /* Primary Colors - Using your primary color #F6B56D */
+    --el-color-primary: #F6B56D!important;
+    --el-color-primary-light-3: #f8c689!important;
+    --el-color-primary-light-5: #fad1a4!important;
+    --el-color-primary-light-7: #fcdcbf!important;
+    --el-color-primary-light-8: #fde7d7!important;
+    --el-color-primary-light-9: #fef3ec!important;
+    --el-color-primary-dark-2: #d4752a!important; /* Using your accent color */
+
+    /* Success Colors - Using your success/darkGreen #4AD775 */
+    --el-color-success: #4AD775!important;
+    --el-color-success-light-3: #6fe390!important;
+    --el-color-success-light-5: #94efab!important;
+    --el-color-success-light-7: #b9f5c6!important;
+    --el-color-success-light-8: #d4fad8!important;
+    --el-color-success-light-9: #eafceb!important;
+    --el-color-success-dark-2: #3bb85e!important;
+
+    /* Warning Colors - Using your warning #FFB01D */
+    --el-color-warning: #FFB01D!important;
+    --el-color-warning-light-3: #ffc04a!important;
+    --el-color-warning-light-5: #ffd077!important;
+    --el-color-warning-light-7: #ffe0a4!important;
+    --el-color-warning-light-8: #ffebc7!important;
+    --el-color-warning-light-9: #fff5ea!important;
+    --el-color-warning-dark-2: #d99617!important;
+
+    /* Danger/Error Colors - Using your error #dc2626 */
+    --el-color-danger: #dc2626!important;
+    --el-color-danger-light-3: #e45151!important;
+    --el-color-danger-light-5: #ec7c7c!important;
+    --el-color-danger-light-7: #f4a7a7!important;
+    --el-color-danger-light-8: #f8c3c3!important;
+    --el-color-danger-light-9: #fce1e1!important;
+    --el-color-danger-dark-2: #b91c1c!important;
+
+    /* Info Colors - Using your info #3b82f6 */
+    --el-color-info: #3b82f6!important;
+    --el-color-info-light-3: #629bf8!important;
+    --el-color-info-light-5: #89b4fa!important;
+    --el-color-info-light-7: #b0cdfc!important;
+    --el-color-info-light-8: #c8ddfd!important;
+    --el-color-info-light-9: #e1eefe!important;
+    --el-color-info-dark-2: #2563eb!important;
+
+    /* Background Colors */
+    --el-bg-color: #ffffff!important; /* cardBackground */
+    --el-bg-color-page: #fefcfa!important; /* background */
+    --el-bg-color-overlay: #ffffff!important; /* cardBackground */
+
+    /* Surface and Fill Colors */
+    --el-fill-color: #f8f5f1!important; /* surface */
+    --el-fill-color-light: #fefcfa!important; /* background */
+    --el-fill-color-lighter: #ffffff!important; /* cardBackground */
+    --el-fill-color-extra-light: #ffffff!important;
+    --el-fill-color-dark: #f0e6db!important; /* hover */
+    --el-fill-color-darker: #e8ddd4!important; /* border */
+    --el-fill-color-blank: #ffffff!important;
+
+    /* Text Colors */
+    --el-text-color-primary: #2d1b12!important; /* textDarkPrimary */
+    --el-text-color-regular: #6b5b4d!important; /* textDarkSecondary */
+    --el-text-color-secondary: #8b7355!important; /* secondary */
+    --el-text-color-placeholder: #D3D3D3!important; /* muted/textLightSecondary */
+    --el-text-color-disabled: #D3D3D3!important; /* muted */
+
+    /* Border Colors */
+    --el-border-color: #e8ddd4!important; /* border */
+    --el-border-color-light: #f0e6db!important; /* hover */
+    --el-border-color-lighter: #f8f5f1!important; /* surface */
+    --el-border-color-extra-light: #fefcfa!important; /* background */
+    --el-border-color-dark: #d4752a!important; /* accent */
+    --el-border-color-darker: #8b7355!important; /* secondary */
+
+    /* Custom Properties for Special Colors */
+    --el-color-rose: #FFA0A2!important; /* rose */
+    --el-color-light-rose: #FCCCCC!important; /* lightRose */
+    --el-color-peach-puff: #FFD88E!important; /* PeachPuff */
+    --el-color-text-light: #efc086!important; /* textLight */
+
+    /* Component Specific Overrides */
+    --el-component-size-large: 40px!important;
+    --el-component-size: 32px!important;
+    --el-component-size-small: 24px!important;
+
+    /* Border Radius */
+    --el-border-radius-base: 6px!important;
+    --el-border-radius-small: 4px!important;
+    --el-border-radius-round: 20px!important;
+    --el-border-radius-circle: 100%!important;
+
+    /* Box Shadow */
+    --el-box-shadow: 0 2px 4px rgba(45, 27, 18, 0.12), 0 0 6px rgba(45, 27, 18, 0.04)!important;
+    --el-box-shadow-light: 0 2px 12px 0 rgba(45, 27, 18, 0.1)!important;
+    --el-box-shadow-base: 0 2px 4px rgba(45, 27, 18, 0.12), 0 0 6px rgba(45, 27, 18, 0.04)!important;
+    --el-box-shadow-dark: 0 4px 8px rgba(45, 27, 18, 0.15)!important;
 }
 
+/* Additional Component Customizations */
+.el-button {
+    border-radius: var(--el-border-radius-base);
+    font-weight: 500;
+}
+
+.el-button--primary {
+    background-color: var(--el-color-primary);
+    border-color: var(--el-color-primary);
+    color: var(--el-text-color-primary);
+}
+
+.el-button--primary:hover {
+    background-color: var(--el-color-primary-light-3);
+    border-color: var(--el-color-primary-light-3);
+}
+
+.el-card {
+    background-color: var(--el-bg-color);
+    border: 1px solid var(--el-border-color);
+    box-shadow: var(--el-box-shadow-light);
+}
+
+.el-input__wrapper {
+    background-color: var(--el-fill-color-lighter);
+    border: 1px solid var(--el-border-color);
+}
+
+.el-input__wrapper:hover {
+    border-color: var(--el-color-primary);
+}
+
+.el-input__wrapper.is-focus {
+    border-color: var(--el-color-primary);
+    box-shadow: 0 0 0 2px rgba(246, 181, 109, 0.2);
+}
+
+/* Custom utility classes using your color palette */
+.bg-peach-puff {
+    background-color: var(--el-color-peach-puff);
+}
+
+.text-rose {
+    color: var(--el-color-rose);
+}
+
+.bg-light-rose {
+    background-color: var(--el-color-light-rose);
+}
+
+.text-light {
+    color: var(--el-color-text-light);
+}
 /* Ensure smooth transitions when switching themes */
 * {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;

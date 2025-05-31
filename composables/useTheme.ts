@@ -8,6 +8,10 @@ export interface ThemeConfig {
         surface: string
         textPrimary: string
         textSecondary: string
+        textLightPrimary: string
+        textLightSecondary: string
+        textDarkPrimary: string
+        textDarkSecondary: string
         textLight: string
         border: string
         success: string
@@ -17,6 +21,10 @@ export interface ThemeConfig {
         muted: string
         cardBackground: string
         hover: string
+        rose: string
+        lightRose: string
+        PeachPuff: string
+        darkGreen: string
     }
 }
 
@@ -25,21 +33,28 @@ export const themes: Record<string, ThemeConfig> = {
         name: 'woosoo-warm',
         colors: {
             background: '#fefcfa',
-            primary: '#ea7c2b',
+            primary: '#F6B56D',
             secondary: '#8b7355',
+            lightGreen: '#F6B56D',
+            darkGreen: '#4AD775',
             accent: '#d4752a',
             surface: '#f8f5f1',
-            textPrimary: '#2d1b12',
-            textSecondary: '#6b5b4d',
+            textLightPrimary: '#f8f5f1',
+            textLightSecondary: '#D3D3D3',
+            textDarkPrimary: '#2d1b12',
+            textDarkSecondary: '#6b5b4d',
+            rose: '#FFA0A2',
+            lightRose: '#FCCCCC',
             textLight: '#efc086',
             border: '#e8ddd4',
-            success: '#22c55e',
-            warning: '#ea7c2b',
+            success: '#4AD775',
+            warning: '#FFB01D',
             error: '#dc2626',
             info: '#3b82f6',
-            muted: '#f3ede6',
+            muted: '#D3D3D3',
+            PeachPuff: '#FFD88E',
             cardBackground: '#ffffff',
-            hover: '#f0e6db'
+            hover: '#f0e6db',
         }
     },
 

@@ -14,7 +14,7 @@
                 />
                 <CommonLink
                     to="/demo/advance"
-                    name="Advance Demo"
+                    name="Woosoo Components"
                     class="text-white bg-gray-500 px-4 py-2"
                 />
             </div>
