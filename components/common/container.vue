@@ -2,7 +2,7 @@
     <el-container class="py-2 rounded-md bg-surface border border-border" :style="{ 'boxShadow': 'var(--el-box-shadow)' }">
         <el-header class="text-lg font-bold border-b border-border">
             <div class="mt-2">
-                <p class="text-lg font-bold">{{ title }}
+                <p class="text-lg font-bold text-text-primary">{{ title }}
                     <span class="text-text-secondary text-sm font-normal">{{ description }}</span>
                 </p>
             </div>

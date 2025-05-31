@@ -1,5 +1,6 @@
 <template>
     <div class="min-h-screen bg-background text-text p-8">
+        <CommonThemeSwitcher/>
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-bold mb-4">

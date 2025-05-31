@@ -11,17 +11,22 @@ export default {
     theme: {
         extend: {
             colors: {
-                primary: 'var(--color-primary)',
-                secondary: 'var(--color-secondary)',
-                accent: 'var(--color-accent)',
-                background: 'var(--color-background)',
-                surface: 'var(--color-surface)',
-                text: 'var(--color-text)',
-                'text-secondary': 'var(--color-textSecondary)',
-                border: 'var(--color-border)',
-                success: 'var(--color-success)',
-                warning: 'var(--color-warning)',
-                error: 'var(--color-error)'
+                background: '#fefcfa',
+                primary: '#ea7c2b',
+                secondary: '#8b7355',
+                accent: '#d4752a',
+                surface: '#f8f5f1',
+                textPrimary: '#2d1b12',
+                textSecondary: '#6b5b4d',
+                textLight: '#efc086',
+                border: '#e8ddd4',
+                success: '#22c55e',
+                warning: '#ea7c2b',
+                error: '#dc2626',
+                info: '#3b82f6',
+                muted: '#f3ede6',
+                cardBackground: '#ffffff',
+                hover: '#f0e6db'
             },
             fontFamily: {
                 custom: ['Inter'],

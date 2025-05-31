@@ -1,91 +1,55 @@
 export interface ThemeConfig {
     name: string
     colors: {
+        background: string
         primary: string
         secondary: string
         accent: string
-        background: string
         surface: string
-        text: string
+        textPrimary: string
         textSecondary: string
+        textLight: string
         border: string
         success: string
         warning: string
         error: string
+        info: string
+        muted: string
+        cardBackground: string
+        hover: string
     }
 }
 
 export const themes: Record<string, ThemeConfig> = {
-    light: {
-        name: 'light',
+    woosooWarm: {
+        name: 'woosoo-warm',
         colors: {
-            primary: '#3b82f6',
-            secondary: '#64748b',
-            accent: '#8b5cf6',
-            background: '#ffffff',
-            surface: '#f8fafc',
-            text: '#0f172a',
-            textSecondary: '#64748b',
-            border: '#e2e8f0',
-            success: '#10b981',
-            warning: '#f59e0b',
-            error: '#ef4444'
+            background: '#fefcfa',
+            primary: '#ea7c2b',
+            secondary: '#8b7355',
+            accent: '#d4752a',
+            surface: '#f8f5f1',
+            textPrimary: '#2d1b12',
+            textSecondary: '#6b5b4d',
+            textLight: '#efc086',
+            border: '#e8ddd4',
+            success: '#22c55e',
+            warning: '#ea7c2b',
+            error: '#dc2626',
+            info: '#3b82f6',
+            muted: '#f3ede6',
+            cardBackground: '#ffffff',
+            hover: '#f0e6db'
         }
     },
-    dark: {
-        name: 'dark',
-        colors: {
-            primary: '#60a5fa',
-            secondary: '#94a3b8',
-            accent: '#a78bfa',
-            background: '#0f172a',
-            surface: '#1e293b',
-            text: '#f8fafc',
-            textSecondary: '#cbd5e1',
-            border: '#334155',
-            success: '#34d399',
-            warning: '#fbbf24',
-            error: '#f87171'
-        }
-    },
-    ocean: {
-        name: 'ocean',
-        colors: {
-            primary: '#0891b2',
-            secondary: '#0f766e',
-            accent: '#06b6d4',
-            background: '#f0fdfa',
-            surface: '#ccfbf1',
-            text: '#134e4a',
-            textSecondary: '#047857',
-            border: '#5eead4',
-            success: '#10b981',
-            warning: '#f59e0b',
-            error: '#ef4444'
-        }
-    },
-    sunset: {
-        name: 'sunset',
-        colors: {
-            primary: '#ea580c',
-            secondary: '#dc2626',
-            accent: '#f59e0b',
-            background: '#fefce8',
-            surface: '#fef3c7',
-            text: '#92400e',
-            textSecondary: '#b45309',
-            border: '#fcd34d',
-            success: '#10b981',
-            warning: '#f59e0b',
-            error: '#ef4444'
-        }
-    }
+
 }
 
-
 export const useTheme = () => {
-    const currentThemeName = useState<string>('theme', () => 'light')
-    const currentTheme = computed(() => themes[currentThemeName.value] || themes.light)
+    const { public: { NUXT_PUBLIC_APP_THEME } } = useRuntimeConfig()
+    const defaultTheme = NUXT_PUBLIC_APP_THEME || 'woosooWarm'
+    const currentThemeName = useState<string>('theme', () => defaultTheme)
+    const currentTheme = computed(() => themes[currentThemeName.value] || themes.woosooWarm)
     const setTheme = (themeName: string) => {
         if (themes[themeName]) {
             currentThemeName.value = themeName
@@ -101,9 +65,6 @@ export const useTheme = () => {
             root.setAttribute('data-theme', theme.name)
         }
     }
-    // onMounted(() => {
-    //     applyThemeToDocument(currentTheme.value)
-    // })
     watch(currentTheme, (newTheme) => {
         applyThemeToDocument(newTheme)
     })
