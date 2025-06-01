@@ -15,6 +15,11 @@
                 <template #main>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <WoosooButton name="WoosooButton" />
+                        <div>
+                            <h1 class="font-kanit">Inter heading</h1>
+                            <h2 class="font-raleway">Kanit heading</h2>
+                            <p class="font-raleway font-bold">Raleway paragraph</p>
+                        </div>
                     </div>
                 </template>
             </CommonContainer>

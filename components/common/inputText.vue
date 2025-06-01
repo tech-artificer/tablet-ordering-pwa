@@ -12,6 +12,7 @@
         :formatter="formatter"
         :parser="parser"
         :suffix-icon="suffixIcon"
+        :size="size"
     >
         <template
             v-if="prepend"
@@ -64,6 +65,10 @@ defineProps({
     label: {
         type: String,
         default: null
+    },
+    size: {
+        type: String,
+        default: 'default'
     }
 })
 const vModel = defineModel('vModel', {

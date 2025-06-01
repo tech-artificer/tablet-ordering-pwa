@@ -1,4 +1,5 @@
 :root {
+    font-family: 'Kanit', sans-serif;
     /* Primary Colors - Using your primary color #F6B56D */
     --el-color-primary: #F6B56D!important;
     --el-color-primary-light-3: #f8c689!important;
@@ -149,6 +150,17 @@
 
 .text-light {
     color: var(--el-color-text-light);
+}
+.font-inter {
+    font-family: 'Inter', sans-serif;
+}
+
+.font-kanit {
+    font-family: 'Kanit', sans-serif;
+}
+
+.font-raleway {
+    font-family: 'Raleway', sans-serif;
 }
 /* Ensure smooth transitions when switching themes */
 * {
