@@ -1,5 +1,3 @@
-<script setup>
-</script>
 <template>
     <div class="min-h-screen bg-black relative overflow-hidden">
         <!-- Animated background flames -->
