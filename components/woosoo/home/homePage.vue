@@ -6,7 +6,7 @@
                 src="/gif/flame.gif"
                 alt="flames"
                 class="absolute opacity-60 p-0 m-0"
-                fit="none"
+                fit="cover"
             />
         </div>
         <!-- Floating food items -->
