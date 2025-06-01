@@ -12,8 +12,19 @@ export default defineNuxtConfig({
         '@nuxt/eslint',
         '@element-plus/nuxt',
         'nuxt-charts',
-        '@nuxt/devtools'
+        '@nuxt/devtools',
+        '@nuxt/fonts'
     ],
+    fonts: {
+        provider: 'google',
+        google: {
+            families: {
+                Inter: [300, 400, 500, 600, 700],
+                Kanit: [300, 400, 500, 600, 700],
+                Raleway: [300, 400, 500, 600, 700],
+            }
+        }
+    },
     app: {
         head: {
             link: [
