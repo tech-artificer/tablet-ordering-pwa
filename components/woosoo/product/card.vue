@@ -24,15 +24,15 @@
                 <div class="flex items-center space-x-2">
                     <button
                         class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
-                        :disabled="itemRef.quantity <= 1"
+                        :disabled="quantity <= 1"
                         @click="decreaseQuantity"
                     >
                         -
                     </button>
-                    <span class="text-sm font-medium w-8 text-center">{{ itemRef.quantity }}</span>
+                    <span class="text-sm font-medium w-8 text-center">{{ quantity }}</span>
                     <button
                         class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
-                        :disabled="itemRef.quantity >= 20"
+                        :disabled="quantity >= 20"
                         @click="increaseQuantity"
                     >
                         +
@@ -68,20 +68,16 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
 
 const showQuantity = ref(false)
+const quantity = ref(1)
 
 const props = defineProps({
     item: {
         type: Object,
         default: () => ({})
     }
-})
-
-const itemRef = reactive({
-    ...props.item,
-    quantity: 1
 })
 
 const emit = defineEmits(['add-to-cart'])
@@ -92,28 +88,30 @@ const showQuantitySelector = () => {
 
 const cancelQuantitySelection = () => {
     showQuantity.value = false
-    itemRef.quantity = 1
+    quantity.value = 1
 }
 
 const increaseQuantity = () => {
-    if (itemRef.quantity < 20) {
-        itemRef.quantity++
+    if (quantity.value < 20) {
+        quantity.value++
     }
 }
 
 const decreaseQuantity = () => {
-    if (itemRef.quantity > 1) {
-        itemRef.quantity--
+    if (quantity.value > 1) {
+        quantity.value--
     }
 }
 
 const confirmAddToCart = () => {
-    emit('add-to-cart', {
-        ...itemRef,
-        quantity: itemRef.quantity
-    })
+    const itemToAdd = {
+        ...props.item,
+        quantity: quantity.value
+    }
+    console.log('Adding to cart:', itemToAdd)
+    emit('add-to-cart', itemToAdd)
 
     showQuantity.value = false
-    itemRef.quantity = 1
+    quantity.value = 1
 }
 </script>
