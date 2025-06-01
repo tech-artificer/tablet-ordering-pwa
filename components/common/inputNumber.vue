@@ -7,8 +7,11 @@
         :min="min"
         :max="max"
         :disabled="disabled"
+        :placeholder="placeholder"
         :step-strictly="stepStrictly"
         :step="step"
+        :size="size"
+        class="w-full"
     >
     <template v-if="prefix" #prefix>
         <span>{{ prefix }}</span>
@@ -52,9 +55,17 @@ defineProps({
         type: String,
         default: null
     },
+    placeholder: {
+        type: String,
+        default: null
+    },
     label: {
         type: String,
         default: null
+    },
+    size: {
+        type: String,
+        default: 'default'
     }
 })
 const vModel = defineModel('vModel', {
