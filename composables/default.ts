@@ -1,11 +1,28 @@
-// This file is the default composable for nuxt, no need to change
-// For example, if you want to create a composable for getting the user's location
-// you can create a file named `useLocation.ts` in the composable directory,
-// and then import it in your component like this:
-// import useLocation from '~/composables/useLocation'
+export enum CategoryFilter {
+    ALL = 'all dishes',
+    MOST_POPULAR = 'most popular',
+    PORK = 'pork',
+    FISH = 'fish',
+    BEEF = 'beef',
+    VEGAN = 'vegan',
+    CHICKEN = 'chicken',
+    MEXICAN = 'mexican',
+    JAPANESE = 'japanese',
+    CHINESE = 'chinese',
+    THAI = 'thai',
+    KOREAN = 'korean',
+    ITALIAN = 'italian',
+    AMERICAN = 'american',
+    VEGETARIAN = 'vegetarian',
+    SEAFOOD = 'seafood',
+    SIDES = 'sides',
+    DESSERT = 'dessert',
+}
 
-// export enum exampleTools {
-//     EXAMPLE_TOOLS_1 = "exampleTools1",
-//     EXAMPLE_TOOLS_2 = "exampleTools2",
-//     EXAMPLE_TOOLS_3 = "exampleTools3",
-// }
+export enum OrderStatus {
+    PENDING = 'pending',
+    IN_PROGRESS = 'in progress',
+    COMPLETE = 'completed',
+    CANCELLED = 'cancelled'
+}
+

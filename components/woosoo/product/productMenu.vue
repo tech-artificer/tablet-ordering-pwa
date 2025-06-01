@@ -1,0 +1,24 @@
+<template>
+    <div class="grid grid-cols-3 gap-6">
+        <WoosooProductCard
+            v-for="item, index in data"
+            :key="index"
+            :item="item"
+            @add-to-cart="addToCart"
+        />
+    </div>
+</template>
+<script setup>
+defineProps({
+    data: {
+        type: Array,
+        default: () => []
+    },
+})
+
+const emit = defineEmits(['add-to-cart'])
+
+const addToCart = (item) => {
+    emit('add-to-cart', item)
+}
+</script>

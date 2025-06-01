@@ -83,13 +83,15 @@
         </div>
     </div>
 </template>
+
 <script setup>
 const guestCount = ref(1)
 
 const startWooSoo = () => {
-    navigateTo('/woosoo/menu')
+console.log(`Starting WooSoo experience for ${guestCount.value} guests!`)
+// Add your navigation logic here
+// navigateTo('/menu') or similar
 }
-
 </script>
 <style scoped>
 @keyframes float-slow {
