@@ -14,7 +14,7 @@ export default {
                 background: '#fefcfa',
                 primary: '#F6B56D',
                 secondary: '#8b7355',
-                lightGreen: '#F6B56D',
+                lightGreen: '#A5D6A7',
                 darkGreen: '#4AD775',
                 accent: '#d4752a',
                 surface: '#f8f5f1',
