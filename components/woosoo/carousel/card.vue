@@ -37,7 +37,7 @@ category: {
 },
 image: {
     type: String,
-    default: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=300&fit=cover'
+    default: '/images/logo/logo2.png'
 }
 })
 const handleImageError = (event) => {

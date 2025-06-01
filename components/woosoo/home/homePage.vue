@@ -89,8 +89,7 @@ const guestCount = ref(1)
 
 const startWooSoo = () => {
 console.log(`Starting WooSoo experience for ${guestCount.value} guests!`)
-// Add your navigation logic here
-// navigateTo('/menu') or similar
+    navigateTo('/menu')
 }
 </script>
 <style scoped>

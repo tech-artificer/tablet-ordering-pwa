@@ -26,18 +26,19 @@ export const useCartStore = defineStore('cart', {
         }
     },
     actions: {
-        addToCart(item: Omit<Cart, 'quantity'>) {
-            const existingItem = this.cartItems.find(cartItem => cartItem.id === item.id)
+            addToCart(item: Omit<Cart, 'quantity'> & { quantity?: number }) {
+                const existingItem = this.cartItems.find(cartItem => cartItem.id === item.id)
+                const quantityToAdd = item.quantity || 1
 
-            if (existingItem) {
-                existingItem.quantity += 1
-            } else {
-                this.cartItems.push({
-                    ...item,
-                    quantity: 1
-                })
-            }
-        },
+                if (existingItem) {
+                    existingItem.quantity += quantityToAdd
+                } else {
+                    this.cartItems.push({
+                        ...item,
+                        quantity: quantityToAdd
+                    })
+                }
+            },
 
         updateQuantity(itemId: number, quantity: number) {
             const item = this.cartItems.find(cartItem => cartItem.id === itemId)

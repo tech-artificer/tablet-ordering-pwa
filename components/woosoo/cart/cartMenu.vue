@@ -18,7 +18,6 @@
                     <h4 class="font-medium">{{ item.name }}</h4>
                     <p class="text-sm text-gray-500">{{ item.description }}</p>
                     <div class="flex items-center justify-between mt-2">
-                        <!-- Quantity Controls -->
                         <div class="flex items-center space-x-1">
                             <button
                                 class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200"
@@ -35,22 +34,19 @@
                             </button>
                         </div>
 
-                        <!-- Delete Button - Only show if quantity > 1 -->
                         <button
                             v-if="item.quantity > 1"
                             class="text-red-500 hover:text-red-700 text-sm font-medium"
                             @click="decreaseQuantity(item.id)"
                         >
-                            Delete
+                            <svg class="w-5 h-5 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
-
-                        <!-- Remove Button - Always visible -->
-                        <button
+                        <!-- <button
                             class="text-gray-500 hover:text-gray-700 text-sm font-medium ml-2"
                             @click="removeFromCart(item.id)"
                         >
-                            Remove
-                        </button>
+                            <svg class="w-5 h-5 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button> -->
                     </div>
                 </div>
                 <div class="text-right">
@@ -60,12 +56,10 @@
             </div>
         </div>
 
-        <!-- Empty Cart Message -->
         <div v-if="!cartStore.hasCartItems" class="text-center py-8 text-gray-500">
             Your cart is empty
         </div>
 
-        <!-- Order Total -->
         <div v-if="cartStore.hasCartItems" class="border-t pt-4 space-y-2">
             <div class="flex justify-between text-gray-600">
                 <span>Sub Total</span>
@@ -81,7 +75,6 @@
             </div>
         </div>
 
-        <!-- Place Order Button -->
         <button
             v-if="cartStore.hasCartItems"
             class="w-full mt-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -96,20 +89,18 @@
 <script setup lang="ts">
 const cartStore = useCartStore()
 
-// Computed properties for totals
 const subTotal = computed(() => {
     return cartStore.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 })
 
 const tax = computed(() => {
-    return Math.round(subTotal.value * 0.12) // 12% tax
+    return Math.round(subTotal.value * 0.12)
 })
 
 const total = computed(() => {
     return subTotal.value + tax.value
 })
 
-// Utility function to format price
 const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-PH', {
         minimumFractionDigits: 0,
@@ -117,16 +108,15 @@ const formatPrice = (price: number): string => {
     }).format(price)
 }
 
-// Handle quantity updates
 const updateQuantity = (itemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
-        removeFromCart(itemId)
+        newQuantity = 1
+        // removeFromCart(itemId)
     } else {
         cartStore.updateQuantity(itemId, newQuantity)
     }
 }
 
-// Decrease quantity by 1 (for delete button)
 const decreaseQuantity = (itemId: number) => {
     const item = cartStore.cartItems.find(item => item.id === itemId)
     if (item && item.quantity > 1) {
@@ -134,12 +124,9 @@ const decreaseQuantity = (itemId: number) => {
     }
 }
 
-// Remove item completely from cart
 const removeFromCart = (itemId: number) => {
     cartStore.removeFromCart(itemId)
 }
-
-// Place order
 const placeOrder = async () => {
     try {
         cartStore.isLoading = true
