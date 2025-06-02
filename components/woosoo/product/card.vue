@@ -31,7 +31,7 @@
                     </button>
                     <span class="text-sm font-medium w-8 text-center">{{ quantity }}</span>
                     <button
-                        class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
+                        class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
                         :disabled="quantity >= 20"
                         @click="increaseQuantity"
                     >

@@ -6,7 +6,8 @@
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#000000",
-    "orientation": "portrait-primary",
+    "orientation": "landscape-primary",
+    "orientation-lock": "landscape-primary",
     "icons": [
         {
             "src": "/icons/android-launchericon-192-192.png",
