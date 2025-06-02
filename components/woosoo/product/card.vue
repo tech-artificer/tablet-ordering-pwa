@@ -31,7 +31,7 @@
                     </button>
                     <span class="text-sm font-medium w-8 text-center">{{ quantity }}</span>
                     <button
-                        class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
+                        class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
                         :disabled="quantity >= 20"
                         @click="increaseQuantity"
                     >
@@ -42,13 +42,13 @@
 
             <div v-show="showQuantity" class="flex justify-center mt-3 space-x-2">
                 <button
-                    class="flex-1 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+                    class="flex-1 p-2 bg-lightGreen text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
                     @click="confirmAddToCart"
                 >
-                    Add to cart
+                    Add
                 </button>
                 <button
-                    class="flex-1 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors font-medium"
+                    class="flex-1 py-2 bg-red-100 text-white rounded-lg hover:bg-red-200 transition-colors font-medium"
                     @click="cancelQuantitySelection"
                 >
                     Cancel
