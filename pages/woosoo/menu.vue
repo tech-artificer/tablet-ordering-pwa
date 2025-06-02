@@ -63,7 +63,7 @@
                 </div>
 
                 <!-- Menu Grid Skeleton -->
-                <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <el-skeleton v-for="n in 6" :key="n" animated>
                         <template #template>
                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -95,7 +95,10 @@
             </div>
 
             <!-- Order Summary Skeleton -->
-            <div class="w-80 bg-white border-l border-gray-200">
+            <div
+                v-if="cartItems.length > 0"
+                class="w-80 bg-white border-l border-gray-200"
+            >
                 <el-skeleton v-if="isLoading" animated class="p-6">
                     <template #template>
                         <!-- Cart header -->
