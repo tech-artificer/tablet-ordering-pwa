@@ -1,5 +1,5 @@
 <template>
-    <el-carousel type="card" :interval="interval" :show-arrows="false" :show-indicators="false">
+    <el-carousel type="card" :interval="interval" height="200px" :show-arrows="false" indicator-position="none" arrow="never">
         <el-carousel-item v-for="item in data" :key="item.id">
             <WoosooCarouselCard
                 :name="item.name"
