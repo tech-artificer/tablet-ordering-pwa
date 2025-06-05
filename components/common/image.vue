@@ -1,6 +1,6 @@
 <template>
     <div class="p-2">
-        <el-image :src="src" :fit="fit" :height="height" :width="width">
+        <el-image :src="src" :fit="fit" :height="height" :width="width" class="w-full">
             <template #placeholder>
                 <div class="image-slot"> {{ placeholder }} </div>
             </template>
@@ -8,7 +8,7 @@
                 <CommonImage
                     src="/logo/logo2.png"
                     alt="logo"
-                    class="w-48 h-48"
+                    class="w-full h-full"
                 />
             </template>
         </el-image>
