@@ -9,7 +9,7 @@
             <div class="flex-1 p-6">
                 <!-- Search Bar Skeleton -->
                 <div class="relative mb-6 hidden">
-                    <el-skeleton v-if="isLoading" animated>
+                    <el-skeleton v-if="isLoading" animated class="hidden">
                         <template #template>
                             <el-skeleton-item variant="rect" style="width: 100%; height: 48px; border-radius: 8px;" />
                         </template>
