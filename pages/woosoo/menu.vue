@@ -8,7 +8,7 @@
             <!-- Menu Section -->
             <div class="flex-1 p-6">
                 <!-- Search Bar Skeleton -->
-                <div class="relative mb-6">
+                <div class="relative mb-6 hidden">
                     <el-skeleton v-if="isLoading" animated>
                         <template #template>
                             <el-skeleton-item variant="rect" style="width: 100%; height: 48px; border-radius: 8px;" />
@@ -27,7 +27,7 @@
                 </div>
 
                 <!-- Featured Item Skeleton -->
-                <div class="mb-8">
+                <div>
                     <el-skeleton v-if="isLoading" animated>
                         <template #template>
                             <el-skeleton-item variant="rect" style="width: 100%; height: 200px; border-radius: 12px;" />
@@ -37,7 +37,7 @@
                 </div>
 
                 <!-- Filter Tabs Skeleton -->
-                <div class="flex overflow-x-auto w-full mb-6">
+                <div class="flex overflow-x-auto w-full mb-6 gap-2 mt-2">
                     <template v-if="isLoading">
                         <el-skeleton v-for="n in 5" :key="n" animated>
                             <template #template>
@@ -63,7 +63,7 @@
                 </div>
 
                 <!-- Menu Grid Skeleton -->
-                <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <el-skeleton v-for="n in 6" :key="n" animated>
                         <template #template>
                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
