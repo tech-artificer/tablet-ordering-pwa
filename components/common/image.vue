@@ -1,6 +1,6 @@
 <template>
     <div class="p-2">
-        <el-image :src="src" :fit="fit" :height="height" :width="width" class="w-full">
+        <el-image :src="src" :fit="fit" :height="height" :width="width" :class="styleClass">
             <template #placeholder>
                 <div class="image-slot"> {{ placeholder }} </div>
             </template>
@@ -8,7 +8,7 @@
                 <CommonImage
                     src="/logo/logo2.png"
                     alt="logo"
-                    class="w-full h-full"
+                    :class="styleClass"
                 />
             </template>
         </el-image>
@@ -37,6 +37,10 @@ defineProps({
         default: ""
     },
     width: {
+        type: String,
+        default: ""
+    },
+    styleClass: {
         type: String,
         default: ""
     }

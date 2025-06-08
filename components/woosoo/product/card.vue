@@ -7,7 +7,7 @@
                 :src="item.image"
                 :alt="item.name"
                 :width="'100%'"
-                class="w-full h-full object-cover"
+                :style-class="'w-full h-full object-cover'"
             />
             <div class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
                 <WoosooProductRating :rating="item.rating" />

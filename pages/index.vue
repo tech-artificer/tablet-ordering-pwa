@@ -2,12 +2,11 @@
     <div class="min-h-screen bg-black relative overflow-hidden">
         <!-- Animated background flames -->
         <div class="absolute inset-0 pointer-events-none">
-            <CommonImage
+            <img
                 src="/gif/flame.gif"
                 alt="flames"
-                class="absolute opacity-60 p-0 m-0"
-                fit="cover"
-            />
+                class="absolute opacity-60 p-0 m-0 w-full h-full"
+            >
         </div>
         <!-- Floating food items -->
         <div class="absolute inset-0 pointer-events-none">
@@ -44,53 +43,9 @@
                 />
             </div>
         </div>
-        <!-- Main content -->
-        <div class="relative z-10 flex flex-col items-center justify-center px-4">
-        <!-- Logo -->
-        <div>
-            <CommonImage
-                src="/logo/logo1.png"
-                alt="logo"
-                class="w-48 h-48"
-            />
-        </div>
-        <!-- Main headline -->
-        <div class="text-center mb-12">
-            <h2 class="text-white text-4xl md:text-5xl leading-tight">
-            The grill is hot.
-            </h2>
-            <h2 class="text-white text-4xl md:text-5xl leading-tight">
-            The meat is marinated.
-            </h2>
-            <h2 class="text-white text-4xl md:text-5xl leading-tight">
-            Let's get started.
-            </h2>
-        </div>
-        <!-- Input and button -->
-        <div class="w-full max-w-md space-y-2">
-            <WoosooGuestCount v-model:v-model="guestCount" />
-            <button
-                class="w-full py-4 px-8 bg-primary text-black text-xl font-bold rounded-md hover:opacity-90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:text-white"
-                @click="startWooSoo"
-            >
-                Let's WooSoo This!
-            </button>
-
-            <p class="text-gray-400 text-sm text-center">
-                Tap to begin your <span class="font-bold text-primary">Ultimate K-BBQ experience</span>
-            </p>
-        </div>
-        </div>
+        <WoosooHome />
     </div>
 </template>
-<script setup>
-const guestCount = ref(1)
-
-const startWooSoo = () => {
-    navigateTo('/woosoo/menu')
-}
-
-</script>
 <style scoped>
 @keyframes float-slow {
     0%, 100% { transform: translateY(0px) rotate(0deg); }

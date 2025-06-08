@@ -8,7 +8,7 @@
     defineProps({
         name: {
             type: String,
-            default: 'Your Button Name / Please change'
+            default: 'Your Button Name / Please change name props'
         },
         type: {
             type: String,
