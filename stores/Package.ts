@@ -11,7 +11,7 @@ interface Menu {
     rating: number,
 }
 interface Package {
-    id: string,
+    id: number,
     name: string,
     subtitle: string,
     price: string,
@@ -25,13 +25,13 @@ interface Package {
 export const usePackageStore = defineStore('package', {
     state: () => ({
         packageList: [] as Array<Package>,
-        selectedPackage: null as string | null,
+        selectedPackage: null as number | null,
         selectedPackageName: null as string | null,
         isLoading: false as boolean,
     }),
 
     getters: {
-        getPackageById: (state) => (id: string) => state.packageList.find((pkg) => pkg.id === id)
+        getPackageById: (state) => (id: number) => state.packageList.find((pkg) => pkg.id === id)
     },
 
     actions: {
@@ -70,43 +70,7 @@ export const usePackageStore = defineStore('package', {
                             rating: 4.6,
                             category: 'Pasta',
                             image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                        },
-                        {
-                            id: 4,
-                            name: 'Pasta Carbonara1',
-                            description: 'Other information, ingredients',
-                            price: 389.99,
-                            rating: 4.6,
-                            category: 'Pasta',
-                            image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                        },
-                        {
-                            id: 4,
-                            name: 'Pasta Carbonara1',
-                            description: 'Other information, ingredients',
-                            price: 389.99,
-                            rating: 4.6,
-                            category: 'Pasta',
-                            image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                        },
-                        {
-                            id: 4,
-                            name: 'Pasta Carbonara1',
-                            description: 'Other information, ingredients',
-                            price: 389.99,
-                            rating: 4.6,
-                            category: 'Pasta',
-                            image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                        },
-                        {
-                            id: 4,
-                            name: 'Pasta Carbonara1',
-                            description: 'Other information, ingredients',
-                            price: 389.99,
-                            rating: 4.6,
-                            category: 'Pasta',
-                            image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                        },
+                        }
                     ]
                 },
                 {
@@ -189,6 +153,6 @@ export const usePackageStore = defineStore('package', {
     persist: {
         key: 'package-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['packageList', 'selectedPackage'   ],
+        paths: ['packageList', 'selectedPackage', 'selectedPackageName'],
     }
 })

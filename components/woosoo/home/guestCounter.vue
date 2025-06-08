@@ -41,7 +41,9 @@
 <script setup>
 const guestStore = useGuestStore()
 const { count } = storeToRefs(guestStore)
-count.value = 1
+if (!count.value) {
+    count.value = 1
+}
 const changePackageView = () => {
     emit('changePackageView')
 }
