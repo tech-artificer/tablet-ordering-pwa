@@ -1,6 +1,13 @@
 <template>
     <div class="w-full bg-white shadow-lg p-6">
-        <h2 class="text-xl mb-6">Order summary</h2>
+        <div class="flex gap-2 justify-between">
+            <h2 class="text-xl mb-6">Order summary</h2>
+            <CommonButton
+                class="min-w-24 py-4 px-8 bg-primary text-black text-xl font-bold rounded-md hover:opacity-90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:text-white"
+                :name="'Clear Cart'"
+                @click="cartStore.clearCart()"
+            />
+        </div>
 
         <!-- Cart Items -->
         <div class="space-y-4 mb-6">
@@ -9,11 +16,11 @@
                 :key="item.id"
                 class="flex items-center space-x-3"
             >
-                <img
+                <CommonImage
                     :src="item.image"
                     :alt="item.name"
-                    class="w-16 h-16 rounded-lg object-cover"
-                >
+                    :style-class="'w-16 h-16 rounded-lg object-cover'"
+                />
                 <div class="flex-1">
                     <h4 class="font-medium">{{ item.name }}</h4>
                     <p class="text-sm text-gray-500">{{ item.description }}</p>

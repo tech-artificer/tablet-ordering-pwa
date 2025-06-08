@@ -12,9 +12,6 @@ interface Cart {
 export const useCartStore = defineStore('cart', {
     state: () => ({
         cartItems: [] as Array<Cart>,
-        subTotal: 0,
-        tax: 0,
-        total: 0,
         isLoading: false,
     }),
     getters: {
