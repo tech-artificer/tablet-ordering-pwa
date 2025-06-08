@@ -1,5 +1,5 @@
 <template>
-    <div class="p-2 flex flex-col items-center w-full px-8">
+    <div class="p-2 flex flex-col items-center w-full min-w-[180px] px-8">
         <div
             class="flex flex-col items-center justify-center w-full bg-white text-black hover:text-white rounded-lg cursor-pointer hover:bg-primary transition-colors"
             @click="handleSupport"
