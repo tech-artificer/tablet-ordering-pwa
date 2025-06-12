@@ -13,6 +13,7 @@ export const useCartStore = defineStore('cart', {
     state: () => ({
         cartItems: [] as Array<Cart>,
         isLoading: false,
+        vatRate: 0.12
     }),
     getters: {
         hasCartItems: (state) => {
@@ -20,22 +21,31 @@ export const useCartStore = defineStore('cart', {
         },
         totalItems: (state) => {
             return state.cartItems.reduce((sum, item) => sum + item.quantity, 0)
+        },
+        subTotal: (state) => {
+            return state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+        },
+        vat: (state) => {
+            return Math.round((state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * state.vatRate) * 100) / 100
+        },
+        total(): number {
+            return this.subTotal + this.vat
         }
     },
     actions: {
-            addToCart(item: Omit<Cart, 'quantity'> & { quantity?: number }) {
-                const existingItem = this.cartItems.find(cartItem => cartItem.id === item.id)
-                const quantityToAdd = item.quantity || 1
+        addToCart(item: Omit<Cart, 'quantity'> & { quantity?: number }) {
+            const existingItem = this.cartItems.find(cartItem => cartItem.id === item.id)
+            const quantityToAdd = item.quantity || 1
 
-                if (existingItem) {
-                    existingItem.quantity += quantityToAdd
-                } else {
-                    this.cartItems.push({
-                        ...item,
-                        quantity: quantityToAdd
-                    })
-                }
-            },
+            if (existingItem) {
+                existingItem.quantity += quantityToAdd
+            } else {
+                this.cartItems.push({
+                    ...item,
+                    quantity: quantityToAdd
+                })
+            }
+        },
 
         updateQuantity(itemId: number, quantity: number) {
             const item = this.cartItems.find(cartItem => cartItem.id === itemId)
@@ -64,6 +74,13 @@ export const useCartStore = defineStore('cart', {
                     this.removeFromCart(itemId)
                 }
             }
+        },
+
+        formatPrice(price: number): string {
+            return new Intl.NumberFormat('en-PH', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            }).format(price)
         }
     },
     persist: {
