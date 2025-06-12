@@ -91,6 +91,8 @@
             {{ cartStore.isLoading ? 'Processing...' : 'Place Order' }}
         </button>
     </div>
+
+    <!-- Order Confirmation Modal -->
     <el-dialog
         v-model="isCartModalShow"
         align-center
@@ -98,22 +100,26 @@
     >
         <div>
             <div class="mb-6 text-center">
-                <svg class="w-16 h-16 mx-auto text-orange-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+                <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <CommonImage
+                        src="/logo/logo2.png"
+                        alt="logo"
+                        :class="'w-20 h-20'"
+                    />
+                </div>
                 <h3 class="text-xl font-semibold mb-2">Confirm Your Order</h3>
                 <p class="text-gray-600">Please review your order details before confirming</p>
             </div>
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
-                class="flex justify-between px-2 pt-2 border rounded-lg"
+                class="flex justify-between px-2 pt-2 border rounded-lg mb-2"
             >
                 <div class="flex flex-col justify-center">
                     <CommonImage
                         :src="item.image"
                         :alt="item.name"
-                        :style-class="'w-8 h-8rounded-lg object-cover'"
+                        :style-class="'w-8 h-8 rounded-lg object-cover'"
                     />
                 </div>
                 <div class="flex flex-col justify-center">
@@ -156,11 +162,106 @@
             </div>
         </template>
     </el-dialog>
+
+    <!-- Success Modal -->
+    <el-dialog
+        v-model="isSuccessModalShow"
+        align-center
+        width="400"
+        :show-close="false"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+    >
+        <div class="text-center">
+            <div class="mb-6">
+                <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <CommonImage
+                        src="/logo/logo2.png"
+                        alt="logo"
+                        :class="'w-20 h-20'"
+                    />
+                </div>
+                <h3 class="text-2xl font-bold text-green-600 mb-2">Order Placed Successfully!</h3>
+                <p class="text-gray-600 mb-4">Thank you for your order. We've received your request and will process it shortly.</p>
+                <div v-if="orderNumber" class="bg-green-50 p-3 rounded-lg mb-4">
+                    <p class="text-sm text-green-700">
+                        <strong>Order Number:</strong> {{ orderNumber }}
+                    </p>
+                    <p class="text-sm text-green-700">Any details here. under development</p>
+                    <p class="text-sm text-green-700">
+                        <strong>Total Amount:</strong> ₱{{ cartStore.formatPrice(orderTotal) }}
+                    </p>
+                </div>
+                <p class="text-sm text-gray-500">You will receive a confirmation email shortly.</p>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex justify-center">
+                <el-button
+                    type="primary"
+                    @click="closeSuccessModal"
+                >
+                    Continue
+                </el-button>
+            </div>
+        </template>
+    </el-dialog>
+
+    <!-- Error Modal -->
+    <el-dialog
+        v-model="isErrorModalShow"
+        align-center
+        width="400"
+        :show-close="false"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+    >
+        <div class="text-center">
+            <div class="mb-6">
+                <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <CommonImage
+                        src="/logo/logo2.png"
+                        alt="logo"
+                        :class="'w-20 h-20'"
+                    />
+                </div>
+                <h3 class="text-2xl font-bold text-red-600 mb-2">Order Failed</h3>
+                <p class="text-gray-600 mb-4">We're sorry, but there was an issue processing your order.</p>
+                <div class="bg-red-50 p-3 rounded-lg mb-4">
+                    <p class="text-sm text-red-700">
+                        <strong>Error:</strong> {{ errorMessage }}
+                    </p>
+                </div>
+                <p class="text-sm text-gray-500">Please try again or contact support if the problem persists.</p>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex justify-center gap-3">
+                <el-button @click="closeErrorModal">
+                    Cancel
+                </el-button>
+                <el-button
+                    type="primary"
+                    @click="retryOrder"
+                >
+                    Try Again
+                </el-button>
+            </div>
+        </template>
+    </el-dialog>
 </template>
 
 <script setup lang="ts">
 const cartStore = useCartStore()
 const isCartModalShow = ref(false)
+const isSuccessModalShow = ref(false)
+const isErrorModalShow = ref(false)
+const orderNumber = ref('')
+const orderTotal = ref(0)
+const errorMessage = ref('')
+
 const updateQuantity = (itemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
         newQuantity = 1
@@ -180,9 +281,13 @@ const decreaseQuantity = (itemId: number) => {
 const removeFromCart = (itemId: number) => {
     cartStore.removeFromCart(itemId)
 }
+
 const placeOrder = async () => {
     try {
         cartStore.isLoading = true
+
+        // Store order total before clearing cart
+        orderTotal.value = cartStore.total
 
         // const orderData = {
         //     items: cartStore.cartItems,
@@ -191,28 +296,64 @@ const placeOrder = async () => {
         //     total: cartStore.total
         // }
 
+        // Uncomment this for real API call
         // const { data } = await $fetch('/api/orders', {
         //   method: 'POST',
         //   body: orderData
         // })
+        // orderNumber.value = data.orderNumber
 
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Simulate API call
+        await new Promise((resolve, reject) => {
+            setTimeout(() => {
+                const isSuccess = Math.random() > 0.5 // 50% success rate
+                if (isSuccess) {
+                    orderNumber.value = `ORD-${Date.now()}`
+                    resolve(true)
+                } else {
+                    reject(new Error('Payment processing failed'))
+                }
+            }, 2000)
+        })
+
+        // Success flow
         isCartModalShow.value = false
-        cartStore.clearCart()
-
-        // await navigateTo('/order-success')
+        isSuccessModalShow.value = true
+        //cartStore.clearCart()
 
     } catch (error) {
         console.error('Error placing order:', error)
+        errorMessage.value = error.message || 'An unexpected error occurred while processing your order.'
+        isCartModalShow.value = false
+        isErrorModalShow.value = true
     } finally {
         cartStore.isLoading = false
     }
 }
+
 const confirmOrder = () => {
     isCartModalShow.value = true
-    // placeOrder()
 }
+
 const closeCartModal = () => {
     isCartModalShow.value = false
+}
+
+const closeSuccessModal = () => {
+    isSuccessModalShow.value = false
+    orderNumber.value = ''
+    orderTotal.value = 0
+    //cartStore.clearCart()
+}
+
+const closeErrorModal = () => {
+    isErrorModalShow.value = false
+    errorMessage.value = ''
+}
+
+const retryOrder = () => {
+    isErrorModalShow.value = false
+    errorMessage.value = ''
+    isCartModalShow.value = true
 }
 </script>
