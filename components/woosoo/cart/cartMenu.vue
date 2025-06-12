@@ -86,16 +86,81 @@
             v-if="cartStore.hasCartItems"
             class="w-full mt-6 py-2 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="cartStore.isLoading"
-            @click="placeOrder"
+            @click="confirmOrder"
         >
             {{ cartStore.isLoading ? 'Processing...' : 'Place Order' }}
         </button>
     </div>
+    <el-dialog
+        v-model="isCartModalShow"
+        align-center
+        width="400"
+    >
+        <div>
+            <div class="mb-6 text-center">
+                <svg class="w-16 h-16 mx-auto text-orange-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h3 class="text-xl font-semibold mb-2">Confirm Your Order</h3>
+                <p class="text-gray-600">Please review your order details before confirming</p>
+            </div>
+            <div
+                v-for="item in cartStore.cartItems"
+                :key="item.id"
+                class="flex justify-between px-2 pt-2 border rounded-lg"
+            >
+                <div class="flex flex-col justify-center">
+                    <CommonImage
+                        :src="item.image"
+                        :alt="item.name"
+                        :style-class="'w-8 h-8rounded-lg object-cover'"
+                    />
+                </div>
+                <div class="flex flex-col justify-center">
+                    <h4 class="font-medium">{{ item.name }}</h4>
+                    <p v-show="item.description" class="text-sm text-gray-500">{{ item.description }}</p>
+                </div>
+                <div class="text-right">
+                    <span class="font-medium">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
+                    <p class="text-xs text-gray-500">{{ item.quantity }}x ₱{{ cartStore.formatPrice(item.price) }}</p>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-2 rounded-lg mb-6">
+                <div class="flex justify-between text-sm mb-2">
+                    <span>Items ({{ cartStore.totalItems }})</span>
+                    <span>₱{{ cartStore.formatPrice(cartStore.subTotal) }}</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2">
+                    <span>VAT (12%)</span>
+                    <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
+                </div>
+                <div class="flex justify-between font-bold text-lg border-t pt-2">
+                    <span>Total Amount</span>
+                    <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex justify-between">
+                <el-button @click="closeCartModal">
+                    Cancel
+                </el-button>
+                <el-button
+                    type="primary"
+                    :loading="cartStore.isLoading"
+                    @click="placeOrder"
+                >
+                    Confirm Order
+                </el-button>
+            </div>
+        </template>
+    </el-dialog>
 </template>
 
 <script setup lang="ts">
 const cartStore = useCartStore()
-
+const isCartModalShow = ref(false)
 const updateQuantity = (itemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
         newQuantity = 1
@@ -115,7 +180,6 @@ const decreaseQuantity = (itemId: number) => {
 const removeFromCart = (itemId: number) => {
     cartStore.removeFromCart(itemId)
 }
-
 const placeOrder = async () => {
     try {
         cartStore.isLoading = true
@@ -133,6 +197,7 @@ const placeOrder = async () => {
         // })
 
         await new Promise(resolve => setTimeout(resolve, 1000))
+        isCartModalShow.value = false
         cartStore.clearCart()
 
         // await navigateTo('/order-success')
@@ -142,5 +207,12 @@ const placeOrder = async () => {
     } finally {
         cartStore.isLoading = false
     }
+}
+const confirmOrder = () => {
+    isCartModalShow.value = true
+    // placeOrder()
+}
+const closeCartModal = () => {
+    isCartModalShow.value = false
 }
 </script>
