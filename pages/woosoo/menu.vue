@@ -96,7 +96,7 @@
             <!-- Order Summary Skeleton -->
             <div
                 v-if="cartItems.length > 0"
-                class="w-80 bg-white border-l border-gray-200"
+                class="w-96 bg-white border-l border-gray-200"
             >
                 <el-skeleton v-if="isLoading" animated class="p-6">
                     <template #template>
