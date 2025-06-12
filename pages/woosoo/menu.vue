@@ -129,8 +129,6 @@
                 <!-- Actual Cart -->
                 <WoosooCartMenu
                     v-else
-                    :items="cartItems"
-                    @update-quantity="updateQuantity"
                 />
             </div>
         </div>
@@ -198,14 +196,6 @@ const addToCart = (item) => {
     cartStore.addToCart({
         ...item
     })
-}
-
-const updateQuantity = (itemId, newQuantity) => {
-    if (newQuantity <= 0) {
-        cartStore.removeCartItem(itemId)
-    } else {
-        cartStore.updateCartItemQuantity(itemId, newQuantity)
-    }
 }
 
 </script>
