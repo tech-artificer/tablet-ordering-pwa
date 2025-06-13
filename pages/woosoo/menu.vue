@@ -96,12 +96,12 @@
             <!-- Order Summary Skeleton -->
             <div
                 v-if="cartItems.length > 0"
-                class="w-92 bg-white border-l border-gray-200"
+                class="bg-white border-l border-gray-200"
             >
                 <el-skeleton v-if="isLoading" animated class="p-6">
                     <template #template>
                         <!-- Cart header -->
-                        <el-skeleton-item variant="h3" class="w-92" style="margin-bottom: 24px;" />
+                        <el-skeleton-item variant="h3" style="margin-bottom: 24px;" />
 
                         <!-- Cart items -->
                         <div v-for="n in 3" :key="n" class="mb-4 pb-4 border-b border-gray-100">
@@ -119,7 +119,7 @@
                         </div>
 
                         <!-- Total -->
-                        <div class="mt-6 pt-4 border-t border-gray-200 space-y-3">
+                        <div class="mt-6 pt-4 border-t border-gray-200">
                             <el-skeleton-item variant="text" style="width: 100%;" />
                             <el-skeleton-item variant="button" style="width: 100%; height: 48px;" />
                         </div>

@@ -1,5 +1,13 @@
 <template>
-    <div>
+    <div v-if="deviceIsMobile" class="bg-white text-center">
+        <CommonImage
+            src="/logo/logo2.png"
+            alt="Logo"
+            class="w-24 h-24 mx-auto pt-24"
+        />
+        <p class="text-xl font-semibold pt-28"> Mobile Device Not allowed </p>
+    </div>
+    <div v-else>
         <CommonSlideDown
             :show-notification="showNotification"
             :is-really-online="isReallyOnline"
@@ -52,7 +60,13 @@ const {
     stopOfflineProgress
 } = connectionStatus
 
+const deviceIsMobile = ref(false)
+
 onMounted(() => {
+    deviceIsMobile.value = window.innerWidth < 768
+    window.addEventListener('resize', () => {
+        deviceIsMobile.value = window.innerWidth < 768
+    })
     window.addEventListener('online', updateOnlineStatus)
     window.addEventListener('offline', updateOnlineStatus)
 
