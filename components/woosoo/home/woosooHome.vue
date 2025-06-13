@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="min-h-screen min-w-screen">
         <!-- Main content -->
         <div class="relative z-10 flex flex-col items-center justify-center px-4">
             <!-- Logo -->

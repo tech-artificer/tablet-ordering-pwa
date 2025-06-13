@@ -1,13 +1,13 @@
 {
-    "name": "Tap To Order",
-    "short_name": "Tap To Order",
-    "description": "Tap To Order is a web application that allows users to order food from restaurants.",
+    "name": "Woosoo",
+    "short_name": "Woosoo",
+    "description": "Woosoo is a web application that allows users to order food from restaurants.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#000000",
-    "orientation": "landscape-primary",
-    "orientation-lock": "landscape-primary",
+    "orientation": "landscape",
+    "orientation-lock": "landscape",
     "icons": [
         {
             "src": "/icons/android-launchericon-192-192.png",
