@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full bg-white shadow-lg p-6">
+    <div class="w-full bg-white shadow-lg px-2 py-4">
         <div class="flex gap-2 justify-between">
             <h2 class="text-xl mb-6">Order summary</h2>
             <CommonButton
@@ -19,7 +19,7 @@
                 <CommonImage
                     :src="item.image"
                     :alt="item.name"
-                    :style-class="'w-16 h-16 rounded-lg object-cover'"
+                    :style-class="'w-8 h-8 rounded-lg object-cover'"
                 />
                 <div class="flex-1">
                     <h4 class="font-medium">{{ item.name }}</h4>
