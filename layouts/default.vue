@@ -63,9 +63,9 @@ const {
 const deviceIsMobile = ref(false)
 
 onMounted(() => {
-    deviceIsMobile.value = window.innerWidth < 768
+    deviceIsMobile.value = window.innerWidth < 480
     window.addEventListener('resize', () => {
-        deviceIsMobile.value = window.innerWidth < 768
+        deviceIsMobile.value = window.innerWidth < 480
     })
     window.addEventListener('online', updateOnlineStatus)
     window.addEventListener('offline', updateOnlineStatus)
