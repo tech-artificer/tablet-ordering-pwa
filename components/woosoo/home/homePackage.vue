@@ -2,7 +2,7 @@
     <div class="text-white relative overflow-hidden">
         <div class="relative z-10 p-4">
             <!-- Package Cards -->
-            <div class="flex flex-col gap-4 max-w-7xl mx-auto mb-12 justify-center">
+            <div class="flex flex-row gap-4 max-w-7xl mx-auto mb-12 justify-center">
                 <WoosooPackageCard
                     :package-list="packageList"
                     @change-include-items-modal-status="changeIncludeItemsModalStatus"
