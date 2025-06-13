@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-screen bg-black relative overflow-hidden">
+    <div class="min-h-screen min-w-screen bg-black relative overflow-hidden">
         <!-- Animated background flames -->
         <div class="absolute inset-0 pointer-events-none">
             <img

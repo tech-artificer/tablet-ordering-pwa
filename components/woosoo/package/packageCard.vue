@@ -3,7 +3,7 @@
         v-for="(pkg, index) in packageList"
         :key="pkg.id"
         :class="[
-            'w-[260px] min-h-[460px] relative rounded-2xl p-6 cursor-pointer transform transition-all duration-500 hover:scale-105 hover:shadow-2xl',
+            'w-[240px] min-h-[400px] relative rounded-2xl py-4 cursor-pointer transform transition-all duration-500 hover:scale-105 hover:shadow-2xl',
             selectedPackage === pkg.id
                 ? 'ring-2 ring-orange-300 shadow-2xl shadow-orange-500/30 scale-105'
                 : 'hover:ring-2 hover:ring-orange-300',

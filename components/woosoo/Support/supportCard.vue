@@ -1,5 +1,5 @@
 <template>
-    <div class="p-2 flex flex-col items-center w-full min-w-[180px] px-8">
+    <div class="p-2 flex flex-col items-center w-full">
         <div
             class="flex flex-col items-center justify-center w-full bg-white text-black hover:text-white rounded-lg cursor-pointer hover:bg-primary transition-colors"
             @click="handleSupport"
@@ -9,7 +9,7 @@
                 :alt="title"
                 :style-class="'w-16 h-16'"
             />
-            <span class="font-medium">{{ title }}</span>
+            <span class="font-medium text-responsive">{{ title }}</span>
         </div>
     </div>
 </template>

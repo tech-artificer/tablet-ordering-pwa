@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-screen bg-gray-50 flex">
+    <div class="min-h-screen min-w-screen bg-gray-50 flex">
         <!-- Sidebar -->
         <WoosooSidebarMenu />
         <!-- Main Content -->
@@ -49,7 +49,7 @@
                             v-for="filter in filters"
                             :key="filter"
                             :class="[
-                                'px-4 py-2 rounded-lg font-medium transition-colors',
+                                'px-2 py-2 rounded-lg font-medium transition-colors text-responsive-sm',
                                 activeFilter === filter
                                     ? 'bg-primary text-white'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -96,12 +96,12 @@
             <!-- Order Summary Skeleton -->
             <div
                 v-if="cartItems.length > 0"
-                class="w-96 bg-white border-l border-gray-200"
+                class="w-92 bg-white border-l border-gray-200"
             >
                 <el-skeleton v-if="isLoading" animated class="p-6">
                     <template #template>
                         <!-- Cart header -->
-                        <el-skeleton-item variant="h3" style="width: 120px; margin-bottom: 24px;" />
+                        <el-skeleton-item variant="h3" class="w-92" style="margin-bottom: 24px;" />
 
                         <!-- Cart items -->
                         <div v-for="n in 3" :key="n" class="mb-4 pb-4 border-b border-gray-100">

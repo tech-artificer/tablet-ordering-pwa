@@ -38,6 +38,9 @@ export default {
             fontFamily: {
                 custom: ['Inter'],
             },
+            fontSize: {
+                'responsive-sm': 'calc(2vmin)',
+            },
         }
     },
     plugins: []
