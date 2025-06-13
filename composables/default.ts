@@ -17,6 +17,9 @@ export enum CategoryFilter {
     SEAFOOD = 'seafood',
     SIDES = 'sides',
     DESSERT = 'dessert',
+    BEST = 'best',
+    NEW = 'new',
+    STAFF_CHOICE = 'staff choice',
 }
 
 export enum OrderStatus {
