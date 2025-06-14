@@ -42,7 +42,7 @@ useHead({
     title: 'Woosoo',
     meta: [
         { charset: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1.0, orientation=landscape' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1.0' },
         { name: 'description', content: 'Woosoo is a web application that allows users to order food from restaurants.' },
     ],
     link: [

@@ -254,7 +254,13 @@
 </template>
 
 <script setup lang="ts">
+import { useMyDeviceStore } from '@/stores/Device'
+import { useCartStore } from '@/stores/Cart'
+import { useGuestStore } from '@/stores/Guest'
+
 const cartStore = useCartStore()
+const deviceStore = useMyDeviceStore()
+const guestStore = useGuestStore()
 const isCartModalShow = ref(false)
 const isSuccessModalShow = ref(false)
 const isErrorModalShow = ref(false)
@@ -284,50 +290,22 @@ const removeFromCart = (itemId: number) => {
 
 const placeOrder = async () => {
     try {
-        cartStore.isLoading = true
-
-        // Store order total before clearing cart
         orderTotal.value = cartStore.total
-
-        // const orderData = {
-        //     items: cartStore.cartItems,
-        //     subTotal: cartStore.subTotal,
-        //     vat: cartStore.vat,
-        //     total: cartStore.total
-        // }
-
-        // Uncomment this for real API call
-        // const { data } = await $fetch('/api/orders', {
-        //   method: 'POST',
-        //   body: orderData
-        // })
-        // orderNumber.value = data.orderNumber
-
-        // Simulate API call
-        await new Promise((resolve, reject) => {
-            setTimeout(() => {
-                const isSuccess = Math.random() > 0.5 // 50% success rate
-                if (isSuccess) {
-                    orderNumber.value = `ORD-${Date.now()}`
-                    resolve(true)
-                } else {
-                    reject(new Error('Payment processing failed'))
-                }
-            }, 2000)
-        })
-
-        // Success flow
+        cartStore.orderParams.device_id = deviceStore.device.device.id
+        cartStore.orderParams.user_id = null
+        cartStore.orderParams.guest_count = guestStore.count
+        cartStore.orderParams.notes = null
+        cartStore.orderParams.total_amount = cartStore.total
+        await cartStore.confirmOrder()
+        orderNumber.value =`ORD-${Date.now()}`
         isCartModalShow.value = false
         isSuccessModalShow.value = true
-        //cartStore.clearCart()
 
     } catch (error) {
         console.error('Error placing order:', error)
-        errorMessage.value = error.message || 'An unexpected error occurred while processing your order.'
+        errorMessage.value = cartStore.errorMessage || 'An unexpected error occurred while processing your order.'
         isCartModalShow.value = false
         isErrorModalShow.value = true
-    } finally {
-        cartStore.isLoading = false
     }
 }
 
@@ -343,7 +321,7 @@ const closeSuccessModal = () => {
     isSuccessModalShow.value = false
     orderNumber.value = ''
     orderTotal.value = 0
-    //cartStore.clearCart()
+    cartStore.clearCart()
 }
 
 const closeErrorModal = () => {

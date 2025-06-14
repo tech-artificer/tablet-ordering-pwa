@@ -9,11 +9,26 @@ interface Cart {
     image: string
 }
 
+interface OrderParams {
+    device_id: number | null,
+    user_id: number | null,
+    guest_count: number | null,
+    notes: string | null,
+    total_amount: number | null,
+}
+
 export const useCartStore = defineStore('cart', {
     state: () => ({
         cartItems: [] as Array<Cart>,
         isLoading: false,
-        vatRate: 0.12
+        vatRate: 0.12,
+        orderParams: {
+            device_id: null,
+            user_id: null,
+            guest_count: null,
+            notes: null,
+            total_amount: null,
+        } as OrderParams,
     }),
     getters: {
         hasCartItems: (state) => {
@@ -33,6 +48,27 @@ export const useCartStore = defineStore('cart', {
         }
     },
     actions: {
+        async confirmOrder() {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/orders', {
+                    method: 'POST',
+                    body: this.orderParams,
+                })
+                this.order = response
+                this.isLoading = false
+            } catch (error) {
+                this.isLoading = false
+                this.errorMessage = error
+                if (error.response) {
+                    if (error.response._data.errors) {
+                        this.errorMessage = error.response._data.errors
+                    } else {
+                        this.errorMessage = error.response._data.message
+                    }
+                }
+            }
+        },
         addToCart(item: Omit<Cart, 'quantity'> & { quantity?: number }) {
             const existingItem = this.cartItems.find(cartItem => cartItem.id === item.id)
             const quantityToAdd = item.quantity || 1
