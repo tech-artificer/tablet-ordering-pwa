@@ -2,12 +2,10 @@
     <div class="text-white relative overflow-hidden">
         <div class="relative z-10 p-4">
             <!-- Package Cards -->
-            <div class="flex flex-row gap-4 max-w-7xl mx-auto mb-12 justify-center">
-                <WoosooPackageCard
-                    :package-list="packageList"
-                    @change-include-items-modal-status="changeIncludeItemsModalStatus"
-                />
-            </div>
+            <WoosooPackageCard
+                :package-list="packageList"
+                @change-include-items-modal-status="changeIncludeItemsModalStatus"
+            />
         </div>
     </div>
 </template>
@@ -15,7 +13,6 @@
 <script setup>
 const packageStore = usePackageStore()
 const { packageList } = storeToRefs(packageStore)
-packageStore.exampleData()
 
 const emit = defineEmits(['changeIncludeItemsModalStatus'])
 const changeIncludeItemsModalStatus = () => {

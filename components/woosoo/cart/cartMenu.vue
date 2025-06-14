@@ -10,14 +10,14 @@
         </div>
 
         <!-- Cart Items -->
-        <div class="space-y-4 mb-6">
+        <div class="space-y-2 mb-6">
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
-                class="flex items-center space-x-3"
+                class="flex items-center"
             >
                 <CommonImage
-                    :src="item.image"
+                    :src="item.image_url"
                     :alt="item.name"
                     :style-class="'w-8 h-8 rounded-lg object-cover'"
                 />
@@ -117,7 +117,7 @@
             >
                 <div class="flex flex-col justify-center">
                     <CommonImage
-                        :src="item.image"
+                        :src="item.image_url"
                         :alt="item.name"
                         :style-class="'w-8 h-8 rounded-lg object-cover'"
                     />

@@ -32,5 +32,11 @@ export default defineNuxtConfig({
             { rel: 'manifest', href: '/manifest.json' }
             ]
         }
-    }
+    },
+    runtimeConfig: {
+        public: {
+            appVersion: process.env.APP_VERSION,
+            MAIN_API_URL: process.env.MAIN_API_URL,
+        },
+    },
 })

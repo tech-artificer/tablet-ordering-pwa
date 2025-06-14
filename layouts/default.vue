@@ -15,6 +15,15 @@
         <main :class="{ 'mt-16': showNotification }">
             <slot />
         </main>
+        <el-dialog
+            v-model="myDeviceStore.showDeviceRegistration"
+            title="Device Registration"
+            width="30%"
+            :close-on-click-modal="false"
+            :show-close="false"
+        >
+            <WoosooDevice />
+        </el-dialog>
         <CommonSlideUp
             :is-really-online="isReallyOnline"
         />
@@ -25,6 +34,7 @@
 import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted } from 'vue'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
+import { useMyDeviceStore } from '@/stores/Device'
 
 // PWA Setup
 useHead({
@@ -48,6 +58,7 @@ useHead({
     ],
 })
 
+
 const connectionStatus = useConnectionStatus()
 
 const {
@@ -62,8 +73,14 @@ const {
 
 const deviceIsMobile = ref(false)
 
+const myDeviceStore = useMyDeviceStore()
+const { hasDevice } = storeToRefs(myDeviceStore)
+
 onMounted(() => {
-    deviceIsMobile.value = window.innerWidth < 480
+    if (!hasDevice.value) {
+        myDeviceStore.showDeviceRegistration = true
+    }
+    deviceIsMobile.value = window.innerWidth < 480 &&
     window.addEventListener('resize', () => {
         deviceIsMobile.value = window.innerWidth < 480
     })

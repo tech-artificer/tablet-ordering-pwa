@@ -21,18 +21,22 @@
                     <div class="p-2">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                             <!-- Sample Cart Item 4 -->
-                            <div v-for="(item, index) in cartItems.slice(1)" :key="item.id" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 hover:shadow-md transition-shadow">
+                            <div v-for="item in cartItems.slice(1)" :key="item.id" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 hover:shadow-md transition-shadow">
                                 <!-- Product Badge -->
                                 <div class="flex items-start justify-between mb-3">
                                     <div class="w-8 h-8 bg-orange-400 rounded-full flex items-center justify-center">
-                                        <span class="text-white font-bold text-xs"> {{ (selectedPackageName.match(/\b\w/g) || []).join('').toUpperCase() }} {{ index + 1 }}</span>
+                                        <span class="text-white font-bold text-xs"> {{ item.receipt_name }} </span>
                                     </div>
                                 </div>
 
                                 <!-- Product Image -->
                                 <div class="relative mb-3">
                                     <div class="w-full h-24 bg-gray-100 rounded-lg overflow-hidden">
-                                        <CommonImage :src="item.image" alt="Plain Samgyupsal" :style-class="'w-full h-full object-cover'"/>
+                                        <CommonImage
+                                            :src="item.image_url || item.image || '/default-food.png'"
+                                            :alt="item.name || 'Food item'"
+                                            :style-class="'w-full h-full object-cover'"
+                                        />
                                     </div>
                                 </div>
 
@@ -44,7 +48,7 @@
                                     <div class="flex items-center justify-between">
                                         <span class="text-xs text-gray-600">Qty</span>
                                         <div class="flex items-center space-x-2">
-                                            <button class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors">
+                                            <button class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors" @click="decreaseQuantity(item)">
                                                 <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
                                                 </svg>
@@ -52,7 +56,7 @@
 
                                             <span class="w-6 text-center font-medium text-sm text-gray-900">{{ item.quantity }}</span>
 
-                                            <button class="w-6 h-6 rounded-full bg-orange-400 flex items-center justify-center hover:bg-orange-500 transition-colors">
+                                            <button class="w-6 h-6 rounded-full bg-orange-400 flex items-center justify-center hover:bg-orange-500 transition-colors" @click="increaseQuantity(item)">
                                                 <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                                                 </svg>
@@ -73,6 +77,15 @@ const cartStore = useCartStore()
 const packageStore = usePackageStore()
 const { cartItems } = storeToRefs(cartStore)
 const { selectedPackageName } = storeToRefs(packageStore)
+
+const increaseQuantity = (item) => {
+    item.quantity++
+}
+const decreaseQuantity = (item) => {
+    if (item.quantity > 1) {
+        item.quantity--
+    }
+}
 </script>
 
 <style scoped>
