@@ -36,7 +36,7 @@
                 </div>
 
                 <!-- Filter Tabs Skeleton -->
-                <div class="flex overflow-x-auto w-full mb-6 gap-2 mt-2">
+                <div class="flex overflow-x-auto w-[700px] mb-6 gap-2 mt-2">
                     <template v-if="isLoading">
                         <el-skeleton v-for="n in 5" :key="n" animated>
                             <template #template>
@@ -145,12 +145,15 @@
 <script setup>
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
+import { useCategoryStore } from '@/stores/Category'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
+const categoryStore = useCategoryStore()
 
 const { cartItems } = storeToRefs(cartStore)
 const { menuItems, featureItems } = storeToRefs(menuStore)
+const { categories } = storeToRefs(categoryStore)
 
 const isLoading = ref(true)
 const showStaffMenu = ref(false)
@@ -158,6 +161,7 @@ const showStaffMenu = ref(false)
 onMounted(async () => {
     try {
         await menuStore.exampleData()
+        await menuStore.getAllMenus()
         setTimeout(() => {
             isLoading.value = false
         }, 2000)
@@ -172,7 +176,10 @@ const activeFilter = ref(CategoryFilter.ALL)
 
 const filters = computed(() => {
     if (isLoading.value) return []
-    return [CategoryFilter.ALL, ...new Set(menuItems.value.map(item => item.category))]
+    return [
+        CategoryFilter.ALL,
+        ...categories.value.map(item => item.name),
+    ]
 })
 
 const filteredMenuItems = computed(() => {

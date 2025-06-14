@@ -113,7 +113,7 @@
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
-                class="flex justify-between px-2 pt-2 border rounded-lg mb-2"
+                class="flex justify-start px-2 rounded-lg"
             >
                 <div class="flex flex-col justify-center">
                     <CommonImage
@@ -126,7 +126,7 @@
                     <h4 class="font-medium">{{ item.name }}</h4>
                     <p v-show="item.description" class="text-sm text-gray-500">{{ item.description }}</p>
                 </div>
-                <div class="text-right">
+                <div class="text-right flex-1">
                     <span class="font-medium">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
                     <p class="text-xs text-gray-500">{{ item.quantity }}x ₱{{ cartStore.formatPrice(item.price) }}</p>
                 </div>

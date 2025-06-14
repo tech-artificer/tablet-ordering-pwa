@@ -4,12 +4,12 @@
     >
         <div class="aspect-square relative">
             <CommonImage
-                :src="item.image"
+                :src="item.image_url"
                 :alt="item.name"
                 :width="'100%'"
                 :style-class="'w-full h-full object-cover'"
             />
-            <div class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
+            <div v-show="item.rating" class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
                 <WoosooProductRating :rating="item.rating" />
             </div>
         </div>

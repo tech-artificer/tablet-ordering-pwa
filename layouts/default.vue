@@ -35,6 +35,7 @@ import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted } from 'vue'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
 import { useMyDeviceStore } from '@/stores/Device'
+import { useCategoryStore } from '@/stores/Category'
 
 // PWA Setup
 useHead({
@@ -76,9 +77,16 @@ const deviceIsMobile = ref(false)
 const myDeviceStore = useMyDeviceStore()
 const { hasDevice } = storeToRefs(myDeviceStore)
 
+const categoryStore = useCategoryStore()
+
 onMounted(() => {
     if (!hasDevice.value) {
         myDeviceStore.showDeviceRegistration = true
+    }
+    if (!categoryStore.categories.length && !categoryStore.courseTypes.length && !categoryStore.menuGroups.length) {
+        categoryStore.getAllCategories()
+        categoryStore.getAllCourseTypes()
+        categoryStore.getAllMenuGroups()
     }
     deviceIsMobile.value = window.innerWidth < 480 &&
     window.addEventListener('resize', () => {
