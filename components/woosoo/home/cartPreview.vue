@@ -9,7 +9,7 @@
                         {{ cartItems.length - 1 }} items
                     </div>
                 </div>
-                <button class="min-w-24 bg-primary text-black py-3 px-4 rounded-lg font-medium hover:bg-primary/80 transition-colors" @click="navigateTo('woosoo/menu')">
+                <button class="min-w-24 bg-primary text-black py-3 px-4 rounded-lg font-medium hover:bg-primary/80 transition-colors" @click="letsGrill()">
                     Let's Grill
                 </button>
             </div>
@@ -84,9 +84,13 @@ const increaseQuantity = (item) => {
     }
 }
 const decreaseQuantity = (item) => {
-    if (item.quantity > 1) {
+    if (item.quantity > 0) {
         item.quantity--
     }
+}
+const letsGrill = () => {
+    cartItems.value = cartItems.value.filter(item => item.quantity > 0)
+    navigateTo('woosoo/menu')
 }
 </script>
 
