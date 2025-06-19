@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full bg-white shadow-lg px-2 py-4">
+    <div class="w-full bg-white px-2 py-4 relative pb-32">
         <div class="flex gap-2 justify-between">
             <h2 class="text-xl mb-6">Order summary</h2>
             <CommonButton
@@ -53,29 +53,31 @@
             Your cart is empty
         </div>
 
-        <div v-if="cartStore.hasCartItems" class="border-t pt-4 space-y-2">
-            <div class="flex justify-between text-gray-600">
-                <span>Sub Total</span>
-                <span>₱{{ cartStore.formatPrice(cartStore.subTotal) }}</span>
-            </div>
-            <div class="flex justify-between text-gray-600">
-                <span>VAT (12%)</span>
-                <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
-            </div>
-            <div class="flex justify-between font-bold text-lg border-t pt-2">
-                <span>Total</span>
-                <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+        <!-- Sticky Bottom Section for Totals -->
+        <div v-if="cartStore.hasCartItems" class="fixed bottom-0 right-0 bg-white shadow-lg border-t p-4 min-w-[260px] rounded-tl-lg z-10">
+            <div class="space-y-2">
+                <div class="flex justify-between text-gray-600">
+                    <span>Sub Total</span>
+                    <span>₱{{ cartStore.formatPrice(cartStore.subTotal) }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>VAT (12%)</span>
+                    <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
+                </div>
+                <div class="flex justify-between font-bold text-lg border-t pt-2">
+                    <span>Total</span>
+                    <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+                </div>
+
+                <button
+                    class="w-full mt-4 py-3 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="cartStore.isLoading"
+                    @click="confirmOrder"
+                >
+                    {{ cartStore.isLoading ? 'Processing...' : 'Place Order' }}
+                </button>
             </div>
         </div>
-
-        <button
-            v-if="cartStore.hasCartItems"
-            class="w-full mt-6 py-2 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="cartStore.isLoading"
-            @click="confirmOrder"
-        >
-            {{ cartStore.isLoading ? 'Processing...' : 'Place Order' }}
-        </button>
     </div>
 
     <!-- Order Confirmation Modal -->
