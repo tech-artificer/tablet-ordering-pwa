@@ -1,4 +1,12 @@
 <template>
+    <el-dialog
+        v-model="showDeviceLogin"
+        width="500"
+        title="Device Login"
+        append-to-body
+    >
+        <WoosooDeviceLogin/>
+    </el-dialog>
     <div>
         <CommonImage
             src="/logo/logo2.png"
@@ -19,11 +27,19 @@
         />
         <p class="text-red-500">{{ errorMessage?.code }}</p>
     </div>
-    <div class="flex justify-end mt-2">
-        <CommonButton
-            name="Register"
-            @click="registerDevice"
-        />
+    <div class="flex justify-end mt-2 gap-2">
+        <div class="flex justify-end mt-2">
+            <CommonButton
+                name="Register"
+                @click="registerDevice"
+            />
+        </div>
+        <div class="flex justify-end mt-2">
+            <CommonButton
+                name="Login"
+                @click="loginDevice"
+            />
+        </div>
     </div>
 </template>
 <script setup>
@@ -41,4 +57,8 @@ onMounted(async () => {
 const registerDevice = () => {
     myDeviceStore.registerDevice()
 }
+const loginDevice = () => {
+    showDeviceLogin.value = true
+}
+const showDeviceLogin = ref(false)
 </script>

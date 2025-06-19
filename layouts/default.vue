@@ -22,7 +22,7 @@
             :close-on-click-modal="false"
             :show-close="false"
         >
-            <WoosooDevice />
+            <WoosooDeviceRegister />
         </el-dialog>
         <CommonSlideUp
             :is-really-online="isReallyOnline"

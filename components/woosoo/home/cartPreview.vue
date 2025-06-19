@@ -79,7 +79,9 @@ const { cartItems } = storeToRefs(cartStore)
 const { selectedPackageName } = storeToRefs(packageStore)
 
 const increaseQuantity = (item) => {
-    item.quantity++
+    if (item.quantity < 5) {
+        item.quantity++
+    }
 }
 const decreaseQuantity = (item) => {
     if (item.quantity > 1) {

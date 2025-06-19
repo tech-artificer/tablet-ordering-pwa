@@ -20,10 +20,16 @@ interface Device {
     device: DeviceInformation,
     isLoading: boolean,
 }
+interface DeviceLoginParams {
+    device_uuid: string,
+}
 
 export const useMyDeviceStore = defineStore('device', {
     state: () => ({
         device: {} as Device,
+        deviceLoginParams: {
+            device_uuid: '',
+        } as DeviceLoginParams,
         deviceParams: {
             name: '',
             code: '',
@@ -42,6 +48,34 @@ export const useMyDeviceStore = defineStore('device', {
     },
 
     actions: {
+        async loginDevice() {
+            this.isLoading = true
+            try {
+                const response = await useMainApiO('/api/devices/login', {
+                    method: 'GET',
+                    params: {
+                        device_uuid: this.deviceLoginParams.device_uuid,
+                    }
+                })
+                this.device = response
+                this.isLoading = false
+            } catch (error) {
+                this.isLoading = false
+                this.errorMessage = error
+                if (error.response) {
+                    if (error.response._data.errors) {
+                        this.errorMessage = error.response._data.errors
+                    } else {
+                        this.errorMessage = error.response._data.message
+                    }
+                    ElNotification({
+                        title: 'Error',
+                        message: this.errorMessage,
+                        type: 'error',
+                    })
+                }
+            }
+        },
         async registerDevice() {
             this.isLoading = true
             try {
