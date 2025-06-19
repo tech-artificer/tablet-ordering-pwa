@@ -27,8 +27,14 @@
 import { useMyDeviceStore } from '@/stores/Device'
 const myDeviceStore = useMyDeviceStore()
 
-const loginDevice = () => {
-    myDeviceStore.loginDevice()
+const loginDevice = async () => {
+    await myDeviceStore.loginDevice()
+    closeDeviceLogin()
+    window.location.reload()
+}
+const emit = defineEmits(['closeDeviceLogin'])
+const closeDeviceLogin = () => {
+    emit('closeDeviceLogin')
 }
 
 </script>

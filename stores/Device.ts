@@ -52,13 +52,16 @@ export const useMyDeviceStore = defineStore('device', {
             this.isLoading = true
             try {
                 const response = await useMainApiO('/api/devices/login', {
-                    method: 'GET',
-                    params: {
+                    method: 'POST',
+                    body: {
                         device_uuid: this.deviceLoginParams.device_uuid,
                     }
                 })
                 this.device = response
+                this.showDeviceRegistration = false
                 this.isLoading = false
+                this.clearData()
+
             } catch (error) {
                 this.isLoading = false
                 this.errorMessage = error
@@ -89,7 +92,6 @@ export const useMyDeviceStore = defineStore('device', {
                     message: 'Device registered successfully',
                     type: 'success',
                 })
-                this.showDeviceRegistration = false
                 this.clearData()
                 this.showDeviceRegistration = false
                 this.isLoading = false
@@ -116,6 +118,9 @@ export const useMyDeviceStore = defineStore('device', {
             return data.ip
         },
         async clearData() {
+            this.deviceLoginParams = {
+                device_uuid: '',
+            }
             this.deviceParams = {
                 name: '',
                 code: '',

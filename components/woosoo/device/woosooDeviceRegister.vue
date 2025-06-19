@@ -5,7 +5,7 @@
         title="Device Login"
         append-to-body
     >
-        <WoosooDeviceLogin/>
+        <WoosooDeviceLogin @close-device-login="closeDeviceLogin"/>
     </el-dialog>
     <div>
         <CommonImage
@@ -61,4 +61,7 @@ const loginDevice = () => {
     showDeviceLogin.value = true
 }
 const showDeviceLogin = ref(false)
+const closeDeviceLogin = () => {
+    showDeviceLogin.value = false
+}
 </script>
