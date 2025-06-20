@@ -1,6 +1,6 @@
 import { ofetch } from "ofetch"
 import { useRuntimeConfig } from "nuxt/app"
-import { useMyDeviceStore } from "~/stores/device"
+import { useMyDeviceStore } from "@/stores/Device"
 
 export function useMainApiO(url: string, params?: RequestInit) {
     const config = useRuntimeConfig()
