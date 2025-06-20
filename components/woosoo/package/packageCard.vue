@@ -149,7 +149,7 @@ const isValidPackageList = computed(() => {
 const initializeSelectedPackage = () => {
     try {
         if (validPackages.value.length > 0) {
-            const defaultPackage = validPackages.value[1] || validPackages.value[0]
+            const defaultPackage = selectedPackage.value || validPackages.value[0]
 
             if (defaultPackage && defaultPackage.id) {
                 selectedPackage.value = defaultPackage.id

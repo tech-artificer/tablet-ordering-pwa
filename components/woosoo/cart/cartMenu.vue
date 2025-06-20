@@ -54,7 +54,7 @@
         </div>
 
         <!-- Sticky Bottom Section for Totals -->
-        <div v-if="cartStore.hasCartItems" class="fixed bottom-0 right-0 bg-white shadow-lg border-t p-4 min-w-[260px] rounded-tl-lg z-10">
+        <div v-if="cartStore.hasCartItems" class="fixed bottom-0 right-0 bg-white shadow-lg border-t p-4 w-full md:w-[21.5vw] rounded-tl-lg z-10">
             <div class="space-y-2">
                 <div class="flex justify-between text-gray-600">
                     <span>Sub Total</span>
