@@ -10,9 +10,14 @@
                     :class="{'w-24 h-24': packageView, 'w-48 h-48': !packageView}"
                 />
             </div>
-            <WoosooHomeHeadline v-show="!guestCountView && !packageView" @change-guest-count-view="changeGuestCountView"/>
-            <WoosooHomeGuestCounter v-show="guestCountView && !packageView" @change-package-view="changePackageView"/>
-            <WoosooHomePackage v-show="packageView && !guestCountView" @change-include-items-modal-status="changeIncludeItemsModalStatus"/>
+            <template v-if="!myDeviceStore.showDeviceRegistration">
+                <WoosooHomeHeadline v-show="!guestCountView && !packageView" @change-guest-count-view="changeGuestCountView"/>
+                <WoosooHomeGuestCounter v-show="guestCountView && !packageView" @change-package-view="changePackageView"/>
+                <WoosooHomePackage v-show="packageView && !guestCountView" @change-include-items-modal-status="changeIncludeItemsModalStatus"/>
+            </template>
+            <template v-else>
+                <WoosooDeviceRegister />
+            </template>
         </div>
     </div>
     <el-dialog
@@ -28,6 +33,12 @@
 const guestCountView = ref(false)
 const packageView = ref(false)
 const isModalShow = ref(false)
+const myDeviceStore = useMyDeviceStore()
+const { hasDevice } = storeToRefs(myDeviceStore)
+
+if (!hasDevice.value) {
+    myDeviceStore.showDeviceRegistration = true
+}
 const changeGuestCountView = () => {
     guestCountView.value = !guestCountView.value
     packageView.value = false

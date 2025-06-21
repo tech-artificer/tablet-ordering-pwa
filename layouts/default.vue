@@ -15,18 +15,6 @@
         <main :class="{ 'mt-16': showNotification }">
             <slot />
         </main>
-        <el-dialog
-            v-model="myDeviceStore.showDeviceRegistration"
-            title="Device Registration"
-            width="30%"
-            :close-on-click-modal="false"
-            :show-close="false"
-        >
-            <WoosooDeviceRegister />
-        </el-dialog>
-        <CommonSlideUp
-            :is-really-online="isReallyOnline"
-        />
     </div>
 </template>
 
@@ -34,7 +22,6 @@
 import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted } from 'vue'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
-import { useMyDeviceStore } from '@/stores/Device'
 import { useCategoryStore } from '@/stores/Category'
 
 // PWA Setup
@@ -74,15 +61,9 @@ const {
 
 const deviceIsMobile = ref(false)
 
-const myDeviceStore = useMyDeviceStore()
-const { hasDevice } = storeToRefs(myDeviceStore)
-
 const categoryStore = useCategoryStore()
 
 onMounted(() => {
-    if (!hasDevice.value) {
-        myDeviceStore.showDeviceRegistration = true
-    }
     if (!categoryStore.categories.length && !categoryStore.courseTypes.length && !categoryStore.menuGroups.length) {
         categoryStore.getAllCategories()
         categoryStore.getAllCourseTypes()
