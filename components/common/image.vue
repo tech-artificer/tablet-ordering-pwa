@@ -2,11 +2,7 @@
     <div class="p-2">
         <el-image :src="src" :fit="fit" :height="height" :width="width" :class="styleClass">
             <template #placeholder>
-                <CommonImage
-                    src="/logo/logo2.png"
-                    alt="logo"
-                    :class="styleClass"
-                />
+                <div class="image-slot"> {{ placeholder }} </div>
             </template>
             <template #error>
                 <CommonImage

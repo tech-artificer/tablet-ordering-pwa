@@ -37,6 +37,14 @@ export default defineNuxtConfig({
         public: {
             appVersion: process.env.APP_VERSION,
             MAIN_API_URL: process.env.MAIN_API_URL,
+
+            NUXT_PUBLIC_BROADCAST_CONNECTION: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION,
+            NUXT_PUBLIC_REVERB_APP_ID: process.env.NUXT_PUBLIC_REVERB_APP_ID,
+            NUXT_PUBLIC_REVERB_APP_KEY: process.env.NUXT_PUBLIC_REVERB_APP_KEY,
+            NUXT_PUBLIC_REVERB_APP_SECRET: process.env.NUXT_PUBLIC_REVERB_APP_SECRET,
+            NUXT_PUBLIC_REVERB_HOST: process.env.NUXT_PUBLIC_REVERB_HOST,
+            NUXT_PUBLIC_REVERB_PORT: process.env.NUXT_PUBLIC_REVERB_PORT,
+            NUXT_PUBLIC_REVERB_SCHEME: process.env.NUXT_PUBLIC_REVERB_SCHEME,
         },
     },
 })
