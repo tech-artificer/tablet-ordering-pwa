@@ -38,7 +38,7 @@ export const usePackageStore = defineStore('package', {
         async getSetMeals () {
             this.isLoading = true
             try {
-                const response = await useMainApiAuth('/api/menus/with-modifiers', {
+                const response = await useMainApiAuth('/api/menus/set-meals', {
                     method: 'GET',
                 })
                 this.packageList = Array.isArray(response) ? response : response.data || []
