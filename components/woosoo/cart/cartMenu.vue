@@ -17,7 +17,7 @@
                 class="flex items-center"
             >
                 <CommonImage
-                    :src="item.image_url"
+                    :src="item.img_url"
                     :alt="item.name"
                     :style-class="'w-8 h-8 rounded-lg object-cover mr-2'"
                 />
@@ -107,7 +107,7 @@
             >
                 <div class="flex flex-col justify-center">
                     <CommonImage
-                        :src="item.image_url"
+                        :src="item.img_url"
                         :alt="item.name"
                         :style-class="'w-8 h-8 rounded-lg object-cover'"
                     />

@@ -3,7 +3,6 @@
         <div class="relative z-10 p-4">
             <!-- Package Cards -->
             <WoosooPackageCard
-                :package-list="packageList"
                 @change-include-items-modal-status="changeIncludeItemsModalStatus"
             />
         </div>
@@ -11,8 +10,6 @@
 </template>
 
 <script setup>
-const packageStore = usePackageStore()
-const { packageList } = storeToRefs(packageStore)
 
 const emit = defineEmits(['changeIncludeItemsModalStatus'])
 const changeIncludeItemsModalStatus = () => {

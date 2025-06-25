@@ -62,10 +62,9 @@
                     >
                         <div class="w-full h-full bg-gradient-to-br rounded-full flex items-center justify-center">
                             <img
-                                :src="item.image_url || item.image || '/default-food.png'"
+                                :src="item.img_url || '/default-food.png'"
                                 :alt="item.name || 'Food item'"
                                 class="w-full h-full object-cover"
-                                @error="handleImageError"
                             >
                         </div>
                     </div>
@@ -112,7 +111,6 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue'
 
 const packageStore = usePackageStore()
 const cartStore = useCartStore()
@@ -133,7 +131,7 @@ const validPackages = computed(() => {
         receipt_name: pkg.receipt_name,
         badge: index === 1 ? 'BEST' : index === 0 ? 'BASIC' : 'PREMIUM',
         items: pkg.modifiers || [],
-        image_url: pkg.image_url
+        img_url: pkg.img_url
     })).filter(pkg =>
         pkg &&
         pkg.id !== null &&
@@ -162,7 +160,7 @@ const initializeSelectedPackage = () => {
                             name: defaultPackage.name || 'Unnamed Package',
                             quantity: count.value || 1,
                             price: defaultPackage.price || 0,
-                            image_url: '/logo/logo2.png'
+                            img_url: '/logo/logo2.png'
                         },
                         ...defaultPackage.items.map(item => ({
                             ...item,
@@ -195,7 +193,7 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
             name: packageName || 'Unnamed Package',
             quantity: count.value || 1,
             price: price || 0,
-            image_url: '/logo/logo2.png'
+            img_url: '/logo/logo2.png'
         })
 
         if (packageItems && Array.isArray(packageItems)) {
@@ -210,10 +208,6 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
     } catch (error) {
         console.error('Error selecting package:', error)
     }
-}
-
-const handleImageError = (event) => {
-    event.target.src = '/default-food.png'
 }
 
 const emit = defineEmits(['changeIncludeItemsModalStatus'])

@@ -4,7 +4,7 @@
     >
         <div class="aspect-square relative">
             <CommonImage
-                :src="item.image_url"
+                :src="item.img_url"
                 :alt="item.name"
                 :width="'100%'"
                 :style-class="'w-full h-full object-cover'"

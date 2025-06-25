@@ -65,8 +65,8 @@ const categoryStore = useCategoryStore()
 
 onMounted(() => {
     if (!categoryStore.categories.length && !categoryStore.courseTypes.length && !categoryStore.menuGroups.length) {
-        categoryStore.getAllCategories()
-        categoryStore.getAllCourseTypes()
+        categoryStore.getStaticCategories()
+        // categoryStore.getAllCourseTypes()
         categoryStore.getAllMenuGroups()
     }
     deviceIsMobile.value = window.innerWidth < 480 &&
@@ -81,25 +81,25 @@ onMounted(() => {
         updateOnlineStatus()
     }
 
-    const handleNewOrder = (order) => {
-        console.log('New order received:', order)
-    }
+    // const handleNewOrder = (order) => {
+    //     console.log('New order received:', order)
+    // }
 
-    const handleUpdatedOrder = (order) => {
-        console.log('Order updated:', order)
-    }
+    // const handleUpdatedOrder = (order) => {
+    //     console.log('Order updated:', order)
+    // }
 
-    if (window.Echo) {
-        console.log('Kitchen Display. Attempting to listen for new orders...')
-        window.Echo.channel('orders')
-            .listen('.order.created', handleNewOrder)
-            .listen('.order.updated', handleUpdatedOrder)
-            .error((error) => {
-                console.error('Display.vue: Error connecting to Reverb channel:', error)
-            })
-    } else {
-        console.error('Display.vue: window.Echo is not available.')
-    }
+    // if (window.Echo) {
+    //     console.log('Kitchen Display. Attempting to listen for new orders...')
+    //     window.Echo.channel('orders')
+    //         .listen('.order.created', handleNewOrder)
+    //         .listen('.order.updated', handleUpdatedOrder)
+    //         .error((error) => {
+    //             console.error('Display.vue: Error connecting to Reverb channel:', error)
+    //         })
+    // } else {
+    //     console.error('Display.vue: window.Echo is not available.')
+    // }
 })
 
 onUnmounted(() => {

@@ -25,6 +25,31 @@ export const useCategoryStore = defineStore('category', {
     getters: {},
 
     actions: {
+        async getStaticCategories ()
+        {
+            this.categories = [
+                {
+                    id: 1,
+                    name: 'Starter',
+                },
+                {
+                    id: 2,
+                    name: 'Main Course',
+                },
+                {
+                    id: 3,
+                    name: 'Salad and Soup',
+                },
+                {
+                    id: 4,
+                    name: 'Dessert',
+                },
+                {
+                    id: 5,
+                    name: 'Beverage',
+                },
+            ]
+        },
         async getAllCategories() {
             this.isLoading = true
             try {

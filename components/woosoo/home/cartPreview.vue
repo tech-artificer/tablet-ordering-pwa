@@ -33,7 +33,7 @@
                                 <div class="relative mb-3">
                                     <div class="w-full h-24 bg-gray-100 rounded-lg overflow-hidden">
                                         <CommonImage
-                                            :src="item.image_url || item.image || '/default-food.png'"
+                                            :src="item.img_url || item.image || '/default-food.png'"
                                             :alt="item.name || 'Food item'"
                                             :style-class="'w-full h-full object-cover'"
                                         />

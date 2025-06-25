@@ -22,7 +22,7 @@ defineProps({
     },
     placeholder: {
         type: String,
-        default: "Loading..."
+        default: ""
     },
     error: {
         type: String,
