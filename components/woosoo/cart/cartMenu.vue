@@ -74,15 +74,17 @@
                     :disabled="cartStore.isLoading"
                     @click="confirmOrder"
                 >
-                    {{ cartStore.isLoading ? 'Processing...' : 'Place Order' }}
+                    {{ cartStore.isLoading ? 'Processing...' : 'Review/Summary Order' }}
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Order Confirmation Modal -->
-    <el-dialog
+    <el-drawer
         v-model="isCartModalShow"
+        title="Confirmation & Summary"
+        :with-header="false"
         align-center
         width="400"
     >
@@ -149,7 +151,7 @@
                 </el-button>
             </div>
         </template>
-    </el-dialog>
+    </el-drawer>
 
     <!-- Success Modal -->
     <el-dialog
