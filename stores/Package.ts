@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 interface Menu {
     id: number,
+    menu_id: number,
     name: string,
     barcode: string,
     price: number,

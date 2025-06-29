@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full bg-white px-2 py-4 relative pb-32">
+    <div class="w-full bg-white px-2 py-4 relative pb-2">
         <div class="flex gap-2 justify-between">
             <h2 class="text-xl mb-6">Order summary</h2>
             <CommonButton
@@ -10,7 +10,7 @@
         </div>
 
         <!-- Cart Items -->
-        <div class="space-y-2 mb-6">
+        <div class="space-y-2 mb-6 max-h-[200px] overflow-y-auto">
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
@@ -54,7 +54,7 @@
         </div>
 
         <!-- Sticky Bottom Section for Totals -->
-        <div v-if="cartStore.hasCartItems" class="fixed bottom-0 right-0 bg-white shadow-lg border-t p-4 w-full md:w-[21.5vw] rounded-tl-lg z-10">
+        <div v-if="cartStore.hasCartItems" class="bg-white shadow-lg border-t p-4 w-full rounded-tl-lg z-10">
             <div class="space-y-2">
                 <div class="flex justify-between text-gray-600">
                     <span>Sub Total</span>
@@ -244,13 +244,13 @@
 </template>
 
 <script setup lang="ts">
-import { useMyDeviceStore } from '@/stores/Device'
 import { useCartStore } from '@/stores/Cart'
 import { useGuestStore } from '@/stores/Guest'
+import { orderStore } from '@/stores/Order'
 
 const cartStore = useCartStore()
-const deviceStore = useMyDeviceStore()
 const guestStore = useGuestStore()
+
 const isCartModalShow = ref(false)
 const isSuccessModalShow = ref(false)
 const isErrorModalShow = ref(false)
@@ -272,16 +272,18 @@ const removeFromCart = (itemId: number) => {
 const placeOrder = async () => {
     try {
         orderTotal.value = cartStore.total
-        cartStore.orderParams.device_id = deviceStore.device.device.id
-        cartStore.orderParams.user_id = null
         cartStore.orderParams.guest_count = guestStore.count
-        cartStore.orderParams.notes = null
         cartStore.orderParams.total_amount = cartStore.total
+        cartStore.orderParams.items = cartStore.cartItems
         await cartStore.confirmOrder()
         orderNumber.value =`ORD-${Date.now()}`
         isCartModalShow.value = false
         isSuccessModalShow.value = true
-
+        orderStore.orders.push({
+            ...cartStore.orderParams,
+            orderNumber: orderNumber.value,
+            status: 'IN_PROGRESS'
+        })
     } catch (error) {
         console.error('Error placing order:', error)
         errorMessage.value = cartStore.errorMessage || 'An unexpected error occurred while processing your order.'

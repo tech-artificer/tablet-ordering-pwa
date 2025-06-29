@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 interface Cart {
     id: number,
+    menu_id: number,
     name: string,
     description: string,
     price: number,
@@ -10,11 +11,10 @@ interface Cart {
 }
 
 interface OrderParams {
-    device_id: number | null,
-    user_id: number | null,
     guest_count: number | null,
-    notes: string | null,
+    note: string | null,
     total_amount: number | null,
+    items: Array<Cart>,
 }
 
 export const useCartStore = defineStore('cart', {
@@ -23,10 +23,8 @@ export const useCartStore = defineStore('cart', {
         isLoading: false,
         vatRate: 0.12,
         orderParams: {
-            device_id: null,
-            user_id: null,
             guest_count: null,
-            notes: null,
+            note: null,
             total_amount: null,
         } as OrderParams,
     }),

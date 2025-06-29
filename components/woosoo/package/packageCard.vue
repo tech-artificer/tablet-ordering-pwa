@@ -157,6 +157,7 @@ const initializeSelectedPackage = () => {
                     cartItems.value = [
                         {
                             id: defaultPackage.id,
+                            ordered_menu_id: defaultPackage.id,
                             name: defaultPackage.name || 'Unnamed Package',
                             quantity: count.value || 1,
                             price: defaultPackage.price || 0,
@@ -164,6 +165,8 @@ const initializeSelectedPackage = () => {
                         },
                         ...defaultPackage.items.map(item => ({
                             ...item,
+                            menu_id: item.id,
+                            price: 0,
                             quantity: count.value || 1
                         })),
                     ]
@@ -190,6 +193,7 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
 
         cartItems.value.push({
             id: packageId,
+            ordered_menu_id: packageId,
             name: packageName || 'Unnamed Package',
             quantity: count.value || 1,
             price: price || 0,
@@ -203,6 +207,7 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
             cartItems.value.forEach((item, index) => {
                 if (index !== 0) item.price = 0
                 item.quantity = count.value || 1
+                item.menu_id = item.id
             })
         }
     } catch (error) {

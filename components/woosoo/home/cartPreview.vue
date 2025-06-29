@@ -74,12 +74,14 @@
 </template>
 <script setup>
 const cartStore = useCartStore()
+const guestStore = useGuestStore()
 const packageStore = usePackageStore()
 const { cartItems } = storeToRefs(cartStore)
 const { selectedPackageName } = storeToRefs(packageStore)
+const { count } = storeToRefs(guestStore)
 
 const increaseQuantity = (item) => {
-    if (item.quantity < 5) {
+    if (item.quantity < count.value) {
         item.quantity++
     }
 }

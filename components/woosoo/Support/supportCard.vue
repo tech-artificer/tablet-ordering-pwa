@@ -7,9 +7,9 @@
             <CommonImage
                 :src="image"
                 :alt="title"
-                :style-class="'w-16 h-16'"
+                :style-class="'w-8 h-8 max-h-8 max-w-8'"
             />
-            <span class="font-medium text-responsive">{{ title }}</span>
+            <span class="font-medium text-sm tex-center">{{ title }}</span>
         </div>
     </div>
 </template>

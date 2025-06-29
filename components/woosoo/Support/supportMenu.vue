@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full min-h-screen bg-white">
+    <div class="min-h-[500px] w-full bg-white">
         <!-- Clean table -->
         <WoosooSupportCard
             title="Clean table"
