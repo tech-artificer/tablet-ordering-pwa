@@ -246,10 +246,11 @@
 <script setup lang="ts">
 import { useCartStore } from '@/stores/Cart'
 import { useGuestStore } from '@/stores/Guest'
-import { orderStore } from '@/stores/Order'
+import { useOrderStore } from '@/stores/Order'
 
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
+const orderStore = useOrderStore()
 
 const isCartModalShow = ref(false)
 const isSuccessModalShow = ref(false)
