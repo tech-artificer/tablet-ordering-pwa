@@ -1,5 +1,5 @@
 <template>
-    <el-container class="w-full h-screen flex">
+    <el-container class="w-full h-screen">
         <div class="min-h-screen w-full bg-gray-50 flex">
             <el-aside width="15vw" class="bg-white shadow-lg flex flex-col">
             <!-- Sidebar -->

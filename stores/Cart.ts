@@ -49,7 +49,7 @@ export const useCartStore = defineStore('cart', {
         async confirmOrder() {
             this.isLoading = true
             try {
-                const response = await useMainApiAuth('/api/orders', {
+                const response = await useMainApiAuth('/api/devices/create-order', {
                     method: 'POST',
                     body: this.orderParams,
                 })

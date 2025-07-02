@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full bg-white px-2 py-4 relative pb-2">
+    <div class="w-full bg-white p-6 relative pb-2">
         <div class="flex gap-2 justify-between">
             <h2 class="text-xl mb-6">Order summary</h2>
             <CommonButton
@@ -247,7 +247,9 @@
 import { useCartStore } from '@/stores/Cart'
 import { useGuestStore } from '@/stores/Guest'
 import { useOrderStore } from '@/stores/Order'
+import { useMyDeviceStore } from '@/stores/Device'
 
+const deviceStore = useMyDeviceStore()
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
 const orderStore = useOrderStore()
@@ -275,6 +277,7 @@ const placeOrder = async () => {
         orderTotal.value = cartStore.total
         cartStore.orderParams.guest_count = guestStore.count
         cartStore.orderParams.total_amount = cartStore.total
+        cartStore.orderParams.table_id = deviceStore.device.device.table_id
         cartStore.orderParams.items = cartStore.cartItems
         await cartStore.confirmOrder()
         orderNumber.value =`ORD-${Date.now()}`
@@ -305,7 +308,6 @@ const closeSuccessModal = () => {
     isSuccessModalShow.value = false
     orderNumber.value = ''
     orderTotal.value = 0
-    cartStore.clearCart()
 }
 
 const closeErrorModal = () => {

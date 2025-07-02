@@ -23,21 +23,6 @@ export const useMenuStore = defineStore('menu', {
         }
     },
     actions: {
-        async getAllMenus() {
-            this.isLoading = true
-            try {
-                const response = await useMainApiAuth('/api/menus', {
-                    method: 'GET',
-                })
-                this.menuItems = Array.isArray(response) ? response : response.data || []
-                console.log('Menus fetched successfully:', this.menuItems)
-            } catch (error) {
-                console.error('Error fetching menus:', error)
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
         async exampleData () {
             this.isLoading = true
             const menuItemExample = [
@@ -72,7 +57,22 @@ export const useMenuStore = defineStore('menu', {
             this.featureItems = menuItemExample
             this.isLoading = false
             console.log('Menus fetched successfully:', this.menuItems)
-        }
+        },
+        async getAllMenus() {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/menus', {
+                    method: 'GET',
+                })
+                this.menuItems = Array.isArray(response) ? response : response.data || []
+                console.log('Menus fetched successfully:', this.menuItems)
+            } catch (error) {
+                console.error('Error fetching menus:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
     },
     persist: {
         key: 'menu-store',

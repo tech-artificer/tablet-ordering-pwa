@@ -126,8 +126,10 @@ const validPackages = computed(() => {
 
     return packageList.value.map((pkg, index) => ({
         id: pkg.id,
+        ordered_menu_id: pkg.id,
         name: pkg.name,
         price: pkg.price,
+        subtotal: pkg.price,
         receipt_name: pkg.receipt_name,
         badge: index === 1 ? 'BEST' : index === 0 ? 'BASIC' : 'PREMIUM',
         items: pkg.modifiers || [],
@@ -157,17 +159,25 @@ const initializeSelectedPackage = () => {
                     cartItems.value = [
                         {
                             id: defaultPackage.id,
-                            ordered_menu_id: defaultPackage.id,
+                            ordered_menu_id: null,
                             name: defaultPackage.name || 'Unnamed Package',
+                            receipt_name: defaultPackage.receipt_name || 'Unnamed Package',
                             quantity: count.value || 1,
+                            discount: 0,
+                            tax: 0,
                             price: defaultPackage.price || 0,
+                            subtotal: defaultPackage.price || 0,
                             img_url: '/logo/logo2.png'
                         },
                         ...defaultPackage.items.map(item => ({
                             ...item,
                             menu_id: item.id,
+                            ordered_menu_id: item.id,
                             price: 0,
-                            quantity: count.value || 1
+                            subtotal: 0,
+                            quantity: count.value || 1,
+                            discount: 0,
+                            tax: 0,
                         })),
                     ]
                 }
@@ -193,9 +203,13 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
 
         cartItems.value.push({
             id: packageId,
-            ordered_menu_id: packageId,
+            ordered_menu_id: null,
             name: packageName || 'Unnamed Package',
+            receipt_name: packageName || 'Unnamed Package',
+            subtotal: price || 0,
             quantity: count.value || 1,
+            discount: 0,
+            tax: 0,
             price: price || 0,
             img_url: '/logo/logo2.png'
         })
@@ -208,6 +222,10 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
                 if (index !== 0) item.price = 0
                 item.quantity = count.value || 1
                 item.menu_id = item.id
+                item.ordered_menu_id = item.id
+                item.subtotal = item.price
+                item.discount = 0
+                item.tax = 0
             })
         }
     } catch (error) {

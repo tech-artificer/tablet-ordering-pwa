@@ -25,19 +25,19 @@
 defineProps({
 name: {
     type: String,
-    default: 'Beef Bulgogi'
+    default: null
 },
 price: {
     type: Number,
-    default: 299
+    default: 0
 },
 category: {
     type: String,
-    default: 'Product of the day'
+    default: null
 },
 image: {
     type: String,
-    default: '/images/logo/logo2.png'
+    default: null
 }
 })
 const handleImageError = (event) => {
