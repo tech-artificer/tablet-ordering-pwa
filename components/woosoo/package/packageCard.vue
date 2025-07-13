@@ -61,11 +61,11 @@
                         ]"
                     >
                         <div class="w-full h-full bg-gradient-to-br rounded-full flex items-center justify-center">
-                            <img
+                            <CommonImage
                                 :src="item.img_url || '/default-food.png'"
                                 :alt="item.name || 'Food item'"
-                                class="w-full h-full object-cover"
-                            >
+                                :style-class="'w-full h-full object-cover'"
+                            />
                         </div>
                     </div>
                 </div>

@@ -3,7 +3,7 @@ import Pusher from 'pusher-js'
 
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
-    window.Pusher = Pusher;
+    window.Pusher = Pusher
 
     const echo = new Echo({
         broadcaster: 'reverb',

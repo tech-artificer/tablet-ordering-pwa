@@ -22,6 +22,8 @@ export const useCartStore = defineStore('cart', {
         cartItems: [] as Array<Cart>,
         isLoading: false,
         vatRate: 0.12,
+        cartStatus: null,
+        orderStatus: null,
         orderParams: {
             guest_count: null,
             note: null,

@@ -15,7 +15,7 @@
     </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { useOrderStore } from '@/stores/Order'
 
 const orderStore = useOrderStore()

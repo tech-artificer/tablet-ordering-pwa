@@ -8,8 +8,8 @@
             <!-- Main Content and Cart Container -->
             <div class="flex-1 flex min-w-0">
                 <!-- Main Content -->
-                <el-main width="80%" class="flex-1 min-w-0 p-0">
-                    <div class="h-full p-6 overflow-auto">
+                <el-main class="flex-1 min-w-0 p-0">
+                    <div class="h-full py-6">
                         <!-- Search Bar Skeleton -->
                         <div class="relative mb-6 hidden">
                             <el-skeleton v-if="isLoading" animated class="hidden">
@@ -141,6 +141,10 @@
                 </el-aside>
             </div>
         </div>
+
+        <!-- Order History Component -->
+        <WoosooOrderHistory />
+        <WoosooOrderProgressViewer />
     </el-container>
 </template>
 

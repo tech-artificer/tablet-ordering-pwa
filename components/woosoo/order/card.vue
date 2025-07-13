@@ -22,7 +22,7 @@
     </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 defineProps({
     name: {
         type: String,

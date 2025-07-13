@@ -74,7 +74,7 @@
                     :disabled="cartStore.isLoading"
                     @click="confirmOrder"
                 >
-                    {{ cartStore.isLoading ? 'Processing...' : 'Review/Summary Order' }}
+                    {{ cartStore.isLoading ? 'Processing...' : 'Review Order' }}
                 </button>
             </div>
         </div>
@@ -243,7 +243,7 @@
     </el-dialog>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { useCartStore } from '@/stores/Cart'
 import { useGuestStore } from '@/stores/Guest'
 import { useOrderStore } from '@/stores/Order'
@@ -261,14 +261,14 @@ const orderNumber = ref('')
 const orderTotal = ref(0)
 const errorMessage = ref('')
 
-const updateQuantity = (itemId: number, newQuantity: number) => {
+const updateQuantity = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
         removeFromCart(itemId)
     } else {
         cartStore.updateQuantity(itemId, newQuantity)
     }
 }
-const removeFromCart = (itemId: number) => {
+const removeFromCart = (itemId) => {
     cartStore.removeFromCart(itemId)
 }
 
