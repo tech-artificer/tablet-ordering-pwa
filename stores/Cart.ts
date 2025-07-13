@@ -7,7 +7,8 @@ interface Cart {
     description: string,
     price: number,
     quantity: number,
-    image: string
+    image: string,
+    tax_amount: number
 }
 
 interface OrderParams {
@@ -41,10 +42,10 @@ export const useCartStore = defineStore('cart', {
             return state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
         },
         vat: (state) => {
-            return Math.round((state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * state.vatRate) * 100) / 100
+            return Math.round((state.cartItems.reduce((sum, item) => sum + (item.tax_amount), 0)))
         },
         total(): number {
-            return this.subTotal + this.vat
+            return this.subTotal
         }
     },
     actions: {

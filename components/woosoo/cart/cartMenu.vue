@@ -276,7 +276,10 @@ const placeOrder = async () => {
     try {
         orderTotal.value = cartStore.total
         cartStore.orderParams.guest_count = guestStore.count
-        cartStore.orderParams.total_amount = cartStore.total
+        cartStore.orderParams.total = cartStore.total
+        cartStore.orderParams.subtotal = cartStore.subTotal
+        cartStore.orderParams.discount = 0
+        cartStore.orderParams.tax = cartStore.vat
         cartStore.orderParams.table_id = deviceStore.device.device.table_id
         cartStore.orderParams.items = cartStore.cartItems
         await cartStore.confirmOrder()

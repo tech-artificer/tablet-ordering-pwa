@@ -107,6 +107,12 @@ const decreaseQuantity = () => {
 const confirmAddToCart = () => {
     const itemToAdd = {
         ...props.item,
+        ordered_menu_id: props.item.id,
+        menu_id: props.item.id,
+        tax_amount: props.item.tax_amount,
+        tax: props.item.tax_amount,
+        discount: 0,
+        subtotal: props.item.price,
         quantity: quantity.value
     }
     console.log('Adding to cart:', itemToAdd)

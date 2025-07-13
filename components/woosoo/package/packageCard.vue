@@ -159,11 +159,13 @@ const initializeSelectedPackage = () => {
                     cartItems.value = [
                         {
                             id: defaultPackage.id,
-                            ordered_menu_id: null,
+                            ordered_menu_id: defaultPackage.id,
+                            menu_id: defaultPackage.id,
                             name: defaultPackage.name || 'Unnamed Package',
                             receipt_name: defaultPackage.receipt_name || 'Unnamed Package',
                             quantity: count.value || 1,
                             discount: 0,
+                            tax_amount: 0,
                             tax: 0,
                             price: defaultPackage.price || 0,
                             subtotal: defaultPackage.price || 0,
@@ -177,7 +179,6 @@ const initializeSelectedPackage = () => {
                             subtotal: 0,
                             quantity: count.value || 1,
                             discount: 0,
-                            tax: 0,
                         })),
                     ]
                 }
@@ -203,12 +204,14 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
 
         cartItems.value.push({
             id: packageId,
-            ordered_menu_id: null,
+            ordered_menu_id: packageId,
+            menu_id: packageId,
             name: packageName || 'Unnamed Package',
             receipt_name: packageName || 'Unnamed Package',
             subtotal: price || 0,
             quantity: count.value || 1,
             discount: 0,
+            tax_amount: 0,
             tax: 0,
             price: price || 0,
             img_url: '/logo/logo2.png'
@@ -225,7 +228,6 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
                 item.ordered_menu_id = item.id
                 item.subtotal = item.price
                 item.discount = 0
-                item.tax = 0
             })
         }
     } catch (error) {
