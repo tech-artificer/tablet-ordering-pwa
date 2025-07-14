@@ -36,6 +36,7 @@ export const useMyDeviceStore = defineStore('device', {
             app_version: '',
             last_ip_address: '',
         } as DeviceParams,
+        oldUUID: '',
         isLoading: false as boolean,
         errorMessage: null as string | null,
         showDeviceRegistration: false as boolean,
@@ -58,6 +59,7 @@ export const useMyDeviceStore = defineStore('device', {
                     }
                 })
                 this.device = response
+                this.oldUUID = this.deviceLoginParams.device_uuid
                 this.showDeviceRegistration = false
                 this.isLoading = false
                 this.clearData()
@@ -134,6 +136,6 @@ export const useMyDeviceStore = defineStore('device', {
     persist: {
         key: 'device-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['device', 'deviceParams', 'showDeviceRegistration'],
+        paths: ['device', 'deviceParams', 'showDeviceRegistration', 'oldUUID'],
     }
 })

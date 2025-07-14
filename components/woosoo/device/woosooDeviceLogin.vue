@@ -33,4 +33,9 @@ const loginDevice = async () => {
 const changeDeviceLogin = () => {
     emit('loginDevice')
 }
+onMounted(() => {
+    if (myDeviceStore.oldUUID) {
+        myDeviceStore.deviceLoginParams.device_uuid = myDeviceStore.oldUUID
+    }
+})
 </script>

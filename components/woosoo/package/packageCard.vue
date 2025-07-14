@@ -177,6 +177,8 @@ const initializeSelectedPackage = () => {
                             ordered_menu_id: item.id,
                             price: 0,
                             subtotal: 0,
+                            tax_amount: 0,
+                            tax: 0,
                             quantity: count.value || 1,
                             discount: 0,
                         })),
