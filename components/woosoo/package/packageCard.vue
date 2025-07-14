@@ -133,7 +133,10 @@ const validPackages = computed(() => {
         receipt_name: pkg.receipt_name,
         badge: index === 1 ? 'BEST' : index === 0 ? 'BASIC' : 'PREMIUM',
         items: pkg.modifiers || [],
-        img_url: pkg.img_url
+        img_url: pkg.img_url,
+        tax: 0,
+        discount: 0,
+        tax_amount: 0,
     })).filter(pkg =>
         pkg &&
         pkg.id !== null &&
@@ -230,6 +233,8 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
                 item.ordered_menu_id = item.id
                 item.subtotal = item.price
                 item.discount = 0
+                item.tax_amount = 0
+                item.tax = 0
             })
         }
     } catch (error) {

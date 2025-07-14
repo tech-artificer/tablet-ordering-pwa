@@ -23,7 +23,7 @@ export const useCartStore = defineStore('cart', {
         cartItems: [] as Array<Cart>,
         isLoading: false,
         vatRate: 0.12,
-        cartStatus: null,
+        cartStatus: false,
         orderStatus: null,
         orderParams: {
             guest_count: null,
@@ -42,7 +42,7 @@ export const useCartStore = defineStore('cart', {
             return state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
         },
         vat: (state) => {
-            return Math.round((state.cartItems.reduce((sum, item) => sum + (item.tax_amount), 0)))
+            return state.cartItems.reduce((sum, item) => sum + (item.tax_amount || 0), 0)
         },
         total(): number {
             return this.subTotal
