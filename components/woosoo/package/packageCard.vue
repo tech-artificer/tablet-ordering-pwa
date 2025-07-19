@@ -1,128 +1,265 @@
 <template>
-    <div
-        v-for="(pkg, index) in packageList"
-        :key="pkg.id"
-        :class="[
-            'w-[240px] min-h-[400px] relative rounded-2xl py-4 cursor-pointer transform transition-all duration-500 hover:scale-105 hover:shadow-2xl',
-            selectedPackage === pkg.id
-                ? 'ring-2 ring-orange-300 shadow-2xl shadow-orange-500/30 scale-105'
-                : 'hover:ring-2 hover:ring-orange-300',
-            index === 0 ? 'bg-gray-400' : index === 1 ? 'bg-primary' : 'bg-gray-600',
-        ]"
-        @click="handlePackageSelect(pkg.id, pkg.items, pkg.name, pkg.price)"
-    >
-        <!-- Badge -->
-        <div class="flex justify-center mb-4">
-            <div class="bg-black px-4 py-1 rounded-full relative">
-                <span class="text-white text-xs font-bold tracking-wide uppercase">
-                    <WoosooPackageCrown
-                        v-show="pkg.badge.toLowerCase() === CategoryFilter.BEST"
-                    />
+    <div v-if="isValidPackageList" class="flex flex-row gap-4 max-w-7xl mx-auto mb-12 justify-center">
+        <div
+            v-for="(pkg, index) in validPackages"
+            :key="pkg.id"
+            :class="[
+                'w-[240px] min-h-[400px] relative rounded-2xl py-4 cursor-pointer transform transition-all duration-500 hover:scale-105 hover:shadow-2xl',
+                selectedPackage === pkg.id
+                    ? 'ring-2 ring-orange-300 shadow-2xl shadow-orange-500/30 scale-105'
+                    : 'hover:ring-2 hover:ring-orange-300',
+                index === 0 ? 'bg-gray-400' : index === 1 ? 'bg-primary' : 'bg-gray-600',
+            ]"
+            @click="handlePackageSelect(pkg.id, pkg.items, pkg.name, pkg.price)"
+        >
+            <!-- Badge -->
+            <div class="flex justify-center mb-4">
+                <div class="bg-black px-4 py-1 rounded-full relative">
+                    <span class="text-white text-xs font-bold tracking-wide uppercase">
+                        <WoosooPackageCrown
+                            v-show="pkg.badge && pkg.badge.toLowerCase() === CategoryFilter.BEST"
+                        />
 
-                    {{ pkg.badge }}
-                </span>
-                <!-- Selection Indicator -->
-                <div
-                    v-if="selectedPackage === pkg.id"
-                    class="absolute top-0 -left-9 w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center shadow-lg"
-                >
-                    <span class="text-white text-sm font-bold">✓</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Package Name and Price -->
-        <div class="text-center mb-4">
-            <h3
-                :class="[
-                    'text-2xl font-semibold leading-tight',
-                    index === 0 ? 'text-gray-300' : index === 2 ? 'text-primary' : 'text-black',
-                ]"
-            >
-                {{ pkg.name }}
-            </h3>
-            <p
-                class="text-2xl font-normal text-white"
-            >
-                &#x20B1; {{ pkg.price }}
-            </p>
-        </div>
-
-        <!-- Food Images -->
-        <div class="flex flex-wrap justify-evenly gap-6 mb-8 px-2">
-            <div
-                v-for="(item, itemIndex) in pkg.items.slice(0, 3)"
-                :key="itemIndex"
-                class="relative"
-            >
-                <div
-                    :class="[
-                    itemIndex === 0 ? 'w-24 h-24': itemIndex === 1 ? 'w-16 h-16': itemIndex === 2 ? 'w-28 h-28': 'w-24 h-24',
-                    ' bg-black bg-opacity-40 rounded-full border-2 border-orange-400/30 flex items-center justify-center overflow-hidden'
-                    ]"
-                >
-                    <div class="w-full h-full bg-gradient-to-br rounded-full flex items-center justify-center">
-                        <img :src="item.image" :alt="item.name" class="w-full h-full object-cover">
+                        {{ pkg.badge || 'Package' }}
+                    </span>
+                    <!-- Selection Indicator -->
+                    <div
+                        v-if="selectedPackage === pkg.id"
+                        class="absolute top-0 -left-9 w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center shadow-lg"
+                    >
+                        <span class="text-white text-sm font-bold">✓</span>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- What's Included Button -->
-        <div class="absolute bottom-6 left-6 right-6">
-            <button
-                class="w-full bg-black bg-opacity-80 text-white py-3 rounded-lg font-normal hover:bg-opacity-90 transition-all duration-300 border border-orange-400/30"
-                @click="handleIncludeItemsModal">
-                What's included?
-            </button>
-        </div>
+            <!-- Package Name and Price -->
+            <div class="text-center mb-4">
+                <h3
+                    :class="[
+                        'text-2xl font-semibold leading-tight',
+                        index === 0 ? 'text-gray-300' : index === 2 ? 'text-primary' : 'text-black',
+                    ]"
+                >
+                    {{ pkg.name || 'Unnamed Package' }}
+                </h3>
+                <p class="text-2xl font-normal text-white">
+                    &#x20B1; {{ pkg.price || 0 }}
+                </p>
+            </div>
 
-        <!-- Highlight effect for selected -->
-        <div
-            v-if="selectedPackage === pkg.id"
-            class="absolute inset-0 rounded-2xl bg-gradient-to-t from-orange-400/20 to-transparent pointer-events-none"
-        />
+            <!-- Food Images -->
+            <div v-if="pkg.items && pkg.items.length > 0" class="flex flex-wrap justify-evenly gap-6 mb-8 px-2">
+                <div
+                    v-for="(item, itemIndex) in pkg.items.slice(0, 3)"
+                    :key="itemIndex"
+                    class="relative"
+                >
+                    <div
+                        :class="[
+                        itemIndex === 0 ? 'w-24 h-24': itemIndex === 1 ? 'w-16 h-16': itemIndex === 2 ? 'w-28 h-28': 'w-24 h-24',
+                        ' bg-black bg-opacity-40 rounded-full border-2 border-orange-400/30 flex items-center justify-center overflow-hidden'
+                        ]"
+                    >
+                        <div class="w-full h-full bg-gradient-to-br rounded-full flex items-center justify-center">
+                            <CommonImage
+                                :src="item.img_url || '/default-food.png'"
+                                :alt="item.name || 'Food item'"
+                                :style-class="'w-full h-full object-cover'"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="flex justify-center mb-8 px-2">
+                <p class="text-white text-sm opacity-70">No items available</p>
+            </div>
+
+            <!-- What's Included Button -->
+            <div class="absolute bottom-6 left-6 right-6">
+                <button
+                    class="w-full bg-black bg-opacity-80 text-white py-3 rounded-lg font-normal hover:bg-opacity-90 transition-all duration-300 border border-orange-400/30"
+                    @click="handleIncludeItemsModal">
+                    What's included?
+                </button>
+            </div>
+
+            <!-- Highlight effect for selected -->
+            <div
+                v-if="selectedPackage === pkg.id"
+                class="absolute inset-0 rounded-2xl bg-gradient-to-t from-orange-400/20 to-transparent pointer-events-none"
+            />
+        </div>
+    </div>
+    <div v-else-if="isLoading" class="flex flex-col items-center justify-center p-8">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mb-4 mx-auto" />
+            <h3 class="text-lg font-medium text-white mb-2">Loading packages...</h3>
+            <p class="text-gray-400">Please wait while we fetch the latest packages.</p>
+        </div>
+    </div>
+    <div v-else class="flex flex-col items-center justify-center p-8">
+        <div class="text-center">
+            <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-2M4 13h2m0 0V9a2 2 0 012-2h2m0 0V6a2 2 0 012-2h2.5"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-white mb-2">No packages available</h3>
+            <p class="text-gray-400">Please check back later or contact support.</p>
+        </div>
     </div>
 </template>
+
 <script setup>
+
 const packageStore = usePackageStore()
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
-const { selectedPackage, selectedPackageName  } = storeToRefs(packageStore)
+const { selectedPackage, selectedPackageName, packageList, isLoading } = storeToRefs(packageStore)
 const { cartItems } = storeToRefs(cartStore)
 const { count } = storeToRefs(guestStore)
 
-selectedPackage.value = packageStore.packageList[1].id
-cartItems.value = packageStore.packageList[1].items.map(item => ({ ...item, quantity: count.value }))
+const validPackages = computed(() => {
+    if (!packageList.value || !Array.isArray(packageList.value)) {
+        return []
+    }
+
+    return packageList.value.map((pkg, index) => ({
+        id: pkg.id,
+        ordered_menu_id: pkg.id,
+        name: pkg.name,
+        price: pkg.price,
+        subtotal: pkg.price,
+        receipt_name: pkg.receipt_name,
+        badge: index === 1 ? 'BEST' : index === 0 ? 'BASIC' : 'PREMIUM',
+        items: pkg.modifiers || [],
+        img_url: pkg.img_url,
+        tax: 0,
+        discount: 0,
+        tax_amount: 0,
+    })).filter(pkg =>
+        pkg &&
+        pkg.id !== null &&
+        pkg.id !== undefined &&
+        pkg.id !== ''
+    )
+})
+
+const isValidPackageList = computed(() => {
+    return validPackages.value.length > 0
+})
+
+const initializeSelectedPackage = () => {
+    try {
+        if (validPackages.value.length > 0) {
+            const defaultPackage = selectedPackage.value || validPackages.value[0]
+
+            if (defaultPackage && defaultPackage.id) {
+                selectedPackage.value = defaultPackage.id
+                selectedPackageName.value = defaultPackage.name
+
+                if (defaultPackage.items && Array.isArray(defaultPackage.items)) {
+                    cartItems.value = [
+                        {
+                            id: defaultPackage.id,
+                            ordered_menu_id: defaultPackage.id,
+                            menu_id: defaultPackage.id,
+                            name: defaultPackage.name || 'Unnamed Package',
+                            receipt_name: defaultPackage.receipt_name || 'Unnamed Package',
+                            quantity: count.value || 1,
+                            discount: 0,
+                            tax_amount: 0,
+                            tax: 0,
+                            price: defaultPackage.price || 0,
+                            subtotal: defaultPackage.price || 0,
+                            img_url: '/logo/logo2.png'
+                        },
+                        ...defaultPackage.items.map(item => ({
+                            ...item,
+                            menu_id: item.id,
+                            ordered_menu_id: item.id,
+                            price: 0,
+                            subtotal: 0,
+                            tax_amount: 0,
+                            tax: 0,
+                            quantity: count.value || 1,
+                            discount: 0,
+                        })),
+                    ]
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error initializing selected package:', error)
+        selectedPackage.value = null
+        cartItems.value = []
+    }
+}
 
 const handlePackageSelect = (packageId, packageItems, packageName, price) => {
-    selectedPackage.value = packageId
-    selectedPackageName.value = packageName
-    cartItems.value = []
-    cartItems.value.push({
-        id: packageId,
-        name: packageName,
-        quantity: count.value,
-        price: price,
-        image:'/logo/logo2.png'
-    })
-    cartItems.value = cartItems.value.concat(packageItems)
-    cartItems.value.forEach((item, index) => {
-        if (index !== 0) item.price = 0
-        item.quantity = count.value
-    })
+    try {
+        if (!packageId) {
+            console.error('Package ID is required')
+            return
+        }
 
-}
-defineProps({
-    packageList: {
-        type: Array,
-        default: () => []
+        selectedPackage.value = packageId
+        selectedPackageName.value = packageName || 'Unnamed Package'
+        cartItems.value = []
+
+        cartItems.value.push({
+            id: packageId,
+            ordered_menu_id: packageId,
+            menu_id: packageId,
+            name: packageName || 'Unnamed Package',
+            receipt_name: packageName || 'Unnamed Package',
+            subtotal: price || 0,
+            quantity: count.value || 1,
+            discount: 0,
+            tax_amount: 0,
+            tax: 0,
+            price: price || 0,
+            img_url: '/logo/logo2.png'
+        })
+
+        if (packageItems && Array.isArray(packageItems)) {
+            const validItems = packageItems.filter(item => item && item.id)
+            cartItems.value = cartItems.value.concat(validItems)
+
+            cartItems.value.forEach((item, index) => {
+                if (index !== 0) item.price = 0
+                item.quantity = count.value || 1
+                item.menu_id = item.id
+                item.ordered_menu_id = item.id
+                item.subtotal = item.price
+                item.discount = 0
+                item.tax_amount = 0
+                item.tax = 0
+            })
+        }
+    } catch (error) {
+        console.error('Error selecting package:', error)
     }
-})
+}
 
 const emit = defineEmits(['changeIncludeItemsModalStatus'])
 
 const handleIncludeItemsModal = () => {
     emit('changeIncludeItemsModalStatus')
 }
+
+onMounted(async () => {
+    try {
+        await packageStore.getSetMeals()
+        initializeSelectedPackage()
+    } catch (error) {
+        console.error('Failed to fetch packages:', error)
+    }
+})
+
+watch(() => packageList.value, () => {
+    if (packageList.value.length > 0) {
+        initializeSelectedPackage()
+    }
+}, { deep: true })
 </script>

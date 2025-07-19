@@ -2,37 +2,74 @@ import { defineStore } from 'pinia'
 
 interface Cart {
     id: number,
+    menu_id: number,
     name: string,
     description: string,
     price: number,
     quantity: number,
-    image: string
+    image: string,
+    tax_amount: number
+}
+
+interface OrderParams {
+    guest_count: number | null,
+    note: string | null,
+    total_amount: number | null,
+    items: Array<Cart>,
 }
 
 export const useCartStore = defineStore('cart', {
     state: () => ({
         cartItems: [] as Array<Cart>,
         isLoading: false,
-        vatRate: 0.12
+        vatRate: 0.12,
+        cartStatus: false,
+        orderStatus: null,
+        orderParams: {
+            guest_count: null,
+            note: null,
+            total_amount: null,
+        } as OrderParams,
     }),
     getters: {
         hasCartItems: (state) => {
             return state.cartItems && state.cartItems.length > 0
         },
         totalItems: (state) => {
-            return state.cartItems.reduce((sum, item) => sum + item.quantity, 0)
+            return state.cartItems.length
         },
         subTotal: (state) => {
             return state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
         },
         vat: (state) => {
-            return Math.round((state.cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * state.vatRate) * 100) / 100
+            return state.cartItems.reduce((sum, item) => sum + (item.tax_amount || 0), 0)
         },
         total(): number {
-            return this.subTotal + this.vat
+            return this.subTotal
         }
     },
     actions: {
+        async confirmOrder() {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/devices/create-order', {
+                    method: 'POST',
+                    body: this.orderParams,
+                })
+                this.order = response
+                this.isLoading = false
+            } catch (error) {
+                this.isLoading = false
+                this.errorMessage = error
+                if (error.response) {
+                    if (error.response._data.errors) {
+                        this.errorMessage = error.response._data.errors
+                    } else {
+                        this.errorMessage = error.response._data.message
+                    }
+                }
+            }
+        },
         addToCart(item: Omit<Cart, 'quantity'> & { quantity?: number }) {
             const existingItem = this.cartItems.find(cartItem => cartItem.id === item.id)
             const quantityToAdd = item.quantity || 1

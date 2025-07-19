@@ -23,21 +23,6 @@ export const useMenuStore = defineStore('menu', {
         }
     },
     actions: {
-        async getAllMenus() {
-            this.isLoading = true
-            try {
-                const response = await useMainApiO('/api/pos/menus', {
-                    method: 'GET',
-                })
-                this.menuItems = Array.isArray(response) ? response : response.data || []
-                console.log('Menus fetched successfully:', this.menuItems)
-            } catch (error) {
-                console.error('Error fetching menus:', error)
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
         async exampleData () {
             this.isLoading = true
             const menuItemExample = [
@@ -68,57 +53,26 @@ export const useMenuStore = defineStore('menu', {
                     category: 'Most popular',
                     image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=300&h=300&fit=crop'
                 },
-                {
-                    id: 4,
-                    name: 'Pasta Carbonara',
-                    description: 'Other information, ingredients',
-                    price: 389.99,
-                    rating: 4.6,
-                    category: 'Pasta',
-                    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                },
-                {
-                    id: 5,
-                    name: 'Korean BBQ',
-                    description: 'Other information, ingredients',
-                    price: 699.99,
-                    rating: 4.9,
-                    category: 'Pork',
-                    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                },
-                {
-                    id: 6,
-                    name: 'Spring Rolls',
-                    description: 'Other information, ingredients',
-                    price: 199.99,
-                    rating: 4.5,
-                    category: 'Most popular',
-                    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop'
-                },
-                {
-                    id: 7,
-                    name: 'Vegan Burger',
-                    description: 'Other information, ingredients',
-                    price: 249.99,
-                    rating: 4.3,
-                    category: 'Fish',
-                    image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=300&h=300&fit=crop'
-                },
-                {
-                    id: 8,
-                    name: 'Chicken Wings',
-                    description: 'Other information, ingredients',
-                    price: 399.99,
-                    rating: 4.4,
-                    category: 'Chicken',
-                    image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=300&h=300&fit=crop'
-                },
             ]
             this.featureItems = menuItemExample
-            this.menuItems = menuItemExample
             this.isLoading = false
             console.log('Menus fetched successfully:', this.menuItems)
-        }
+        },
+        async getAllMenus() {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/menus', {
+                    method: 'GET',
+                })
+                this.menuItems = Array.isArray(response) ? response : response.data || []
+                console.log('Menus fetched successfully:', this.menuItems)
+            } catch (error) {
+                console.error('Error fetching menus:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
     },
     persist: {
         key: 'menu-store',

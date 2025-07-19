@@ -4,12 +4,12 @@
     >
         <div class="aspect-square relative">
             <CommonImage
-                :src="item.image"
+                :src="item.img_url"
                 :alt="item.name"
                 :width="'100%'"
                 :style-class="'w-full h-full object-cover'"
             />
-            <div class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
+            <div v-show="item.rating" class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
                 <WoosooProductRating :rating="item.rating" />
             </div>
         </div>
@@ -107,6 +107,12 @@ const decreaseQuantity = () => {
 const confirmAddToCart = () => {
     const itemToAdd = {
         ...props.item,
+        ordered_menu_id: props.item.id,
+        menu_id: props.item.id,
+        tax_amount: props.item.tax_amount,
+        tax: props.item.tax_amount,
+        discount: 0,
+        subtotal: props.item.price,
         quantity: quantity.value
     }
     console.log('Adding to cart:', itemToAdd)

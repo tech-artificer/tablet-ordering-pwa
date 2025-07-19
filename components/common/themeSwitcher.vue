@@ -20,6 +20,6 @@
     </nav>
 </template>
 
-<script setup lang="ts">
+<script setup>
     const { currentThemeName, themes, setTheme } = useTheme()
 </script>
