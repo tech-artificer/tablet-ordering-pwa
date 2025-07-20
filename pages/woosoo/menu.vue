@@ -10,6 +10,7 @@
                 <!-- Main Content -->
                 <el-main class="flex-1 min-w-0 p-0">
                     <div class="h-full py-6">
+
                         <!-- Search Bar Skeleton -->
                         <div class="relative mb-6 hidden">
                             <el-skeleton v-if="isLoading" animated class="hidden">
@@ -23,13 +24,16 @@
                                 type="text"
                                 placeholder="Search"
                                 class="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                @input="debouncedSearch"
                             >
                             <svg v-if="!isLoading" class="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
-
-                        <!-- Featured Item Skeleton -->
+                        <div>
+                            <el-button class="bg-primary text-white" @click="resetSession()">reset</el-button>
+                        </div>
+                        <!-- Featured Item -->
                         <div class="mb-6">
                             <el-skeleton v-if="isLoading" animated>
                                 <template #template>
@@ -39,7 +43,7 @@
                             <WoosooCarouselMenu v-else :data="featureItems" />
                         </div>
 
-                        <!-- Filter Tabs Skeleton -->
+                        <!-- Filter Tabs -->
                         <div class="flex overflow-x-auto w-full mb-6 gap-2 mt-2">
                             <template v-if="isLoading">
                                 <el-skeleton v-for="n in 5" :key="n" animated>
@@ -58,7 +62,8 @@
                                             ? 'bg-primary text-white'
                                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     ]"
-                                    @click="activeFilter = filter"
+                                    @click="handleFilterChange(filter)"
+                                    :disabled="isFilterLoading"
                                 >
                                     {{ filter.charAt(0).toUpperCase() + filter.slice(1) }}
                                 </button>
@@ -66,7 +71,7 @@
                         </div>
 
                         <!-- Menu Grid Skeleton -->
-                        <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div v-if="isLoading || isFilterLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <el-skeleton v-for="n in 6" :key="n" animated>
                                 <template #template>
                                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -92,7 +97,7 @@
                         <!-- Actual Menu Grid -->
                         <WoosooProductMenu
                             v-else
-                            :data="filteredMenuItems"
+                            :data="menuItems"
                             @add-to-cart="addToCart"
                         />
                     </div>
@@ -100,7 +105,6 @@
 
                 <!-- Cart Aside -->
                 <el-aside width="23vw" class="flex-shrink-0">
-                    <!-- Order Summary Skeleton -->
                     <div
                         v-if="cartItems.length > 0"
                         class="bg-white border-l border-gray-200 h-full"
@@ -133,22 +137,18 @@
                             </template>
                         </el-skeleton>
 
-                        <!-- Actual Cart -->
-                        <WoosooCartMenu
-                            v-else
-                        />
+                        <WoosooCartMenu v-else />
                     </div>
                 </el-aside>
             </div>
         </div>
 
-        <!-- Order History Component -->
-        <WoosooOrderHistory />
         <WoosooOrderProgressViewer />
     </el-container>
 </template>
 
 <script setup>
+import { debounce } from 'lodash-es'
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
 import { useCategoryStore } from '@/stores/Category'
@@ -162,22 +162,28 @@ const { menuItems, featureItems } = storeToRefs(menuStore)
 const { categories } = storeToRefs(categoryStore)
 
 const isLoading = ref(true)
-
-onMounted(async () => {
-    try {
-        await menuStore.exampleData()
-        await menuStore.getAllMenus()
-        setTimeout(() => {
-            isLoading.value = false
-        }, 2000)
-    } catch (error) {
-        console.error('Error loading menu data:', error)
-        isLoading.value = false
-    }
-})
+const isFilterLoading = ref(false)
 
 const searchQuery = ref('')
 const activeFilter = ref(CategoryFilter.ALL)
+
+onMounted(async () => {
+    try {
+        isLoading.value = true
+        await Promise.all([
+            menuStore.exampleData(),
+            menuStore.getAllMenus(),
+            categoryStore.getCategories()
+        ])
+
+        setTimeout(() => {
+            isLoading.value = false
+        }, 1000)
+    } catch (error) {
+        console.error('Error loading initial data:', error)
+        isLoading.value = false
+    }
+})
 
 const filters = computed(() => {
     if (isLoading.value) return []
@@ -187,22 +193,55 @@ const filters = computed(() => {
     ]
 })
 
-const filteredMenuItems = computed(() => {
-    if (isLoading.value) return []
+const handleFilterChange = async (newFilter) => {
+    if (newFilter === activeFilter.value) return
 
-    let items = menuItems.value
+    try {
+        isFilterLoading.value = true
+        activeFilter.value = newFilter
+        searchQuery.value = ''
 
-    if (activeFilter.value !== CategoryFilter.ALL) {
-        items = items.filter(item => item.category === activeFilter.value)
+        if (newFilter === CategoryFilter.ALL) {
+            await menuStore.getAllMenus()
+        } else {
+            await menuStore.getMenuByCategory(newFilter)
+        }
+    } catch (error) {
+        console.error('Error filtering by category:', error)
+    } finally {
+        isFilterLoading.value = false
     }
+}
 
-    if (searchQuery.value) {
-        items = items.filter(item =>
-            item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-        )
+const handleSearch = async (query) => {
+    try {
+        isFilterLoading.value = true
+
+        if (!query || query.trim() === '') {
+            if (activeFilter.value === CategoryFilter.ALL) {
+                await menuStore.getAllMenus()
+            } else {
+                await menuStore.getMenuByCategory(activeFilter.value)
+            }
+        } else {
+            await menuStore.searchMenus(query.trim())
+        }
+    } catch (error) {
+        console.error('Error searching menus:', error)
+    } finally {
+        isFilterLoading.value = false
     }
-    return items
-})
+}
+
+const resetSession = () => {
+    cartStore.clearCart()
+    navigateTo('/')
+}
+
+const debouncedSearch = debounce((event) => {
+    const query = event.target.value
+    handleSearch(query)
+}, 300)
 
 const addToCart = (item) => {
     cartStore.addToCart({

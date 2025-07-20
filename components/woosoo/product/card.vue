@@ -109,10 +109,10 @@ const confirmAddToCart = () => {
         ...props.item,
         ordered_menu_id: props.item.id,
         menu_id: props.item.id,
-        tax_amount: props.item.tax_amount,
-        tax: props.item.tax_amount,
+        tax_amount: props.item.tax_amount || 0,
+        tax: props.item.tax_amount || 0,
         discount: 0,
-        subtotal: props.item.price,
+        subtotal: props.item.price || 0,
         quantity: quantity.value
     }
     console.log('Adding to cart:', itemToAdd)

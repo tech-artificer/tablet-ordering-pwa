@@ -21,9 +21,9 @@
             <!-- Top right meat -->
             <div class="floating-food absolute top-0 right-0 animate-float-medium h-56 w-56">
                 <CommonImage
-                    src="/images/2.png"
+                    src="/images/4.png"
                     alt="grilled meat"
-                    class="object-cover rounded-lg shadow-2xl transform rotate-45 hover:scale-110 transition-transform duration-300"
+                    class="object-cover rounded-lg shadow-2xl transform rotate-15 hover:scale-110 transition-transform duration-300"
                 />
             </div>
             <!-- Bottom left fried item -->
@@ -31,15 +31,15 @@
                 <CommonImage
                     src="/images/3.png"
                     alt="fried food"
-                    class="object-cover rounded-lg shadow-2xl transform rotate-90 hover:scale-110 transition-transform duration-300"
+                    class="object-cover rounded-lg shadow-2xl transform rotate-0 hover:scale-110 transition-transform duration-300"
                 />
             </div>
             <!-- Bottom right rolled item -->
             <div class="floating-food absolute bottom-0 right-0 animate-float-slow h-56 w-56">
                 <CommonImage
-                    src="/images/4.png"
+                    src="/images/2.png"
                     alt="rolled food"
-                    class="object-cover rounded-lg shadow-2xl transform -rotate-90 hover:scale-110 transition-transform duration-300"
+                    class="object-cover rounded-lg shadow-2xl transform -rotate-0 hover:scale-110 transition-transform duration-300"
                 />
             </div>
         </div>

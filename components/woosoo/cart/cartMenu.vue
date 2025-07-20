@@ -2,15 +2,10 @@
     <div class="w-full bg-white p-6 relative pb-2">
         <div class="flex gap-2 justify-between">
             <h2 class="text-xl mb-6">Order summary</h2>
-            <CommonButton
-                class="min-w-24 py-4 px-8 bg-primary text-black text-xl font-bold rounded-md hover:opacity-90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:text-white"
-                :name="'Clear Cart'"
-                @click="cartStore.clearCart()"
-            />
         </div>
 
         <!-- Cart Items -->
-        <div class="space-y-2 mb-6 max-h-[200px] overflow-y-auto">
+        <div class="space-y-2 mb-6 max-h-[400px] min-h-[400px] overflow-y-auto">
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
@@ -54,7 +49,7 @@
         </div>
 
         <!-- Sticky Bottom Section for Totals -->
-        <div v-if="cartStore.hasCartItems" class="bg-white shadow-lg border-t p-4 w-full rounded-tl-lg z-10">
+        <div v-if="cartStore.hasCartItems" class="bg-white p-4 w-full z-10">
             <div class="space-y-2">
                 <div class="flex justify-between text-gray-600">
                     <span>Sub Total</span>
@@ -64,7 +59,7 @@
                     <span>VAT (12%)</span>
                     <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
                 </div>
-                <div class="flex justify-between font-bold text-lg border-t pt-2">
+                <div class="flex justify-between font-bold text-lg pt-2">
                     <span>Total</span>
                     <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
                 </div>
@@ -80,11 +75,9 @@
         </div>
     </div>
 
-    <!-- Order Confirmation Modal -->
-    <el-drawer
+    <el-dialog
         v-model="isCartModalShow"
         title="Confirmation & Summary"
-        :with-header="false"
         align-center
         width="400"
     >
@@ -151,7 +144,7 @@
                 </el-button>
             </div>
         </template>
-    </el-drawer>
+    </el-dialog>
 
     <!-- Success Modal -->
     <el-dialog
@@ -279,7 +272,7 @@ const placeOrder = async () => {
         cartStore.orderParams.total = cartStore.total
         cartStore.orderParams.subtotal = cartStore.subTotal
         cartStore.orderParams.discount = 0
-        cartStore.orderParams.tax = cartStore.vat
+        cartStore.orderParams.tax = cartStore.vat || 0
         cartStore.orderParams.table_id = deviceStore.device.device.table_id
         cartStore.orderParams.items = cartStore.cartItems
         await cartStore.confirmOrder()
