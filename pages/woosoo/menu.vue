@@ -173,7 +173,6 @@ onMounted(async () => {
         await Promise.all([
             menuStore.exampleData(),
             menuStore.getAllMenus(),
-            categoryStore.getCategories()
         ])
 
         setTimeout(() => {

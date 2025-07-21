@@ -9,8 +9,12 @@
                         {{ cartItems.length - 1 }} items
                     </div>
                 </div>
-                <button class="min-w-24 bg-primary text-black py-3 px-4 rounded-lg font-medium hover:bg-primary/80 transition-colors" @click="letsGrill()">
-                    Let's Grill
+                <button
+                    class="min-w-24 bg-primary text-black py-3 px-4 rounded-lg font-medium hover:bg-primary/80 transition-colors"
+                    :disabled="cartStore.isLoading"
+                    @click="letsGrill()"
+                >
+                    {{ cartStore.isLoading ? "Processing..." : "Let's Grill" }}
                 </button>
             </div>
 
@@ -76,7 +80,7 @@
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
 const packageStore = usePackageStore()
-const { cartItems } = storeToRefs(cartStore)
+const { cartItems, isLoading } = storeToRefs(cartStore)
 const { selectedPackageName } = storeToRefs(packageStore)
 const { count } = storeToRefs(guestStore)
 
@@ -91,7 +95,9 @@ const decreaseQuantity = (item) => {
     }
 }
 const letsGrill = () => {
+    isLoading.value = true
     cartItems.value = cartItems.value.filter(item => item.quantity > 0)
+    isLoading.value = false
     navigateTo('woosoo/menu')
 }
 </script>
