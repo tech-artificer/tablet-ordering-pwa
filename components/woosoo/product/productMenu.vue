@@ -1,5 +1,5 @@
 <template>
-    <div class="grid grid-cols-4 gap-6">
+    <div class="grid grid-cols-4 gap-2">
         <WoosooProductCard
             v-for="item, index in data"
             :key="index"

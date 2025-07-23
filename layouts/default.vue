@@ -1,21 +1,31 @@
 <template>
-    <div v-if="deviceIsMobile" class="bg-white text-center">
-        <CommonImage
-            src="/logo/logo2.png"
-            alt="Logo"
-            class="w-24 h-24 mx-auto pt-24"
-        />
-        <p class="text-xl font-semibold pt-28"> Mobile Device Not allowed </p>
-    </div>
-    <div v-else>
-        <CommonSlideDown
-            :show-notification="showNotification"
-            :is-really-online="isReallyOnline"
-        />
-        <main :class="{ 'mt-16': showNotification }">
-            <slot />
-        </main>
-    </div>
+    <!DOCTYPE html>
+    <html lang="en" class="!scroll-smooth">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+    </head>
+    <body>
+        <div v-if="deviceIsMobile" class="bg-white text-center">
+            <CommonImage
+                src="/logo/logo2.png"
+                alt="Logo"
+                class="w-24 h-24 mx-auto pt-24"
+            />
+            <p class="text-xl font-semibold pt-28"> Mobile Device Not allowed </p>
+        </div>
+        <div v-else>
+            <CommonSlideDown
+                :show-notification="showNotification"
+                :is-really-online="isReallyOnline"
+            />
+            <main :class="{ 'mt-16': showNotification }">
+                <slot />
+            </main>
+        </div>
+    </body>
+    </html>
 </template>
 
 <script setup>

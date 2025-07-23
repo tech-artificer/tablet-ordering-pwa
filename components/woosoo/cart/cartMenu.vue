@@ -1,11 +1,11 @@
 <template>
-    <div class="w-full bg-white p-6 relative pb-2">
+    <div class="w-full bg-white py-6 p-2 relative pb-2 !scroll-smooth">
         <div class="flex gap-2 justify-between">
-            <h2 class="text-xl mb-6">Order summary</h2>
+            <h2 class="text-lg mb-6 font-medium ml-4">Order summary</h2>
         </div>
 
         <!-- Cart Items -->
-        <div class="space-y-2 mb-6 max-h-[400px] min-h-[400px] overflow-y-auto">
+        <div class="space-y-2 px-2 mb-4 max-h-[390px] min-h-[390px] overflow-y-auto">
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
@@ -14,10 +14,10 @@
                 <CommonImage
                     :src="item.img_url"
                     :alt="item.name"
-                    :style-class="'w-8 h-8 rounded-lg object-cover mr-2'"
+                    :style-class="'w-8 h-8 rounded-lg object-cover mr-8'"
                 />
                 <div class="flex-1">
-                    <h4 class="font-medium">{{ item.name }}</h4>
+                    <h4 class="font-normal text-sm">{{ item.name }}</h4>
                     <p class="text-sm text-gray-500">{{ item.description }}</p>
                     <div class="flex items-center justify-between mt-2">
                         <div class="flex items-center space-x-1">
