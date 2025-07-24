@@ -184,6 +184,20 @@
 .font-raleway {
     font-family: 'Raleway', sans-serif;
 }
+/* Custom scrollbar for all */
+*::-webkit-scrollbar {
+    width: 8px;
+}
+*::-webkit-scrollbar-track {
+    background: #ffffff;
+}
+*::-webkit-scrollbar-thumb {
+    background: #ffffff;
+    border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: #ffffff;
+}
 /* Ensure smooth transitions when switching themes */
 * {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;

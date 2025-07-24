@@ -1,56 +1,72 @@
 <template>
-    <div class="w-full bg-white py-6 p-2 relative pb-2 !scroll-smooth">
-        <div class="flex gap-2 justify-between">
-            <h2 class="text-lg mb-6 font-medium ml-4">Order summary</h2>
+    <div class="w-full bg-white relative flex flex-col h-full !scroll-smooth">
+        <!-- Header Section - Fixed -->
+        <div class="flex gap-2 justify-between py-6 px-4 border-b border-gray-200 bg-white">
+            <h2 class="text-lg font-medium">Order summary</h2>
         </div>
 
-        <!-- Cart Items -->
-        <div class="space-y-2 px-2 mb-4 max-h-[390px] min-h-[390px] overflow-y-auto">
-            <div
-                v-for="item in cartStore.cartItems"
-                :key="item.id"
-                class="flex items-center"
-            >
-                <CommonImage
-                    :src="item.img_url"
-                    :alt="item.name"
-                    :style-class="'w-8 h-8 rounded-lg object-cover mr-8'"
-                />
-                <div class="flex-1">
-                    <h4 class="font-normal text-sm">{{ item.name }}</h4>
-                    <p class="text-sm text-gray-500">{{ item.description }}</p>
-                    <div class="flex items-center justify-between mt-2">
-                        <div class="flex items-center space-x-1">
-                            <button
-                                class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200"
-                                @click="updateQuantity(item.id, item.quantity - 1)"
-                            >
-                                <svg class="w-5 h-5 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                            <span class="text-sm font-medium w-8 text-center">{{ item.quantity }}</span>
-                            <button
-                                class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600"
-                                @click="updateQuantity(item.id, item.quantity + 1)"
-                            >
-                                +
-                            </button>
+        <!-- Cart Items - Scrollable Middle Section -->
+        <div class="flex-1 overflow-y-auto px-4 py-2 min-h-0">
+            <div class="space-y-4">
+                <div
+                    v-for="item in cartStore.cartItems"
+                    :key="item.id"
+                    class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-b-0"
+                >
+                    <CommonImage
+                        :src="item.img_url"
+                        :alt="item.name"
+                        :style-class="'w-12 h-12 rounded-lg object-cover flex-shrink-0'"
+                    />
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-medium text-sm text-gray-800 truncate">{{ item.name }}</h4>
+                        <p class="text-sm text-gray-500 line-clamp-1">{{ item.description }}</p>
+                        <div class="flex items-center justify-between mt-2">
+                            <div class="flex items-center space-x-2">
+                                <button
+                                    class="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+                                    @click="updateQuantity(item.id, item.quantity - 1)"
+                                >
+                                    <svg class="w-4 h-4 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                                <span class="text-sm font-medium w-8 text-center">{{ item.quantity }}</span>
+                                <button
+                                    class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
+                                    @click="updateQuantity(item.id, item.quantity + 1)"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-medium text-gray-800">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
+                                <p class="text-xs text-gray-500">{{ item.quantity }}x</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="text-right">
-                    <span class="font-medium">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
-                    <p class="text-xs text-gray-500">{{ item.quantity }}x</p>
+            </div>
+
+            <!-- Empty Cart State -->
+            <div v-if="!cartStore.hasCartItems" class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6" />
+                    </svg>
                 </div>
+                <p class="text-gray-500 font-medium">Your cart is empty</p>
+                <p class="text-sm text-gray-400 mt-1">Add items from the menu to get started</p>
             </div>
         </div>
 
-        <div v-if="!cartStore.hasCartItems" class="text-center py-8 text-gray-500">
-            Your cart is empty
-        </div>
+        <!-- Fixed Bottom Section - Order Summary & Checkout -->
+        <div v-if="cartStore.hasCartItems" class="bg-white border-t border-gray-200 p-4 mt-auto">
 
-        <!-- Sticky Bottom Section for Totals -->
-        <div v-if="cartStore.hasCartItems" class="bg-white p-4 w-full z-10">
-            <div class="space-y-2">
+            <!-- Price Breakdown -->
+            <div class="space-y-2 mb-4">
                 <div class="flex justify-between text-gray-600">
                     <span>Sub Total</span>
                     <span>₱{{ cartStore.formatPrice(cartStore.subTotal) }}</span>
@@ -59,22 +75,26 @@
                     <span>VAT (12%)</span>
                     <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
                 </div>
-                <div class="flex justify-between font-bold text-lg pt-2">
-                    <span>Total</span>
-                    <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+                <div class="border-t border-gray-200 pt-2 mt-2">
+                    <div class="flex justify-between font-bold text-lg">
+                        <span>Total</span>
+                        <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+                    </div>
                 </div>
-
-                <button
-                    class="w-full mt-4 py-3 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    :disabled="cartStore.isLoading"
-                    @click="confirmOrder"
-                >
-                    {{ cartStore.isLoading ? 'Processing...' : 'Review Order' }}
-                </button>
             </div>
+
+            <!-- Place Order Button -->
+            <button
+                class="w-full py-3 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                :disabled="cartStore.isLoading"
+                @click="confirmOrder"
+            >
+                {{ cartStore.isLoading ? 'Processing...' : 'Review Order' }}
+            </button>
         </div>
     </div>
 
+    <!-- Modals remain the same -->
     <el-dialog
         v-model="isCartModalShow"
         title="Confirmation & Summary"
@@ -96,36 +116,38 @@
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
-                class="flex justify-start px-2 rounded-lg"
+                class="flex justify-between items-center px-2 py-2 rounded-lg border-b border-gray-100 last:border-b-0"
             >
-                <div class="flex flex-col justify-center">
+                <div class="flex items-center gap-3">
                     <CommonImage
                         :src="item.img_url"
                         :alt="item.name"
                         :style-class="'w-8 h-8 rounded-lg object-cover'"
                     />
+                    <div>
+                        <h4 class="font-medium">{{ item.name }}</h4>
+                        <p v-show="item.description" class="text-sm text-gray-500">{{ item.description }}</p>
+                    </div>
                 </div>
-                <div class="flex flex-col justify-center">
-                    <h4 class="font-medium">{{ item.name }}</h4>
-                    <p v-show="item.description" class="text-sm text-gray-500">{{ item.description }}</p>
-                </div>
-                <div class="text-right flex-1">
+                <div class="text-right">
                     <span class="font-medium">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
                     <p class="text-xs text-gray-500">{{ item.quantity }}x ₱{{ cartStore.formatPrice(item.price) }}</p>
                 </div>
             </div>
-            <div class="bg-gray-50 p-2 rounded-lg mb-6">
-                <div class="flex justify-between text-sm mb-2">
-                    <span>Items ({{ cartStore.totalItems }})</span>
-                    <span>₱{{ cartStore.formatPrice(cartStore.subTotal) }}</span>
-                </div>
-                <div class="flex justify-between text-sm mb-2">
-                    <span>VAT (12%)</span>
-                    <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
-                </div>
-                <div class="flex justify-between font-bold text-lg border-t pt-2">
-                    <span>Total Amount</span>
-                    <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+            <div class="bg-gray-50 p-3 rounded-lg mt-4">
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span>Items ({{ cartStore.totalItems }})</span>
+                        <span>₱{{ cartStore.formatPrice(cartStore.subTotal) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span>VAT (12%)</span>
+                        <span>₱{{ cartStore.formatPrice(cartStore.vat) }}</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-lg border-t pt-2">
+                        <span>Total Amount</span>
+                        <span>₱{{ cartStore.formatPrice(cartStore.total) }}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -317,3 +339,33 @@ const retryOrder = () => {
     isCartModalShow.value = true
 }
 </script>
+
+<style scoped>
+/* Custom scrollbar styling */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Line clamp utility for text truncation */
+.line-clamp-1 {
+    display: -webkit-box;
+    line-clamp:1;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+</style>
