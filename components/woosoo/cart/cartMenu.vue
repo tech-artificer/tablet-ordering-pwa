@@ -11,7 +11,7 @@
                 <div
                     v-for="item in cartStore.cartItems"
                     :key="item.id"
-                    class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-b-0"
+                    class="flex items-center gap-3 border-b border-gray-100 last:border-b-0"
                 >
                     <CommonImage
                         :src="item.img_url"
