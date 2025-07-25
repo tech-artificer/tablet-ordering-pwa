@@ -30,7 +30,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
-                        <div>
+                        <div class="hidden">
                             <el-button class="bg-primary text-white" @click="resetSession()">reset</el-button>
                         </div>
                         <!-- Featured Item -->
@@ -71,7 +71,7 @@
                         </div>
 
                         <!-- Menu Grid Skeleton -->
-                        <div v-if="isLoading || isFilterLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div v-if="isLoading || isFilterLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <el-skeleton v-for="n in 6" :key="n" animated>
                                 <template #template>
                                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

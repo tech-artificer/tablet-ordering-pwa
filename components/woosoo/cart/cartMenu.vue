@@ -116,7 +116,7 @@
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
-                class="flex justify-between items-center px-2 py-2 rounded-lg border-b border-gray-100 last:border-b-0"
+                class="flex justify-between items-center px-6 rounded-lg border-b border-gray-100 last:border-b-0"
             >
                 <div class="flex items-center gap-3">
                     <CommonImage
@@ -298,14 +298,11 @@ const placeOrder = async () => {
         cartStore.orderParams.table_id = deviceStore.device.device.table_id
         cartStore.orderParams.items = cartStore.cartItems
         await cartStore.confirmOrder()
-        orderNumber.value =`ORD-${Date.now()}`
         isCartModalShow.value = false
         isSuccessModalShow.value = true
-        orderStore.orders.push({
-            ...cartStore.orderParams,
-            orderNumber: orderNumber.value,
-            status: 'IN_PROGRESS'
-        })
+        orderStore.orders.push(cartStore.order)
+        orderStore.current_order = cartStore.order
+        orderNumber.value = orderStore.current_order.order_number
     } catch (error) {
         console.error('Error placing order:', error)
         errorMessage.value = cartStore.errorMessage || 'An unexpected error occurred while processing your order.'

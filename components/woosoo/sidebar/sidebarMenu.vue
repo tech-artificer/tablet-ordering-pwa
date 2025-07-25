@@ -16,18 +16,10 @@
 </template>
 
 <script setup>
-import { useOrderStore } from '@/stores/Order'
-
-const orderStore = useOrderStore()
-
-// Loading state
 const isLoading = ref(true)
 
-// Simulate loading process
 onMounted(async () => {
     try {
-        await orderStore.exampleData()
-        // Simulate network delay
         setTimeout(() => {
             isLoading.value = false
         }, 1500)

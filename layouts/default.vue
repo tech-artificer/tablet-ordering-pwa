@@ -34,6 +34,7 @@ import { useConnectionStatus } from "@/stores/ConnectionStatus"
 import { useCategoryStore } from '@/stores/Category'
 import { useMyDeviceStore } from '@/stores/Device'
 import { useCartStore } from '@/stores/Cart'
+import { useOrderStore } from '@/stores/Order'
 
 // PWA Setup
 useHead({
@@ -70,84 +71,26 @@ const {
 } = connectionStatus
 
 const deviceIsMobile = ref(false)
-const deviceStore = useMyDeviceStore()
 const categoryStore = useCategoryStore()
-const cartStore = useCartStore()
+const orderStore = useOrderStore()
+
 
 onMounted(() => {
-    if (!categoryStore.categories.length && !categoryStore.courseTypes.length && !categoryStore.menuGroups.length) {
-        categoryStore.getStaticCategories()
-        categoryStore.getAllMenuGroups()
-    }
-
+    categoryStore.getStaticCategories()
     deviceIsMobile.value = window.innerWidth < 480
-
     window.addEventListener('resize', () => {
         deviceIsMobile.value = window.innerWidth < 480
     })
-
     window.addEventListener('online', updateOnlineStatus)
     window.addEventListener('offline', updateOnlineStatus)
-
     if (navigator.onLine) {
         updateOnlineStatus()
     }
-
-    const handleOrderCreated = (order) => {
-        console.log('New order received:', order)
-        console.log('Current cart status:', cartStore.cartStatus)
-
-        if (order) {
-            cartStore.cartStatus = true
-            cartStore.orderStatus = order.status
-            console.log('Updated cart status:', cartStore.cartStatus)
-        }
-    }
-
-    const handleOrderCompleted = (order) => {
-        console.log('New order received:', order)
-        console.log('Current cart status:', cartStore.cartStatus)
-
-        if (order) {
-            cartStore.cartStatus = false
-            cartStore.orderStatus = order.status
-            console.log('Updated cart status:', cartStore.cartStatus)
-        }
-    }
-
-    if (window.Echo && deviceStore.device?.device?.id) {
-        const deviceId = deviceStore.device.device.id
-        console.log('Kitchen Display. Attempting to listen for orders on device:', deviceId)
-        console.log('Device store:', deviceStore.device)
-
-            window.Echo.private(`orders.${deviceId}`)
-                .listen('.order.created', handleOrderCreated)
-                .listen('.order.completed', handleOrderCompleted)
-                .error((error) => {
-                    console.error('Display.vue: Error connecting to device-specific channel:', error)
-                })
-
-            if (window.Echo.connector?.socket) {
-                window.Echo.connector.socket.on('connect', () => {
-                    console.log('Connected to WebSocket')
-                })
-
-                window.Echo.connector.socket.on('disconnect', () => {
-                    console.log('Disconnected from WebSocket')
-                })
-            }
-
-        } else {
-            console.error('Display.vue: window.Echo is not available or device ID is missing.')
-            console.log('Echo available:', !!window.Echo)
-            console.log('Device ID:', deviceStore.device?.device?.id)
-        }
 })
 
 onUnmounted(() => {
     window.removeEventListener('online', updateOnlineStatus)
     window.removeEventListener('offline', updateOnlineStatus)
     stopOfflineProgress()
-    window.Echo.leave('orders')
 })
 </script>

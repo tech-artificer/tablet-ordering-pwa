@@ -28,26 +28,12 @@ export const useCategoryStore = defineStore('category', {
         async getStaticCategories ()
         {
             this.categories = [
-                {
-                    id: 1,
-                    name: 'Starter',
-                },
-                {
-                    id: 2,
-                    name: 'Main Course',
-                },
-                {
-                    id: 3,
-                    name: 'Salad and Soup',
-                },
-                {
-                    id: 4,
-                    name: 'Dessert',
-                },
-                {
-                    id: 5,
-                    name: 'Beverage',
-                },
+                {id: 1, name: CategoryFilter.PROMOS},
+                {id: 2, name: CategoryFilter.MEATS},
+                {id: 3, name: CategoryFilter.SIDES_BANCHAN},
+                {id: 4, name: CategoryFilter.A_LA_CARTE},
+                {id: 5, name: CategoryFilter.DESSERTS},
+                {id: 6, name: CategoryFilter.BEVERAGE},
             ]
         },
         async getAllCategories() {
@@ -58,7 +44,7 @@ export const useCategoryStore = defineStore('category', {
                 })
                 this.categories = response
                 this.isLoading = false
-            } catch (error) {
+            } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error
                 if (error.response) {
@@ -78,7 +64,7 @@ export const useCategoryStore = defineStore('category', {
                 })
                 this.courseTypes = response
                 this.isLoading = false
-            } catch (error) {
+            } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error
                 if (error.response) {
@@ -93,12 +79,12 @@ export const useCategoryStore = defineStore('category', {
         async getAllMenuGroups() {
             this.isLoading = true
             try {
-                const response = await useMainApiAuth('/api/menus/menu-groups', {
+                const response = await useMainApiAuth('/api/menus/group', {
                     method: 'GET',
                 })
                 this.menuGroups = response
                 this.isLoading = false
-            } catch (error) {
+            } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error
                 if (error.response) {

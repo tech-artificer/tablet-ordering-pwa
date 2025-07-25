@@ -20,7 +20,14 @@ export enum CategoryFilter {
     BEST = 'best',
     NEW = 'new',
     STAFF_CHOICE = 'staff choice',
+    PROMOS = 'promos',
+    MEATS = 'meats',
+    SIDES_BANCHAN = 'sides (banchan)',
+    A_LA_CARTE = 'a la carte',
+    DESSERTS = 'desserts',
+    BEVERAGE = 'beverage',
 }
+
 
 export enum OrderStatus {
     PENDING = 'pending',

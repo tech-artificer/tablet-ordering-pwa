@@ -193,9 +193,6 @@ const orderStore = useOrderStore()
 const isOrdersDrawerShow = ref(false)
 const isOrderDetailsShow = ref(false)
 const selectedOrder = ref(null)
-onMounted(() => {
-    orderStore.exampleData()
-})
 
 const openOrdersDrawer = () => {
     isOrdersDrawerShow.value = true

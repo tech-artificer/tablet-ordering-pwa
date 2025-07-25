@@ -109,8 +109,8 @@ const confirmAddToCart = () => {
         ...props.item,
         ordered_menu_id: props.item.id,
         menu_id: props.item.id,
-        tax_amount: props.item.tax_amount || 0,
-        tax: props.item.tax_amount || 0,
+        tax_amount: parseFloat(props.item.tax_amount || 0),
+        tax: parseFloat(props.item.tax_amount || 0),
         discount: 0,
         subtotal: props.item.price || 0,
         quantity: quantity.value

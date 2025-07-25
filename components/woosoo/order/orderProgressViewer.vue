@@ -3,12 +3,15 @@
     <el-drawer
         v-model="cartStore.cartStatus"
         :title="drawerTitle"
-        :with-header="true"
+        :with-header="false"
         direction="rtl"
         size="400px"
-        class="order-drawer">
+        class="order-drawer"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false">
         <!-- Pending State -->
         <div v-if="cartStore.orderStatus === OrderStatus.CONFIRMED" class="order-pending">
+            <h1 class="text-2xl font-bold mt-10">Order Confirmed</h1>
             <div class="flex justify-center">
                 <CommonImage
                     src="/logo/logo2.png"
@@ -55,7 +58,7 @@
 
         <!-- Complete State -->
         <div v-else-if="cartStore.orderStatus === OrderStatus.COMPLETE" class="order-complete">
-            <div class="complete-animation ">
+            <div class="complete-animation mt-10">
                 <div class="flex justify-center mb-4">
                     <CommonImage
                         src="/logo/logo2.png"
@@ -64,13 +67,8 @@
                     />
                 </div>
 
-                <h2 class="complete-title">Order Delivered!</h2>
-                <p class="complete-message">Your delicious food has been delivered successfully</p>
-
-                <!-- Action Buttons -->
-                <div class="action-buttons">
-                    <el-button type="primary" @click="rateOrder">Done</el-button>
-                </div>
+                <h2 class="complete-title">Order Prepareing Complete !</h2>
+                <p class="complete-message">Your delicious food is being prepared and will arrive shortly.</p>
             </div>
         </div>
     </el-drawer>
@@ -78,28 +76,138 @@
 
 <script setup>
 import { useCartStore } from '@/stores/Cart'
+import { useOrderStore } from '@/stores/Order'
 
 const cartStore = useCartStore()
+const orderStore = useOrderStore()
 const estimatedTime = ref(21)
 const progress = ref(0)
 const progressWidth = ref(0)
+const currentOrderId = ref(null) // Track the current order being processed
 
 const drawerTitle = computed(() => {
     return cartStore.orderStatus === OrderStatus.CONFIRMED ? 'Order Pending' : 'Order Complete'
 })
 
-// Methods
-const rateOrder = () => {
-    // Handle rating
-    console.log('Rating order...')
+const setupOrderListening = (orderId) => {
+    if (!window.Echo || !orderId) {
+        console.error('Display.vue: window.Echo is not available or order ID is missing.')
+        console.log('Echo available:', !!window.Echo)
+        console.log('Order ID:', orderId)
+        return
+    }
+
+    console.log('Kitchen Display. Setting up listener for order:', orderId)
+
+    // Leave previous channel if exists
+    if (currentOrderId.value) {
+        window.Echo.leave(`orders.${currentOrderId.value}`)
+    }
+
+    currentOrderId.value = orderId
+
+    window.Echo.channel(`orders.${orderId}`)
+        .listen('.order.created', (orderEvent) => handleOrderCreated(orderEvent))
+        .listen('.order.completed', (orderEvent) => handleOrderCompleted(orderEvent))
+        .error((error) => {
+            console.error('Display.vue: Error connecting to order channel:', error)
+        })
+
+    if (window.Echo.connector?.socket) {
+        window.Echo.connector.socket.on('connect', () => {
+            console.log('Connected to WebSocket')
+        })
+
+        window.Echo.connector.socket.on('disconnect', () => {
+            console.log('Disconnected from WebSocket')
+        })
+    }
 }
 
 onMounted(() => {
-    cartStore.orderStatus = OrderStatus.CONFIRMED
     progress.value = 0
     progressWidth.value = 0
     estimatedTime.value = 21
+
+    // Get the initial order ID from the store
+    const initialOrderId = orderStore.current_order?.order_id
+    if (initialOrderId) {
+        setupOrderListening(initialOrderId)
+    }
 })
+
+onUnmounted(() => {
+    if (currentOrderId.value) {
+        window.Echo.leave(`orders.${currentOrderId.value}`)
+    }
+})
+
+const handleOrderCreated = (orderEvent) => {
+    console.log('New order received:', orderEvent)
+    console.log('Current cart status:', cartStore.cartStatus)
+
+    if (orderEvent && orderEvent.order) {
+        const order = orderEvent.order
+
+        // Update the current order in the store
+        orderStore.current_order = order
+
+        // Set up listening for this specific order
+        if (order.order_id && order.order_id !== currentOrderId.value) {
+            setupOrderListening(order.order_id)
+        }
+    }
+}
+
+const handleOrderCompleted = (orderEvent) => {
+    console.log('Order completed received:', orderEvent)
+    console.log('Current cart status:', cartStore.cartStatus)
+
+    if (orderEvent && orderEvent.order) {
+        const order = orderEvent.order
+
+        // Update the current order in the store
+        orderStore.current_order = order
+
+        cartStore.orderStatus = order.status
+        console.log('Updated order status:', cartStore.orderStatus)
+
+        // Close cart after a delay
+        setTimeout(() => {
+            cartStore.cartStatus = false
+        }, 1000)
+    }
+}
+
+// Watch for changes in the current order
+watch(
+    () => orderStore.current_order?.order_id,
+    (newOrderId, oldOrderId) => {
+        if (newOrderId && newOrderId !== oldOrderId) {
+            console.log('Order ID changed, setting up new listener:', newOrderId)
+            cartStore.cartStatus = true
+            cartStore.orderStatus = orderStore.current_order.status
+            console.log('Updated cart status:', cartStore.cartStatus)
+            console.log('Updated order status:', cartStore.orderStatus)
+            setupOrderListening(newOrderId)
+        }
+    }
+)
+
+watch(
+    () => cartStore.orderStatus,
+    (newVal) => {
+        if (newVal === OrderStatus.COMPLETE) {
+            setTimeout(() => {
+                navigateTo('/')
+                cartStore.orderStatus = OrderStatus.PENDING
+                cartStore.cartItems = []
+                cartStore.cartStatus = false
+                currentOrderId.value = null // Reset current order ID
+            }, 3000)
+        }
+    }
+)
 </script>
 
 <style scoped>
@@ -293,8 +401,6 @@ onMounted(() => {
     margin: 5px 0;
 }
 
-
-
 .action-buttons {
     display: flex;
     gap: 10px;
@@ -308,19 +414,12 @@ onMounted(() => {
 
 /* Animations */
 @keyframes bounce {
-
-    0%,
-    20%,
-    50%,
-    80%,
-    100% {
+    0%, 20%, 50%, 80%, 100% {
         transform: translateY(0);
     }
-
     40% {
         transform: translateY(-10px);
     }
-
     60% {
         transform: translateY(-5px);
     }
@@ -331,7 +430,6 @@ onMounted(() => {
         opacity: 0.7;
         transform: translateY(0);
     }
-
     100% {
         opacity: 0;
         transform: translateY(-20px);
@@ -339,16 +437,12 @@ onMounted(() => {
 }
 
 @keyframes shake {
-
-    0%,
-    100% {
+    0%, 100% {
         transform: translateX(0);
     }
-
     25% {
         transform: translateX(-1px);
     }
-
     75% {
         transform: translateX(1px);
     }
@@ -359,7 +453,6 @@ onMounted(() => {
         opacity: 0;
         transform: translateY(20px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
@@ -370,11 +463,9 @@ onMounted(() => {
     0% {
         transform: scale(0);
     }
-
     50% {
         transform: scale(1.2);
     }
-
     100% {
         transform: scale(1);
     }

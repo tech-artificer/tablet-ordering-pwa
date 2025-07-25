@@ -4,6 +4,7 @@ export interface ThemeConfig {
         background: string
         primary: string
         secondary: string
+        lightGreen: string,
         accent: string
         surface: string
         textPrimary: string
@@ -39,6 +40,8 @@ export const themes: Record<string, ThemeConfig> = {
             darkGreen: '#4AD775',
             accent: '#d4752a',
             surface: '#f8f5f1',
+            textPrimary: '#2d1b12',
+            textSecondary: '#6b5b4d',
             textLightPrimary: '#f8f5f1',
             textLightSecondary: '#D3D3D3',
             textDarkPrimary: '#2d1b12',
@@ -63,7 +66,7 @@ export const themes: Record<string, ThemeConfig> = {
 export const useTheme = () => {
     const { public: { NUXT_PUBLIC_APP_THEME } } = useRuntimeConfig()
     const defaultTheme = NUXT_PUBLIC_APP_THEME || 'woosooWarm'
-    const currentThemeName = useState<string>('theme', () => defaultTheme)
+    const currentThemeName = useState<string>('theme', () => defaultTheme as string)
     const currentTheme = computed(() => themes[currentThemeName.value] || themes.woosooWarm)
     const setTheme = (themeName: string) => {
         if (themes[themeName]) {

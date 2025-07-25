@@ -20,19 +20,11 @@
             </template>
         </div>
     </div>
-    <el-dialog
-        v-model="isModalShow"
-        align-center
-        width="800"
-    >
-        <WoosooHomeCartPreview/>
-    </el-dialog>
 </template>
 
 <script setup>
 const guestCountView = ref(false)
 const packageView = ref(false)
-const isModalShow = ref(false)
 const myDeviceStore = useMyDeviceStore()
 const { hasDevice } = storeToRefs(myDeviceStore)
 
@@ -42,14 +34,12 @@ if (!hasDevice.value) {
 const changeGuestCountView = () => {
     guestCountView.value = !guestCountView.value
     packageView.value = false
-    isModalShow.value = false
 }
 const changePackageView = () => {
     packageView.value = !packageView.value
     guestCountView.value = false
-    isModalShow.value = false
 }
 const changeIncludeItemsModalStatus = () => {
-    isModalShow.value = !isModalShow.value
+    navigateTo('woosoo/menu')
 }
 </script>
