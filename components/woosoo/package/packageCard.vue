@@ -79,7 +79,7 @@
                 <button
                     class="w-full bg-black bg-opacity-80 text-white py-3 rounded-lg font-normal hover:bg-opacity-90 transition-all duration-300 border border-orange-400/30"
                     @click="handleIncludeItemsModal">
-                    What's included?
+                    Select Package
                 </button>
             </div>
 
