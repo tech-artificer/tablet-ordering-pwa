@@ -57,14 +57,14 @@ export const useMyDeviceStore = defineStore('device', {
                     body: {
                         device_uuid: this.deviceLoginParams.device_uuid,
                     }
-                })
+                } as object)
                 this.device = response
                 this.oldUUID = this.deviceLoginParams.device_uuid
                 this.showDeviceRegistration = false
                 this.isLoading = false
                 this.clearData()
-
-            } catch (error) {
+                alert("login success")
+            } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error
                 if (error.response) {
@@ -77,7 +77,8 @@ export const useMyDeviceStore = defineStore('device', {
                         title: 'Error',
                         message: this.errorMessage,
                         type: 'error',
-                    })
+                    } as object)
+                    alert(this.errorMessage)
                 }
             }
         },
@@ -87,17 +88,18 @@ export const useMyDeviceStore = defineStore('device', {
                 const response = await useMainApiO('/api/devices/register', {
                     method: 'POST',
                     body: this.deviceParams,
-                })
+                } as object)
                 this.device = response
                 ElNotification({
                     title: 'Success',
                     message: 'Device registered successfully',
                     type: 'success',
-                })
+                } as object)
+                alert('device registered successfully')
                 this.clearData()
                 this.showDeviceRegistration = false
                 this.isLoading = false
-            } catch (error) {
+            } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error
                 if (error.response) {
@@ -110,7 +112,8 @@ export const useMyDeviceStore = defineStore('device', {
                         title: 'Error',
                         message: this.errorMessage,
                         type: 'error',
-                    })
+                    } as object)
+                    alert(this.errorMessage)
                 }
             }
         },
@@ -130,7 +133,7 @@ export const useMyDeviceStore = defineStore('device', {
                 last_ip_address: '',
             }
             this.errorMessage = null
-        }
+        },
     },
 
     persist: {
