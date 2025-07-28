@@ -115,9 +115,12 @@
 const packageStore = usePackageStore()
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
+const menuStore = useMenuStore()
+
 const { selectedPackage, selectedPackageName, packageList, isLoading } = storeToRefs(packageStore)
 const { cartItems } = storeToRefs(cartStore)
 const { count } = storeToRefs(guestStore)
+const { menuItems } = storeToRefs(menuStore)
 
 const validPackages = computed(() => {
     if (!packageList.value || !Array.isArray(packageList.value)) {
@@ -223,15 +226,14 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
         })
 
         if (packageItems && Array.isArray(packageItems)) {
-            const validItems = packageItems.filter(item => item && item.id)
-            cartItems.value = cartItems.value.concat(validItems)
+            menuItems.value = packageItems.filter(item => item && item.id)
 
             cartItems.value.forEach((item, index) => {
                 if (index !== 0) item.price = 0
                 item.quantity = count.value || 1
                 item.menu_id = item.id
                 item.ordered_menu_id = item.id
-                item.subtotal = item.price
+                item.subtotal = item.price || 0
                 item.discount = 0
                 item.tax_amount = 0
                 item.tax = 0

@@ -10,4 +10,4 @@ export const useGuestStore = defineStore('guest', {
         storage: import.meta.client ? localStorage : undefined,
         paths: ['count'],
     },
-})
+} as object)

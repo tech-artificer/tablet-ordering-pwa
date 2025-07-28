@@ -62,16 +62,16 @@
                                             ? 'bg-primary text-white'
                                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     ]"
-                                    :disabled="isFilterLoading"
                                     @click="handleFilterChange(filter)"
                                 >
+
                                     {{ filter.charAt(0).toUpperCase() + filter.slice(1) }}
                                 </button>
                             </template>
                         </div>
 
                         <!-- Menu Grid Skeleton -->
-                        <div v-if="isLoading || isFilterLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <el-skeleton v-for="n in 6" :key="n" animated>
                                 <template #template>
                                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -97,7 +97,7 @@
                         <!-- Actual Menu Grid -->
                         <WoosooProductMenu
                             v-else
-                            :data="menuItems"
+                            :data="filteredMenuItems"
                             @add-to-cart="addToCart"
                         />
                     </div>
@@ -130,7 +130,7 @@
                                 </div>
 
                                 <!-- Total -->
-                                <div class="mt-6 pt-4 border-t border-gray-200">
+                                <div class="mt-6 pt-4 border-gray-200">
                                     <el-skeleton-item variant="text" style="width: 100%;" />
                                     <el-skeleton-item variant="button" style="width: 100%; height: 48px;" />
                                 </div>
@@ -151,21 +151,21 @@
 import { debounce } from 'lodash-es'
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
-import { useCategoryStore } from '@/stores/Category'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
-const categoryStore = useCategoryStore()
 
 const { cartItems } = storeToRefs(cartStore)
 const { menuItems, featureItems } = storeToRefs(menuStore)
-const { categories } = storeToRefs(categoryStore)
 
 const isLoading = ref(true)
-const isFilterLoading = ref(false)
-
 const searchQuery = ref('')
-const activeFilter = ref(CategoryFilter.ALL)
+const activeFilter = ref('ALL')
+
+// Helper function to extract value from reactive objects
+const extractValue = (item) => {
+    return item?._custom?.value || item
+}
 
 onMounted(async () => {
     try {
@@ -184,52 +184,53 @@ onMounted(async () => {
     }
 })
 
+// Generate unique filters from menuItems
 const filters = computed(() => {
-    if (isLoading.value) return []
-    return [
-        CategoryFilter.ALL,
-        ...categories.value.map(item => item.name),
-    ]
+    if (isLoading.value || !menuItems.value) return ['ALL']
+
+    const uniqueGroups = new Set()
+
+    menuItems.value.forEach(item => {
+        const itemValue = extractValue(item)
+        if (itemValue?.group) {
+            uniqueGroups.add(itemValue.group)
+        }
+    })
+
+    return ['ALL', ...Array.from(uniqueGroups).sort()]
 })
 
-const handleFilterChange = async (newFilter) => {
+// Filter menu items based on active filter and search query
+const filteredMenuItems = computed(() => {
+    if (!menuItems.value) return []
+
+    let filtered = menuItems.value.map(item => extractValue(item))
+
+    // Filter by category/group
+    if (activeFilter.value !== 'ALL') {
+        filtered = filtered.filter(item =>
+            item?.group === activeFilter.value
+        )
+    }
+
+    // Filter by search query
+    if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase().trim()
+        filtered = filtered.filter(item =>
+            item?.name?.toLowerCase().includes(query) ||
+            item?.kitchen_name?.toLowerCase().includes(query) ||
+            item?.group?.toLowerCase().includes(query) ||
+            item?.category?.toLowerCase().includes(query)
+        )
+    }
+
+    return filtered
+})
+
+const handleFilterChange = (newFilter) => {
     if (newFilter === activeFilter.value) return
-
-    try {
-        isFilterLoading.value = true
-        activeFilter.value = newFilter
-        searchQuery.value = ''
-
-        if (newFilter === CategoryFilter.ALL) {
-            await menuStore.getAllMenus()
-        } else {
-            await menuStore.getMenuByCategory(newFilter)
-        }
-    } catch (error) {
-        console.error('Error filtering by category:', error)
-    } finally {
-        isFilterLoading.value = false
-    }
-}
-
-const handleSearch = async (query) => {
-    try {
-        isFilterLoading.value = true
-
-        if (!query || query.trim() === '') {
-            if (activeFilter.value === CategoryFilter.ALL) {
-                await menuStore.getAllMenus()
-            } else {
-                await menuStore.getMenuByCategory(activeFilter.value)
-            }
-        } else {
-            await menuStore.searchMenus(query.trim())
-        }
-    } catch (error) {
-        console.error('Error searching menus:', error)
-    } finally {
-        isFilterLoading.value = false
-    }
+    activeFilter.value = newFilter
+    searchQuery.value = '' // Clear search when changing filter
 }
 
 const resetSession = () => {
@@ -238,11 +239,12 @@ const resetSession = () => {
 }
 
 const debouncedSearch = debounce((event) => {
-    const query = event.target.value
-    handleSearch(query)
+    searchQuery.value = event.target.value
 }, 300)
 
 const addToCart = (item) => {
+    if (!item || !item.price) item.price = 0
+    if (!item || !item.quantity) item.quantity = 1
     cartStore.addToCart({
         ...item
     })

@@ -23,7 +23,6 @@ interface Device {
 interface DeviceLoginParams {
     device_uuid: string,
 }
-
 export const useMyDeviceStore = defineStore('device', {
     state: () => ({
         device: {} as Device,
@@ -56,7 +55,7 @@ export const useMyDeviceStore = defineStore('device', {
                     method: 'POST',
                     body: {
                         device_uuid: this.deviceLoginParams.device_uuid,
-                    }
+                    } as object
                 })
                 this.device = response
                 this.oldUUID = this.deviceLoginParams.device_uuid
@@ -64,7 +63,7 @@ export const useMyDeviceStore = defineStore('device', {
                 this.isLoading = false
                 this.clearData()
 
-            } catch (error) {
+            } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error
                 if (error.response) {
@@ -77,7 +76,7 @@ export const useMyDeviceStore = defineStore('device', {
                         title: 'Error',
                         message: this.errorMessage,
                         type: 'error',
-                    })
+                    } as object)
                 }
             }
         },
@@ -99,18 +98,18 @@ export const useMyDeviceStore = defineStore('device', {
                 this.isLoading = false
             } catch (error) {
                 this.isLoading = false
-                this.errorMessage = error
-                if (error.response) {
-                    if (error.response._data.errors) {
-                        this.errorMessage = error.response._data.errors
+                this.errorMessage = error as string
+                if (error as any) {
+                    if (error?.response._data.errors) {
+                        this.errorMessage = error?.response._data.errors
                     } else {
-                        this.errorMessage = error.response._data.message
+                        this.errorMessage = error?.response._data.message
                     }
                     ElNotification({
                         title: 'Error',
                         message: this.errorMessage,
                         type: 'error',
-                    })
+                    } as object)
                 }
             }
         },

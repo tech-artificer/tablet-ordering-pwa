@@ -116,7 +116,7 @@
             <div
                 v-for="item in cartStore.cartItems"
                 :key="item.id"
-                class="flex justify-between items-center px-6 rounded-lg border-b border-gray-100 last:border-b-0"
+                class="flex justify-between items-center px-3 rounded-lg border-b border-gray-100 last:border-b-0"
             >
                 <div class="flex items-center gap-3">
                     <CommonImage
