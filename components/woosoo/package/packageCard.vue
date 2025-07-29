@@ -250,15 +250,6 @@ const handleIncludeItemsModal = () => {
     emit('changeIncludeItemsModalStatus')
 }
 
-onMounted(async () => {
-    try {
-        await packageStore.getSetMeals()
-        initializeSelectedPackage()
-    } catch (error) {
-        console.error('Failed to fetch packages:', error)
-    }
-})
-
 watch(() => packageList.value, () => {
     if (packageList.value.length > 0) {
         initializeSelectedPackage()

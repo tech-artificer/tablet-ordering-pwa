@@ -16,7 +16,6 @@ export enum CategoryFilter {
     VEGETARIAN = 'vegetarian',
     SEAFOOD = 'seafood',
     SIDES = 'sides',
-    DESSERT = 'dessert',
     BEST = 'best',
     NEW = 'new',
     STAFF_CHOICE = 'staff choice',
@@ -24,7 +23,7 @@ export enum CategoryFilter {
     MEATS = 'meats',
     SIDES_BANCHAN = 'sides (banchan)',
     A_LA_CARTE = 'a la carte',
-    DESSERTS = 'desserts',
+    DESSERT = 'desserts',
     BEVERAGE = 'beverage',
 }
 

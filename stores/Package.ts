@@ -26,6 +26,9 @@ interface Package {
 export const usePackageStore = defineStore('package', {
     state: () => ({
         packageList: [] as Array<Package>,
+        sideList: [] as Array<Menu>,
+        desertList: [] as Array<Menu>,
+        beverageList: [] as Array<Menu>,
         selectedPackage: null as number | null,
         selectedPackageName: null as string | null,
         isLoading: false as boolean,
@@ -50,12 +53,66 @@ export const usePackageStore = defineStore('package', {
             } finally {
                 this.isLoading = false
             }
+        },
+        async getSides () {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/menus/group', {
+                    method: 'GET',
+                    params: {
+                        group: CategoryFilter.SIDES
+                    }
+                })
+                this.sideList = Array.isArray(response) ? response : response.data || []
+                console.log('Sides fetched successfully:', this.sideList)
+            } catch (error) {
+                console.error('Error fetching sides:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
+        async getDesserts () {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/menus/group', {
+                    method: 'GET',
+                    params: {
+                        group: CategoryFilter.DESSERT
+                    }
+                })
+                this.desertList = Array.isArray(response) ? response : response.data || []
+                console.log('Deserts fetched successfully:', this.desertList)
+            } catch (error) {
+                console.error('Error fetching deserts:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
+        async getBeverage() {
+            this.isLoading = true
+            try {
+                const response = await useMainApiAuth('/api/menus/category', {
+                    method: 'GET',
+                    params: {
+                        category: CategoryFilter.BEVERAGE
+                    }
+                })
+                this.beverageList = Array.isArray(response) ? response : response.data || []
+                console.log('Beverage fetched successfully:', this.beverageList)
+            } catch (error) {
+                console.error('Error fetching beverage:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
         }
     },
 
     persist: {
         key: 'package-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['packageList', 'selectedPackage', 'selectedPackageName'],
+        paths: ['packageList', 'sideList', 'desertList', 'beverageList', 'selectedPackage', 'selectedPackageName'],
     }
 })

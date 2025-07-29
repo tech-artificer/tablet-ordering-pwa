@@ -54,7 +54,7 @@
                             </template>
                             <template v-else>
                                 <button
-                                    v-for="filter in filters"
+                                    v-for="filter in mainFilter"
                                     :key="filter"
                                     :class="[
                                         'px-4 py-2 rounded-lg font-medium transition-colors text-responsive-sm whitespace-nowrap flex-shrink-0',
@@ -97,7 +97,7 @@
                         <!-- Actual Menu Grid -->
                         <WoosooProductMenu
                             v-else
-                            :data="filteredMenuItems"
+                            :data="filteredMainMenuItems"
                             @add-to-cart="addToCart"
                         />
                     </div>
@@ -151,16 +151,28 @@
 import { debounce } from 'lodash-es'
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
+import { usePackageStore } from '@/stores/Package'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
+const packageStore = usePackageStore()
 
 const { cartItems } = storeToRefs(cartStore)
 const { menuItems, featureItems } = storeToRefs(menuStore)
+const { sideList, desertList, beverageList } = storeToRefs(packageStore)
 
 const isLoading = ref(true)
 const searchQuery = ref('')
-const activeFilter = ref('ALL')
+const activeFilter = ref('')
+const showMainFilter = ref(true)
+const mainFilterTabs = ref([
+    CategoryFilter.MEATS,
+    CategoryFilter.SIDES_BANCHAN,
+    CategoryFilter.A_LA_CARTE,
+    CategoryFilter.DESSERT,
+    CategoryFilter.BEVERAGE,
+])
+
 
 // Helper function to extract value from reactive objects
 const extractValue = (item) => {
@@ -168,6 +180,7 @@ const extractValue = (item) => {
 }
 
 onMounted(async () => {
+    activeFilter.value = showMainFilter.value ? 'MEATS' : 'CURRENT PACKAGE'
     try {
         isLoading.value = true
         await Promise.all([
@@ -184,53 +197,37 @@ onMounted(async () => {
     }
 })
 
-// Generate unique filters from menuItems
-const filters = computed(() => {
-    if (isLoading.value || !menuItems.value) return ['ALL']
-
-    const uniqueGroups = new Set()
-
-    menuItems.value.forEach(item => {
-        const itemValue = extractValue(item)
-        if (itemValue?.group) {
-            uniqueGroups.add(itemValue.group)
-        }
-    })
-
-    return ['ALL', ...Array.from(uniqueGroups).sort()]
+const mainFilter = computed(() => {
+    return mainFilterTabs.value.map(filter => filter.toUpperCase())
 })
 
-// Filter menu items based on active filter and search query
-const filteredMenuItems = computed(() => {
+const filteredMainMenuItems = computed(() => {
     if (!menuItems.value) return []
 
-    let filtered = menuItems.value.map(item => extractValue(item))
-
-    // Filter by category/group
-    if (activeFilter.value !== 'ALL') {
-        filtered = filtered.filter(item =>
-            item?.group === activeFilter.value
-        )
+    let filtered = []
+    if (activeFilter.value.toLowerCase() === CategoryFilter.MEATS.toLowerCase()) {
+        console.log('meats')
+        filtered = menuItems.value.map(item => extractValue(item))
     }
-
-    // Filter by search query
-    if (searchQuery.value.trim()) {
-        const query = searchQuery.value.toLowerCase().trim()
-        filtered = filtered.filter(item =>
-            item?.name?.toLowerCase().includes(query) ||
-            item?.kitchen_name?.toLowerCase().includes(query) ||
-            item?.group?.toLowerCase().includes(query) ||
-            item?.category?.toLowerCase().includes(query)
-        )
+    if (activeFilter.value.toLowerCase() === CategoryFilter.SIDES_BANCHAN.toLowerCase()) {
+        console.log('sides')
+        filtered = sideList.value
     }
-
+    if (activeFilter.value.toLowerCase() === CategoryFilter.DESSERT.toLowerCase()) {
+        console.log('desert')
+        filtered = desertList.value
+    }
+    if (activeFilter.value.toLowerCase() === CategoryFilter.BEVERAGE.toLowerCase()) {
+        console.log('beverage')
+        filtered = beverageList.value
+    }
     return filtered
 })
 
 const handleFilterChange = (newFilter) => {
     if (newFilter === activeFilter.value) return
     activeFilter.value = newFilter
-    searchQuery.value = '' // Clear search when changing filter
+    searchQuery.value = ''
 }
 
 const resetSession = () => {

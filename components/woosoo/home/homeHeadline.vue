@@ -27,9 +27,23 @@
     </div>
 </template>
 <script setup>
+import { usePackageStore } from '@/stores/Package'
+const packageStore = usePackageStore()
 const emit = defineEmits(['changeGuestCountView'])
 
 const changeGuestCountView = () => {
     emit('changeGuestCountView')
 }
+onMounted(async () => {
+    await packageStore.getSetMeals()
+    if (packageStore.sideList) {
+        await packageStore.getSides()
+    }
+    if (packageStore.desertList) {
+        await packageStore.getDesserts()
+    }
+    if (packageStore.beverageList) {
+        await packageStore.getBeverage()
+    }
+})
 </script>
