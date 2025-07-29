@@ -77,9 +77,22 @@
             <!-- What's Included Button -->
             <div class="absolute bottom-6 left-6 right-6">
                 <button
-                    class="w-full bg-black bg-opacity-80 text-white py-3 rounded-lg font-normal hover:bg-opacity-90 transition-all duration-300 border border-orange-400/30"
-                    @click="handleIncludeItemsModal">
-                    Select Package
+                    :disabled="isSelecting && selectingPackageId === pkg.id"
+                    :class="[
+                        'w-full py-3 rounded-lg font-normal transition-all duration-300 border border-orange-400/30',
+                        (isSelecting && selectingPackageId === pkg.id)
+                            ? 'bg-orange-600 text-white cursor-not-allowed'
+                            : 'bg-black bg-opacity-80 text-white hover:bg-opacity-90'
+                    ]"
+                    @click="handleSelectPackage(pkg.id, pkg.items, pkg.name, pkg.price)"
+                >
+                    <!-- Loading spinner for the specific package being selected -->
+                    <div v-if="isSelecting && selectingPackageId === pkg.id" class="flex items-center justify-center">
+                        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Selecting...
+                    </div>
+                    <!-- Default button text -->
+                    <span v-else>Select Package</span>
                 </button>
             </div>
 
@@ -111,6 +124,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 
 const packageStore = usePackageStore()
 const cartStore = useCartStore()
@@ -121,6 +135,10 @@ const { selectedPackage, selectedPackageName, packageList, isLoading } = storeTo
 const { cartItems } = storeToRefs(cartStore)
 const { count } = storeToRefs(guestStore)
 const { menuItems } = storeToRefs(menuStore)
+
+// Loading state for package selection
+const isSelecting = ref(false)
+const selectingPackageId = ref(null)
 
 const validPackages = computed(() => {
     if (!packageList.value || !Array.isArray(packageList.value)) {
@@ -241,6 +259,33 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
         }
     } catch (error) {
         console.error('Error selecting package:', error)
+    }
+}
+
+// New function to handle the button click with loading
+const handleSelectPackage = async (packageId, packageItems, packageName, price) => {
+    if (isSelecting.value) return // Prevent multiple clicks
+
+    try {
+        // Set loading state for the specific package
+        isSelecting.value = true
+        selectingPackageId.value = packageId
+
+        // Simulate API call or processing time (2 seconds)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        // Call the original package selection logic
+        handlePackageSelect(packageId, packageItems, packageName, price)
+
+        // Emit the modal change event
+        handleIncludeItemsModal()
+
+    } catch (error) {
+        console.error('Error during package selection:', error)
+    } finally {
+        // Reset loading state
+        isSelecting.value = false
+        selectingPackageId.value = null
     }
 }
 

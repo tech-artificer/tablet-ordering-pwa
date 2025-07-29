@@ -199,11 +199,11 @@ watch(
     (newVal) => {
         if (newVal === OrderStatus.COMPLETE) {
             setTimeout(() => {
-                navigateTo('/')
-                cartStore.orderStatus = OrderStatus.PENDING
                 cartStore.cartItems = []
                 cartStore.cartStatus = false
-                currentOrderId.value = null // Reset current order ID
+                currentOrderId.value = null
+                cartStore.orderStatus = OrderStatus.PENDING
+                navigateTo('/')
             }, 3000)
         }
     }

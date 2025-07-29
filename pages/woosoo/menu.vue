@@ -30,9 +30,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
-                        <div class="hidden">
-                            <el-button class="bg-primary text-white" @click="resetSession()">reset</el-button>
-                        </div>
                         <!-- Featured Item -->
                         <div class="mb-6">
                             <el-skeleton v-if="isLoading" animated>
@@ -228,11 +225,6 @@ const handleFilterChange = (newFilter) => {
     if (newFilter === activeFilter.value) return
     activeFilter.value = newFilter
     searchQuery.value = ''
-}
-
-const resetSession = () => {
-    cartStore.clearCart()
-    navigateTo('/')
 }
 
 const debouncedSearch = debounce((event) => {

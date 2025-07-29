@@ -168,7 +168,7 @@
         </template>
     </el-dialog>
 
-    <!-- Success Modal -->
+    <!-- Success Modal with Auto-Close -->
     <el-dialog
         v-model="isSuccessModalShow"
         align-center
@@ -198,6 +198,11 @@
                     </p>
                 </div>
                 <p class="text-sm text-gray-500">You will receive a confirmation email shortly.</p>
+                <div v-if="autoCloseCountdown > 0" class="mt-4 p-2 bg-blue-50 rounded-lg">
+                    <p class="text-sm text-green-600">
+                        Close automatically in {{ autoCloseCountdown }} seconds
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -275,6 +280,8 @@ const isErrorModalShow = ref(false)
 const orderNumber = ref('')
 const orderTotal = ref(0)
 const errorMessage = ref('')
+const autoCloseCountdown = ref(0)
+const autoCloseTimer = ref(null)
 
 const updateQuantity = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
@@ -283,8 +290,31 @@ const updateQuantity = (itemId, newQuantity) => {
         cartStore.updateQuantity(itemId, newQuantity)
     }
 }
+
 const removeFromCart = (itemId) => {
     cartStore.removeFromCart(itemId)
+}
+
+const startAutoCloseTimer = () => {
+    autoCloseCountdown.value = 10
+
+    autoCloseTimer.value = setInterval(() => {
+        autoCloseCountdown.value--
+
+        if (autoCloseCountdown.value <= 0) {
+            clearInterval(autoCloseTimer.value)
+            autoCloseTimer.value = null
+            closeSuccessModal()
+        }
+    }, 1000)
+}
+
+const clearAutoCloseTimer = () => {
+    if (autoCloseTimer.value) {
+        clearInterval(autoCloseTimer.value)
+        autoCloseTimer.value = null
+    }
+    autoCloseCountdown.value = 0
 }
 
 const placeOrder = async () => {
@@ -303,6 +333,7 @@ const placeOrder = async () => {
         orderStore.orders.push(cartStore.order)
         orderStore.current_order = cartStore.order
         orderNumber.value = orderStore.current_order.order_number
+        startAutoCloseTimer()
     } catch (error) {
         console.error('Error placing order:', error)
         errorMessage.value = cartStore.errorMessage || 'An unexpected error occurred while processing your order.'
@@ -320,6 +351,7 @@ const closeCartModal = () => {
 }
 
 const closeSuccessModal = () => {
+    clearAutoCloseTimer()
     isSuccessModalShow.value = false
     orderNumber.value = ''
     orderTotal.value = 0
@@ -335,6 +367,16 @@ const retryOrder = () => {
     errorMessage.value = ''
     isCartModalShow.value = true
 }
+
+watch(isSuccessModalShow, (newValue) => {
+    if (!newValue) {
+        clearAutoCloseTimer()
+    }
+})
+
+onUnmounted(() => {
+    clearAutoCloseTimer()
+})
 </script>
 
 <style scoped>
