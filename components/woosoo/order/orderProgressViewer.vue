@@ -10,67 +10,27 @@
         :close-on-click-modal="false"
         :close-on-press-escape="false">
         <!-- Pending State -->
-        <div v-if="cartStore.orderStatus === OrderStatus.CONFIRMED" class="order-pending">
-            <h1 class="text-2xl font-bold mt-10">Order Confirmed</h1>
-            <div class="flex justify-center">
-                <CommonImage
-                    src="/logo/logo2.png"
-                    alt="logo"
-                    class="w-20 h-20"
-                />
-            </div>
-
-            <!-- Chef Animation -->
-            <div class="chef-container">
-                <div class="chef-illustration">
-                    <!-- Chef SVG -->
-                    <svg width="120" height="120" viewBox="0 0 120 120" class="chef-svg">
-                        <!-- Chef Hat -->
-                        <ellipse cx="60" cy="35" rx="25" ry="15" fill="#ffa07a" stroke="#" stroke-width="2" />
-                        <!-- Chef Head -->
-                        <circle cx="60" cy="55" r="20" fill="black" />
-                        <!-- Chef Body -->
-                        <rect x="45" y="70" width="30" height="35" rx="15" fill="black" />
-                        <!-- Chef Arms -->
-                        <circle cx="40" cy="80" r="8" fill="black" />
-                        <circle cx="80" cy="80" r="8" fill="black" />
-                        <!-- Cooking Pan -->
-                        <ellipse cx="60" cy="95" rx="15" ry="8" fill="#ffffff" class="cooking-pan" />
-                        <!-- Steam Animation -->
-                        <g class="steam">
-                            <path d="M50 88 Q52 82 50 78" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.7" />
-                            <path d="M60 88 Q62 82 60 78" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.7" />
-                            <path d="M70 88 Q72 82 70 78" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.7" />
-                        </g>
-                    </svg>
-                </div>
-
-                <!-- orange Circle Background -->
-                <div class="gray-circle" />
-            </div>
-
-            <!-- Status Text -->
-            <div class="status-text">
-                <p>Preparing your food</p>
-                <p>Please wait . .</p>
-            </div>
-        </div>
-
+        <WoosooOrderCardConfirm
+            v-if="cartStore.orderStatus === OrderStatus.CONFIRMED"
+        />
         <!-- Complete State -->
-        <div v-else-if="cartStore.orderStatus === OrderStatus.COMPLETE" class="order-complete">
-            <div class="complete-animation mt-10">
-                <div class="flex justify-center mb-4">
-                    <CommonImage
-                        src="/logo/logo2.png"
-                        alt="logo"
-                        class="w-20 h-20"
-                    />
-                </div>
-
-                <h2 class="complete-title">Order Prepareing Complete !</h2>
-                <p class="complete-message">Your delicious food is being prepared and will arrive shortly.</p>
-            </div>
-        </div>
+        <WoosooOrderCardState
+            v-if="cartStore.orderStatus === OrderStatus.COMPLETE"
+            title="Order Prepareing Complete !"
+            description="Your delicious food is being prepared and will arrive shortly."
+        />
+        <!-- Void State -->
+        <WoosooOrderCardState
+            v-else-if="cartStore.orderStatus === OrderStatus.VOIDED"
+            title="Order Voided"
+            description="Your order has been voided."
+        />
+        <!-- Cancelled State -->
+        <WoosooOrderCardState
+            v-else-if="cartStore.orderStatus === OrderStatus.CANCELLED"
+            title="Order Cancelled"
+            description="Your order has been cancelled."
+        />
     </el-drawer>
 </template>
 
@@ -109,6 +69,8 @@ const setupOrderListening = (orderId) => {
     window.Echo.channel(`orders.${orderId}`)
         .listen('.order.created', (orderEvent) => handleOrderCreated(orderEvent))
         .listen('.order.completed', (orderEvent) => handleOrderCompleted(orderEvent))
+        .listen('.order.voided', (orderEvent) => handleOrderVoided(orderEvent))
+        .listen('.order.cancelled', (orderEvent) => handleOrderCancelled(orderEvent))
         .error((error) => {
             console.error('Display.vue: Error connecting to order channel:', error)
         })
@@ -143,6 +105,39 @@ onUnmounted(() => {
 })
 
 const handleOrderCreated = (orderEvent) => {
+    console.log('New order received:', orderEvent)
+    console.log('Current cart status:', cartStore.cartStatus)
+
+    if (orderEvent && orderEvent.order) {
+        const order = orderEvent.order
+
+        // Update the current order in the store
+        orderStore.current_order = order
+
+        // Set up listening for this specific order
+        if (order.order_id && order.order_id !== currentOrderId.value) {
+            setupOrderListening(order.order_id)
+        }
+    }
+}
+
+const handleOrderVoided = (orderEvent) => {
+    console.log('New order received:', orderEvent)
+    console.log('Current cart status:', cartStore.cartStatus)
+
+    if (orderEvent && orderEvent.order) {
+        const order = orderEvent.order
+
+        // Update the current order in the store
+        orderStore.current_order = order
+
+        // Set up listening for this specific order
+        if (order.order_id && order.order_id !== currentOrderId.value) {
+            setupOrderListening(order.order_id)
+        }
+    }
+}
+const handleOrderCancelled = (orderEvent) => {
     console.log('New order received:', orderEvent)
     console.log('Current cart status:', cartStore.cartStatus)
 
