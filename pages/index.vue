@@ -13,7 +13,7 @@
             <!-- Top left sushi -->
             <div class="floating-food absolute animate-float-slow h-56 w-56">
                 <CommonImage
-                    src="/images/1.png"
+                    :src="CustomImage.IMAGE_1"
                     alt="sushi rolls"
                     class="object-cover transform hover:scale-110 transition-transform duration-300"
                 />
@@ -21,7 +21,7 @@
             <!-- Top right meat -->
             <div class="floating-food absolute top-0 right-0 animate-float-medium h-56 w-56">
                 <CommonImage
-                    src="/images/4.png"
+                    :src="CustomImage.IMAGE_4"
                     alt="grilled meat"
                     class="object-cover rounded-lg shadow-2xl transform rotate-15 hover:scale-110 transition-transform duration-300"
                 />
@@ -29,7 +29,7 @@
             <!-- Bottom left fried item -->
             <div class="floating-food absolute bottom-0 left-0 animate-float-fast h-56 w-56">
                 <CommonImage
-                    src="/images/3.png"
+                    :src="CustomImage.IMAGE_3"
                     alt="fried food"
                     class="object-cover rounded-lg shadow-2xl transform rotate-0 hover:scale-110 transition-transform duration-300"
                 />
@@ -37,7 +37,7 @@
             <!-- Bottom right rolled item -->
             <div class="floating-food absolute bottom-0 right-0 animate-float-slow h-56 w-56">
                 <CommonImage
-                    src="/images/2.png"
+                    :src="CustomImage.IMAGE_2"
                     alt="rolled food"
                     class="object-cover rounded-lg shadow-2xl transform -rotate-0 hover:scale-110 transition-transform duration-300"
                 />

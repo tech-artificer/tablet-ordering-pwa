@@ -7,7 +7,7 @@
             :alt="name || 'Order item'"
             class="w-6 h-6 object-cover rounded-lg"
             loading="lazy"
-            @error="$event.target.src = '/images/logo/logo2.png'"
+            @error="$event.target.src = '/images/'+CustomLogo.LOGO_2"
         >
         <div class="flex-1">
             <h4 class="font-medium">{{ name }}</h4>

@@ -2,11 +2,7 @@
     <!-- Void State -->
     <div class="order-void">
         <div class="flex justify-center">
-            <CommonImage
-                src="/logo/logo2.png"
-                alt="logo"
-                class="w-20 h-20"
-            />
+            <CommonLogo />
         </div>
 
         <h2 class="text-2xl font-bold mt-10">{{ title }}</h2>

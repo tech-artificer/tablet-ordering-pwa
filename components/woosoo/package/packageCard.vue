@@ -193,7 +193,7 @@ const initializeSelectedPackage = () => {
                             tax: 0,
                             price: defaultPackage.price || 0,
                             subtotal: defaultPackage.price || 0,
-                            img_url: '/logo/logo2.png'
+                            img_url: CustomLogo.LOGO_2
                         },
                         ...defaultPackage.items.map(item => ({
                             ...item,
@@ -240,7 +240,7 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
             tax_amount: 0,
             tax: 0,
             price: price || 0,
-            img_url: '/logo/logo2.png'
+            img_url: CustomLogo.LOGO_2
         })
 
         if (packageItems && Array.isArray(packageItems)) {

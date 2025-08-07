@@ -27,7 +27,6 @@ export enum CategoryFilter {
     BEVERAGE = 'beverage',
 }
 
-
 export enum OrderStatus {
     PENDING = 'pending',
     IN_PROGRESS = 'in progress',
@@ -37,4 +36,20 @@ export enum OrderStatus {
     READY = 'ready',
     SERVED = 'served',
     VOIDED = 'voided',
+}
+
+export enum CustomLogo {
+    LOGO_1 = '/logo/logo1.png',
+    LOGO_2 = '/logo/logo2.png',
+}
+
+export enum CustomImage {
+    IMAGE_1 = '/images/1.png',
+    IMAGE_2 = '/images/2.png',
+    IMAGE_3 = '/images/3.png',
+    IMAGE_4 = '/images/4.png',
+}
+
+export enum TestSite {
+    GOOGLE = 'https://www.google.com/favicon.ico',
 }

@@ -105,11 +105,7 @@
         <div>
             <div class="mb-6 text-center">
                 <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <CommonImage
-                        src="/logo/logo2.png"
-                        alt="logo"
-                        :class="'w-20 h-20'"
-                    />
+                    <CommonLogo />
                 </div>
                 <h3 class="text-xl font-semibold mb-2">Confirm Your Order</h3>
                 <p class="text-gray-600">Please review your order details before confirming</p>
@@ -181,11 +177,7 @@
         <div class="text-center">
             <div class="mb-6">
                 <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <CommonImage
-                        src="/logo/logo2.png"
-                        alt="logo"
-                        :class="'w-20 h-20'"
-                    />
+                    <CommonLogo />
                 </div>
                 <h3 class="text-2xl font-bold text-green-600 mb-2">Order Placed Successfully!</h3>
                 <p class="text-gray-600 mb-4">Thank you for your order. We've received your request and will process it shortly.</p>
@@ -231,11 +223,7 @@
         <div class="text-center">
             <div class="mb-6">
                 <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <CommonImage
-                        src="/logo/logo2.png"
-                        alt="logo"
-                        :class="'w-20 h-20'"
-                    />
+                    <CommonLogo />
                 </div>
                 <h3 class="text-2xl font-bold text-red-600 mb-2">Order Failed</h3>
                 <p class="text-gray-600 mb-4">We're sorry, but there was an issue processing your order.</p>

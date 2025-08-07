@@ -10,26 +10,6 @@
                 <!-- Main Content -->
                 <el-main class="flex-1 min-w-0 p-0">
                     <div class="h-full py-6">
-
-                        <!-- Search Bar Skeleton -->
-                        <div class="relative mb-6 hidden">
-                            <el-skeleton v-if="isLoading" animated class="hidden">
-                                <template #template>
-                                    <el-skeleton-item variant="rect" style="width: 100%; height: 48px; border-radius: 8px;" />
-                                </template>
-                            </el-skeleton>
-                            <input
-                                v-else
-                                v-model="searchQuery"
-                                type="text"
-                                placeholder="Search"
-                                class="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                @input="debouncedSearch"
-                            >
-                            <svg v-if="!isLoading" class="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
                         <!-- Featured Item -->
                         <div class="mb-6">
                             <el-skeleton v-if="isLoading" animated>
@@ -145,7 +125,6 @@
 </template>
 
 <script setup>
-import { debounce } from 'lodash-es'
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
 import { usePackageStore } from '@/stores/Package'
@@ -184,7 +163,6 @@ onMounted(async () => {
             menuStore.exampleData(),
             menuStore.getAllMenus(),
         ])
-
         setTimeout(() => {
             isLoading.value = false
         }, 1000)
@@ -200,7 +178,6 @@ const mainFilter = computed(() => {
 
 const filteredMainMenuItems = computed(() => {
     if (!menuItems.value) return []
-
     let filtered = []
     if (activeFilter.value.toLowerCase() === CategoryFilter.MEATS.toLowerCase()) {
         console.log('meats')
@@ -226,10 +203,6 @@ const handleFilterChange = (newFilter) => {
     activeFilter.value = newFilter
     searchQuery.value = ''
 }
-
-const debouncedSearch = debounce((event) => {
-    searchQuery.value = event.target.value
-}, 300)
 
 const addToCart = (item) => {
     if (!item || !item.price) item.price = 0

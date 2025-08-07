@@ -87,7 +87,7 @@ export const useMenuStore = defineStore('menu', {
             }
         },
 
-        async getMenuByCategory(category) {
+        async getMenuByCategory(category: string) {
             if (this.currentFilter === category && !this.currentSearchQuery) {
                 return
             }
@@ -99,7 +99,7 @@ export const useMenuStore = defineStore('menu', {
                     params: {
                         category: category
                     }
-                })
+                } as object)
 
                 this.menuItems = Array.isArray(response) ? response : response.data || []
                 this.currentFilter = category
@@ -114,7 +114,7 @@ export const useMenuStore = defineStore('menu', {
             }
         },
 
-        async searchMenus(query) {
+        async searchMenus(query: string) {
             if (this.currentSearchQuery === query) {
                 return
             }
@@ -126,7 +126,7 @@ export const useMenuStore = defineStore('menu', {
                     params: {
                         q: query
                     }
-                })
+                } as object)
 
                 this.menuItems = Array.isArray(response) ? response : response.data || []
                 this.currentFilter = null
@@ -141,7 +141,7 @@ export const useMenuStore = defineStore('menu', {
             }
         },
 
-        async getMenuByCourse(course) {
+        async getMenuByCourse(course: string) {
             if (this.currentFilter === `course_${course}` && !this.currentSearchQuery) {
                 return
             }
@@ -153,7 +153,7 @@ export const useMenuStore = defineStore('menu', {
                     params: {
                         course: course
                     }
-                })
+                } as object)
 
                 this.menuItems = Array.isArray(response) ? response : response.data || []
                 this.currentFilter = `course_${course}`

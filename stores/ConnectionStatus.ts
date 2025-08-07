@@ -12,7 +12,7 @@ export const useConnectionStatus = defineStore('connection-status', {
     actions: {
         async checkInternet() {
             try {
-                await fetch('https://www.google.com/favicon.ico', {
+                await fetch(TestSite.GOOGLE, {
                     method: 'HEAD',
                     mode: 'no-cors',
                     cache: 'no-cache'

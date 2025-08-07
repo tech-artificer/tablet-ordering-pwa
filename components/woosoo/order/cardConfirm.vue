@@ -2,11 +2,7 @@
     <div class="order-pending">
         <h1 class="text-2xl font-bold mt-10">Order Confirmed</h1>
         <div class="flex justify-center">
-            <CommonImage
-                src="/logo/logo2.png"
-                alt="logo"
-                class="w-20 h-20"
-            />
+            <CommonLogo />
         </div>
 
         <!-- Chef Animation -->

@@ -3,11 +3,7 @@
         <!-- Logo Section -->
         <div class="p-6 border-b flex justify-center">
             <NuxtLink to="/" >
-                <CommonImage
-                    src="/logo/logo2.png"
-                    alt="logo"
-                    class="w-24 h-24"
-                />
+                <CommonLogo />
             </NuxtLink>
         </div>
         <!-- Staff Menu -->

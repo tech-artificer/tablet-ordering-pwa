@@ -1,7 +1,7 @@
 {
     "name": "Woosoo",
     "short_name": "Woosoo",
-    "description": "Woosoo is a web application that allows users to order food from restaurants.",
+    "description": "Woosoo tablet",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#ffffff",

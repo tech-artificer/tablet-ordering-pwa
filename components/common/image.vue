@@ -5,11 +5,7 @@
                 <div class="image-slot"> {{ placeholder }} </div>
             </template>
             <template #error>
-                <CommonImage
-                    src="/logo/logo2.png"
-                    alt="logo"
-                    :class="styleClass"
-                />
+                <CommonLogo />
             </template>
         </el-image>
     </div>

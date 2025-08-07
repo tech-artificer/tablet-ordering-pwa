@@ -5,7 +5,7 @@
             <!-- Logo -->
             <div>
                 <CommonImage
-                    src="/logo/logo1.png"
+                    :src="CustomLogo.LOGO_1"
                     alt="logo"
                     :class="{'w-24 h-24': packageView, 'w-48 h-48': !packageView}"
                 />

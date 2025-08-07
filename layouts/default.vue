@@ -4,15 +4,11 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0 viewport-fit=cover">
-        <title>Document</title>
+        <title>Woosoo - Tablet</title>
     </head>
     <body>
         <div v-if="deviceIsMobile" class="bg-white text-center">
-            <CommonImage
-                src="/logo/logo2.png"
-                alt="Logo"
-                class="w-24 h-24 mx-auto pt-24"
-            />
+            <CommonLogo />
             <p class="text-xl font-semibold pt-28"> Mobile Device Not allowed </p>
         </div>
         <div v-else>

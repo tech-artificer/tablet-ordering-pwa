@@ -62,7 +62,7 @@ export const usePackageStore = defineStore('package', {
                     params: {
                         group: CategoryFilter.SIDES
                     }
-                })
+                } as object)
                 this.sideList = Array.isArray(response) ? response : response.data || []
                 console.log('Sides fetched successfully:', this.sideList)
             } catch (error) {
@@ -80,7 +80,7 @@ export const usePackageStore = defineStore('package', {
                     params: {
                         group: CategoryFilter.DESSERT
                     }
-                })
+                } as object)
                 this.desertList = Array.isArray(response) ? response : response.data || []
                 console.log('Deserts fetched successfully:', this.desertList)
             } catch (error) {
@@ -98,7 +98,7 @@ export const usePackageStore = defineStore('package', {
                     params: {
                         category: CategoryFilter.BEVERAGE
                     }
-                })
+                } as object)
                 this.beverageList = Array.isArray(response) ? response : response.data || []
                 console.log('Beverage fetched successfully:', this.beverageList)
             } catch (error) {

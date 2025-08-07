@@ -8,10 +8,8 @@
             }"
             @error="handleImageError"
         />
-
         <!-- Orange Gradient Overlay -->
         <div class="absolute inset-0 bg-gradient-to-r from-orange-300 to-orange-0" />
-
         <!-- Content Layer -->
         <div class="relative flex flex-col justify-end text-white p-8">
             <p class="text-sm opacity-90 mb-2 font-light tracking-wide">{{ category || 'Product of the day' }}</p>
@@ -23,24 +21,25 @@
 
 <script setup>
 defineProps({
-name: {
-    type: String,
-    default: null
-},
-price: {
-    type: Number,
-    default: 0
-},
-category: {
-    type: String,
-    default: null
-},
-image: {
-    type: String,
-    default: null
-}
+    name: {
+        type: String,
+        default: null
+    },
+    price: {
+        type: Number,
+        default: 0
+    },
+    category: {
+        type: String,
+        default: null
+    },
+    image: {
+        type: String,
+        default: null
+    }
 })
+
 const handleImageError = (event) => {
-    event.target.src = '/images/logo/logo2.png'
+    event.target.src = '/images/'+CustomLogo.LOGO_2
 }
 </script>
