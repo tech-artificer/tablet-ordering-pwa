@@ -32,7 +32,7 @@ export const useCategoryStore = defineStore('category', {
                 {id: 2, name: CategoryFilter.MEATS},
                 {id: 3, name: CategoryFilter.SIDES_BANCHAN},
                 {id: 4, name: CategoryFilter.A_LA_CARTE},
-                {id: 5, name: CategoryFilter.DESSERTS},
+                {id: 5, name: CategoryFilter.DESSERT},
                 {id: 6, name: CategoryFilter.BEVERAGE},
             ]
         },

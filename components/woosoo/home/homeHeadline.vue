@@ -35,17 +35,15 @@ const changeGuestCountView = () => {
     emit('changeGuestCountView')
 }
 onMounted(async () => {
-    if (!packageStore.packageList) {
-        await packageStore.getSetMeals()
+    await packageStore.getSetMeals()
+    if (packageStore.sideList.length < 0) {
+        packageStore.getSides()
     }
-    if (!packageStore.sideList) {
-        await packageStore.getSides()
+    if (packageStore.desertList.length < 0) {
+        packageStore.getDesserts()
     }
-    if (packageStore.desertList) {
-        await packageStore.getDesserts()
-    }
-    if (packageStore.beverageList) {
-        await packageStore.getBeverage()
+    if (packageStore.beverageList.length < 0) {
+        packageStore.getBeverage()
     }
 })
 </script>

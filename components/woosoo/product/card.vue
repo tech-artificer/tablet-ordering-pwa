@@ -13,7 +13,7 @@
                 <WoosooProductRating :rating="item.rating" />
             </div>
         </div>
-        <div class="p-4">
+        <div v-show="!item.is_modifier" class="p-4">
             <h3 class="font-semibold text-responsive mb-1">{{ item.name }}</h3>
             <p class="text-gray-500 text-sm mb-3">{{ item.description }}</p>
             <div class="flex justify-between items-center">
@@ -63,6 +63,39 @@
                 >
                     Add to cart
                 </button>
+            </div>
+        </div>
+        <div v-show="item.is_modifier" class="p-4">
+            <h3 class="font-semibold text-responsive mb-1">{{ item.name }}</h3>
+            <div class="flex justify-between items-center">
+                <span v-show="item.price || item.price === 0" class="font-semibold text-lg">₱{{ item.price || 0.00 }}</span>
+                <div class="flex justify-center mt-4 gap-2">
+                    <div class="flex items-center space-x-2">
+                        <button
+                            class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+                            :disabled="quantity <= 1"
+                            @click="decreaseQuantity"
+                        >
+                            -
+                        </button>
+                        <span class="text-sm font-medium w-8 text-center">{{ quantity }}</span>
+                        <button
+                            class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
+                            :disabled="quantity >= 20"
+                            @click="increaseQuantity"
+                        >
+                            +
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button
+                            class="w-full p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors font-medium"
+                            @click="confirmAddToCart"
+                        >
+                            Add to cart
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

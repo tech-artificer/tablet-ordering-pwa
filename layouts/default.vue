@@ -28,9 +28,6 @@
 import { storeToRefs } from 'pinia'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
 import { useCategoryStore } from '@/stores/Category'
-import { useMyDeviceStore } from '@/stores/Device'
-import { useCartStore } from '@/stores/Cart'
-import { useOrderStore } from '@/stores/Order'
 
 // PWA Setup
 useHead({
@@ -68,7 +65,6 @@ const {
 
 const deviceIsMobile = ref(false)
 const categoryStore = useCategoryStore()
-const orderStore = useOrderStore()
 
 
 onMounted(() => {
