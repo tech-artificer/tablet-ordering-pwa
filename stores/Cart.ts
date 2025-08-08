@@ -117,7 +117,7 @@ export const useCartStore = defineStore('cart', {
 
         formatPrice(price: number): string {
             return new Intl.NumberFormat('en-PH', {
-                minimumFractionDigits: 0,
+                minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }).format(price)
         }
