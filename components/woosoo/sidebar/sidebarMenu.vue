@@ -6,6 +6,8 @@
                 <CommonLogo />
             </NuxtLink>
         </div>
+        <!-- Device Name -->
+        <WoosooDeviceName />
         <!-- Staff Menu -->
         <WoosooSupportMenu />
     </div>
