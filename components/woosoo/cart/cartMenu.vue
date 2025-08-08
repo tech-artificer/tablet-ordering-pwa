@@ -9,7 +9,7 @@
         <div class="flex-1 overflow-y-auto px-4 py-2 min-h-0">
             <div class="space-y-4">
                 <div
-                    v-for="item in cartStore.cartItems"
+                    v-for="item,index in cartStore.cartItems"
                     :key="item.id"
                     class="flex items-center gap-3 border-b border-gray-100 last:border-b-0"
                 >
@@ -24,6 +24,7 @@
                         <div class="flex items-center justify-between mt-2">
                             <div class="flex items-center space-x-2">
                                 <button
+                                    v-show="index > 0"
                                     class="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
                                     @click="updateQuantity(item.id, item.quantity - 1)"
                                 >
@@ -33,6 +34,7 @@
                                 </button>
                                 <span class="text-sm font-medium w-8 text-center">{{ item.quantity }}</span>
                                 <button
+                                    v-show="index > 0"
                                     class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
                                     @click="updateQuantity(item.id, item.quantity + 1)"
                                 >
