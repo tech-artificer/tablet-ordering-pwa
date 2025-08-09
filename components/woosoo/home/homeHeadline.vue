@@ -36,14 +36,9 @@ const changeGuestCountView = () => {
 }
 onMounted(async () => {
     await packageStore.getSetMeals()
-    if (packageStore.sideList.length < 0) {
         packageStore.getSides()
-    }
-    if (packageStore.desertList.length < 0) {
         packageStore.getDesserts()
-    }
-    if (packageStore.beverageList.length < 0) {
         packageStore.getBeverage()
     }
-})
+)
 </script>
