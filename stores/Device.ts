@@ -48,14 +48,11 @@ export const useMyDeviceStore = defineStore('device', {
     },
 
     actions: {
-        async loginDevice() {
+        async checkDevice () {
             this.isLoading = true
             try {
                 const response = await useMainApiO('/api/devices/login', {
-                    method: 'POST',
-                    body: {
-                        device_uuid: this.deviceLoginParams.device_uuid,
-                    } as object
+                    method: 'GET',
                 })
                 this.device = response
                 this.oldUUID = this.deviceLoginParams.device_uuid
@@ -64,20 +61,7 @@ export const useMyDeviceStore = defineStore('device', {
                 this.clearData()
 
             } catch (error: any) {
-                this.isLoading = false
-                this.errorMessage = error
-                if (error.response) {
-                    if (error.response._data.errors) {
-                        this.errorMessage = error.response._data.errors
-                    } else {
-                        this.errorMessage = error.response._data.message
-                    }
-                    ElNotification({
-                        title: 'Error',
-                        message: this.errorMessage,
-                        type: 'error',
-                    } as object)
-                }
+                this.showDeviceRegistration = true
             }
         },
         async registerDevice() {
@@ -112,11 +96,6 @@ export const useMyDeviceStore = defineStore('device', {
                     } as object)
                 }
             }
-        },
-        async getIPAddress() {
-            const response = await fetch('https://api.ipify.org?format=json')
-            const data = await response.json()
-            return data.ip
         },
         async clearData() {
             this.deviceLoginParams = {

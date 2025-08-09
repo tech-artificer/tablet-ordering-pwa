@@ -1,7 +1,7 @@
 <template>
     <div class="min-w-[25vw] max-w-[400px]">
         <template v-if="showDeviceLogin">
-            <WoosooDeviceLogin @login-device="loginDevice"/>
+            <WoosooDeviceLogin @check-device="checkDevice"/>
         </template>
         <template v-else>
             <div class="w-full">
@@ -25,9 +25,6 @@
                     >
                         Register
                     </button>
-                    <p class="text-sm text-center cursor-pointer text-primary" @click="loginDevice()">
-                        Login <span class="text-white">instead</span>
-                    </p>
                 </div>
             </div>
         </template>
@@ -43,13 +40,9 @@ const { deviceParams } = storeToRefs(myDeviceStore)
 onMounted(async () => {
     myDeviceStore.clearData()
     deviceParams.value.app_version = runtimeConfig.public.appVersion
-    deviceParams.value.last_ip_address = await myDeviceStore.getIPAddress()
 })
 const registerDevice = () => {
     myDeviceStore.registerDevice()
-}
-const loginDevice = () => {
-    showDeviceLogin.value = !showDeviceLogin.value
 }
 const showDeviceLogin = ref(false)
 </script>

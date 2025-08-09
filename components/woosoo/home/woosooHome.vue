@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-screen min-w-screen">
+    <div class="min-h-screen min-w-screen flex justify-center items-center">
         <!-- Main content -->
         <div class="relative z-10 flex flex-col items-center justify-center px-4">
             <!-- Logo -->
@@ -27,10 +27,13 @@ const guestCountView = ref(false)
 const packageView = ref(false)
 const myDeviceStore = useMyDeviceStore()
 const { hasDevice } = storeToRefs(myDeviceStore)
+onMounted(async () => {
+    await myDeviceStore.checkDevice()
+    if (!hasDevice.value) {
+        myDeviceStore.showDeviceRegistration = true
+    }
+})
 
-if (!hasDevice.value) {
-    myDeviceStore.showDeviceRegistration = true
-}
 const changeGuestCountView = () => {
     guestCountView.value = !guestCountView.value
     packageView.value = false
@@ -42,4 +45,5 @@ const changePackageView = () => {
 const changeIncludeItemsModalStatus = () => {
     navigateTo('woosoo/menu')
 }
+
 </script>
