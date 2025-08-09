@@ -1,6 +1,6 @@
 <template>
     <div
-        class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+        class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden relative"
     >
         <div class="aspect-square relative">
             <CommonImage
@@ -11,6 +11,11 @@
             />
             <div v-show="item.rating" class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
                 <WoosooProductRating :rating="item.rating" />
+            </div>
+
+            <!-- Circular Receipt Name Badge -->
+            <div v-show="item.is_modifier" class="absolute top-3 right-3 bg-primary text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg">
+                <span class="text-sm font-bold">{{ item.receipt_name || 'P1' }}</span>
             </div>
         </div>
 
@@ -53,7 +58,7 @@
                         Add
                     </button>
                     <button
-                        class="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                        class="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary/80 transition-colors font-medium"
                         @click="cancelQuantitySelection"
                     >
                         Cancel
@@ -69,6 +74,8 @@
                 </button>
             </div>
         </div>
+
+        <!-- Modifier Product Layout -->
         <div v-show="item.is_modifier" class="p-4">
             <h3 class="font-semibold text-responsive mb-3">{{ item.name }}</h3>
             <div>
@@ -94,7 +101,7 @@
                     </div>
 
                     <button
-                        class="flex items-center justify-center gap-2 p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors font-medium min-w-[80px]"
+                        class="flex items-center justify-center gap-2 p-2 bg-primary text-white rounded-lg hover:bg-orange-200 transition-colors font-medium min-w-[80px]"
                         @click="confirmAddToCart"
                     >
                         Add To Cart
@@ -106,7 +113,6 @@
 </template>
 
 <script setup>
-
 const showQuantity = ref(false)
 const quantity = ref(1)
 
