@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-[500px] w-full bg-white">
+    <div class="min-h-[500px] w-full bg-white flex flex-col justify-evenly">
         <!-- Clean table -->
         <WoosooSupportCard
             title="Clean table"
