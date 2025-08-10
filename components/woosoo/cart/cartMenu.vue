@@ -9,8 +9,8 @@
         <div class="flex-1 overflow-y-auto px-4 py-2 min-h-0">
             <div class="space-y-4">
                 <div
-                    v-for="item in cartStore.cartItems"
-                    :key="item.id"
+                    v-for="item, index in cartStore.cartItems"
+                    :key="index"
                     class="flex items-center gap-3 border-b border-gray-100 last:border-b-0"
                 >
                     <CommonImage
@@ -25,16 +25,17 @@
                             <div class="flex items-center space-x-2">
                                 <button
                                     class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
-                                    @click="updateQuantity(item.id, item.quantity - 1)"
+                                    @click="updateQuantity(index, item.id, item.quantity - 1)"
                                 >
-                                    <svg class="w-4 h-4 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg v-if="index > 0" class="w-4 h-4 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
+                                    <p v-else>-</p>
                                 </button>
                                 <span class="text-sm font-medium w-4 text-center">{{ item.quantity }}</span>
                                 <button
                                     class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
-                                    @click="updateQuantity(item.id, item.quantity + 1)"
+                                    @click="updateQuantity(index, item.id, item.quantity + 1)"
                                 >
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -271,8 +272,10 @@ const errorMessage = ref('')
 const autoCloseCountdown = ref(0)
 const autoCloseTimer = ref(null)
 
-const updateQuantity = (itemId, newQuantity) => {
-    if (newQuantity <= 0) {
+const updateQuantity = (index, itemId, newQuantity) => {
+    if (newQuantity <= 0 && index === 0) {
+        cartStore.updateQuantity(itemId, 1)
+    } else if (newQuantity <= 0) {
         removeFromCart(itemId)
     } else {
         cartStore.updateQuantity(itemId, newQuantity)
