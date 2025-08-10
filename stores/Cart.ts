@@ -25,7 +25,7 @@ export const useCartStore = defineStore('cart', {
         isLoading: false,
         vatRate: 0.12,
         cartStatus: false,
-        orderStatus: null,
+        orderStatus: OrderStatus.PENDING,
         order: null,
         orderParams: {
             guest_count: null,

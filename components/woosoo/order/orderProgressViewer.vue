@@ -37,9 +37,12 @@
 <script setup>
 import { useCartStore } from '@/stores/Cart'
 import { useOrderStore } from '@/stores/Order'
+import { useGuestStore } from '@/stores/Guest'
 
+const guestStore = useGuestStore()
 const cartStore = useCartStore()
 const orderStore = useOrderStore()
+
 const estimatedTime = ref(21)
 const progress = ref(0)
 const progressWidth = ref(0)
@@ -194,13 +197,11 @@ watch(
     (newVal) => {
         if (newVal === OrderStatus.COMPLETE) {
             setTimeout(() => {
-                cartStore.cartItems = []
-                cartStore.cartStatus = false
                 currentOrderId.value = null
-                cartStore.isLoading = false
-                cartStore.orderStatus = OrderStatus.PENDING
+                guestStore.$reset()
+                cartStore.$reset()
                 navigateTo('/')
-            }, 3000)
+            }, 2000)
         }
     }
 )
