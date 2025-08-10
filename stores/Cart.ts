@@ -59,7 +59,6 @@ export const useCartStore = defineStore('cart', {
                     body: this.orderParams,
                 })
                 this.order = response
-                this.isLoading = false
             } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error

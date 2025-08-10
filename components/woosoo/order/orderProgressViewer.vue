@@ -197,6 +197,7 @@ watch(
                 cartStore.cartItems = []
                 cartStore.cartStatus = false
                 currentOrderId.value = null
+                cartStore.isLoading = false
                 cartStore.orderStatus = OrderStatus.PENDING
                 navigateTo('/')
             }, 3000)

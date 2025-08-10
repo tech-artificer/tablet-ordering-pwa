@@ -84,7 +84,7 @@
 
             <!-- Place Order Button -->
             <button
-                v-if="!cartStore.cartStatus"
+                v-show="!cartStore.isLoading"
                 class="w-full py-3 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 :disabled="cartStore.isLoading"
                 @click="confirmOrder"
