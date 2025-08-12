@@ -17,14 +17,11 @@ export default defineNuxtConfig({
         '@nuxt/fonts'
     ],
     fonts: {
-        provider: 'google',
-        google: {
-            families: {
-                Inter: [300, 400, 500, 600, 700],
-                Kanit: [300, 400, 500, 600, 700],
-                Raleway: [300, 400, 500, 600, 700],
-            }
-        }
+        families: [
+            { name: 'Kanit', provider: 'google', weights: [300, 400, 500, 600, 700] },
+            { name: 'Inter', provider: 'google', weights: [300, 400, 500, 600, 700] },
+            { name: 'Raleway', provider: 'google', weights: [300, 400, 500, 600, 700] }
+        ]
     },
     app: {
         head: {
