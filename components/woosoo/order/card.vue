@@ -2,13 +2,13 @@
     <div
         class="flex items-center space-x-3"
     >
-        <img
+        <NuxtImg
             :src="image"
             :alt="name || 'Order item'"
             class="w-6 h-6 object-cover rounded-lg"
             loading="lazy"
             @error="$event.target.src = '/images/'+CustomLogo.LOGO_2"
-        >
+        />
         <div class="flex-1">
             <h4 class="font-medium">{{ name }}</h4>
             <p class="text-sm text-gray-500">{{ description }}</p>

@@ -93,11 +93,11 @@
                                 :key="index"
                                 class="w-8 h-8 rounded-full border-2 border-white overflow-hidden"
                             >
-                                <img
+                                <NuxtImg
                                     :src="item.image"
                                     :alt="item.name"
                                     class="w-full h-full object-cover"
-                                >
+                                />
                             </div>
                             <div
                                 v-if="order.details.length > 3"
@@ -148,11 +148,11 @@
                         :key="item.id"
                         class="flex items-center bg-gray-50 rounded-lg p-3"
                     >
-                        <img
+                        <NuxtImg
                             :src="item.image"
                             :alt="item.name"
                             class="w-12 h-12 rounded-lg object-cover mr-3"
-                        >
+                        />
                         <div class="flex-1">
                             <h5 class="font-medium text-gray-800">{{ item.name }}</h5>
                             <p class="text-sm text-gray-500">{{ item.quantity }}x ₱{{ formatPrice(item.price) }}</p>

@@ -2,11 +2,11 @@
     <div class="min-h-screen min-w-screen bg-black relative overflow-hidden">
         <!-- Animated background flames -->
         <div class="absolute inset-0 pointer-events-none">
-            <img
+            <NuxtImg
                 src="/gif/flame.gif"
                 alt="flames"
                 class="absolute opacity-60 p-0 m-0 w-full h-full"
-            >
+            />
         </div>
         <!-- Floating food items -->
         <div class="absolute inset-0 pointer-events-none">
