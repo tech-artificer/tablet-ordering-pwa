@@ -23,7 +23,7 @@ export enum CategoryFilter {
     MEATS = 'meats',
     SIDES_BANCHAN = 'sides (banchan)',
     A_LA_CARTE = 'a la carte',
-    DESSERT = 'desserts',
+    DESSERT = 'dessert',
     BEVERAGE = 'beverage',
 }
 

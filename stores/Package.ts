@@ -75,10 +75,10 @@ export const usePackageStore = defineStore('package', {
         async getDesserts () {
             this.isLoading = true
             try {
-                const response = await useMainApiAuth('/api/menus/group', {
+                const response = await useMainApiAuth('/api/menus/course', {
                     method: 'GET',
                     params: {
-                        group: CategoryFilter.DESSERT
+                        course: CategoryFilter.DESSERT
                     }
                 } as object)
                 this.desertList = Array.isArray(response) ? response : response.data || []

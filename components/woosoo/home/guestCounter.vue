@@ -39,13 +39,23 @@
     </div>
 </template>
 <script setup>
+
 const guestStore = useGuestStore()
 const { count } = storeToRefs(guestStore)
-if (!count.value) {
-    count.value = 1
-}
+const defaultCount = ref(1)
+
+// if (!count.value) {
+//     count.value = defaultCount.value
+// }
+
 const changePackageView = () => {
     emit('changePackageView')
 }
+
 const emit = defineEmits(['changePackageView'])
+
+onMounted(() => {
+    count.value = defaultCount.value
+})
+
 </script>
