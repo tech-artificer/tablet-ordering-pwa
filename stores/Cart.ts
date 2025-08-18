@@ -20,7 +20,8 @@ interface OrderParams {
 
 export const useCartStore = defineStore('cart', {
     state: () => ({
-        errorMessage: "" as string,
+        errorMessage: null as string | null,
+        successMessage: null as string | null,
         cartItems: [] as Array<Cart>,
         isLoading: false,
         vatRate: 0.12,
@@ -59,6 +60,7 @@ export const useCartStore = defineStore('cart', {
                     body: this.orderParams,
                 })
                 this.order = response
+                this.successMessage = "Order placed successfully"
             } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error

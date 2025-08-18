@@ -4,7 +4,11 @@ export const useGuestStore = defineStore('guest', {
     state: () => ({
         count: 1,
     }),
-    actions: {},
+    actions: {
+        setGuest(count: number) {
+            this.count = count
+        },
+    },
     persist: {
         key: 'guest-store',
         storage: import.meta.client ? localStorage : undefined,

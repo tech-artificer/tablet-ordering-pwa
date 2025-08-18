@@ -1,9 +1,6 @@
 <template>
     <div class="min-w-[25vw] max-w-[400px]">
-        <template v-if="showDeviceLogin">
-            <WoosooDeviceLogin @check-device="checkDevice"/>
-        </template>
-        <template v-else>
+        <div>
             <div class="w-full">
                 <h1 class="text-white text-center mb-4">Register a new device</h1>
                 <div>
@@ -27,7 +24,7 @@
                     </button>
                 </div>
             </div>
-        </template>
+        </div>
     </div>
 </template>
 <script setup>
@@ -44,5 +41,4 @@ onMounted(async () => {
 const registerDevice = () => {
     myDeviceStore.registerDevice()
 }
-const showDeviceLogin = ref(false)
 </script>
