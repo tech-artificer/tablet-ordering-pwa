@@ -11,22 +11,8 @@
         :close-on-press-escape="false">
         <!-- Pending State -->
         <WoosooOrderCardConfirm
-            v-if="cartStore.orderStatus === OrderStatus.CONFIRMED" />
-        <!-- Complete State -->
-        <WoosooOrderCardState
-            v-if="cartStore.orderStatus === OrderStatus.COMPLETE"
-            title="Order Prepareing Complete !"
-            description="Your delicious food is being prepared and will arrive shortly." />
-        <!-- Void State -->
-        <WoosooOrderCardState
-            v-else-if="cartStore.orderStatus === OrderStatus.VOIDED"
-            title="Order Voided"
-            description="Your order has been voided." />
-        <!-- Cancelled State -->
-        <WoosooOrderCardState
-            v-else-if="cartStore.orderStatus === OrderStatus.CANCELLED"
-            title="Order Cancelled"
-            description="Your order has been cancelled." />
+            v-if="cartStore.orderStatus === OrderStatus.CONFIRMED"
+        />
     </el-drawer>
 </template>
 <script setup>
