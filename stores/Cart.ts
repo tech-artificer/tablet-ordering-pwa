@@ -27,6 +27,7 @@ export const useCartStore = defineStore('cart', {
         vatRate: 0.12,
         cartStatus: false,
         orderStatus: OrderStatus.PENDING,
+        isLocked: false,
         order: null,
         orderParams: {
             guest_count: null,
@@ -61,6 +62,7 @@ export const useCartStore = defineStore('cart', {
                 })
                 this.order = response
                 this.successMessage = "Order placed successfully"
+                this.isLocked = true
             } catch (error: any) {
                 this.isLoading = false
                 this.errorMessage = error

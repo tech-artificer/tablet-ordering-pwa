@@ -41,3 +41,265 @@
         </div>
     </div>
 </template>
+<style scoped>
+.order-drawer {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.order-pending {
+    padding: 20px;
+    text-align: center;
+}
+
+.delivery-time-section {
+    margin-bottom: 30px;
+}
+
+.delivery-label {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.delivery-time {
+    font-size: 36px;
+    font-weight: bold;
+    color: #333;
+    margin: 0;
+}
+
+.chef-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 40px 0;
+}
+
+.gray-circle {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    background: linear-gradient(135deg, #e88d1e 0%, rgb(255, 81, 0) 100%);
+    border-radius: 50%;
+    z-index: 1;
+}
+
+.chef-illustration {
+    position: relative;
+    z-index: 2;
+}
+
+.chef-svg {
+    animation: bounce 2s infinite;
+}
+
+.steam {
+    animation: steam 1.5s infinite;
+}
+
+.cooking-pan {
+    animation: shake 0.5s infinite;
+}
+
+.progress-section {
+    margin: 30px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff6b6b, #ff8787);
+    transition: width 0.3s ease;
+}
+
+.progress-dots {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    transition: background 0.3s ease;
+}
+
+.dot.active {
+    background: #ff6b6b;
+}
+
+.status-text {
+    margin: 30px 0;
+    padding: 0 20px;
+    color: #666;
+    line-height: 1.5;
+}
+
+.order-details {
+    margin-top: 40px;
+    text-align: left;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.order-details h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.order-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.order-item:last-child {
+    border-bottom: none;
+}
+
+.item-name {
+    flex: 1;
+}
+
+.item-quantity {
+    margin: 0 10px;
+    color: #666;
+}
+
+.item-price {
+    font-weight: bold;
+    color: #333;
+}
+
+.order-total {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 2px solid #ddd;
+    text-align: right;
+}
+
+/* Complete State Styles */
+.order-complete {
+    padding: 30px 20px;
+    text-align: center;
+}
+
+.complete-animation {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.success-icon {
+    margin-bottom: 20px;
+    margin: auto;
+    animation: scale 0.5s ease-out;
+}
+
+.complete-title {
+    color: #4CAF50;
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.complete-message {
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.delivery-info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.delivery-info p {
+    margin: 5px 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.action-buttons .el-button {
+    flex: 1;
+    max-width: 150px;
+}
+
+/* Animations */
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes steam {
+    0% {
+        opacity: 0.7;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-1px);
+    }
+    75% {
+        transform: translateX(1px);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes scale {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+</style>
+

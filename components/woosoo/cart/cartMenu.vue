@@ -36,7 +36,7 @@
                         <div class="flex items-center justify-between mt-2">
                             <div class="flex items-center space-x-2">
                                 <button
-                                    v-if="index > 0"
+                                    v-if="index > 0 && !cartStore.isLocked"
                                     class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
                                     @click="updateQuantity(index, item.id, item.quantity - 1)"
                                 >
@@ -60,7 +60,7 @@
                                 </svg>
                                 <span class="text-sm font-medium w-4 text-center">{{ item.quantity }}</span>
                                 <button
-                                    v-if="index > 0"
+                                    v-if="index > 0 && !cartStore.isLocked"
                                     class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors"
                                     @click="updateQuantity(index, item.id, item.quantity + 1)"
                                 >
@@ -112,12 +112,12 @@
 
             <!-- Place Order Button -->
             <button
-                v-show="!cartStore.isLoading"
+                v-show="!cartStore.isLocked"
                 class="w-full py-3 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                :disabled="cartStore.isLoading"
+                :disabled="cartStore.isLocked"
                 @click="confirmOrder"
             >
-                {{ cartStore.isLoading ? 'Processing...' : 'Review Order' }}
+                {{ cartStore.isLocked ? 'Processing...' : 'Review Order' }}
             </button>
         </div>
     </div>
@@ -347,8 +347,7 @@ const placeOrder = async () => {
         cartStore.orderParams.items = cartStore.cartItems
         await cartStore.confirmOrder()
         isCartModalShow.value = false
-        if ( cartStore.successMessage.value )
-        {
+        if ( cartStore.isLocked ) {
             isSuccessModalShow.value = true
             orderStore.orders.push(cartStore.order)
             orderStore.current_order = cartStore.order

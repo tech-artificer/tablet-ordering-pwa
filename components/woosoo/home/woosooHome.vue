@@ -27,10 +27,14 @@ const guestCountView = ref(false)
 const packageView = ref(false)
 const myDeviceStore = useMyDeviceStore()
 const { hasDevice } = storeToRefs(myDeviceStore)
+const cartStore = useCartStore()
 onMounted(async () => {
     await myDeviceStore.checkDevice()
     if (!hasDevice.value) {
         myDeviceStore.showDeviceRegistration = true
+    }
+    if(cartStore.isLocked){
+        navigateTo('woosoo/menu')
     }
 })
 
