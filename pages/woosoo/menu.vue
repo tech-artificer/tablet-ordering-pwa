@@ -128,10 +128,12 @@
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
 import { usePackageStore } from '@/stores/Package'
+import { useOrderStore } from '@/stores/Order'
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
 const packageStore = usePackageStore()
+const orderStore = useOrderStore()
 
 const { cartItems } = storeToRefs(cartStore)
 const { menuItems, featureItems } = storeToRefs(menuStore)
@@ -169,6 +171,9 @@ onMounted(async () => {
     } catch (error) {
         console.error('Error loading initial data:', error)
         isLoading.value = false
+    }
+    if (!orderStore.current_order) {
+        navigateTo('/')
     }
 })
 
