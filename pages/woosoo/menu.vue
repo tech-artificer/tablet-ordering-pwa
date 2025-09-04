@@ -172,9 +172,9 @@ onMounted(async () => {
         console.error('Error loading initial data:', error)
         isLoading.value = false
     }
-    if (!orderStore.current_order) {
-        navigateTo('/')
-    }
+    // if (!orderStore.current_order) {
+    //     navigateTo('/')
+    // }
 })
 
 const mainFilter = computed(() => {
