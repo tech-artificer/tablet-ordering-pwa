@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
     font-family: 'Kanit', sans-serif;
     /* Primary Colors - Using your primary color #F6B56D */
@@ -97,28 +101,57 @@
     --el-box-shadow-base: 0 2px 4px rgba(45, 27, 18, 0.12), 0 0 6px rgba(45, 27, 18, 0.04)!important;
     --el-box-shadow-dark: 0 4px 8px rgba(45, 27, 18, 0.15)!important;
 }
-@media screen and (orientation: landscape) {
-    /* Your landscape styles */
-    body {
-        width: 99vw;
-        height: 100vh;
-    }
+
+:root {
+    --breakpoint-xs: 375px;
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+    
+    /* Spacing system */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
 }
 
-/* Force landscape layout */
-@media screen and (min-width: 768px) and (max-width: 1024px) {
-    html {
-        scroll-behavior: smooth!important;
-        transform: rotate(90deg);
-        transform-origin: center center;
-        width: 100vh;
-        height: 100vw;
-        overflow-x: hidden;
-        position: absolute;
-        top: 100%;
-        left: 0;
-    }
+@layer components {
+  .responsive-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
+  }
+  
+  .responsive-text {
+    @apply text-sm sm:text-base md:text-lg lg:text-xl;
+  }
+  
+  .responsive-padding {
+    @apply p-4 sm:p-6 md:p-8 lg:p-10;
+  }
+  
+  .section-container {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8;
+  }
 }
+
+/* Utility classes for common patterns */
+@layer utilities {
+  .aspect-ratio-16-9 {
+    aspect-ratio: 16 / 9;
+  }
+  
+  .aspect-ratio-4-3 {
+    aspect-ratio: 4 / 3;
+  }
+  
+  .aspect-ratio-square {
+    aspect-ratio: 1 / 1;
+  }
+}
+
 
 /* Additional Component Customizations */
 .el-button {

@@ -7,7 +7,7 @@
         <title>Woosoo - Tablet</title>
     </head>
     <body>
-        <div v-if="deviceIsMobile" class="bg-white text-center">
+        <!-- <div v-if="deviceIsMobile" class="bg-white text-center">
             <CommonLogo />
             <p class="text-xl font-semibold pt-28"> Mobile Device Not allowed </p>
         </div>
@@ -19,7 +19,18 @@
             <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">
                 <NuxtPage :transition="pageTransition" />
             </main>
+        </div> -->
+
+        <div>
+            <CommonSlideDown
+                :show-notification="showNotification"
+                :is-really-online="isReallyOnline"
+            />
+            <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">
+                <NuxtPage :transition="pageTransition" />
+            </main>
         </div>
+        
     </body>
     </html>
 </template>
@@ -101,7 +112,7 @@ const categoryStore = useCategoryStore()
 
 onMounted(() => {
     categoryStore.getStaticCategories()
-    deviceIsMobile.value = window.innerWidth < 480
+    // deviceIsMobile.value = window.innerWidth < 480
 
     // Initialize route history
     routeHistory.value = [route.fullPath]
@@ -112,7 +123,7 @@ onMounted(() => {
     })
 
     window.addEventListener('resize', () => {
-        deviceIsMobile.value = window.innerWidth < 480
+        // deviceIsMobile.value = window.innerWidth < 480
     })
     window.addEventListener('online', updateOnlineStatus)
     window.addEventListener('offline', updateOnlineStatus)
