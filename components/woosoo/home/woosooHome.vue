@@ -11,7 +11,8 @@
                 />
             </div>
             <template v-if="!myDeviceStore.showDeviceRegistration">
-                <WoosooHomeHeadline v-show="!guestCountView && !packageView" @change-guest-count-view="changeGuestCountView"/>
+                <!-- <WoosooHomeHeadline v-show="!guestCountView && !packageView" @change-guest-count-view="changeGuestCountView"/> -->
+                 <WoosooHomeHeadline v-show="!guestCountView && !packageView"/>
                 <WoosooHomeGuestCounter v-show="guestCountView && !packageView" @change-package-view="changePackageView"/>
                 <WoosooHomePackage v-show="packageView && !guestCountView" @change-include-items-modal-status="changeIncludeItemsModalStatus"/>
             </template>

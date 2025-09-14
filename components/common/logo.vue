@@ -1,7 +1,7 @@
 <template>
     <CommonImage
-        :src="CustomLogo.LOGO_2"
+        :src="CustomLogo.ICON_1"
         alt="logo"
-        :class="'w-20 h-20'"
+        class="w-14"
     />
 </template>

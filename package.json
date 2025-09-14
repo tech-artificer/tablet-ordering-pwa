@@ -1,5 +1,9 @@
 {
-  "name": "nuxt-app",
+  "name": "wooserve",
+  "version": "1.0.0",
+  "description": "Nuxt 3 application for tablet ordering",
+  "author": "Tech Artificer",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +16,7 @@
   "dependencies": {
     "laravel-echo": "^2.1.5",
     "nuxt": "^3.17.4",
+    "nuxt-lucide-icons": "^1.0.5",
     "pusher-js": "^8.4.0",
     "vue": "^3.5.14",
     "vue-router": "^4.5.1"

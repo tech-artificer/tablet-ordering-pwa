@@ -41,6 +41,7 @@ export enum OrderStatus {
 export enum CustomLogo {
     LOGO_1 = '/logo/logo1.png',
     LOGO_2 = '/logo/logo2.png',
+    ICON_1 = '/logo/icon1.png',
 }
 
 export enum CustomImage {

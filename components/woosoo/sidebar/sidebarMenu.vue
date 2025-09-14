@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full min-h-[200px]">
+    <div class="max-w-[100px]">
         <!-- Logo Section -->
         <div class="p-6 border-b flex justify-center">
             <NuxtLink to="/" >
@@ -9,7 +9,7 @@
         <!-- Device Name -->
         <WoosooDeviceName />
         <!-- Staff Menu -->
-        <WoosooSupportMenu />
+        <!-- <WoosooSupportMenu /> -->
     </div>
 </template>
 

@@ -1,61 +1,79 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
+import { useMyDeviceStore } from '@/stores/Device'
 
-declare global {
-    interface Window {
-        Pusher: typeof Pusher
-        Echo: Echo
+export default defineNuxtPlugin((nuxtApp) => {
+    // Ensure this plugin only runs on the client
+    if (!import.meta.client) {
+        return
     }
-}
 
-export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
-    const deviceStore = useMyDeviceStore()
-
-    // Make Pusher available globally
-    window.Pusher = Pusher
-
-    // Configure Echo with environment variables
-    const echoConfig = {
-        broadcaster: config.public.broadcastConnection || config.public.NUXT_PUBLIC_BROADCAST_CONNECTION,
-        key: config.public.reverb.appKey || config.public.NUXT_PUBLIC_REVERB_APP_KEY,
-        wsHost: config.public.reverb.host || config.public.NUXT_PUBLIC_REVERB_SERVER_HOST,
-        wsPort: config.public.reverb.port || config.public.NUXT_PUBLIC_REVERB_HOST,
-        wssPort: config.public.reverb.port || config.public.NUXT_PUBLIC_REVERB_HOST,
-        forceTLS: config.public.reverb.scheme === 'https' || false,
-        encrypted: config.public.echo.encrypted || false,
-        disableStats: true,
-        enabledTransports: ['ws', 'wss'],
-        cluster: 'mt1',
-        authorizer: () => {
-            return {
-                authorize: (socketId: string, callback: Function) => {
-                    $fetch('/api/broadcasting/auth', {
-                        baseURL: config.public.MAIN_API_URL,
-                        method: 'POST',
-                        headers: {
-                            Authorization: `Bearer ${deviceStore.device.token}`,
-                        },
-                        body: {
-                            socket_id: socketId,
-                        },
-                    })
-                        .then(response => callback(false, response))
-                        .catch(error => callback(true, error))
-                }
-            }
-        }
+    // console.log('config', config)
+    // Minimal required config checks
+    const reverbKey = config.public.reverb.appKey
+    const reverbHost = config.public.reverb.host
+    const mainApi = config.public.mainApiUrl
+    // console.log(reverbKey, reverbHost, mainApi)
+    if (!reverbKey || !reverbHost || !mainApi) {
+        // Missing runtime config — do nothing but warn
+        // This keeps the app running in environments without websockets configured
+        // (e.g., CI, static preview)
+        // eslint-disable-next-line no-console
+        console.warn('[laravel-echo] missing reverb/pusher/runtime config; plugin will not initialize')
+        return
     }
 
-    // Create Echo instance
-    const echo = new Echo(echoConfig)
+    try {
+        const deviceStore = useMyDeviceStore()
 
-    // Make Echo available globally
-    window.Echo = echo
+        // expose Pusher to window for libraries that expect it
+        // (only in client runtime)
+        // @ts-ignore - augmenting window
+        window.Pusher = Pusher
 
-    return {
-        provide: {
-            echo: window.Echo
+        // Build a normalized auth endpoint
+        const authEndpoint = `${String(mainApi).replace(/\/$/, '')}/broadcasting/auth`
+
+        // Prepare headers only if we have a token
+        const token = deviceStore?.device?.token
+        const headers: Record<string, string> = {
+            Accept: 'application/json',
+            'Content-Type': 'application/json'
         }
+        if (token) {
+            headers.Authorization = `Bearer ${token}`
+        }
+
+        const wsPort = config.public.reverb.port ?? 8081
+        const wssPort = wsPort
+
+        const echo = new Echo({
+            broadcaster: 'reverb',
+            key: config.public.reverb.appKey,
+            wsHost: reverbHost,
+            wsPort,
+            wssPort,
+            // set forceTLS based on scheme if provided
+            forceTLS: String(config.public.NUXT_PUBLIC_REVERB_SCHEME || '').toLowerCase() === 'https',
+            disableStats: true,
+            enabledTransports: ['ws', 'wss'],
+            authEndpoint,
+            auth: {
+                headers
+            }
+        })
+
+        // @ts-ignore - attach for global access (used across the app)
+        window.Echo = echo
+
+        // Provide via Nuxt injection
+        nuxtApp.provide('echo', echo)
+
+        // return { provide: { echo } }
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[laravel-echo] initialization failed', err)
+        return
     }
 })

@@ -15,6 +15,10 @@ interface OrderParams {
     guest_count: number | null,
     note: string | null,
     total_amount: number | null,
+    subtotal?: number | null,
+    discount?: number | null,
+    tax?: number | null,
+    table_id?: number | null,
     items: Array<Cart>,
 }
 
@@ -33,6 +37,11 @@ export const useCartStore = defineStore('cart', {
             guest_count: null,
             note: null,
             total_amount: null,
+            subtotal: null,
+            discount: null,
+            tax: null,
+            table_id: null,
+            items: []
         } as OrderParams,
     }),
     getters: {
@@ -53,12 +62,35 @@ export const useCartStore = defineStore('cart', {
         }
     },
     actions: {
-        async confirmOrder() {
+        // async confirmOrder() {
+        //     this.isLoading = true
+        //     try {
+        //         const response = await useMainApiAuth('/api/devices/create-order', {
+        //             method: 'POST',
+        //             body: this.orderParams
+
+        //         })
+        //         this.order = response
+        //         this.successMessage = "Order placed successfully"
+        //         this.isLocked = true
+        //     } catch (error: any) {
+        //         this.isLoading = false
+        //         this.errorMessage = error
+        //         if (error.response) {
+        //             if (error.response._data.errors) {
+        //                 this.errorMessage = error.response._data.errors
+        //             } else {
+        //                 this.errorMessage = error.response._data.message
+        //             }
+        //         }
+        //     }
+        // },
+        async confirmOrder(params: OrderParams) {
             this.isLoading = true
             try {
                 const response = await useMainApiAuth('/api/devices/create-order', {
                     method: 'POST',
-                    body: this.orderParams,
+                    body: params
                 })
                 this.order = response
                 this.successMessage = "Order placed successfully"
@@ -128,6 +160,6 @@ export const useCartStore = defineStore('cart', {
     persist: {
         key: 'cart-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['cartItems'],
+        pick: ['cartItems', 'cartStatus', 'orderStatus', 'isLocked', 'order', 'orderParams', 'confirmOrder'],
     }
 })

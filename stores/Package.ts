@@ -1,31 +1,9 @@
-import { defineStore } from 'pinia'
-interface Menu {
-    id: number,
-    menu_id: number,
-    name: string,
-    barcode: string,
-    price: number,
-    description: string,
-    image: string,
-    category_id: number,
-    restaurant_id: number,
-    rating: number,
-}
-interface Package {
-    id: number,
-    name: string,
-    subtitle: string,
-    price: string,
-    badge: string,
-    bgColor: string,
-    textColor: string,
-    images: string[],
-    items: Array<Menu>
-}
+import type { Package, Menu } from '~/types/index';
+
 
 export const usePackageStore = defineStore('package', {
     state: () => ({
-        packageList: [] as Array<Package>,
+        packageList: [] as Package[],
         sideList: [] as Array<Menu>,
         desertList: [] as Array<Menu>,
         beverageList: [] as Array<Menu>,
@@ -113,6 +91,6 @@ export const usePackageStore = defineStore('package', {
     persist: {
         key: 'package-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['packageList', 'sideList', 'desertList', 'beverageList', 'selectedPackage', 'selectedPackageName'],
+        pick: ['packageList', 'sideList', 'desertList', 'beverageList', 'selectedPackage', 'selectedPackageName'],
     }
 })

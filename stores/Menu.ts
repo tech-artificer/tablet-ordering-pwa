@@ -1,15 +1,4 @@
-import { defineStore } from 'pinia'
-
-interface Menu {
-    id: number,
-    name: string,
-    barcode: string,
-    price: number,
-    description: string,
-    image: string,
-    category_id: number,
-    restaurant_id: number,
-}
+import type { Menu } from '~/types/index';
 
 export const useMenuStore = defineStore('menu', {
     state: () => ({
@@ -58,7 +47,7 @@ export const useMenuStore = defineStore('menu', {
                     image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=300&h=300&fit=crop'
                 },
             ]
-            this.featureItems = menuItemExample
+            this.featureItems = menuItemExample as Array<Menu>
             this.isLoading = false
             console.log('Example menus loaded:', this.featureItems)
         },
@@ -183,6 +172,6 @@ export const useMenuStore = defineStore('menu', {
     persist: {
         key: 'menu-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['featureItems'],
+        pick: ['featureItems'],
     }
 })

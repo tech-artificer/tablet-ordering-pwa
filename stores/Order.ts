@@ -1,13 +1,15 @@
 import { defineStore } from 'pinia'
-interface Order {
-    id: number,
-    details: Array<OrderItem>
-    total: number,
-    tax: number,
-    subTotal: number,
-    date: string
-}
-interface OrderItem {
+import type { Order } from '~/types/index'
+// export interface Order {
+//     id: number,
+//     details: Array<OrderItem>
+//     total: number,
+//     tax: number,
+//     guest_count: number,
+//     subTotal: number,
+//     date: string
+// }
+export interface OrderItem {
     id: number,
     name: string,
     price: number,
@@ -25,6 +27,7 @@ export const useOrderStore = defineStore('order', {
     persist: {
         key: 'order-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['orders', 'current_order'],
+        pick: ['orders', 'current_order'],
     }
+    
 })

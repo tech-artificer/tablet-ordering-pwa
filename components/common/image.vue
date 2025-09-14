@@ -1,44 +1,21 @@
 <template>
-    <div class="p-2">
-        <el-image :src="src" :fit="fit" :height="height" :width="width" :class="styleClass">
-            <template #placeholder>
-                <div class="image-slot"> {{ placeholder }} </div>
-            </template>
-            <template #error>
-                <CommonLogo />
-            </template>
-        </el-image>
-    </div>
+  <img
+    :src="src"
+    :alt="alt"
+    class="floating-image-responsive"
+    v-bind="$attrs"
+  />
 </template>
-<script setup>
-defineProps({
-    src: {
-        type: String,
-        default: null
-    },
-    placeholder: {
-        type: String,
-        default: ""
-    },
-    error: {
-        type: String,
-        default: "Error"
-    },
-    fit: {
-        type: String,
-        default: "fill"
-    },
-    height: {
-        type: String,
-        default: ""
-    },
-    width: {
-        type: String,
-        default: ""
-    },
-    styleClass: {
-        type: String,
-        default: ""
-    }
-})
+
+<script setup lang="ts">
+defineProps<{
+  src: string;
+  alt: string;
+}>();
 </script>
+
+<style scoped>
+.floating-image-responsive {
+  @apply object-cover rounded-lg shadow-sm;
+}
+</style>

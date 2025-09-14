@@ -15,7 +15,8 @@ export default defineNuxtConfig({
         '@element-plus/nuxt',
         'nuxt-charts',
         '@nuxt/devtools',
-        '@nuxt/fonts'
+        '@nuxt/fonts',
+        'nuxt-lucide-icons'
     ],
 
     fonts: {
@@ -29,7 +30,7 @@ export default defineNuxtConfig({
     app: {
         head: {
             link: [
-            { rel: 'manifest', href: '/manifest.json' }
+                { rel: 'manifest', href: '/manifest.json' }
             ]
         }
     },
@@ -46,22 +47,22 @@ export default defineNuxtConfig({
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION,
             // Reverb Configuration
             reverb: {
-            appId: process.env.NUXT_PUBLIC_REVERB_APP_ID,
-            appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY,
-            appSecret: process.env.NUXT_PUBLIC_REVERB_APP_SECRET,
-            host: process.env.NUXT_PUBLIC_REVERB_HOST,
-            port: parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || '8081'),
-            scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME,
-            serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST,
-            serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '8081'),
-            serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH,
+                appId: process.env.NUXT_PUBLIC_REVERB_APP_ID,
+                appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY,
+                appSecret: process.env.NUXT_PUBLIC_REVERB_APP_SECRET,
+                host: process.env.NUXT_PUBLIC_REVERB_HOST,
+                port: parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || '8081'),
+                scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME,
+                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST,
+                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '8081'),
+                serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH,
             },
             // Laravel Echo Configuration
             echo: {
-            host: process.env.NUXT_PUBLIC_ECHO_HOST,
-            port: parseInt(process.env.NUXT_PUBLIC_ECHO_PORT || '8081'),
-            encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true'
+                host: process.env.NUXT_PUBLIC_ECHO_HOST,
+                port: parseInt(process.env.NUXT_PUBLIC_ECHO_PORT || '8081'),
+                encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true'
             }
         }
-        }
+    },
 })

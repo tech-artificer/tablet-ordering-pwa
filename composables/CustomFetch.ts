@@ -20,14 +20,30 @@ export function useMainApiAuth(url: string, params?: RequestInit) {
     const config = useRuntimeConfig()
     const deviceStore = useMyDeviceStore()
 
+    // Build default headers and only include Authorization when a token exists
+    const defaultHeaders: Record<string, string> = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+         credentials: deviceStore?.device?.token ? "omit" : "include", 
+    }
+
+    if (deviceStore?.device?.token) {
+        defaultHeaders["Authorization"] = `Bearer ${deviceStore.device.token}`
+    }
+
+    // Merge any headers passed in via params
+    const mergedParams: RequestInit = params ? { ...params } : {}
+    if (mergedParams.headers) {
+        // Normalize headers into an object
+        const incoming = mergedParams.headers as Record<string, string>
+        mergedParams.headers = { ...defaultHeaders, ...incoming }
+    } else {
+        mergedParams.headers = defaultHeaders
+    }
+
     const ofetchApi = ofetch.create({
         baseURL: config.public.mainApiUrl,
-        headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${deviceStore.device.token}`,
-        },
     })
 
-    return ofetchApi(url, params)
+    return ofetchApi(url, mergedParams)
 }

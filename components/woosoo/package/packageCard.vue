@@ -1,5 +1,5 @@
 <template>
-    <div v-if="isValidPackageList" class="flex flex-row gap-4 max-w-7xl mx-auto mb-12 justify-center">
+    <div v-if="isValidPackageList" class="flex flex-row gap-4 max-w-7xl mx-auto mb-12 justify-center items">
         <div
             v-for="(pkg, index) in validPackages"
             :key="pkg.id"
@@ -10,7 +10,7 @@
                     : 'hover:ring-2 hover:ring-orange-300',
                 index === 0 ? 'bg-gray-400' : index === 1 ? 'bg-primary' : 'bg-gray-600',
             ]"
-            @click="handlePackageSelect(pkg.id, pkg.items, pkg.name, pkg.price)"
+            @click="handlePackageSelect(pkg)"
         >
             <!-- Badge -->
             <div class="flex justify-center mb-4">
@@ -84,7 +84,7 @@
                             ? 'bg-orange-600 text-white cursor-not-allowed'
                             : 'bg-black bg-opacity-80 text-white hover:bg-opacity-90'
                     ]"
-                    @click="handleSelectPackage(pkg.id, pkg.items, pkg.name, pkg.price)"
+                    @click="handleSelectPackage(pkg)"
                 >
                     <!-- Loading spinner for the specific package being selected -->
                     <div v-if="isSelecting && selectingPackageId === pkg.id" class="flex items-center justify-center">
@@ -180,6 +180,7 @@ const initializeSelectedPackage = () => {
                 selectedPackageName.value = defaultPackage.name
 
                 if (defaultPackage.items && Array.isArray(defaultPackage.items)) {
+                    console.log('defaultPackage.items', defaultPackage.items)
                     cartItems.value = [
                         {
                             id: defaultPackage.id,
@@ -193,7 +194,7 @@ const initializeSelectedPackage = () => {
                             tax: 0,
                             price: defaultPackage.price || 0,
                             subtotal: defaultPackage.price || 0,
-                            img_url: CustomLogo.LOGO_2
+                            img_url: defaultPackage.img_url ?? CustomLogo.LOGO_2
                         },
                         ...defaultPackage.items.map(item => ({
                             ...item,
@@ -205,6 +206,7 @@ const initializeSelectedPackage = () => {
                             tax: 0,
                             quantity: count.value || 1,
                             discount: 0,
+                            img_url: defaultPackage.img_url ?? CustomLogo.LOGO_2
                         })),
                     ]
                 }
@@ -217,34 +219,35 @@ const initializeSelectedPackage = () => {
     }
 }
 
-const handlePackageSelect = (packageId, packageItems, packageName, price) => {
+const handlePackageSelect = (packageSelected) => {
     try {
-        if (!packageId) {
+        if (!packageSelected.id) {
             console.error('Package ID is required')
             return
         }
 
-        selectedPackage.value = packageId
-        selectedPackageName.value = packageName || 'Unnamed Package'
+        selectedPackage.value = packageSelected.id
+        selectedPackageName.value =  packageSelected.name || 'Unnamed Package'
         cartItems.value = []
 
         cartItems.value.push({
-            id: packageId,
-            ordered_menu_id: packageId,
-            menu_id: packageId,
-            name: packageName || 'Unnamed Package',
-            receipt_name: packageName || 'Unnamed Package',
-            subtotal: price || 0,
+            id: packageSelected.id,
+            ordered_menu_id: packageSelected.id,
+            menu_id: packageSelected.id,
+            name: packageSelected.name || 'Unnamed Package',
+            receipt_name: packageSelected.receipt_name || 'Unnamed Package',
+            subtotal: packageSelected.price || 0,
             quantity: count.value || 1,
             discount: 0,
-            tax_amount: 0,
+            tax_amount: packageSelected.tax_amount || 0,
             tax: 0,
-            price: price || 0,
-            img_url: CustomLogo.LOGO_2
+            price: packageSelected.price || 0,
+            img_url: packageSelected.img_url ?? CustomLogo.LOGO_2,
+            modifiers: packageSelected.items
         })
 
-        if (packageItems && Array.isArray(packageItems)) {
-            menuItems.value = packageItems.filter(item => item && item.id)
+        if (packageSelected.items && Array.isArray(packageSelected.items)) {
+            menuItems.value = packageSelected.items.filter(item => item && item.id)
 
             cartItems.value.forEach((item, index) => {
                 if (index !== 0) item.price = 0
@@ -253,8 +256,9 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
                 item.ordered_menu_id = item.id
                 item.subtotal = item.price || 0
                 item.discount = 0
-                item.tax_amount = 0
+                item.tax_amount = item.tax_amount || 0
                 item.tax = 0
+                item.img_url = item.img_url ?? CustomLogo.LOGO_2
             })
         }
     } catch (error) {
@@ -263,19 +267,19 @@ const handlePackageSelect = (packageId, packageItems, packageName, price) => {
 }
 
 // New function to handle the button click with loading
-const handleSelectPackage = async (packageId, packageItems, packageName, price) => {
+const handleSelectPackage = async (packageSelected) => {
     if (isSelecting.value) return // Prevent multiple clicks
 
     try {
         // Set loading state for the specific package
         isSelecting.value = true
-        selectingPackageId.value = packageId
+        selectingPackageId.value = packageSelected.id
 
         // Simulate API call or processing time (2 seconds)
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         // Call the original package selection logic
-        handlePackageSelect(packageId, packageItems, packageName, price)
+        handlePackageSelect(packageSelected)
 
         // Emit the modal change event
         handleIncludeItemsModal()

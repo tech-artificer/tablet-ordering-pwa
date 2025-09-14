@@ -6,8 +6,6 @@
             <CommonImage
                 :src="item.img_url"
                 :alt="item.name"
-                :width="'100%'"
-                :style-class="'w-full h-full object-cover'"
             />
             <div v-show="item.rating" class="absolute top-3 right-3 bg-white rounded-full px-2 py-1">
                 <WoosooProductRating :rating="item.rating" />
@@ -20,12 +18,12 @@
         </div>
 
         <!-- Regular Product Layout -->
-        <div v-show="!item.is_modifier" class="p-4">
+        <div v-show="!item.is_modifier" class="flex flex-col justify-between gap-2 p-2">
             <h3 class="font-semibold text-responsive mb-1">{{ item.name }}</h3>
             <p class="text-gray-500 text-sm mb-3">{{ item.description }}</p>
 
             <div class="flex justify-between items-center mb-4">
-                <span v-show="item.price || item.price === 0" class="font-semibold text-lg">₱{{ item.price || 0.00 }}</span>
+                <span v-show="item.price || item.price === 0" class="font-semibold text-gray-800">₱{{ item.price || 0.00 }}</span>
                 <span class="text-gray-400 text-sm">{{ item.group }}</span>
             </div>
 
@@ -79,16 +77,16 @@
         <div v-show="item.is_modifier" class="p-4">
             <h3 class="font-semibold text-responsive mb-3">{{ item.name }}</h3>
             <div>
-                <span v-show="item.price || item.price === 0" class="font-semibold text-lg">₱{{ item.price || 0.00 }}</span>
+                <span v-show="item.price || item.price === 0" class="text-xl font-semibold text-gray-800">₱{{ item.price || 0.00 }}</span>
 
                 <div class="flex justify-between gap-3">
                     <div class="flex items-center ">
-                        <button
+                         <button
                             class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            :disabled="quantity <= 1"
+                           :disabled="quantity <= 1"
                             @click="decreaseQuantity"
                         >
-                            -
+                            <Minus />
                         </button>
                         <span class="text-sm font-medium min-w-8 text-center">{{ quantity }}</span>
                         <button
@@ -96,7 +94,7 @@
                             :disabled="quantity >= 20"
                             @click="increaseQuantity"
                         >
-                            +
+                           <Plus />
                         </button>
                     </div>
 
@@ -112,7 +110,9 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { Minus, Plus, CircleChevronLeft } from 'lucide-vue-next'
+
 const showQuantity = ref(false)
 const quantity = ref(1)
 

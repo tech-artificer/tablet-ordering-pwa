@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full bg-white relative flex flex-col h-full !scroll-smooth">
+    <div class="w-full bg-white relative flex flex-col min-h-screen !scroll-smooth">
         <!-- Header Section - Fixed -->
         <div class="flex gap-2 justify-between py-6 px-4 border-b border-gray-200 bg-white">
             <h2 class="text-lg font-medium">Order Details</h2>
@@ -7,27 +7,32 @@
 
         <!-- Cart Items - Scrollable Middle Section -->
         <div
-            class="flex-1 overflow-y-auto px-4 min-h-0"
+            class="px-4 flex-1 overflow-y-auto"
         >
-            <div>
+            <div class="space-y-2">
                 <div
                     v-for="item, index in cartStore.cartItems"
                     :key="index"
                     class="flex items-center gap-3 border-b border-gray-100 last:border-b-0"
                     :class="index === 0 ? '' : 'py-2'"
-                >
-                    <CommonImage
+                >   
+                    <NuxtImg
+                        :src="item.img_url"
+                        :alt="item.name"
+                        class="max-w-[50px] max-h-[50px] object-fit rounded-lg"
+                    />
+                    <!-- <CommonImage
                         v-if="index > 0"
                         :src="item.img_url"
                         :alt="item.name"
-                        :style-class="'w-12 h-12 rounded-lg object-cover flex-shrink-0'"
-                    />
+                        :style-class="'w-6 h-6 rounded-lg object-cover'"
+                    /> -->
                     <div
                         class="flex-1 min-w-0"
                         :class="index === 0 ? 'border-b border-gray-300 pb-2' : ''"
                     >
                         <h4
-                            class="font-medium text-gray-800 truncate"
+                            class="text-lg truncate"
                             :class="index === 0 ? 'text-lg font-bold' : 'text-sm font-normal'"
                         >
                             {{ item.name }}
@@ -40,10 +45,10 @@
                                     class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
                                     @click="updateQuantity(index, item.id, item.quantity - 1)"
                                 >
-                                    <svg v-if="index > 0" class="w-4 h-4 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <!-- <svg v-if="index > 0" class="w-4 h-4 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    <p v-else>-</p>
+                                    </svg> -->
+                                    <!-- <p v-else>-</p> -->
                                 </button>
                                 <svg
                                     v-if="index === 0"
@@ -70,7 +75,7 @@
                                 </button>
                             </div>
                             <div class="text-right">
-                                <span class="font-medium text-gray-800">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
+                                <span class="text-lg font-semibold text-gray-900">₱{{ cartStore.formatPrice(item.price * item.quantity) }}</span>
                             </div>
                         </div>
                     </div>
@@ -143,11 +148,11 @@
                 class="flex justify-between items-center px-3 rounded-lg border-b border-gray-100 last:border-b-0"
             >
                 <div class="flex items-center gap-3">
-                    <CommonImage
+                    <!-- <CommonImage
                         :src="item.img_url"
                         :alt="item.name"
                         :style-class="'w-8 h-8 rounded-lg object-cover'"
-                    />
+                    /> -->
                     <div>
                         <h4 class="font-medium">{{ item.name }}</h4>
                         <p v-show="item.description" class="text-sm text-gray-500">{{ item.description }}</p>
@@ -284,7 +289,7 @@ import { useCartStore } from '@/stores/Cart'
 import { useGuestStore } from '@/stores/Guest'
 import { useOrderStore } from '@/stores/Order'
 import { useMyDeviceStore } from '@/stores/Device'
-
+import { Minus, Plus, CircleChevronLeft } from 'lucide-vue-next'
 const deviceStore = useMyDeviceStore()
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
@@ -335,18 +340,50 @@ const clearAutoCloseTimer = () => {
     autoCloseCountdown.value = 0
 }
 
+// const placeOrder = async () => {
+//     try {
+
+//         console.log(cartStore);
+//         orderTotal.value = cartStore.total
+//         cartStore.orderParams.guest_count = guestStore.count
+//         cartStore.orderParams.total = cartStore.total
+//         cartStore.orderParams.subtotal = cartStore.subTotal
+//         cartStore.orderParams.discount = 0
+//         cartStore.orderParams.tax = cartStore.vat || 0
+//         cartStore.orderParams.table_id = deviceStore.device.device.table_id
+//         cartStore.orderParams.items = cartStore.cartItems
+//         cartStore.confirmOrder()
+//         isCartModalShow.value = false
+//         if ( cartStore.isLocked ) {
+//             isSuccessModalShow.value = true
+//             orderStore.orders.push(cartStore.order)
+//             orderStore.current_order = cartStore.order
+//             orderNumber.value = orderStore.current_order.order_number
+//             startAutoCloseTimer()
+//         }
+//     } catch (error) {
+//         console.error('Error placing order:', error)
+//         errorMessage.value = cartStore.errorMessage || 'An unexpected error occurred while processing your order.'
+//         isCartModalShow.value = false
+//         isErrorModalShow.value = true
+//     }
+// }
+
 const placeOrder = async () => {
-    try {
-        orderTotal.value = cartStore.total
-        cartStore.orderParams.guest_count = guestStore.count
-        cartStore.orderParams.total = cartStore.total
-        cartStore.orderParams.subtotal = cartStore.subTotal
-        cartStore.orderParams.discount = 0
-        cartStore.orderParams.tax = cartStore.vat || 0
-        cartStore.orderParams.table_id = deviceStore.device.device.table_id
-        cartStore.orderParams.items = cartStore.cartItems
-        await cartStore.confirmOrder()
-        isCartModalShow.value = false
+  try {
+    const payload = {
+      guest_count: guestStore.count,
+      note: null,
+      total_amount: cartStore.total,
+      subtotal: cartStore.subTotal,
+      discount: 0,
+      tax: cartStore.vat || 0,
+      table_id: deviceStore.device.device.table_id,
+      items: cartStore.cartItems,
+    }
+
+    await cartStore.confirmOrder(payload) // pass it in
+    isCartModalShow.value = false
         if ( cartStore.isLocked ) {
             isSuccessModalShow.value = true
             orderStore.orders.push(cartStore.order)
@@ -354,13 +391,13 @@ const placeOrder = async () => {
             orderNumber.value = orderStore.current_order.order_number
             startAutoCloseTimer()
         }
-    } catch (error) {
-        console.error('Error placing order:', error)
-        errorMessage.value = cartStore.errorMessage || 'An unexpected error occurred while processing your order.'
-        isCartModalShow.value = false
+  } catch (error) {
+    console.error('Error placing order:', error)
+       isCartModalShow.value = false
         isErrorModalShow.value = true
-    }
+  }
 }
+
 
 const confirmOrder = () => {
     isCartModalShow.value = true

@@ -2,12 +2,11 @@
     <!-- Orders List Drawer -->
     <el-drawer
         v-model="cartStore.cartStatus"
-        :title="drawerTitle"
-        :with-header="false"
+        :with-header="true"
         direction="rtl"
         size="400px"
         class="order-drawer"
-        :close-on-click-modal="false"
+        :close-on-click-modal="true"
         :close-on-press-escape="false">
         <!-- Pending State -->
         <WoosooOrderCardConfirm
@@ -32,11 +31,11 @@ const progressWidth = ref(0)
 const currentOrder = computed(() => orderStore.current_order)
 const orderOnRuntime = computed(() => orderStore.current_order?.order)
 
-const drawerTitle = computed(() =>
-    cartStore.orderStatus === OrderStatus.CONFIRMED
-        ? 'Order Pending'
-        : 'Order Complete'
-)
+// const drawerTitle = computed(() =>
+//     cartStore.orderStatus === OrderStatus.CONFIRMED
+//         ? cartStore.orderStatus
+//         : ''
+// )
 
 
 function setupOrderListening(orderId) {
@@ -70,12 +69,12 @@ function handleOrderUpdate(event) {
     updateCurrentOrder(order)
 
     console.log('after update current order', order)
-    if (shouldReturnToWelcome(order)) {
-        console.log('return to welcome after order update')
+    // if (shouldReturnToWelcome(order)) {
+    //     console.log('return to welcome after order update')
         transitionToWelcome()
-    }
+    // }
 
-    console.log('skipped return to welcome after order update')
+    // console.log('skipped return to welcome after order update')
 }
 
 function updateCurrentOrder(order) {

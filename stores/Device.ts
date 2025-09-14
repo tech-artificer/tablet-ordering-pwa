@@ -1,28 +1,6 @@
 import { defineStore } from 'pinia'
+import type { DeviceInformation, Device, DeviceParams, DeviceLoginParams } from '~/types/index'
 
-interface DeviceInformation {
-    name: string,
-    branch_id: number,
-    table_id: number | null,
-    device_uuid: string,
-    updated_at: string,
-    created_at: string,
-    id: number
-}
-interface DeviceParams {
-    name: string,
-    code: string,
-    app_version: string,
-    last_ip_address: string,
-}
-interface Device {
-    token: string,
-    device: DeviceInformation,
-    isLoading: boolean,
-}
-interface DeviceLoginParams {
-    device_uuid: string,
-}
 export const useMyDeviceStore = defineStore('device', {
     state: () => ({
         device: {} as Device,
@@ -53,12 +31,20 @@ export const useMyDeviceStore = defineStore('device', {
             try {
                 const response = await useMainApiO('/api/devices/login', {
                     method: 'GET',
+
                 })
-                this.device = response
-                this.oldUUID = this.deviceLoginParams.device_uuid
-                this.showDeviceRegistration = false
-                this.isLoading = false
-                this.clearData()
+                // backend returns { token, device }
+                if (response && response.token) {
+                    this.device = response
+                    this.oldUUID = this.deviceLoginParams.device_uuid
+                    this.showDeviceRegistration = false
+                    this.isLoading = false
+                    ;(this as any).clearData()
+                } else {
+                    // defensive: mark as missing device to trigger registration
+                    this.showDeviceRegistration = true
+                    this.isLoading = false
+                }
 
             } catch (error: any) {
                 this.showDeviceRegistration = true
@@ -69,7 +55,8 @@ export const useMyDeviceStore = defineStore('device', {
             try {
                 const response = await useMainApiO('/api/devices/register', {
                     method: 'POST',
-                    body: this.deviceParams,
+                    // ofetch expects serializable body; stringify to satisfy TS BodyInit
+                    body: JSON.stringify(this.deviceParams),
                 })
                 this.device = response
                 ElNotification({
@@ -77,17 +64,18 @@ export const useMyDeviceStore = defineStore('device', {
                     message: 'Device registered successfully',
                     type: 'success',
                 })
-                this.clearData()
+                ;(this as any).clearData()
                 this.showDeviceRegistration = false
                 this.isLoading = false
             } catch (error) {
                 this.isLoading = false
-                this.errorMessage = error as string
-                if (error as any) {
-                    if (error?.response._data.errors) {
-                        this.errorMessage = error?.response._data.errors
+                const err = error as any
+                this.errorMessage = String(err?.message ?? err)
+                if (err) {
+                    if (err.response?._data?.errors) {
+                        this.errorMessage = err.response._data.errors
                     } else {
-                        this.errorMessage = error?.response._data.message
+                        this.errorMessage = err.response?._data?.message ?? this.errorMessage
                     }
                     ElNotification({
                         title: 'Error',
@@ -111,9 +99,9 @@ export const useMyDeviceStore = defineStore('device', {
         }
     },
 
-    persist: {
+    persist: ({
         key: 'device-store',
         storage: import.meta.client ? localStorage : undefined,
-        paths: ['device', 'deviceParams', 'showDeviceRegistration', 'oldUUID'],
-    }
+        pick: ['device', 'deviceParams', 'showDeviceRegistration', 'oldUUID'],
+    } as any)
 })

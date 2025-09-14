@@ -32,7 +32,8 @@ const packageStore = usePackageStore()
 const emit = defineEmits(['changeGuestCountView'])
 
 const changeGuestCountView = () => {
-    emit('changeGuestCountView')
+    navigateTo('guestCount')
+    // emit('changeGuestCountView')
 }
 onMounted(async () => {
     await packageStore.getSetMeals()
