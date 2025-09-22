@@ -64,6 +64,8 @@ function setupOrderListening(orderId) {
 }
 
 function handleOrderUpdate(event) {
+
+    console.log('order update', event)
     if (!event?.order) return
     const order = event.order
     updateCurrentOrder(order)
@@ -78,6 +80,7 @@ function handleOrderUpdate(event) {
 }
 
 function updateCurrentOrder(order) {
+    console.log('has order', order)
     if (!order) return
 
     if (order.order_id && order.order_id !== currentOrderId.value) {
@@ -94,7 +97,7 @@ function shouldReturnToWelcome(order) {
     if (status.toLowerCase().includes(['complete', 'completed', 'void', 'voided', 'cancel', 'cancelled'])) return true
 
 }
-
+// resetStores()
 function transitionToWelcome(delay = 2000) {
     setTimeout(() => {
         resetStores()

@@ -39,7 +39,35 @@ export default {
                 custom: ['Inter'],
             },
             fontSize: {
-                'responsive-sm': 'calc(2vmin)',
+                'xs': '.50rem',  // This is a default, but you can override it
+                'sm': '.75rem',
+                'base': '85rem',
+                'lg': '1rem',
+                'xl': '1.25rem',
+                '2xl': '1.5rem',
+                '3xl': '1.875rem',
+            },
+            screens: {
+                // Mobile-first breakpoints (recommended)
+                'xs': '375px',    // Small phones
+                'sm': '640px',    // Large phones / small tablets
+                'md': '768px',    // Tablets
+                'lg': '1024px',   // Small laptops
+                'xl': '1280px',   // Desktop
+                '2xl': '1536px',  // Large desktop
+                '3xl': '1920px',  // Ultra-wide
+
+                // Max-width breakpoints for desktop-first (when needed)
+                'max-2xl': { 'max': '1535px' },
+                'max-xl': { 'max': '1279px' },
+                'max-lg': { 'max': '1023px' },
+                'max-md': { 'max': '767px' },
+                'max-sm': { 'max': '639px' },
+
+                // Custom semantic breakpoints
+                'mobile': { 'max': '767px' },
+                'tablet': { 'min': '768px', 'max': '1023px' },
+                'desktop': { 'min': '1024px' },
             },
         },
         // screens: {

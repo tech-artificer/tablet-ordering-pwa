@@ -1,3 +1,58 @@
+
+<script setup lang="ts">
+import { Minus, Plus, CircleChevronLeft } from 'lucide-vue-next'
+
+const showQuantity = ref(false)
+const quantity = ref(1)
+
+const props = defineProps({
+    item: {
+        type: Object,
+        default: () => ({})
+    }
+})
+
+const emit = defineEmits(['add-to-cart'])
+
+const showQuantitySelector = () => {
+    showQuantity.value = true
+}
+
+const cancelQuantitySelection = () => {
+    showQuantity.value = false
+    quantity.value = 1
+}
+
+const increaseQuantity = () => {
+    if (quantity.value < 20) {
+        quantity.value++
+    }
+}
+
+const decreaseQuantity = () => {
+    if (quantity.value > 1) {
+        quantity.value--
+    }
+}
+
+const confirmAddToCart = () => {
+    const itemToAdd = {
+        ...props.item,
+        ordered_menu_id: props.item.id,
+        menu_id: props.item.id,
+        tax_amount: parseFloat(props.item.tax_amount || 0),
+        tax: parseFloat(props.item.tax_amount || 0),
+        discount: 0,
+        subtotal: props.item.price || 0,
+        quantity: quantity.value
+    }
+    console.log('Adding to cart:', itemToAdd)
+    emit('add-to-cart', itemToAdd)
+
+    showQuantity.value = false
+    quantity.value = 1
+}
+</script>
 <template>
     <div
         class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden relative"
@@ -34,16 +89,14 @@
                             class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="quantity <= 1"
                             @click="decreaseQuantity"
-                        >
-                            -
-                        </button>
+                        ><Minus /></button>
                         <span class="text-sm font-medium min-w-8 text-center">{{ quantity }}</span>
                         <button
                             class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             :disabled="quantity >= 20"
                             @click="increaseQuantity"
                         >
-                            +
+                           <Plus />
                         </button>
                     </div>
                 </div>
@@ -110,57 +163,3 @@
     </div>
 </template>
 
-<script setup lang="ts">
-import { Minus, Plus, CircleChevronLeft } from 'lucide-vue-next'
-
-const showQuantity = ref(false)
-const quantity = ref(1)
-
-const props = defineProps({
-    item: {
-        type: Object,
-        default: () => ({})
-    }
-})
-
-const emit = defineEmits(['add-to-cart'])
-
-const showQuantitySelector = () => {
-    showQuantity.value = true
-}
-
-const cancelQuantitySelection = () => {
-    showQuantity.value = false
-    quantity.value = 1
-}
-
-const increaseQuantity = () => {
-    if (quantity.value < 20) {
-        quantity.value++
-    }
-}
-
-const decreaseQuantity = () => {
-    if (quantity.value > 1) {
-        quantity.value--
-    }
-}
-
-const confirmAddToCart = () => {
-    const itemToAdd = {
-        ...props.item,
-        ordered_menu_id: props.item.id,
-        menu_id: props.item.id,
-        tax_amount: parseFloat(props.item.tax_amount || 0),
-        tax: parseFloat(props.item.tax_amount || 0),
-        discount: 0,
-        subtotal: props.item.price || 0,
-        quantity: quantity.value
-    }
-    console.log('Adding to cart:', itemToAdd)
-    emit('add-to-cart', itemToAdd)
-
-    showQuantity.value = false
-    quantity.value = 1
-}
-</script>

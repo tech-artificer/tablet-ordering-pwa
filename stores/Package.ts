@@ -1,9 +1,9 @@
-import type { Package, Menu } from '~/types/index';
+import type { Package, Menu } from '@/types/index';
 
 
 export const usePackageStore = defineStore('package', {
     state: () => ({
-        packageList: [] as Package[],
+        packageList: [] as Array<Package>,
         sideList: [] as Array<Menu>,
         desertList: [] as Array<Menu>,
         beverageList: [] as Array<Menu>,
@@ -42,7 +42,7 @@ export const usePackageStore = defineStore('package', {
                     }
                 } as object)
                 this.sideList = Array.isArray(response) ? response : response.data || []
-                console.log('Sides fetched successfully:', this.sideList)
+                // console.log('Sides fetched successfully:', this.sideList)
             } catch (error) {
                 console.error('Error fetching sides:', error)
                 throw error
@@ -60,7 +60,7 @@ export const usePackageStore = defineStore('package', {
                     }
                 } as object)
                 this.desertList = Array.isArray(response) ? response : response.data || []
-                console.log('Deserts fetched successfully:', this.desertList)
+                // console.log('Deserts fetched successfully:', this.desertList)
             } catch (error) {
                 console.error('Error fetching deserts:', error)
                 throw error
@@ -78,7 +78,7 @@ export const usePackageStore = defineStore('package', {
                     }
                 } as object)
                 this.beverageList = Array.isArray(response) ? response : response.data || []
-                console.log('Beverage fetched successfully:', this.beverageList)
+                // console.log('Beverage fetched successfully:', this.beverageList)
             } catch (error) {
                 console.error('Error fetching beverage:', error)
                 throw error

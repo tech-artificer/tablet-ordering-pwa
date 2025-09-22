@@ -1,6 +1,7 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 import { useMyDeviceStore } from '@/stores/Device'
+import { useErrorDialogStore } from '@/stores/ErrorDialog'
 
 export default defineNuxtPlugin((nuxtApp) => {
     // Ensure this plugin only runs on the client
@@ -9,6 +10,9 @@ export default defineNuxtPlugin((nuxtApp) => {
     }
 
     const config = useRuntimeConfig()
+    const errorDialog = useErrorDialogStore()
+
+    console.log('config', config)
     // console.log('config', config)
     // Minimal required config checks
     const reverbKey = config.public.reverb.appKey
@@ -20,7 +24,8 @@ export default defineNuxtPlugin((nuxtApp) => {
         // This keeps the app running in environments without websockets configured
         // (e.g., CI, static preview)
         // eslint-disable-next-line no-console
-        console.warn('[laravel-echo] missing reverb/pusher/runtime config; plugin will not initialize')
+        // console.log('Reverb server not running; skipping initialization')
+        errorDialog.show('Reverb configuration error. Retrying...')
         return
     }
 
@@ -45,7 +50,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             headers.Authorization = `Bearer ${token}`
         }
 
-        const wsPort = config.public.reverb.port ?? 8081
+        const wsPort = config.public.reverb.port ?? 6001
         const wssPort = wsPort
 
         const echo = new Echo({
@@ -64,14 +69,17 @@ export default defineNuxtPlugin((nuxtApp) => {
             }
         })
 
+        console.log('echo', echo)
+
         // @ts-ignore - attach for global access (used across the app)
         window.Echo = echo
 
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
-
+         errorDialog.hide()
         // return { provide: { echo } }
     } catch (err) {
+        errorDialog.show('Failed to connect to WebSocket. Retrying...')
         // eslint-disable-next-line no-console
         console.error('[laravel-echo] initialization failed', err)
         return

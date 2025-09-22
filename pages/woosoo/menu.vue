@@ -3,10 +3,13 @@
         <!-- prevent page scrolling; only the center column will scroll -->
        
         <el-container class="w-full h-full">
+
             <div class="min-h-screen w-full flex">
+
                 <el-aside class="bg-white shadow-lg flex flex-col max-w-[100px]">
                     <WoosooSidebarMenu />
                 </el-aside> 
+
                 <!-- Main Content and Cart Container -->
                 <div class="flex-1 flex min-w-0 h-full">
                     <!-- Main Content -->
@@ -124,6 +127,7 @@
                         </div>
                     </el-aside>
                 </div>
+                
             </div>
 
             <WoosooOrderProgressViewer />
@@ -133,15 +137,22 @@
 
 </template>
 
-<script setup>
+<script setup lang="ts">
+definePageMeta({
+    layout: false,
+    middleware: [
+        function (to, from) {
+            // Custom inline middleware
+        },
+        'order',
+    ],
+});
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
 import { usePackageStore } from '@/stores/Package'
 import { useOrderStore } from '@/stores/Order'
 
-definePageMeta({
-    layout: false,
-});
+
 
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
@@ -166,7 +177,7 @@ const mainFilterTabs = ref([
 
 
 // Helper function to extract value from reactive objects
-const extractValue = (item) => {
+const extractValue = (item: any) => {
     return item?._custom?.value || item
 }
 
@@ -199,11 +210,11 @@ const mainFilter = computed(() => {
 
 const filteredMainMenuItems = computed(() => {
     if (!menuItems.value) return []
-    let filtered = []
+    let filtered = [] as any
     if (activeFilter.value.toLowerCase() === CategoryFilter.MEATS.toLowerCase()) {
-        console.log(cartItems.value[0].modifiers)
+        // console.log(cartItems)
         // filtered = menuItems.value.map(item => extractValue(item))
-        filtered = cartItems.value[0].modifiers
+        filtered = orderStore.order.orderedPackage?.items || []
     }
     if (activeFilter.value.toLowerCase() === CategoryFilter.SIDES_BANCHAN.toLowerCase()) {
         console.log('sides')
@@ -220,13 +231,13 @@ const filteredMainMenuItems = computed(() => {
     return filtered
 })
 
-const handleFilterChange = (newFilter) => {
+const handleFilterChange = (newFilter: string) => {
     if (newFilter === activeFilter.value) return
     activeFilter.value = newFilter
     searchQuery.value = ''
 }
 
-const addToCart = (item) => {
+const addToCart = (item: any) => {
     if (!item || !item.price) item.price = 0
     if (!item || !item.quantity) item.quantity = 1
     cartStore.addToCart({

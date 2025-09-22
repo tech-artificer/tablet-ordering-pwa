@@ -1,0 +1,101 @@
+# Node.js dependencies
+node_modules/
+
+# Nuxt and build outputs
+.nuxt/
+.output/
+dist/
+build/
+out/
+
+# Version control
+.git/
+.gitignore
+
+# IDE/editor configs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and debug
+*.log
+debug/
+
+# Test and coverage artifacts
+test/
+tests/
+.pytest_cache/
+.coverage
+
+# Python cache (for completeness, though not detected)
+__pycache__/
+*.pyc
+*.pyo
+
+# Go build/test cache (for completeness)
+.go-cache/
+*.test
+
+# Java build outputs (for completeness)
+target/
+*.class
+.gradle/
+
+# Environment and secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.crt
+config.local.*
+*.local.yml
+
+# Temporary and local files
+tmp/
+temp/
+*.tmp
+.local/
+local/
+
+# Documentation
+README*
+*.md
+docs/
+
+# Docker and Compose files
+Dockerfile*
+docker-compose*
+
+# Miscellaneous
+npm-debug.log
+yarn-debug.log
+
+# Exclude nginx directory if not needed in build
+nginx/
+
+# Exclude empty directories (optional, Docker ignores them by default)
+# Cart/
+# Menu/
+# ui/
+
+# Exclude public assets if not needed (uncomment if not required)
+# public/
+
+# Exclude editor config files (optional)
+.editorconfig
+.eslintrc
+
+# Exclude example env files
+.env.example
+
+# Exclude package-lock.json (if you want reproducible builds, comment this out)
+# package-lock.json
+
+# Exclude any other lock files (handled by instructions)
+# *.lock
+
+# Exclude SVN and Mercurial (for completeness)
+.svn/
+.hg/

@@ -1,11 +1,12 @@
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
-import { useCategoryStore } from '@/stores/Category'
-import { useGuestStore } from '@/stores/Guest'
-import { useOrderStore } from '@/stores/Order'
+// import { useCategoryStore } from '@/stores/Category'
+// import { useGuestStore } from '@/stores/Guest'
+// import { useOrderStore } from '@/stores/Order'
+import ServiceRequest from '~/components/ServiceRequest.vue'
 
-console.log('order', useOrderStore().current_order?.order)
+// console.log('order', useOrderStore().current_order?.order)
 
 // PWA Setup
 useHead({
@@ -76,10 +77,10 @@ const pageTransition = computed(() => ({
 }))
 
 const deviceIsMobile = ref(false)
-const categoryStore = useCategoryStore()
+// const categoryStore = useCategoryStore()
 
 onMounted(() => {
-    categoryStore.getStaticCategories()
+    // categoryStore.getStaticCategories()
     // deviceIsMobile.value = window.innerWidth < 480
 
     // Initialize route history
@@ -108,15 +109,14 @@ onUnmounted(() => {
 })
 </script>
 
-
 <template>
-    <div class="min-h-screen min-w-screen z-0 bg-black relative">
+    <div class="min-h-screen min-w-screen">
         <CommonSlideDown :show-notification="showNotification" :is-really-online="isReallyOnline" />
         
         <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">
             <NuxtPage :transition="pageTransition" />
         </main>
-        
+        <!-- <ServiceRequest /> -->
   
     </div>
 

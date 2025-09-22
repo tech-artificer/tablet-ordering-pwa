@@ -1,15 +1,17 @@
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
-import { useCategoryStore } from '@/stores/Category'
-import { useGuestStore } from '@/stores/Guest'
-import { useOrderStore } from '@/stores/Order'
+import ServiceRequest from '~/components/ServiceRequest.vue'
+import ErrorDialog from '@/components/ErrorDialog.vue'
+// import { useCategoryStore } from '@/stores/Category'
+// import { useGuestStore } from '@/stores/Guest'
+// import { useOrderStore } from '@/stores/Order'
 
-console.log('order', useOrderStore().current_order?.order)
+// console.log('order', useOrderStore().order)
 
 // PWA Setup
 useHead({
-    title: 'Woosoo',
+    title: 'Wooserve',
     meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1.0 viewport-fit=cover' },
@@ -76,28 +78,28 @@ const pageTransition = computed(() => ({
 }))
 
 const deviceIsMobile = ref(false)
-const categoryStore = useCategoryStore()
+// const categoryStore = useCategoryStore()
 
 onMounted(() => {
-    categoryStore.getStaticCategories()
-    // deviceIsMobile.value = window.innerWidth < 480
+    // categoryStore.getStaticCategories()
+    // // deviceIsMobile.value = window.innerWidth < 480
 
-    // Initialize route history
-    routeHistory.value = [route.fullPath]
+    // // Initialize route history
+    // routeHistory.value = [route.fullPath]
 
-    // Handle browser back button
-    window.addEventListener('popstate', () => {
-        direction.value = 'back'
-    })
+    // // Handle browser back button
+    // window.addEventListener('popstate', () => {
+    //     direction.value = 'back'
+    // })
 
-    window.addEventListener('resize', () => {
-        // deviceIsMobile.value = window.innerWidth < 480
-    })
-    window.addEventListener('online', updateOnlineStatus)
-    window.addEventListener('offline', updateOnlineStatus)
-    if (navigator.onLine) {
-        updateOnlineStatus()
-    }
+    // window.addEventListener('resize', () => {
+    //     // deviceIsMobile.value = window.innerWidth < 480
+    // })
+    // window.addEventListener('online', updateOnlineStatus)
+    // window.addEventListener('offline', updateOnlineStatus)
+    // if (navigator.onLine) {
+    //     updateOnlineStatus()
+    // }
 })
 
 onUnmounted(() => {
@@ -161,9 +163,12 @@ onUnmounted(() => {
         </div>
         <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">
             <NuxtPage :transition="pageTransition" />
+            <ErrorDialog />
         </main>
         
     </div>
+
+    <!-- <ServiceRequest /> -->
 
     <!-- </body>
     </html> -->

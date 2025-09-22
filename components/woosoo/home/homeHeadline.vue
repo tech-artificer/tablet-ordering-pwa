@@ -27,19 +27,18 @@
     </div>
 </template>
 <script setup>
-import { usePackageStore } from '@/stores/Package'
-const packageStore = usePackageStore()
-const emit = defineEmits(['changeGuestCountView'])
+// import { usePackageStore } from '@/stores/Package'
+// const packageStore = usePackageStore()
+// const emit = defineEmits(['changeGuestCountView'])
 
 const changeGuestCountView = () => {
-    navigateTo('guestCount')
+    navigateTo('guest')
     // emit('changeGuestCountView')
 }
 onMounted(async () => {
-    await packageStore.getSetMeals()
-        packageStore.getSides()
-        packageStore.getDesserts()
-        packageStore.getBeverage()
-    }
-)
+    // await packageStore.getSetMeals()
+    //     packageStore.getSides()
+    //     packageStore.getDesserts()
+    //     packageStore.getBeverage()
+})
 </script>

@@ -124,7 +124,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useOrderStore } from '~/stores/Order'
+const orderStore = useOrderStore()
+
+// read entire order
+const order = computed(() => orderStore.order)
 
 const packageStore = usePackageStore()
 const cartStore = useCartStore()
@@ -135,6 +140,25 @@ const { selectedPackage, selectedPackageName, packageList, isLoading } = storeTo
 const { cartItems } = storeToRefs(cartStore)
 const { count } = storeToRefs(guestStore)
 const { menuItems } = storeToRefs(menuStore)
+
+function setOrderPackage(selectedPackage) {
+    console.log('Package was set', selectedPackage)
+//   orderStore.updateOrder({ orderedPackage: selectedPackage })
+    const subtotal = (Number(selectedPackage.price) * Number(order.value.guest_count))  + Number(selectedPackage.tax_amount)
+    orderStore.updateOrder({
+        orderedPackage: selectedPackage,
+        total: subtotal,
+        tax: selectedPackage.tax,
+        subTotal: subtotal,
+        discount: selectedPackage.discount,
+        tax_amount: selectedPackage.tax_amount,
+        discount_amount: selectedPackage.discount,
+    })
+}
+
+// function updateOrderDetails(item: any) {
+//   orderStore.updateOrder({ orderedMenus: [...current, item] })
+// }
 
 // Loading state for package selection
 const isSelecting = ref(false)
@@ -155,9 +179,9 @@ const validPackages = computed(() => {
         badge: index === 1 ? 'BEST' : index === 0 ? 'BASIC' : 'PREMIUM',
         items: pkg.modifiers || [],
         img_url: pkg.img_url,
-        tax: 0,
-        discount: 0,
-        tax_amount: 0,
+        tax: pkg.tax,
+        discount: pkg.discount,
+        tax_amount: pkg.tax_amount,
     })).filter(pkg =>
         pkg &&
         pkg.id !== null &&
@@ -220,6 +244,18 @@ const initializeSelectedPackage = () => {
 }
 
 const handlePackageSelect = (packageSelected) => {
+    // if (isSelecting.value) return // Prevent multiple clicks
+
+    isSelecting.value = true
+    setOrderPackage(packageSelected)
+
+
+    // orderStore.order.orderedPackage = packageSelected
+    // orderStore.order.tax = packageSelected.tax
+    // orderStore.order.subTotal = packageSelected.subTotal
+    // orderStore.order.total = packageSelected.total
+    // orderStore.order.tax_amount = packageSelected.tax_amount
+    // orderStore.order.discount = packageSelected.discount
     try {
         if (!packageSelected.id) {
             console.error('Package ID is required')

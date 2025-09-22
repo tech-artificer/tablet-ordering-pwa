@@ -1,49 +1,30 @@
-import { ofetch } from "ofetch"
+import { ofetch, type FetchOptions } from 'ofetch'
 import { useRuntimeConfig } from "nuxt/app"
 import { useMyDeviceStore } from "@/stores/Device"
 
-export function useMainApiO(url: string, params?: RequestInit) {
-    const config = useRuntimeConfig()
 
-    const ofetchApi = ofetch.create({
-        baseURL: config.public.mainApiUrl,
-        headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-    })
+export function useMainApiAuth(url: string, options?: FetchOptions) {
+  const config = useRuntimeConfig()
+  const deviceStore = useMyDeviceStore()
 
-    return ofetchApi(url, params)
-}
+  const defaultHeaders: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
 
-export function useMainApiAuth(url: string, params?: RequestInit) {
-    const config = useRuntimeConfig()
-    const deviceStore = useMyDeviceStore()
+  if (deviceStore?.device?.token) {
+    defaultHeaders['Authorization'] = `Bearer ${deviceStore.device.token}`
+  }
 
-    // Build default headers and only include Authorization when a token exists
-    const defaultHeaders: Record<string, string> = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-         credentials: deviceStore?.device?.token ? "omit" : "include", 
-    }
+  const ofetchApi = ofetch.create({
+    baseURL: config.public.mainApiUrl,
+  })
 
-    if (deviceStore?.device?.token) {
-        defaultHeaders["Authorization"] = `Bearer ${deviceStore.device.token}`
-    }
-
-    // Merge any headers passed in via params
-    const mergedParams: RequestInit = params ? { ...params } : {}
-    if (mergedParams.headers) {
-        // Normalize headers into an object
-        const incoming = mergedParams.headers as Record<string, string>
-        mergedParams.headers = { ...defaultHeaders, ...incoming }
-    } else {
-        mergedParams.headers = defaultHeaders
-    }
-
-    const ofetchApi = ofetch.create({
-        baseURL: config.public.mainApiUrl,
-    })
-
-    return ofetchApi(url, mergedParams)
+  return ofetchApi(url, {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...(options?.headers || {}),
+    },
+  })
 }

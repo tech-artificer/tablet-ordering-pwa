@@ -1,0 +1,23 @@
+services:
+  wooserve:
+    # Main Nuxt 3 application service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wooserve:latest
+    container_name: wooserve
+    restart: unless-stopped
+    init: true
+    ports:
+      - "3000:3000"  # Expose Nuxt app on port 3000
+    env_file: ./.env   # 👈 uncomment if you want Nuxt to load your .env file
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./certs:/app/certs   # 👈 mount your certs for HTTPS dev
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge

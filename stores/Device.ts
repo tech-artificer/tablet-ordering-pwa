@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { DeviceInformation, Device, DeviceParams, DeviceLoginParams } from '~/types/index'
+import type {  Device, DeviceParams, DeviceLoginParams } from '~/types/index'
 
 export const useMyDeviceStore = defineStore('device', {
     state: () => ({
@@ -14,6 +14,7 @@ export const useMyDeviceStore = defineStore('device', {
             last_ip_address: '',
         } as DeviceParams,
         oldUUID: '',
+        token: null as string | null,
         isLoading: false as boolean,
         errorMessage: null as string | null,
         showDeviceRegistration: false as boolean,
@@ -22,14 +23,18 @@ export const useMyDeviceStore = defineStore('device', {
     getters: {
         hasDevice: (state) => {
             return state.device.token ? true : false
-        }
+        },
+
+        getTableAssigned: (state) => state.device.table.name,
+
+
     },
 
     actions: {
         async checkDevice () {
             this.isLoading = true
             try {
-                const response = await useMainApiO('/api/devices/login', {
+                const response = await useMainApiAuth('/api/devices/login', {
                     method: 'GET',
 
                 })
@@ -53,7 +58,7 @@ export const useMyDeviceStore = defineStore('device', {
         async registerDevice() {
             this.isLoading = true
             try {
-                const response = await useMainApiO('/api/devices/register', {
+                const response = await useMainApiAuth('/api/devices/register', {
                     method: 'POST',
                     // ofetch expects serializable body; stringify to satisfy TS BodyInit
                     body: JSON.stringify(this.deviceParams),
@@ -83,6 +88,27 @@ export const useMyDeviceStore = defineStore('device', {
                         type: 'error',
                     } as object)
                 }
+            }
+        },
+
+        async authenticate() {
+            try {
+                const response = await useMainApiAuth('/api/devices/login', {
+                    method: 'GET',
+
+                })
+                // backend returns { token, device }
+                if (response && response.token) {
+                    console.log('refresh token', response)
+                    this.device = response
+                } else {
+                    // defensive: mark as missing device to trigger registration
+                    this.showDeviceRegistration = true
+                    this.isLoading = false
+                }
+
+            } catch (error: any) {
+                this.showDeviceRegistration = true
             }
         },
         async clearData() {

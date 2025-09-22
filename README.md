@@ -1,136 +1,38 @@
-# Tap to Order System
+## 🐳 Running with Docker
 
-A modern, responsive web application built with Nuxt 3, Vue 3, and Pinia, designed to provide a seamless ordering experience for restaurants and cafes.
+You can run this project in a containerized environment using Docker and Docker Compose. This setup ensures consistency across development and production environments.
 
-## ✨ Features
+### Requirements
+- **Docker** and **Docker Compose** installed on your system
+- (Optional) `.env` file for environment variables (see below)
 
-- 🍽️ Interactive menu browsing
-- 🛒 Real-time cart management
-- 📱 Progressive Web App (PWA) support
-- 🎨 Modern UI with Tailwind CSS
-- 📱 Responsive design for all devices
-- 🔄 State management with Pinia
-- 📊 Built-in analytics with nuxt-charts
-- 🔍 SEO optimized
+### Docker Details
+- **Node.js version:** 22.13.1 (as specified in the Dockerfile)
+- **Exposed port:** `3000` (the Nuxt app will be available at `http://localhost:3000`)
+- **Environment variables:**
+  - The application expects environment variables defined in a `.env` file. You can copy `.env.example` to `.env` and adjust as needed.
 
-## 🚀 Tech Stack
+### Build and Run
 
-- **Frontend**: Vue 3, Nuxt 3
-- **State Management**: Pinia with persistence
-- **Styling**: Tailwind CSS
-- **UI Components**: Element Plus
-- **Icons**: Nuxt Icon
-- **Charts**: nuxt-charts
-- **Build Tool**: Vite
-- **Linting**: ESLint
-
-## 🛠️ Prerequisites
-
-- Node.js 18+ (LTS recommended)
-- npm, pnpm, yarn, or bun package manager
-- Git
-
-## 🏗️ Setup
-
-1. Clone the repository:
-   ```bash
-   git clone [your-repository-url]
-   cd tap-to-order
-   ```
-
-2. Install dependencies:
-   ```bash
-   # Using npm
-   npm install
-
-   # Using pnpm
-   pnpm install
-
-   # Using yarn
-   yarn install
-
-   # Using bun
-   bun install
-   ```
-
-3. Copy the environment file:
+1. **Copy the example environment file (if you haven't already):**
    ```bash
    cp .env.example .env
+   # Edit .env as needed
    ```
 
-4. Configure your environment variables in the `.env` file.
-
-## 🚦 Development
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## 🏗️ Building for Production
-
-1. Build the application:
+2. **Build and start the application using Docker Compose:**
    ```bash
-   # npm
-   npm run build
-
-   # pnpm
-   pnpm build
-
-   # yarn
-   yarn build
-
-   # bun
-   bun run build
+   docker compose up --build
    ```
+   This will build the Docker image and start the `typescript-app` service.
 
-2. Preview the production build:
-   ```bash
-   # npm
-   npm run preview
+3. **Access the app:**
+   - Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-   # pnpm
-   pnpm preview
+### Notes
+- The Docker Compose file defines a single service (`typescript-app`) and a custom bridge network (`appnet`).
+- The container runs as a non-root user for improved security.
+- If you update your `.env` file, restart the container to apply changes.
+- If you need to customize the build (e.g., change the Node.js version), edit the `Dockerfile`'s `ARG NODE_VERSION` line.
 
-   # yarn
-   yarn preview
-
-   # bun
-   bun run preview
-   ```
-
-## 📂 Project Structure
-
-```
-.
-├── assets/          # Global styles, images, and fonts
-├── components/      # Reusable Vue components
-├── composables/     # Vue 3 composables
-├── layouts/         # Layout components
-├── pages/           # Application views and routes
-├── plugins/         # Nuxt plugins
-├── public/          # Static files
-├── stores/          # Pinia stores
-├── .env             # Environment variables
-├── nuxt.config.ts   # Nuxt configuration
-└── tailwind.config.js # Tailwind CSS configuration
-```
-
-## 🙏 Acknowledgments
-
-- [Nuxt.js](https://nuxt.com/)
-- [Vue.js](https://vuejs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Element Plus](https://element-plus.org/)
-- [Pinia](https://pinia.vuejs.org/)
+---

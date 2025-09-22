@@ -1,177 +1,140 @@
-import type { Menu } from '~/types/index';
+import { defineStore } from 'pinia'
+import type { MenuItem } from '~/types/menu'
+
+
+export interface CarouselItem {
+  title: string
+  price: number
+  image: string
+  tag?: string
+}
+
 
 export const useMenuStore = defineStore('menu', {
     state: () => ({
-        menuItems: [] as Array<Menu>,
-        isLoading: false as boolean,
-        featureItems: [] as Array<Menu>,
-        currentFilter: null as string | null,
-        currentSearchQuery: null as string | null,
+        desserts: [] as MenuItem[],
+        sides: [] as MenuItem[],
+        beverage: [] as MenuItem[],
+        sets: [] as MenuItem[],
+        modifiers: [] as MenuItem[],
+        featuredItems: {} as CarouselItem[],
+        tiers: {
+            classic: 'Basic',
+            noble: 'Best',
+            royal: 'Premium'
+        },
+        loading: false,
+        error: null as string | null,
     }),
 
-    getters: {
-        hasMenus: (state) => {
-            return state.menuItems && state.menuItems.length > 0
-        }
+    actions: {
+        async fetchCourses() {
+            const data = await useMainApiAuth('api/menus/course', {
+                method: 'GET',
+                params: {
+                    course: CategoryFilter.DESSERT
+                }
+            })
+
+            this.desserts = Array.isArray(data) ? data : data.data
+        },
+
+        async fetchGroups() {
+            const data = await useMainApiAuth('api/menus/group', {
+                method: 'GET',
+                params: {
+                    group: CategoryFilter.SIDES
+                }
+            })
+
+            this.sides = Array.isArray(data) ? data : data.data
+        },
+
+        async fetchCategories() {
+            const data = await useMainApiAuth('api/menus/category', {
+                method: 'GET',
+                params: {
+                    category: CategoryFilter.BEVERAGE
+                }
+            })
+
+            this.beverage = Array.isArray(data) ? data : data.data
+        },
+        async fetchModifiers() {
+            const data = await useMainApiAuth('api/menus/modifiers')
+        },
+
+        async fetchSets() {
+            const data = await useMainApiAuth('api/menus/with-modifiers')
+            console.log('Sets', data)
+            this.sets = Array.isArray(data) ? data : data.data
+            console.log('Sets', this.sets)
+            // each set has modifiers. seet[0].modifiers
+          this.modifiers = this.sets.reduce<MenuItem[]>((accumulator, currentSet) => {
+            return [...accumulator, ...currentSet.modifiers];
+            }, []);
+        },
+
+        async getFeaturedItems() {
+            this.featuredItems = [
+                { title: 'Sushi Platter', price: 999, image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=1000&h=1000&fit=crop', tag: 'Chef’s Pick' },
+                { title: 'Breakfast Special', price: 499, image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=1000&h=1000&fit=crop', tag: 'Best Seller' },
+                { title: 'Samgyupsal Set', price: 799, image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=1000&h=1000&fit=crop', tag: 'Limited' },
+            ]
+        },
+
+
+        reset() {
+            // this.items = []
+            this.sets = [],
+                this.modifiers = [],
+                this.desserts = [],
+                this.sides = [],
+                this.beverage = [],
+                this.loading = false
+            this.error = null
+        },
+
+        async init() {
+            this.loading = true
+            try {
+                await Promise.all([
+                    this.fetchCourses(),
+                    this.fetchGroups(),
+                    this.fetchCategories(),
+                    this.fetchModifiers(),
+                    this.fetchSets(),
+                    this.getFeaturedItems
+                ])
+            } catch (err) {
+                console.error(err)
+                this.error = 'Failed to load menu data'
+            } finally {
+                this.loading = false
+            }
+        },
     },
 
-    actions: {
-        async exampleData() {
-            this.isLoading = true
-            const menuItemExample = [
-                {
-                    id: 1,
-                    name: 'Beef Bulgogi',
-                    description: 'Other information, ingredients',
-                    price: 459.99,
-                    rating: 4.9,
-                    category: 'Beef',
-                    image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=300&h=300&fit=crop'
-                },
-                {
-                    id: 2,
-                    name: 'Sushi Platter',
-                    description: 'Other information, ingredients',
-                    price: 899.99,
-                    rating: 4.8,
-                    category: 'Fish',
-                    image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300&h=300&fit=crop'
-                },
-                {
-                    id: 3,
-                    name: 'Breakfast Special',
-                    description: 'Other information, ingredients',
-                    price: 299.99,
-                    rating: 4.7,
-                    category: 'Most popular',
-                    image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=300&h=300&fit=crop'
-                },
-            ]
-            this.featureItems = menuItemExample as Array<Menu>
-            this.isLoading = false
-            console.log('Example menus loaded:', this.featureItems)
+    getters: {
+        // Items grouped by course → group → category
+        menuSets: (state) => state.sets,
+        menuSides: (state) => state.sides,
+        menuDesserts: (state) => state.desserts,
+        menuBeverage: (state) => state.beverage,
+        menuModifiers: (state) => {
+            const cartStore = useCartStore()
+            if (cartStore.packageSelected.modifiers.length > 0) {
+                return cartStore.packageSelected.modifiers    
+            }
+
+            return state.modifiers
         },
-
-        async getAllMenus() {
-            if (this.currentFilter === 'all' && !this.currentSearchQuery) {
-                return
-            }
-
-            this.isLoading = true
-            try {
-                const response = await useMainApiAuth('/api/menus', {
-                    method: 'GET',
-                })
-
-                this.menuItems = Array.isArray(response) ? response : response.data || []
-                this.currentFilter = 'all'
-                this.currentSearchQuery = null
-
-                console.log('All menus fetched successfully:', this.menuItems.length, 'items')
-            } catch (error) {
-                console.error('Error fetching all menus:', error)
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async getMenuByCategory(category: string) {
-            if (this.currentFilter === category && !this.currentSearchQuery) {
-                return
-            }
-
-            this.isLoading = true
-            try {
-                const response = await useMainApiAuth('/api/menus/category', {
-                    method: 'GET',
-                    params: {
-                        category: category
-                    }
-                } as object)
-
-                this.menuItems = Array.isArray(response) ? response : response.data || []
-                this.currentFilter = category
-                this.currentSearchQuery = null
-
-                console.log(`Category '${category}' menus fetched successfully:`, this.menuItems.length, 'items')
-            } catch (error) {
-                console.error('Error fetching category menus:', error)
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async searchMenus(query: string) {
-            if (this.currentSearchQuery === query) {
-                return
-            }
-
-            this.isLoading = true
-            try {
-                const response = await useMainApiAuth('/api/menus/search', {
-                    method: 'GET',
-                    params: {
-                        q: query
-                    }
-                } as object)
-
-                this.menuItems = Array.isArray(response) ? response : response.data || []
-                this.currentFilter = null
-                this.currentSearchQuery = query
-
-                console.log(`Search results for '${query}':`, this.menuItems.length, 'items')
-            } catch (error) {
-                console.error('Error searching menus:', error)
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        async getMenuByCourse(course: string) {
-            if (this.currentFilter === `course_${course}` && !this.currentSearchQuery) {
-                return
-            }
-
-            this.isLoading = true
-            try {
-                const response = await useMainApiAuth('/api/menus/course', {
-                    method: 'GET',
-                    params: {
-                        course: course
-                    }
-                } as object)
-
-                this.menuItems = Array.isArray(response) ? response : response.data || []
-                this.currentFilter = `course_${course}`
-                this.currentSearchQuery = null
-
-                console.log(`Course '${course}' menus fetched successfully:`, this.menuItems.length, 'items')
-            } catch (error) {
-                console.error('Error fetching course menus:', error)
-                throw error
-            } finally {
-                this.isLoading = false
-            }
-        },
-
-        resetFilterState() {
-            this.currentFilter = null
-            this.currentSearchQuery = null
-        },
-
-        clearMenuItems() {
-            this.menuItems = []
-            this.currentFilter = null
-            this.currentSearchQuery = null
-        }
     },
 
     persist: {
         key: 'menu-store',
-        storage: import.meta.client ? localStorage : undefined,
-        pick: ['featureItems'],
-    }
+        storage: localStorage,
+        pick: ['sides', 'desserts', 'beverage', 'sets', 'modifiers', 'featuredItems'],
+    },
 })
+
