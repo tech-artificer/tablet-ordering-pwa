@@ -99,12 +99,16 @@ export interface Device {
     branch:Branch,
     table: Table,
     token?: string,
-    device?: DeviceInformation,
+    code?: string,
+    app_version?: string,
+    last_ip_address?: string,
+    // device?: DeviceInformation,
+    table: Table,
     isLoading?: boolean,
 }
-export interface DeviceLoginParams {
-    device_uuid: string,
-}
+// export interface DeviceLoginParams {
+//     device_uuid: string,
+// }
 
 export interface DeviceOrder {
     items: OrderedMenu[];

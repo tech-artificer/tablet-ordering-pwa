@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import GuestCounter from '~/components/GuestCounter.vue'
 
-definePageMeta({
-  middleware: [
-    function (to, from) {
-      // Custom inline middleware
-    },
-    'order',
-  ],
-});
+// definePageMeta({
+//   middleware: [
+//     function (to, from) {
+//       // Custom inline middleware
+//     },
+//     'order',
+//   ],
+//   layout: 'default',
+// });
 
 </script>
 

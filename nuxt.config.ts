@@ -7,7 +7,12 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-06-01',
     ssr: false,
     css: ['~/assets/css/main.css'],
-
+    devServer: {
+        https: {
+            key: process.env.NUXT_DEV_SERVER_HTTPS_KEY,
+            cert: process.env.NUXT_DEV_SERVER_HTTPS_CERT
+        }
+    },
     modules: [
         '@pinia/nuxt',
         'pinia-plugin-persistedstate',

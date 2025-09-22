@@ -78,9 +78,9 @@ export const useOrderListener = () => {
 
   function transitionToWelcome(delay = 2000) {
     ElNotification({
-      title: 'Success',
-      message: 'Order completed successfully',
-      type: 'success',
+      title: 'Session Completed',
+      message: 'Returning to Welcome',
+      type: 'info',
     })
     setTimeout(() => {
       resetStores()

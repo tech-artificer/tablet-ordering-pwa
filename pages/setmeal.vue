@@ -38,14 +38,14 @@ const setTier = (set: any) => {
     return tier
 }
 
-definePageMeta({
-    middleware: [
-        function (to, from) {
-            // Custom inline middleware
-        },
-        'order',
-    ],
-});
+// definePageMeta({
+//     middleware: [
+//         function (to, from) {
+//             // Custom inline middleware
+//         },
+//         'order',
+//     ],
+// });
 
 </script>
 

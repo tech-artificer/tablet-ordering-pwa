@@ -1,14 +1,20 @@
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
-import ServiceRequest from '~/components/ServiceRequest.vue'
+// import { useDeviceStore } from '~/stores/Device'
+// import { useAppControl } from '@/composables/useAppControl'
+// import ServiceRequest from '~/components/ServiceRequest.vue'
 import ErrorDialog from '@/components/ErrorDialog.vue'
+
 // import { useCategoryStore } from '@/stores/Category'
 // import { useGuestStore } from '@/stores/Guest'
 // import { useOrderStore } from '@/stores/Order'
 
+// const deviceStore = useDeviceStore()
 // console.log('order', useOrderStore().order)
+// const deviceId = deviceStore.device?.id
 
+// useAppControl(deviceId)
 // PWA Setup
 useHead({
     title: 'Wooserve',
@@ -77,7 +83,7 @@ const pageTransition = computed(() => ({
     mode: 'out-in'
 }))
 
-const deviceIsMobile = ref(false)
+// const deviceIsMobile = ref(false)
 // const categoryStore = useCategoryStore()
 
 onMounted(() => {
@@ -103,10 +109,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-    window.removeEventListener('online', updateOnlineStatus)
-    window.removeEventListener('offline', updateOnlineStatus)
-    window.removeEventListener('popstate', () => { })
-    stopOfflineProgress()
+    // window.removeEventListener('online', updateOnlineStatus)
+    // window.removeEventListener('offline', updateOnlineStatus)
+    // window.removeEventListener('popstate', () => { })
+    // stopOfflineProgress()
 })
 </script>
 

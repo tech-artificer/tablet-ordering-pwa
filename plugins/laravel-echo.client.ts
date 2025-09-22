@@ -1,6 +1,6 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
-import { useMyDeviceStore } from '@/stores/Device'
+import { useDeviceStore } from '@/stores/Device'
 import { useErrorDialogStore } from '@/stores/ErrorDialog'
 
 export default defineNuxtPlugin((nuxtApp) => {
@@ -30,7 +30,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     }
 
     try {
-        const deviceStore = useMyDeviceStore()
+        const deviceStore = useDeviceStore()
 
         // expose Pusher to window for libraries that expect it
         // (only in client runtime)
@@ -41,7 +41,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         const authEndpoint = `${String(mainApi).replace(/\/$/, '')}/broadcasting/auth`
 
         // Prepare headers only if we have a token
-        const token = deviceStore?.device?.token
+        const token = deviceStore?.token
         const headers: Record<string, string> = {
             Accept: 'application/json',
             'Content-Type': 'application/json'

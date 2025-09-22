@@ -1,20 +1,25 @@
 import { defineStore } from 'pinia'
-import type {  Device, DeviceParams, DeviceLoginParams } from '~/types/index'
+import type { Device } from '~/types/index'
 
-export const useMyDeviceStore = defineStore('device', {
+export const useDeviceStore = defineStore('device', {
     state: () => ({
+
         device: {} as Device,
-        deviceLoginParams: {
-            device_uuid: '',
-        } as DeviceLoginParams,
-        deviceParams: {
-            name: '',
-            code: '',
-            app_version: '',
-            last_ip_address: '',
-        } as DeviceParams,
-        oldUUID: '',
+        code: '' as string | number | null,
+        table : {} as any,
+        // deviceLoginParams: {
+        //     device_uuid: '',
+        // } as DeviceLoginParams,
+        // table: {} as Table,
+        // deviceParams: {
+        //     name: '',
+        //     code: '',
+        //     app_version: '',
+        //     last_ip_address: '',
+        // } as DeviceParams,
+        // oldUUID: '',
         token: null as string | null,
+        expiration: null as number | string | null,
         isLoading: false as boolean,
         errorMessage: null as string | null,
         showDeviceRegistration: false as boolean,
@@ -22,54 +27,76 @@ export const useMyDeviceStore = defineStore('device', {
 
     getters: {
         hasDevice: (state) => {
-            return state.device.token ? true : false
+            return state.token
         },
-
         getTableAssigned: (state) => state.device.table.name,
-
+        getDeviceToken: (state) => state.token,
 
     },
 
     actions: {
-        async checkDevice () {
+
+        async checkDevice() {
             this.isLoading = true
             try {
-                const response = await useMainApiAuth('/api/devices/login', {
+                const { token, device, expires_at } = await useMainApiAuth('/api/devices/login', {
                     method: 'GET',
-
                 })
+                this.$reset()
                 // backend returns { token, device }
-                if (response && response.token) {
-                    this.device = response
-                    this.oldUUID = this.deviceLoginParams.device_uuid
+
+
+                if (device && token) {
+                    this.device = device
+                    this.token = token
+                    this.table = device.table
+                    this.expiration = expires_at
+                    // this.oldUUID = this.deviceLoginParams.device_uuid
                     this.showDeviceRegistration = false
                     this.isLoading = false
-                    ;(this as any).clearData()
+
+                    ElNotification({
+                        title: 'Success',
+                        message: 'Device logged in successfully',
+                        type: 'success',
+                    })
+
+                    navigateTo('/')
+
+                    // ;(this as any).clearData()
                 } else {
                     // defensive: mark as missing device to trigger registration
                     this.showDeviceRegistration = true
                     this.isLoading = false
+
+
                 }
 
             } catch (error: any) {
                 this.showDeviceRegistration = true
             }
         },
-        async registerDevice() {
+        async register(formData: any) {
             this.isLoading = true
             try {
-                const response = await useMainApiAuth('/api/devices/register', {
+                const { token, device, expires_at } = await useMainApiAuth('/api/devices/register', {
                     method: 'POST',
                     // ofetch expects serializable body; stringify to satisfy TS BodyInit
-                    body: JSON.stringify(this.deviceParams),
+                    body: JSON.stringify(formData),
                 })
-                this.device = response
+
+                this.device = device
+                this.token = token
+                this.table = device.table
+                this.expiration = expires_at
+
                 ElNotification({
-                    title: 'Success',
-                    message: 'Device registered successfully',
+                    title: 'Registration Complete',
+                    message: 'You can now begin your K-BBQ experience',
                     type: 'success',
                 })
-                ;(this as any).clearData()
+
+                    // ; (this as any).clearData()
                 this.showDeviceRegistration = false
                 this.isLoading = false
             } catch (error) {
@@ -92,42 +119,61 @@ export const useMyDeviceStore = defineStore('device', {
         },
 
         async authenticate() {
+
             try {
-                const response = await useMainApiAuth('/api/devices/login', {
+                const { token, device, table, expires_at } = await useMainApiAuth('/api/devices/login', {
                     method: 'GET',
 
                 })
                 // backend returns { token, device }
-                if (response && response.token) {
-                    console.log('refresh token', response)
-                    this.device = response
+                if (token && device) {
+                    console.log('refresh token', token)
+                    this.device = device
+                    this.token = token
+                    this.table = table
+                    this.expiration = expires_at
+
+                    console.log('refreshed device', this.device)
+
+                  console.log('refreshed table', this.table)
+
                 } else {
+
+                     ElNotification({
+                        title: 'Error',
+                        message: 'Authentication Failed',
+                        type: 'error',
+                    })
+
                     // defensive: mark as missing device to trigger registration
                     this.showDeviceRegistration = true
                     this.isLoading = false
                 }
+
+                console.log('rehydrated device', this.table)
 
             } catch (error: any) {
                 this.showDeviceRegistration = true
             }
         },
         async clearData() {
-            this.deviceLoginParams = {
-                device_uuid: '',
-            }
-            this.deviceParams = {
-                name: '',
-                code: '',
-                app_version: '',
-                last_ip_address: '',
-            }
+            this.$reset()
+            // this.deviceLoginParams = {
+            //     device_uuid: '',
+            // }
+            // this.deviceParams = {
+            //     name: '',
+            //     code: '',
+            //     app_version: '',
+            //     last_ip_address: '',
+            // }
             this.errorMessage = null
         }
     },
 
-    persist: ({
+    persist: {
         key: 'device-store',
-        storage: import.meta.client ? localStorage : undefined,
-        pick: ['device', 'deviceParams', 'showDeviceRegistration', 'oldUUID'],
-    } as any)
+        storage: localStorage,
+        pick: ['device', 'token', 'expiration', 'table'],
+    }
 })

@@ -3,8 +3,6 @@ import WoosooDeviceRegister from '~/components/woosoo/device/woosooDeviceRegiste
 
 </script>
 
-
-
 <template>
     <div>
         <WoosooDeviceRegister />

@@ -1,4 +1,4 @@
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin(async() => {
     const { setTheme } = useTheme()
     const savedTheme = localStorage.getItem('theme') || 'woosooWarm'
     setTheme(savedTheme)

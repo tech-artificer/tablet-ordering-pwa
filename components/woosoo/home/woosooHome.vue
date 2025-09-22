@@ -10,14 +10,14 @@
                     :class="{'w-24 h-24': packageView, 'w-48 h-48': !packageView}"
                 />
             </div>
-            <template v-if="!myDeviceStore.showDeviceRegistration">
+            <template v-if="!deviceStore.showDeviceRegistration">
                 <!-- <WoosooHomeHeadline v-show="!guestCountView && !packageView" @change-guest-count-view="changeGuestCountView"/> -->
                  <WoosooHomeHeadline v-show="!guestCountView && !packageView"/>
                 <WoosooHomeGuestCounter v-show="guestCountView && !packageView" @change-package-view="changePackageView"/>
                 <WoosooHomePackage v-show="packageView && !guestCountView" @change-include-items-modal-status="changeIncludeItemsModalStatus"/>
             </template>
             <template v-else>
-                <WoosooDeviceRegister />
+                <!-- <WoosooDeviceRegister /> -->
             </template>
         </div>
     </div>
@@ -26,17 +26,18 @@
 <script setup>
 const guestCountView = ref(false)
 const packageView = ref(false)
-const myDeviceStore = useMyDeviceStore()
-const { hasDevice } = storeToRefs(myDeviceStore)
+const deviceStore = useDeviceStore()
+const { hasDevice } = storeToRefs(deviceStore)
 const cartStore = useCartStore()
-onMounted(async () => {
-    await myDeviceStore.checkDevice()
-    if (!hasDevice.value) {
-        myDeviceStore.showDeviceRegistration = true
-    }
-    if(cartStore.isLocked){
-        navigateTo('woosoo/menu')
-    }
+onMounted(async () => { 
+    // console.log(deviceStore)
+    // await deviceStore.checkDevice()
+    // if (!hasDevice.value) {
+    //     deviceStore.showDeviceRegistration = true
+    // }
+    // if(cartStore.isLocked){
+    //     navigateTo('woosoo/menu')
+    // }
 })
 
 const changeGuestCountView = () => {

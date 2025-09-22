@@ -1,47 +1,42 @@
-// import { useNuxtApp } from '#app'
-// import { useOrderStore } from '~/stores/Order'
-// import { useCartStore } from '~/stores/Cart'
-// import { useSessionStore } from '~/stores/session'
-// import { useMyDeviceStore } from '~/stores/Device'
+import { useNuxtApp } from '#app'
 
-// let echo: Echo | null = null
 
-// export const useOrderListener = () => {
+export function useAppControl(deviceId: string) {
+  
+ const { $echo } = useNuxtApp()
 
-//     const { $echo } = useNuxtApp()
-//     const orderStore = useOrderStore()
-//     const cartStore = useCartStore()
-//     const sessionStore = useSessionStore()
-//     const deviceStore = useMyDeviceStore()
+ const channelName = `device.${deviceId}`
+    console.log(`📡 Subscribing to ${channelName}`)
+  $echo.channel(channelName)
+    .listen('.device.control', (event: any) => {
+      console.log('[device.control]', event)
 
-//     echo.channel(`app-control.${deviceStore.device?.id}`)
-//         .listen('.AppControlEvent', (event: any) => {
-//             console.log('[AppControl]', event)
+    //   const session = useSessionStore()  
 
-//             switch (event.action) {
-//                 case 'reset':
-//                     // Reset Pinia stores
-//                     const stores = [useOrderStore(), useCartStore(), useSessionStore()]
-//                     stores.forEach(store => store.$reset?.())
-//                     break
+      switch (event.action) {
+        case 'reset':
+            console.log('[device.control]', event)
+        //   session.endSession()
+          // also reset dependent stores
+        //   useOrderStore().$reset()
+        //   useCartStore().$reset()
+        //   navigateTo('/welcome')
+          break
 
-//                 case 'navigate':
-//                     if (event.payload?.route) {
-//                         navigateTo(event.payload.route)
-//                     }
-//                     break
+        case 'navigate':
+             console.log('[device.control]', event)
+        //   if (event.payload?.route) {
+        //     navigateTo(event.payload.route)
+        //   }
+          break
 
-//                 case 'refresh':
-//                     location.reload()
-//                     break
+        case 'print_status':
+          // Example: show toast to user
+          console.log('Printer says:', event.payload?.message)
+          break
 
-//                 case 'toast':
-//                     // optional: show a notification on the tablet
-//                     console.log('Toast:', event.payload?.message)
-//                     break
-
-//                 default:
-//                     console.warn('Unknown action', event.action)
-//             }
-//         })
-// }
+        default:
+          console.warn('Unknown action', event.action)
+      }
+    })
+}

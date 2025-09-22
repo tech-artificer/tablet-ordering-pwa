@@ -283,9 +283,9 @@
 import { useCartStore } from '@/stores/Cart'
 import { useGuestStore } from '@/stores/Guest'
 import { useOrderStore } from '@/stores/Order'
-import { useMyDeviceStore } from '@/stores/Device'
+import { useDeviceStore } from '@/stores/Device'
 
-const deviceStore = useMyDeviceStore()
+const deviceStore = useDeviceStore()
 const cartStore = useCartStore()
 const guestStore = useGuestStore()
 const orderStore = useOrderStore()
@@ -342,7 +342,7 @@ const placeOrder = async () => {
         cartStore.orderParams.subtotal = cartStore.subTotal
         cartStore.orderParams.discount = 0
         cartStore.orderParams.tax = cartStore.vat || 0
-        cartStore.orderParams.table_id = deviceStore.device.device.table_id
+        cartStore.orderParams.table_id = deviceStore.device.table_id
         cartStore.orderParams.items = cartStore.cartItems
          cartStore.orderParams.total = cartStore.total
         cartStore.orderParams.total_amount = cartStore.total

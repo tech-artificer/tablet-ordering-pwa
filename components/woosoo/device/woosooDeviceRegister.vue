@@ -1,3 +1,27 @@
+<script setup lang="ts">
+import { useDeviceStore } from '~/stores/Device'
+import { useRuntimeConfig } from '#app'
+const runtimeConfig = useRuntimeConfig()
+const deviceStore = useDeviceStore()
+
+const form = reactive({
+    name: '',
+    code: '',
+    app_version: runtimeConfig.public.appVersion
+})
+
+deviceStore.checkDevice()
+
+const registerDevice = async() => {
+    await deviceStore.register(form)
+
+    if (deviceStore.hasDevice) {
+       alert('Device Registered')
+    }
+}
+
+</script>
+
 <template>
     <div class="min-w-[25vw] max-w-[400px]">
         <div>
@@ -5,12 +29,12 @@
                 <h1 class="text-white text-center mb-4">Register a new device</h1>
                 <div>
                     <input
-                        v-model="deviceParams.name"
+                        v-model="form.name"
                         class="w-full bg-transparent text-white border-white border-2 rounded-lg p-2 mb-4"
                         placeholder="Device Name"
                     >
                     <input
-                        v-model="deviceParams.code"
+                        v-model="form.code"
                         class="w-full bg-transparent text-white border-white border-2 rounded-lg p-2 "
                         placeholder="Device Code"
                     >
@@ -27,18 +51,3 @@
         </div>
     </div>
 </template>
-<script setup>
-import { useMyDeviceStore } from '@/stores/Device'
-import { useRuntimeConfig } from '#app'
-import { storeToRefs } from 'pinia'
-const runtimeConfig = useRuntimeConfig()
-const myDeviceStore = useMyDeviceStore()
-const { deviceParams } = storeToRefs(myDeviceStore)
-onMounted(async () => {
-    myDeviceStore.clearData()
-    deviceParams.value.app_version = runtimeConfig.public.appVersion
-})
-const registerDevice = () => {
-    myDeviceStore.registerDevice()
-}
-</script>

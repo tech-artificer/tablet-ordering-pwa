@@ -1,18 +1,18 @@
 import { defineNuxtRouteMiddleware, navigateTo } from '#app'
-import { useOrderStore } from '@/stores/Order'
-import { useCartStore } from '@/stores/Cart'
-import { useMyDeviceStore } from '@/stores/Device'
+import { useOrderStore } from '~/stores/Order'
+import { useCartStore } from '~/stores/Cart'
+import { useDeviceStore } from '~/stores/Device'
 
 
 export default defineNuxtRouteMiddleware((to, from) => {
     // Use the order store as source of truth
     const orderStore = useOrderStore()
     const cart = useCartStore() 
-    const deviceStore = useMyDeviceStore()
+    const deviceStore = useDeviceStore()
 
-    if (!deviceStore.hasDevice) {
-        deviceStore.checkDevice()
-    }
+    // if (!deviceStore.hasDevice) {
+    //     deviceStore.checkDevice()
+    // }
 
     console.log('device', deviceStore)
     

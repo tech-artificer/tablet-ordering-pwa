@@ -1,19 +1,19 @@
 import { ofetch, type FetchOptions } from 'ofetch'
 import { useRuntimeConfig } from "nuxt/app"
-import { useMyDeviceStore } from "@/stores/Device"
+import { useDeviceStore } from "@/stores/Device"
 
 
 export function useMainApiAuth(url: string, options?: FetchOptions) {
   const config = useRuntimeConfig()
-  const deviceStore = useMyDeviceStore()
+  const deviceStore = useDeviceStore()
 
   const defaultHeaders: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
 
-  if (deviceStore?.device?.token) {
-    defaultHeaders['Authorization'] = `Bearer ${deviceStore.device.token}`
+  if (deviceStore?.token) {
+    defaultHeaders['Authorization'] = `Bearer ${deviceStore.token}`
   }
 
   const ofetchApi = ofetch.create({

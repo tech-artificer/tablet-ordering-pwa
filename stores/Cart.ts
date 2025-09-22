@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import type { CartItem } from '~/types'
 import { useOrderStore } from './Order'
-import { useMyDeviceStore } from './Device'
+import { useDeviceStore } from './Device'
 
 
 export const useCartStore = defineStore('cart', {
@@ -176,7 +176,7 @@ export const useCartStore = defineStore('cart', {
 
         if (error.response?.status === 401) {
             console.warn('⚠️ Token expired. Attempting refresh...')
-            await useMyDeviceStore().authenticate()
+            await useDeviceStore().authenticate()
          
           // return navigateTo('/login')
         }

@@ -2,35 +2,35 @@
 import { useCartStore } from '~/stores/Cart'
 import { useMenuStore } from '~/stores/Menu'
 import { useOrderStore } from '~/stores/Order'
+import { useDeviceStore } from '~/stores/Device'
 
 const cart = useCartStore()
 const menu = useMenuStore()
 const order = useOrderStore()
-const deviceStore = useMyDeviceStore()
 
-console.log('device', deviceStore.hasDevice)
-// const guestStore = useGuestStore()
+const deviceStore = useDeviceStore()
 
+if (!deviceStore.token) {
+  // already have persisted device, just rehydrate
+  await deviceStore.authenticate()
+} else {
+  // no token, must register or login
+  // deviceStore.showDeviceRegistration = true
+  // console.log('no token, must register or login')
+}
+console.log(deviceStore)
 // initialize menu
 await menu.init()
 
-cart.$reset()
-cart.clear()
-order.$reset()
+// cart.$reset()
+// cart.clear()
+// order.$reset()
 
 const changeGuestCountView = () => {
-    navigateTo('guest')
-    // emit('changeGuestCountView')
+  navigateTo('guest')
+  // emit('changeGuestCountView')
 }
 
-definePageMeta({
-  middleware: [
-    function (to, from) {
-      // Custom inline middleware
-    },
-    'order',
-  ],
-});
 
 </script>
 
