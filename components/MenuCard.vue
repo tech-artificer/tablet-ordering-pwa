@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useCartStore } from '~/stores/Cart';
+import { useOrderStore } from '~/stores/Order';
 import type { CartItem } from '~/types';
+import { formatCurrency } from '~/utils/formats';
 
 const cart = useCartStore()
-
-
+const order = useOrderStore()
 
 const props = defineProps<{
     item: CartItem
@@ -64,6 +65,7 @@ const decrease = (item: CartItem) => {
 
         <el-button
             type="primary"
+            :disabled="order.hasOrder"
             class="mt-4 w-fit self-end"
             @click="addToCart()"
         >

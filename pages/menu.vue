@@ -7,7 +7,6 @@ import OrderPendingDetails from '~/components/OrderPendingDetails.vue'
 import { useMenuStore } from '~/stores/Menu'
 import { useOrderStore } from '~/stores/Order'
 import { useCartStore } from '~/stores/Cart'
-import { useDeviceStore } from '~/stores/Device'
 
 const { setupOrderListening } = useOrderListener()
 
@@ -68,10 +67,9 @@ definePageMeta({
 </script>
 
 <template>
-    <div class="w-full h-screen overflow-hidden">
-
+    <div class="w-full h-screen overflow-hidden font-inter">
+    
         <el-container class="w-full h-full">
-
 
             <div class="min-h-screen w-full flex">
                 <!-- Left Side: Menu Content -->

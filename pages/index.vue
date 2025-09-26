@@ -1,45 +1,38 @@
 <script setup lang="ts">
-import { useCartStore } from '~/stores/Cart'
+import { storeToRefs } from 'pinia'
 import { useMenuStore } from '~/stores/Menu'
-import { useOrderStore } from '~/stores/Order'
-import { useDeviceStore } from '~/stores/Device'
+import { CustomLogo } from '~/composables/default'
+import { useSessionStore } from '~/stores/Session'
+const sessionStore = useSessionStore()
+const { canProceed } = storeToRefs(sessionStore)
 
-const cart = useCartStore()
 const menu = useMenuStore()
-const order = useOrderStore()
-
-const deviceStore = useDeviceStore()
-
-if (!deviceStore.token) {
-  // already have persisted device, just rehydrate
-  await deviceStore.authenticate()
-} else {
-  // no token, must register or login
-  // deviceStore.showDeviceRegistration = true
-  // console.log('no token, must register or login')
-}
-console.log(deviceStore)
 // initialize menu
 await menu.init()
 
-// cart.$reset()
-// cart.clear()
-// order.$reset()
-
 const changeGuestCountView = () => {
+  sessionStore.startSession()
   navigateTo('guest')
-  // emit('changeGuestCountView')
+  // emit('changeGuestCountView')CustomLogo
 }
 
-
+definePageMeta({
+  middleware: [
+    function (to, from) {
+      // Custom inline middleware
+    },
+    'order',
+  ],
+})
 </script>
 
 <template>
+ 
   <div class="flex flex-col justify-center items-center h-full relative z-10">
     <!-- Animated background flames -->
     <div class="min-h-screen min-w-screen flex flex-col justify-center items-center">
       <div>
-        <CommonImage :src="CustomLogo.LOGO_1" alt="logo" class="w-32 h-32" />
+        <CommonImage v-if="CustomLogo.LOGO_1" :src="CustomLogo.LOGO_1" alt="logo" class="w-32 h-32" />
       </div>
       <!-- Main content -->
       <div class="relative z-10 flex flex-col items-center justify-center px-4">
@@ -53,7 +46,7 @@ const changeGuestCountView = () => {
             <!-- Main headline -->
             <div class="text-center mb-12">
               <h2 class="text-white text-4xl md:text-5xl leading-tight">
-                The grill is hot.
+                The grill is hot. {{ canProceed }}
               </h2>
               <h2 class="text-white text-4xl md:text-5xl leading-tight">
                 The meat is marinated.
@@ -64,8 +57,10 @@ const changeGuestCountView = () => {
             </div>
             <!-- Input and button -->
             <div class="w-full max-w-md space-y-2">
-              <button
+             
+              <button :disabled="!canProceed"
                 class="w-full py-4 px-8 bg-primary text-black text-xl font-bold rounded-md hover:opacity-90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:text-white"
+                :class="{ 'opacity-50 cursor-not-allowed pointer-events-none transform-none hover:scale-100': !canProceed }"
                 @click="changeGuestCountView()">
                 Let's WooSoo This!
               </button>
@@ -79,6 +74,5 @@ const changeGuestCountView = () => {
       </div>
     </div>
 
-    <!-- <WoosooHome /> -->
   </div>
 </template>

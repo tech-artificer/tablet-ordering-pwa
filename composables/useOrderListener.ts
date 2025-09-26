@@ -3,14 +3,12 @@ import { ref, onUnmounted } from 'vue'
 import { useNuxtApp } from '#app'
 import { useOrderStore } from '~/stores/Order'
 import { useCartStore } from '~/stores/Cart'
-// import { useGuestStore } from '@/stores/Guest'
 
 export const useOrderListener = () => {
 
   const { $echo } = useNuxtApp()
   const orderStore = useOrderStore()
   const cartStore = useCartStore()
-//   const guestStore = useGuestStore()
 
   const activeChannel = ref<string | null>(null)
 
@@ -18,7 +16,7 @@ export const useOrderListener = () => {
     if (!orderId) return
 
     const channelName = `orders.${orderId}`
-
+    
     // Leave old channel if switching
     if (activeChannel.value && activeChannel.value !== channelName) {
       console.log(`🔌 Leaving channel: ${activeChannel.value}`)
@@ -48,8 +46,6 @@ export const useOrderListener = () => {
     console.log('✅ Order created:', event)
     if (!event?.order) return
     orderStore.current = event.order
-//     cartStore.orderStatus = event.order.status
-//     cartStore.cartStatus = true
   }
 
   function handleOrderUpdate(event: any) {
@@ -59,11 +55,12 @@ export const useOrderListener = () => {
     const order = event.order
     orderStore.current = order
     // cartStore.orderStatus = order.status
-    if( order.status.includes('created') ) {
-        
+    if( order.status.includes('confirmed') ) {
+         console.log('status confirmed:', order.status)
     }
 
     if (shouldReturnToWelcome(order.status)) {
+      console.log('status:', order.status)
       transitionToWelcome()
     }
   }
@@ -76,12 +73,7 @@ export const useOrderListener = () => {
     )
   }
 
-  function transitionToWelcome(delay = 2000) {
-    ElNotification({
-      title: 'Session Completed',
-      message: 'Returning to Welcome',
-      type: 'info',
-    })
+  function transitionToWelcome(delay = 1000) {
     setTimeout(() => {
       resetStores()
       navigateTo('/')
@@ -89,10 +81,22 @@ export const useOrderListener = () => {
   }
 
   function resetStores() {
+
+    if(  activeChannel.value ) {
+       ElNotification({
+        title: 'Session Completed',
+        message: 'Preparing for a new session.',
+        type: 'info',
+      })
+    }
+   
+
     activeChannel.value && $echo.leave(activeChannel.value)
     activeChannel.value = null
     orderStore.$reset()
     cartStore.$reset()
+
+  
   }
 
   onUnmounted(() => {

@@ -7,12 +7,12 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-06-01',
     ssr: false,
     css: ['~/assets/css/main.css'],
-    devServer: {
-        https: {
-            key: process.env.NUXT_DEV_SERVER_HTTPS_KEY,
-            cert: process.env.NUXT_DEV_SERVER_HTTPS_CERT
-        }
-    },
+    // devServer: {
+    //     https: {
+    //         key: process.env.NUXT_DEV_SERVER_HTTPS_KEY,
+    //         cert: process.env.NUXT_DEV_SERVER_HTTPS_CERT
+    //     }
+    // },
     modules: [
         '@pinia/nuxt',
         'pinia-plugin-persistedstate',
@@ -42,22 +42,22 @@ export default defineNuxtConfig({
         }
     },
 
-    devServer: {
-        // https: {
-        //     key: '../certs/localhost-key.pem',
-        //     cert: '../certs/localhost.pem'
-        // }
-    },
+    // devServer: {
+    //     // https: {
+    //     //     key: '../certs/localhost-key.pem',
+    //     //     cert: '../certs/localhost.pem'
+    //     // }
+    // },
 
     runtimeConfig: {
         public: {
             // App Configuration
-            appVersion: process.env.NUXT_PUBLIC_APP_VERSION,
-            appEnv: process.env.NUXT_PUBLIC_APP_ENV,
+            appVersion: process.env.APP_VERSION,
+            appEnv: process.env.APP_ENV,
 
             // API Configuration    
-            mainApiUrl: 'http://192.168.100.85:8000',
-            staticBaseUrl: 'http://192.168.100.85:3000',
+            mainApiUrl: process.env.MAIN_API_URL,
+            staticBaseUrl: process.env.NUXT_APP_BASE_URL,
 
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION,

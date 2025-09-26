@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { Minus, Plus } from 'lucide-vue-next'
 import { useMenuStore } from '@/stores/Menu'
 import { useCartStore } from '@/stores/Cart'
 import { CircleCheckBig } from 'lucide-vue-next'

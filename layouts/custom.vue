@@ -1,12 +1,15 @@
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
-// import { useCategoryStore } from '@/stores/Category'
-// import { useGuestStore } from '@/stores/Guest'
-// import { useOrderStore } from '@/stores/Order'
-import ServiceRequest from '~/components/ServiceRequest.vue'
+import { useDeviceStore } from '~/stores/Device'
+// import ServiceRequest from '~/components/ServiceRequest.vue'
+// import ErrorDialog from '@/components/ErrorDialog.vue'
 
-// console.log('order', useOrderStore().current_order?.order)
+const { device } = useDeviceStore()
+// console.log('order', useOrderStore().order)
+const deviceId = device?.id
+
+useAppControl(deviceId)
 
 // PWA Setup
 useHead({

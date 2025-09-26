@@ -11,9 +11,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
     const config = useRuntimeConfig()
     const errorDialog = useErrorDialogStore()
-
-    console.log('config', config)
-    // console.log('config', config)
+   
     // Minimal required config checks
     const reverbKey = config.public.reverb.appKey
     const reverbHost = config.public.reverb.host
@@ -25,7 +23,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         // (e.g., CI, static preview)
         // eslint-disable-next-line no-console
         // console.log('Reverb server not running; skipping initialization')
-        errorDialog.show('Reverb configuration error. Retrying...')
+        // errorDialog.show('Reverb configuration error. Retrying...')
         return
     }
 
@@ -69,16 +67,21 @@ export default defineNuxtPlugin((nuxtApp) => {
             }
         })
 
-        console.log('echo', echo)
-
         // @ts-ignore - attach for global access (used across the app)
         window.Echo = echo
 
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
-         errorDialog.hide()
-        // return { provide: { echo } }
+
     } catch (err) {
+
+
+        ElNotification({
+            title: 'Unavailable',
+            message: 'Cannot connect to WebSocket.',
+            type: 'error',
+        })
+
         errorDialog.show('Failed to connect to WebSocket. Retrying...')
         // eslint-disable-next-line no-console
         console.error('[laravel-echo] initialization failed', err)

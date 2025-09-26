@@ -6,6 +6,7 @@ import { storeToRefs } from 'pinia'
 import { useOrderStore } from '~/stores/Order'
 import { formatCurrency } from '~/utils/formats'
 import type { CartItem } from '~/types'
+import OrderItems from '~/components/Order/OrderItems.vue'
 
 const orderStore = useOrderStore()
 const cart = useCartStore()
@@ -15,7 +16,7 @@ const { cartItems, subtotal, total, vat } = storeToRefs(cart)
 const loading = ref(false)
 const countDown = ref(0)
 const orderConfirmation = ref(false)
-const orderPlaced = ref(false)
+const orderPlaced = computed(() => orderStore.hasOrder )
 let timer: ReturnType<typeof setInterval> | null = null
 
 
@@ -33,8 +34,6 @@ function startCountdownAndRequest() {
       timer = null
 
       if( !orderConfirmation.value ) {
-        // modifyOrder.value = false
-        // orderConfirmation.value = false
         return
       }
 
@@ -51,7 +50,6 @@ const placeOrder = async () => {
     await cart.placeOrder()
     loading.value = false
     orderConfirmation.value = false
-    orderPlaced.value = true
 
   } catch (error) {
     console.error('❌ Order failed:', error)
@@ -60,7 +58,6 @@ const placeOrder = async () => {
 
     if (orderStore.current.order_id) {
       loading.value = false
-
     }
     // onPlaceOrder(true)
   }
@@ -102,51 +99,50 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="p-4 bg-white rounded-xl shadow-sm flex flex-col h-full">
+  <div class="p-4 shadow-sm flex flex-col h-full font-inter">
     <h3 class="text-xl flex items-center font-normal mb-2">Order #: {{ orderStore.current.order_id }} </h3>
 
-    <div class="flex-1 overflow-y-auto border-t pt-2 space-y-4">
+    <div class="border-t ">
 
-      <div v-for="item in cartItems" :key="item.id" class="flex flex-row gap-1 justify-between place-items-end">
-        <!-- <img :src="item.img_url" class="w-16 h-16 object-cover rounded-lg" /> -->
-        <div class="flex flex-col justify-between gap-1">
-          <!-- <div class="flex flex-col"> -->
-          <h3 class="text-lg font-medium truncate" v-if="item.id == cart.packageSelected.id">{{ item.name }} </h3>
-          <h3 class="truncate" v-else>{{ item.name }} </h3>
-          <div class="flex flex-row items-center" v-if="item.id == cart.packageSelected.id">{{ item.price }}
-            <X class="h-3" /> {{ item.quantity }}
-          </div>
-
-          <!-- </div> -->
-
-          <div class="flex items-center" v-if="item.id !== cart.packageSelected.id">
-            <button v-if="!orderPlaced"
+      <!-- <div v-for="item in cartItems" :key="item.id" class="flex flex-row gap-1 justify-between place-items-end"> -->
+        
+       
+      <h3 class="text-md font-bold block font-sans pt-2 truncate">{{ cart.packageSelected.name }} </h3>
+       
+      <div class="flex flex-row justify-between py-2">
+        <div class="flex items-center">
+            <button 
               class="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              @click="decrease(item)">
+              @click="decrease(cart.packageSelected)"
+              disabled
+            >
               <Minus />
             </button>
-            <span class="font-medium min-w-10 text-center">{{ getQuantity(item) }} </span>
-            <button v-if="!orderPlaced"
+            <span class="font-medium min-w-10 text-center">{{ getQuantity(cart.packageSelected) }} </span>
+            <button
+            disabled
               class="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              @click="increase(item)">
+              @click="increase(cart.packageSelected)">
 
               <Plus />
             </button>
 
           </div>
-        </div>
 
-        <div class="flex flex-col h-full">
-          <h3 class="text-lg font-medium flex justify-end h-full flex-row items-center">
-            {{ formatCurrency(item.price * item.quantity) }}
+       
+          <h3 class="text-lg font-medium flex justify-end h-full flex-row cart.packageSelecteds-center">
+            {{ formatCurrency(cart.packageSelected.price * cart.guestCount) }}
           </h3>
         </div>
 
+      <!-- </div> -->
 
-      </div>
+      
     </div>
 
-    <div class="mt-4 border-t border-b py-4 space-y-2">
+    <OrderItems class="overflow-y-auto" />
+
+    <div class="mt-4 border-t py-4 space-y-1">
       <div class="flex justify-between text-lg font-light">
         <span>Subtotal</span>
         <span>{{ formatCurrency(subtotal) }}</span>
@@ -155,7 +151,7 @@ onUnmounted(() => {
         <span>Tax(12%)</span>
         <span>{{ formatCurrency(vat) }}</span>
       </div>
-      <div class="flex justify-between text-xl font-semibold">
+      <div class="flex justify-between text-xl font-semibold py-2 border-t-2">
         <span>Total</span>
         <span>{{ formatCurrency(total) }}</span>
       </div>

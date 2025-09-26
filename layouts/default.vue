@@ -1,20 +1,17 @@
 <script setup>
-import { storeToRefs } from 'pinia'
+import { useAppControl } from '@/composables/useAppControl'
+import { useSessionStore } from '@/stores/Session'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
-// import { useDeviceStore } from '~/stores/Device'
-// import { useAppControl } from '@/composables/useAppControl'
+import { useDeviceStore } from '~/stores/Device'
+import { useErrorDialogStore } from '~/stores/ErrorDialog'  
 // import ServiceRequest from '~/components/ServiceRequest.vue'
-import ErrorDialog from '@/components/ErrorDialog.vue'
+// import ErrorDialog from '@/components/ErrorDialog.vue'
 
-// import { useCategoryStore } from '@/stores/Category'
-// import { useGuestStore } from '@/stores/Guest'
-// import { useOrderStore } from '@/stores/Order'
-
-// const deviceStore = useDeviceStore()
+const { device } = useDeviceStore()
 // console.log('order', useOrderStore().order)
-// const deviceId = deviceStore.device?.id
-
-// useAppControl(deviceId)
+const deviceId = device?.id
+const { isVisible, message, title } = useErrorDialogStore()
+useAppControl(deviceId)
 // PWA Setup
 useHead({
     title: 'Wooserve',
@@ -54,6 +51,10 @@ const {
 // Navigation direction detection
 const direction = ref('forward')
 const routeHistory = ref([])
+
+const handleClose = () => {
+    errorDialog.isVisible = false
+}
 
 // Track navigation direction
 watch(() => route.fullPath, (newPath, oldPath) => {
@@ -141,37 +142,52 @@ onUnmounted(() => {
         </div> -->
 
     <div class="min-h-screen min-w-screen z-0 bg-black relative">
-         <div class="absolute inset-0 pointer-events-none">
-                    <img src="/gif/flame.gif" alt="flames" class="absolute opacity-60 p-0 m-0 w-full h-full" />
-                </div>
-                <!-- Floating food items -->
-                <div class="absolute inset-0 pointer-events-none">
-                    <!-- Top left sushi -->
-                    <div class="floating-food absolute animate-float-slow top-left">
-                        <CommonImage :src="CustomImage.IMAGE_1" alt="sushi rolls" class="floating-image-responsive" />
-                    </div>
-                    <!-- Top right meat -->
-                    <div class="floating-food absolute animate-float-slow top-right">
-                        <CommonImage :src="CustomImage.IMAGE_4" alt="sushi rolls" class="floating-image-responsive" />
-                    </div>
-                    <!-- Bottom left fried item -->
-                    <div class="floating-food absolute animate-float-slow bottom-left">
-                        <CommonImage :src="CustomImage.IMAGE_3" alt="sushi rolls" class="floating-image-responsive" />
-                    </div>
-                    <!-- Bottom right rolled item -->
-                    <div class="floating-food absolute animate-float-slow bottom-right">
-                        <CommonImage :src="CustomImage.IMAGE_2" alt="sushi rolls" class="floating-image-responsive" />
-                    </div>
-                </div>
+        <div class="absolute inset-0 pointer-events-none">
+            <img src="/gif/flame.gif" alt="flames" class="absolute opacity-60 p-0 m-0 w-full h-full" />
+        </div>
+        <!-- Floating food items -->
+        <div class="absolute inset-0 pointer-events-none">
+            <!-- Top left sushi -->
+            <div class="floating-food absolute animate-float-slow top-left">
+                <CommonImage :src="CustomImage.IMAGE_1" alt="sushi rolls" class="floating-image-responsive" />
+            </div>
+            <!-- Top right meat -->
+            <div class="floating-food absolute animate-float-slow top-right">
+                <CommonImage :src="CustomImage.IMAGE_4" alt="sushi rolls" class="floating-image-responsive" />
+            </div>
+            <!-- Bottom left fried item -->
+            <div class="floating-food absolute animate-float-slow bottom-left">
+                <CommonImage :src="CustomImage.IMAGE_3" alt="sushi rolls" class="floating-image-responsive" />
+            </div>
+            <!-- Bottom right rolled item -->
+            <div class="floating-food absolute animate-float-slow bottom-right">
+                <CommonImage :src="CustomImage.IMAGE_2" alt="sushi rolls" class="floating-image-responsive" />
+            </div>
+        </div>
 
-                <div>
-        <CommonSlideDown :show-notification="showNotification" :is-really-online="isReallyOnline" />
+        <div>
+           
+            <CommonSlideDown :show-notification="showNotification" :is-really-online="isReallyOnline" />
         </div>
         <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">
             <NuxtPage :transition="pageTransition" />
-            <ErrorDialog />
         </main>
-        
+
+         <el-dialog
+            v-model="isVisible"
+            :title="title"
+            width="30%"
+            :before-close="handleClose"
+            >
+            <span>{{ message }}</span>
+            
+            <template #footer>
+                <span class="dialog-footer">
+                <el-button @click="handleClose">OK</el-button>
+                </span>
+            </template>
+            </el-dialog>
+
     </div>
 
     <!-- <ServiceRequest /> -->

@@ -1,7 +1,6 @@
 // stores/order.ts
 import { defineStore } from 'pinia'
-import { useNuxtApp } from '#app'
-import type { Device, DeviceOrder } from '~/types';
+import type { DeviceOrder } from '~/types';
 
 export interface OrderResponse {
   id: number
@@ -22,7 +21,11 @@ export const useOrderStore = defineStore('order', {
   }),
 
   getters: {
-    hasOrder: (state) => !!state.current,
+    hasOrder: (state) => !!state.currentOrderId,
+    getOrder: (state) => state.current,
+    getHistory: (state) => state.history,
+    getDrawerOpen: (state) => state.drawerOpen,
+    getCurrentOrderId: (state) => state.currentOrderId,  
   },
 
   actions: {
@@ -108,7 +111,7 @@ export const useOrderStore = defineStore('order', {
 
   persist: {
     key: 'order-store',
-    storage: import.meta.client ? localStorage : undefined,
-    pick: ['current', 'history', 'drawerOpen'],
+    storage: localStorage,
+    pick: ['current', 'history', 'drawerOpen', 'currentOrderId'],
   },
 })

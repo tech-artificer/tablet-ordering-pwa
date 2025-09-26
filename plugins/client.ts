@@ -5,4 +5,5 @@ export default defineNuxtPlugin(async() => {
     watch(() => useTheme().currentThemeName.value, (newTheme) => {
         localStorage.setItem('theme', newTheme)
     })
+
 })

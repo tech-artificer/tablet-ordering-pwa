@@ -1,6 +1,5 @@
 services:
   wooserve:
-    # Main Nuxt 3 application service
     build:
       context: .
       dockerfile: Dockerfile
@@ -8,15 +7,22 @@ services:
     container_name: wooserve
     restart: unless-stopped
     init: true
+    command: npm run dev   # run Nuxt in dev mode with HMR
     ports:
-      - "3000:3000"  # Expose Nuxt app on port 3000
-    env_file: ./.env   # 👈 uncomment if you want Nuxt to load your .env file
+      - "3000:3000"        # Nuxt listens on 3000 in dev
+    env_file: ./.env
     volumes:
-      - .:/app
-      - /app/node_modules
-      - ./certs:/app/certs   # 👈 mount your certs for HTTPS dev
+      - .:/app             # sync project files with container
+      - node_modules:/app/node_modules   # named volume so node_modules aren’t clobbered
+      - ./certs:/app/certs               # mount your SSL certs
     networks:
       - appnet
+    environment:
+      - NUXT_HOST=0.0.0.0   # allow connections from outside container
+      - NUXT_PORT=3000      # ensure Nuxt binds to port 3000
+
+volumes:
+  node_modules:             # declare the named volume
 
 networks:
   appnet:

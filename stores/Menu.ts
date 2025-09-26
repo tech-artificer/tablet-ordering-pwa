@@ -66,9 +66,7 @@ export const useMenuStore = defineStore('menu', {
 
         async fetchSets() {
             const data = await useMainApiAuth('api/menus/with-modifiers')
-            console.log('Sets', data)
             this.sets = Array.isArray(data) ? data : data.data
-            console.log('Sets', this.sets)
             // each set has modifiers. seet[0].modifiers
           this.modifiers = this.sets.reduce<MenuItem[]>((accumulator, currentSet) => {
             return [...accumulator, ...currentSet.modifiers];

@@ -1,30 +1,32 @@
-// stores/errorDialog.ts
+// ~/stores/ErrorDialog.js (or similar path)
+
 import { defineStore } from 'pinia'
 
 export const useErrorDialogStore = defineStore('errorDialog', {
   state: () => ({
-    visible: false,
-    message: '' as string,
-    retrying: false,
-    attempts: 0
+    // 1. STATE: Controls visibility
+    isVisible: false,
+    // 2. STATE: Controls content
+    message: '',
+    title: 'Error',
   }),
   actions: {
-    show(msg: string) {
-      this.message = msg
-      this.visible = true
+    // ACTION: Called from the middleware/plugin
+    show(message: string, title = 'Connection Error') {
+      this.message = message
+      this.title = title
+      this.isVisible = true // <--- Set the state to true
     },
+    // ACTION: Called from the dialog component's close button
     hide() {
-      this.visible = false
+      this.isVisible = false // <--- Set the state back to false
       this.message = ''
-      this.retrying = false
-      this.attempts = 0
     },
-    startRetry() {
-      this.retrying = true
-      this.attempts++
-    },
-    stopRetry() {
-      this.retrying = false
-    }
-  }
+  },
+
+  persist: {
+    key: 'error-dialog-store',
+    storage: localStorage,
+    pick: ['isVisible', 'message', 'title'],
+  },
 })

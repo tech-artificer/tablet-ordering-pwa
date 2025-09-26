@@ -23,7 +23,7 @@ function selectCategory(cat: string) {
 </script>
 
 <template>
-  <div class="flex gap-3 overflow-x-auto no-scrollbar">
+  <div class="flex gap-3 overflow-x-auto no-scrollbar font-inter font-bold">
     <button
       v-for="cat in categories"
       :key="cat.value"
