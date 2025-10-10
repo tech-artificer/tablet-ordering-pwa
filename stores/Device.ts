@@ -25,7 +25,7 @@ export const useDeviceStore = defineStore('device', {
 
     actions: {
 
-        async checkDevice() {
+        async authenticate() {
             this.isLoading = true
             try {
                 const { token, device, table, expires_at } = await useMainApiAuth('/api/devices/login', {
@@ -63,6 +63,7 @@ export const useDeviceStore = defineStore('device', {
                 this.showDeviceRegistration = true
             }
         },
+
         async register(formData: any) {
             this.isLoading = true
             try {
@@ -105,10 +106,10 @@ export const useDeviceStore = defineStore('device', {
             }
         },
 
-        async authenticate() {
+        async refresh() {
 
             try {
-                const { token, device, table, expires_at } = await useMainApiAuth('/api/devices/login', {
+                const { token, device, table, expires_at } = await useMainApiAuth('/api/devices/refresh', {
                     method: 'GET',
 
                 })

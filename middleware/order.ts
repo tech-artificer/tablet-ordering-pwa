@@ -12,48 +12,21 @@ export default defineNuxtRouteMiddleware((to, from) => {
     const deviceStore = useDeviceStore()
     const sessionStore = useSessionStore()
 
-
     console.log('order', orderStore)
     console.log('cart', cartStore)
     console.log('device', deviceStore)
     console.log('session', sessionStore)
 
-    // if (!deviceStore.hasDevice) {
-    //     deviceStore.checkDevice()
-    // }
+    if( deviceStore.getDeviceToken )
 
+    console.log('device', deviceStore.getDeviceToken)
+    if( !deviceStore.getTableAssigned ) {
+        deviceStore.authenticate()
+    }
+
+
+    console.log('table', deviceStore.getTableAssigned)
     
-    // const order = orderStore.order
-
-    // if( !deviceStore.hasDevice ) {
-    //     return navigateTo('/register')
-    // }
-
-
-    // console.log('device', deviceStore.hasDevice)
-    // if( order.guest_count === 0 && to.path !== '/guestCount' ) {
-        
-    // }
-
-
-    // if (!order.orderedPackage?.name && to.path !== '/') {
-    //     console.log('welcome')
-    //     return navigateTo('/')
-    // }
-
-    // console.log(!order.orderedPackage?.name && from.path == '/woosoo/menu' && to.path == '/')
-
-    // if (!order.orderedPackage?.name && from.path == '/woosoo/menu' && to.path == '/') {
-        // console.log('cartstatus', cartStore.cartStatus)
-    //     return navigateTo('/')
-    // }
-
-    // if (order.orderedPackage?.name && to.path === '/') {
-    //     return navigateTo('/woosoo/menu')
-    // }
-    // cartStore.$reset()
-    // orderStore.$reset()
-
     // Example logic:
     // - If there are orders, ensure user can see the orders page
     // - If no orders and user is on /orders, redirect to home

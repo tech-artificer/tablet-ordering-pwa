@@ -10,12 +10,12 @@ const form = reactive({
     app_version: runtimeConfig.public.appVersion
 })
 
-deviceStore.checkDevice()
+deviceStore.authenticate()
 
 const registerDevice = async() => {
     await deviceStore.register(form)
 
-    if (deviceStore.hasDevice) {
+    if (deviceStore.getDeviceToken) {
        alert('Device Registered')
     }
 }
