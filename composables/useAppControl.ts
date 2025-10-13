@@ -9,7 +9,7 @@ export function useAppControl(deviceId: string) {
 
  const channelName = `device.${deviceId}`
     console.log(`📡 Subscribing to ${channelName}`)
-  $echo.channel(channelName)
+    $echo.channel(channelName)
     .listen('.device.control', (event: any) => {
       console.log('[device.control]', event)
 
@@ -52,5 +52,7 @@ export function useAppControl(deviceId: string) {
         default:
           console.warn('Unknown action', event.action)
       }
+      return true;
     })
+
 }

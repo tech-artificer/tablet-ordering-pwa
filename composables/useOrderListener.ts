@@ -13,7 +13,7 @@ export const useOrderListener = () => {
   const activeChannel = ref<string | null>(null)
 
   function setupOrderListening(orderId: number) {
-    if (!orderId) return
+    if (!orderId) return true
 
     const channelName = `orders.${orderId}`
     
@@ -26,7 +26,7 @@ export const useOrderListener = () => {
     // Already subscribed? skip
     if (activeChannel.value === channelName) {
       console.log(`⏩ Already listening to ${channelName}`)
-      return
+      return true;
     }
 
     console.log(`📡 Subscribing to ${channelName}`)
@@ -44,13 +44,13 @@ export const useOrderListener = () => {
 
   function handleOrderCreated(event: any) {
     console.log('✅ Order created:', event)
-    if (!event?.order) return
+    if (!event?.order) return true
     orderStore.current = event.order
   }
 
   function handleOrderUpdate(event: any) {
     console.log('📨 Order update received:', event)
-    if (!event?.order) return
+    if (!event?.order) return true
 
     const order = event.order
     orderStore.current = order

@@ -32,7 +32,7 @@ export const useDeviceStore = defineStore('device', {
                     method: 'GET',
                 })
 
-                this.$reset()
+            
                 // backend returns { token, device }
                
                 if (device && token) {

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { useMenuStore } from '~/stores/Menu'
+import { useDeviceStore } from '~/stores/Device'
 import { CustomLogo } from '~/composables/default'
 import { useSessionStore } from '~/stores/Session'
 const sessionStore = useSessionStore()
 const { canProceed } = storeToRefs(sessionStore)
-
+const { device, table } = useDeviceStore()
 const { isFullscreen, toggleFullscreen } = useFullscreen();
-
 const menu = useMenuStore()
 // initialize menu
 await menu.init()
@@ -55,7 +55,7 @@ definePageMeta({
             <div class="text-center mb-12">
           
               <h2 class="text-white text-4xl md:text-5xl leading-tight">
-                The grill is hot. {{ canProceed }}
+                The grill is hot.
               </h2>
               <h2 class="text-white text-4xl md:text-5xl leading-tight">
                 The meat is marinated.
