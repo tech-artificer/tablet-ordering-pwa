@@ -17,15 +17,15 @@ export default defineNuxtRouteMiddleware((to, from) => {
     console.log('device', deviceStore)
     console.log('session', sessionStore)
 
-    if( deviceStore.getDeviceToken )
+    // if( deviceStore.getDeviceToken )
 
-    console.log('device', deviceStore.getDeviceToken)
-    if( !deviceStore.getTableAssigned ) {
-        deviceStore.authenticate()
-    }
+    // console.log('device', deviceStore.getDeviceToken)
+    // if( !deviceStore.getTableAssigned ) {
+    //     // deviceStore.authenticate()
+    // }
 
 
-    console.log('table', deviceStore.getTableAssigned)
+    // console.log('table', deviceStore.getTableAssigned)
     
     // Example logic:
     // - If there are orders, ensure user can see the orders page

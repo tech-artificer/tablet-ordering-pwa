@@ -33,16 +33,16 @@ const decrease = (item: CartItem) => {
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden relative flex flex-col">
+  <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden relative flex flex-col">
     <!-- Image -->
     <CommonImage
       :src="props.item.img_url"
       :alt="props.item.name"
-      class="w-full h-48 object-cover rounded-t-lg"
+      class="w-full h-36 object-fit rounded-t-lg"
     />
 
     <!-- Card Content -->
-    <div class="flex flex-col justify-between flex-1 p-4">
+    <div class="flex flex-col justify-between p-3">
       <!-- Top Content -->
       <div class="">
         
@@ -66,7 +66,7 @@ const decrease = (item: CartItem) => {
         <el-button
             type="primary"
             :disabled="order.hasOrder"
-            class="mt-4 w-fit self-end"
+            class="w-fit self-end"
             @click="addToCart()"
         >
             Add

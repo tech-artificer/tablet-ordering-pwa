@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-[100px]">
+    <div class="w-full h-full">
         <!-- Logo Section -->
         <div class="p-6 border-b flex justify-center">
             <NuxtLink to="/" >

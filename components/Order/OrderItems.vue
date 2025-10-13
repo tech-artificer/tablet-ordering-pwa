@@ -99,13 +99,13 @@ onUnmounted(() => {
 
 <template>
 
-    <div class="h-full min-w-screen font-inter">
+    <div class="h-full min-w-screen font-inter bg-gray-50 p-2 flex flex-col">
 
-        <div v-for="item in cartItems.filter(i => i.id !== cart.packageSelected.id)" :key="item.id"
+        <div v-for="item in cartItems.filter((i: number | any) => i.id !== cart.packageSelected.id)" :key="item.id"
             class="flex flex-col gap-1 justify-between">
 
             <div class="flex flex-row justify-between p-1">
-                <h3 class="text-lg font-medium block truncate">{{ item.name }} </h3>
+                <h3 class="text-lg font-normal block truncate w-full">{{ item.name }} </h3>
                 <h3 class="text-lg font-medium flex justify-end h-full flex-row items-center">
                     {{ formatCurrency(item.price * item.quantity) }}
                 </h3>

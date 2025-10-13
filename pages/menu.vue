@@ -71,15 +71,15 @@ definePageMeta({
     
         <el-container class="w-full h-full">
 
-            <div class="min-h-screen w-full flex">
+            <div class="min-h-screen w-full flex justify-evenly">
                 <!-- Left Side: Menu Content -->
-                <el-aside class="bg-white shadow-lg flex flex-col max-w-[90px]">
+                <el-aside class="bg-white shadow-lg max-w-[100px] flex-none">
                     <WoosooSidebarMenu />
-                </el-aside>
+                </el-aside> 
 
                 <!-- Middle Side: Menu Content -->
-                <el-main class="flex-1 flex min-w-0 h-full">
-                    <div class="flex-1 min-w-0 p-0 overflow-auto">
+                <el-main class="flex-auto w-full h-full">
+                    <div class="flex-1 min-w-0 p-0">
                         <!-- Carousel -->
                         <MenuCarousel />
                         <!-- Category Filters -->
@@ -89,10 +89,10 @@ definePageMeta({
 
                         <div class="group-section">
                             <div class="group-header py-4 px-2">
-                                <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-orange-400 pb-2">
+                                <h2 class="text-1xl font-bold text-gray-800 border-b-2 border-orange-400 pb-2">
                                     {{ formatGroupName(activeCategory) }}
 
-                                    <span class="text-sm text-gray-500 ml-2">({{ activeItems.length }} items)</span>
+                                    <span class="text-sm text-gray-500 ml-1">({{ activeItems.length }} items)</span>
                                 </h2>
                             </div>
 
@@ -106,10 +106,10 @@ definePageMeta({
                 </el-main>
 
                 <!-- Right Side: Order Details -->
-                <div class="shrink-0 min-w-[300px] border-l border-gray-200">
+                <el-aside class="flex-none max-w-[250px] border-l border-gray-200">
                     <!-- {{ cartItems }} -->
                     <OrderPendingDetails />
-                </div>
+                </el-aside>
 
             </div>
 

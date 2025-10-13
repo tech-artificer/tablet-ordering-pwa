@@ -172,7 +172,7 @@ export const useCartStore = defineStore('cart', {
 
         if (error.response?.status === 401) {
             console.warn('⚠️ Token expired. Attempting refresh...')
-            await useDeviceStore().authenticate()
+            // await useDeviceStore().authenticate()
          
           // return navigateTo('/login')
         }

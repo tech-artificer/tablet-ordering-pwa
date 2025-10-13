@@ -28,7 +28,7 @@ function selectCategory(cat: string) {
       v-for="cat in categories"
       :key="cat.value"
       @click="selectCategory(cat.value)"
-      class="px-4 py-2 rounded-lg text-lg font-medium whitespace-nowrap"
+      class="px-4 py-1 rounded-lg text-lg font-medium whitespace-nowrap"
       :class="activeCategory === cat.value ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'"
     >
       {{ cat.label }}

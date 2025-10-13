@@ -20,7 +20,7 @@ const decrementGuests = () => {
 
 </script>
 <template >
-  <div class="flex items-center justify-center mt-16">
+  <div class="flex items-center justify-center mt-8">
                 <button
                     class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
                     :disabled="guestCount <= 1"

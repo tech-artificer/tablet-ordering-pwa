@@ -10,7 +10,7 @@ const form = reactive({
     app_version: runtimeConfig.public.appVersion
 })
 
-deviceStore.authenticate()
+// deviceStore.authenticate()
 
 const registerDevice = async() => {
     await deviceStore.register(form)

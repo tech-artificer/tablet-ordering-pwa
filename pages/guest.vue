@@ -32,7 +32,7 @@ import GuestCounter from '~/components/GuestCounter.vue'
                 <GuestCounter />
             </div>
             
-            <div class="w-full max-w-md space-y-2 mt-16">
+            <div class="w-full max-w-md space-y-2 mt-6">
                 <button
                     class="w-full py-4 px-8 bg-primary text-black text-xl font-bold rounded-md hover:opacity-90 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl hover:text-white"
                     @click="navigateTo('setmeal')"

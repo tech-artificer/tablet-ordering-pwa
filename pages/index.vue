@@ -6,6 +6,8 @@ import { useSessionStore } from '~/stores/Session'
 const sessionStore = useSessionStore()
 const { canProceed } = storeToRefs(sessionStore)
 
+const { isFullscreen, toggleFullscreen } = useFullscreen();
+
 const menu = useMenuStore()
 // initialize menu
 await menu.init()
@@ -29,6 +31,12 @@ definePageMeta({
 <template>
  
   <div class="flex flex-col justify-center items-center h-full relative z-10">
+
+    <div>
+      <button @click="toggleFullscreen" class="text-white absolute top-4 right-4 z-20 p-2 bg-white rounded-full hover:bg-opacity-75 transition">
+        <svg  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="m160 96.064 192 .192a32 32 0 0 1 0 64l-192-.192V352a32 32 0 0 1-64 0V96h64zm0 831.872V928H96V672a32 32 0 1 1 64 0v191.936l192-.192a32 32 0 1 1 0 64zM864 96.064V96h64v256a32 32 0 1 1-64 0V160.064l-192 .192a32 32 0 1 1 0-64l192-.192zm0 831.872-192-.192a32 32 0 0 1 0-64l192 .192V672a32 32 0 1 1 64 0v256h-64z"></path></svg>
+      </button>
+    </div>
     <!-- Animated background flames -->
     <div class="min-h-screen min-w-screen flex flex-col justify-center items-center">
       <div>
@@ -45,6 +53,7 @@ definePageMeta({
           <div>
             <!-- Main headline -->
             <div class="text-center mb-12">
+          
               <h2 class="text-white text-4xl md:text-5xl leading-tight">
                 The grill is hot. {{ canProceed }}
               </h2>

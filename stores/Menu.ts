@@ -102,7 +102,7 @@ export const useMenuStore = defineStore('menu', {
                     this.fetchCategories(),
                     this.fetchModifiers(),
                     this.fetchSets(),
-                    this.getFeaturedItems
+                    this.getFeaturedItems()
                 ])
             } catch (err) {
                 console.error(err)

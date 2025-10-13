@@ -4,6 +4,7 @@ import path from 'path'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
     devtools: { enabled: true },
+    debug: true,
     compatibilityDate: '2025-06-01',
     ssr: false,
     css: ['~/assets/css/main.css'],
@@ -25,6 +26,38 @@ export default defineNuxtConfig({
         '@nuxt/devtools',
         '@nuxt/fonts'
     ],
+
+    pwa: {
+        "name": "Woosoo",
+        "short_name": "Woosoo",
+        "description": "Woosoo tablet",
+        "start_url": "/",
+        "display": "fullscreen",
+        "background_color": "#ffffff",
+        "theme_color": "#000000",
+        "orientation": "landscape",
+        "orientation-lock": "landscape",
+        "icons": [
+            {
+                "src": "/icons/android-launchericon-192-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": "/icons/android-launchericon-512-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": "/icons/android-launchericon-512-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable"
+            }
+        ]
+    },
 
     fonts: {
         families: [

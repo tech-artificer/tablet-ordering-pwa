@@ -99,17 +99,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="p-4 shadow-sm flex flex-col h-full font-inter">
+  <div class="py-2 px-3  shadow-sm flex flex-col h-full font-inter">
     <h3 class="text-xl flex items-center font-normal mb-2">Order #: {{ orderStore.current.order_id }} </h3>
 
     <div class="border-t ">
-
-      <!-- <div v-for="item in cartItems" :key="item.id" class="flex flex-row gap-1 justify-between place-items-end"> -->
-        
        
-      <h3 class="text-md font-bold block font-sans pt-2 truncate">{{ cart.packageSelected.name }} </h3>
+      <h3 class="text-md font-bold block font-sans pt-2 truncate">{{ cart.packageSelected.name }}</h3>
        
       <div class="flex flex-row justify-between py-2">
+        
         <div class="flex items-center">
             <button 
               class="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -135,23 +133,22 @@ onUnmounted(() => {
           </h3>
         </div>
 
-      <!-- </div> -->
 
       
     </div>
 
     <OrderItems class="overflow-y-auto" />
 
-    <div class="mt-4 border-t py-4 space-y-1">
-      <div class="flex justify-between text-lg font-light">
+    <div class="border-t space-y-1">
+      <div class="flex justify-between  font-light py-2">
         <span>Subtotal</span>
         <span>{{ formatCurrency(subtotal) }}</span>
       </div>
-      <div class="flex justify-between text-lg font-light text-gray-600">
+      <div class="flex justify-between font-light text-gray-600">
         <span>Tax(12%)</span>
         <span>{{ formatCurrency(vat) }}</span>
       </div>
-      <div class="flex justify-between text-xl font-semibold py-2 border-t-2">
+      <div class="flex justify-between text-xl font-semibold py-2 border-t-2 align-self-end">
         <span>Total</span>
         <span>{{ formatCurrency(total) }}</span>
       </div>

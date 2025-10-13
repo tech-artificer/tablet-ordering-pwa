@@ -1,12 +1,12 @@
 <script setup lang="ts">
 
-const { featuredItems} = useMenuStore()
+const { featuredItems } = useMenuStore()
 
-
+console.log('featuredItems', featuredItems)
 </script>
 
 <template>
-  <el-carousel height="200px" arrow="hover" indicator-position="outside">
+  <el-carousel height="180px" arrow="hover" indicator-position="outside">
     <el-carousel-item
       v-for="item in featuredItems"
       :key="item.title"

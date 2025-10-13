@@ -15,11 +15,11 @@ export const useDeviceStore = defineStore('device', {
     }),
 
     getters: {
-        hasDevice: (state) => {
+        hasDevice: (state: any) => {
             return state.token
         },
-        getTableAssigned: (state) => state.table.name,
-        getDeviceToken: (state) => state.token,
+        getTableAssigned: (state: any) => state.table.name,
+        getDeviceToken: (state: any) => state.token,
 
     },
 
@@ -28,12 +28,13 @@ export const useDeviceStore = defineStore('device', {
         async authenticate() {
             this.isLoading = true
             try {
-                const { token, device, table, expires_at } = await useMainApiAuth('/api/devices/login', {
+                const { token, device, table, expires_at, error } = await useMainApiAuth('/api/devices/login', {
                     method: 'GET',
                 })
 
                 this.$reset()
                 // backend returns { token, device }
+               
                 if (device && token) {
                     this.device = device
                     this.token = token
@@ -44,7 +45,7 @@ export const useDeviceStore = defineStore('device', {
 
                     // ElNotification({
                     //     title: 'Success',
-                    //     message: 'Device logged in successfully',
+                    //     message: error,
                     //     type: 'success',
                     // })
 
@@ -55,7 +56,11 @@ export const useDeviceStore = defineStore('device', {
                     // defensive: mark as missing device to trigger registration
                     this.showDeviceRegistration = true
                     this.isLoading = false
-
+                    //  ElNotification({
+                    //     title: 'Success',
+                    //     message: error,
+                    //     type: 'success',
+                    // })
 
                 }
 
