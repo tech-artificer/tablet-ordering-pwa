@@ -65,7 +65,7 @@ export const useOrderListener = () => {
     }
   }
 
-  function shouldReturnToWelcome(status: string | undefined) {
+  function shouldReturnToWelcome(status: string) {
     if (!status) return false
     const normalized = status.toLowerCase()
     return ['complete', 'completed', 'void', 'voided', 'cancel', 'cancelled'].some(s =>

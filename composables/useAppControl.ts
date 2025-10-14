@@ -1,6 +1,6 @@
 import { useNuxtApp } from '#app'
 import { useSessionStore } from '~/stores/Session'
-import { refreshNuxtData } from '#app';
+// import { refreshNuxtData } from '#app';
 
 export function useAppControl(deviceId: string) {
   
