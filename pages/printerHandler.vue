@@ -17,7 +17,7 @@
                 <p class="ml-2 text-xl" :class="isConnected ? 'text-green-600' : 'text-red-600'">{{ isConnected ? 'Connected' : 'Disconnected' }}</p>
             </div>
 
-            <button v-show="isConnected" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 w-full" @click="_print()">Print</button>
+
         </div>
         <div class="w-full p-2">
             <div class="w-full">
@@ -36,6 +36,17 @@
                 <li>Note your printer's Bluetooth MAC address</li>
             </ol>
         </div>
+
+        <!-- Order Preview Section -->
+        <div v-if="currentOrder" class="mt-4 p-3 bg-gray-800 rounded">
+            <p class="font-semibold mb-2">Current Order Preview:</p>
+            <div class="text-sm">
+                <p>Order ID: {{ currentOrder.order_id }}</p>
+                <p>Table: {{ currentOrder.table?.name || 'Unknown' }}</p>
+                <p>Guests: {{ currentOrder.guest_count || 0 }}</p>
+                <p>Items: {{ currentOrder.items?.length || 0 }}</p>
+            </div>
+        </div>
     </div>
 </template>
 <script setup>
@@ -51,7 +62,7 @@ const isConnected = ref(false)
 const currentOrder = ref(null)
 const printListener = () => {
     $echo
-    .channel(`printCurrentOrder`)
+    .channel(`admin.print`)
     .listen('.order.printed', (e) => handlePrinterUpdate(e))
     .error((error) => {
         console.error('Error connecting to order channel:', error)
@@ -61,8 +72,15 @@ const handlePrinterUpdate = (event) => {
     console.log('printer update', event)
     if (event?.order) {
         currentOrder.value = event.order
-        //buildPrintData(event.order)
-        buildPrintData()
+        // Auto-print when order is received
+        if (isConnected.value) {
+            console.log('Auto-printing order:', event.order.order_id)
+            _print()
+        } else {
+            console.warn('Printer not connected. Order received but cannot print.')
+            // Optionally show a notification to the user
+            alert('Printer not connected! Please connect printer to print orders.')
+        }
     }
 }
 const connectViaIntent = () => {
@@ -87,17 +105,18 @@ const connectPrinter = () => {
         console.error('Connection error:', error)
     }
 }
-const printViaIntent = () => {
+
+const printViaIntent = (printData) => {
     try {
-        const printData = buildPrintData()
         const encoded = encodeURIComponent(printData)
         const intent = `intent:${encoded}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end`
         window.location.href = intent
-        console.log(intent)
+        console.log('Printing via intent...')
     } catch (error) {
-        console.log(error)
+        console.log('Print via intent error:', error)
     }
 }
+
 const checkRawBT = () => {
     console.log('Checking RawBT availability...')
     console.log('window.RawBT:', window.RawBT)
@@ -109,6 +128,7 @@ const checkRawBT = () => {
         return false
     }
 }
+
 //for print test rani
 const buildPrintDataTest = () => {
     const ESC = '\x1B'
@@ -133,21 +153,71 @@ const buildPrintDataTest = () => {
 
     return data
 }
+
 const buildPrintData = () => {
-    console.log(currentOrder.value)
+    if (!currentOrder.value) {
+        console.log('No order data available')
+        return buildPrintDataTest()
+    }
+
+    const order = currentOrder.value
     const ESC = '\x1B'
     const INIT = ESC + '@'
-    // const ALIGN_CENTER = ESC + 'a1'
-    // const ALIGN_LEFT = ESC + 'a0'
+    const ALIGN_CENTER = ESC + 'a1'
+    const ALIGN_LEFT = ESC + 'a0'
     // const BOLD_ON = ESC + 'E1'
     // const BOLD_OFF = ESC + 'E0'
     const NEWLINE = '\n'
 
+    // Extract order data
+    const items = order.items || []
+    const tableName = order.table?.name || 'Unknown Table'
+    const orderDate = order.created_at ? new Date(order.created_at) : new Date()
+    const date = orderDate.toLocaleDateString()
+    const time = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    const guestCount = order.guest_count || 0
+    const orderId = order.order_id || 'Unknown ID'
+    const packageName = items.length > 0 ? items[0].name : 'Unknown Package'
+
+    // Build print data matching PHP format
     let data = INIT
     data += NEWLINE
-    data += '================================' + NEWLINE
-    //CONTENT ORDER
-    data += '================================' + NEWLINE
+    data += '==============================' + NEWLINE
+
+    // Center aligned "DINE IN" header
+    data += ALIGN_CENTER
+    data += '    DINE IN    ' + NEWLINE
+
+    // Left aligned date and time
+    data += ALIGN_LEFT
+    const dateTimeStr = `${date}    ${time}`
+    data += dateTimeStr + NEWLINE
+
+    data += '==============================' + NEWLINE
+    data += `Package: ${packageName}` + NEWLINE
+    data += `Table: ${tableName}` + NEWLINE
+    data += `Guests: ${guestCount}` + NEWLINE
+    data += '------------------------------' + NEWLINE
+
+    // Print items (skip first item as it's the package)
+    items.forEach((item, index) => {
+        if (index === 0) return // Skip package item
+
+        const name = item.name || 'Unknown Item'
+        const quantity = item.quantity || 1
+        data += `${quantity} ${name}` + NEWLINE
+    })
+
+    data += NEWLINE
+    data += '****************************' + NEWLINE
+
+    // Center aligned Order ID
+    data += ALIGN_CENTER
+    data += `Order #: ${orderId}` + NEWLINE
+
+    data += ALIGN_LEFT
+    data += '****************************' + NEWLINE
+    data += NEWLINE + NEWLINE + NEWLINE
 
     return data
 }
@@ -170,13 +240,12 @@ const _print = () => {
     }
 
     try {
-        //testing
-        const printData = buildPrintDataTest()
+        const printData = buildPrintData()
         printViaIntent(printData)
+        console.log('Print command sent successfully')
     } catch (error) {
         console.error('Print error:', error)
     }
 }
 
 </script>
-
