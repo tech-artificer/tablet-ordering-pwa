@@ -6,9 +6,12 @@ export default defineNuxtPlugin(async () => {
     const sessionStore = useSessionStore()
 
     // sessionStore.canProceed = false
-    if (!deviceStore.hasDevice) {
+    if (!deviceStore.hasDevice || !deviceStore.getTableAssigned ) {
+
         await deviceStore.authenticate()
+
         sessionStore.canProceed = false
+
         if(!deviceStore.hasDevice) {
             
             navigateTo('/register')
