@@ -1,4 +1,6 @@
 <script setup>
+import { useAppControl } from '@/composables/useAppControl'
+const { isFullscreen, toggleFullscreen } = useFullscreen();
 import { storeToRefs } from 'pinia'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
 import { useDeviceStore } from '~/stores/Device'
@@ -83,6 +85,10 @@ const deviceIsMobile = ref(false)
 // const categoryStore = useCategoryStore()
 
 onMounted(() => {
+    
+    if( !isFullscreen ) {
+        toggleFullscreen
+    }
     // categoryStore.getStaticCategories()
     // deviceIsMobile.value = window.innerWidth < 480
 
@@ -114,6 +120,13 @@ onUnmounted(() => {
 
 <template>
     <div class="min-h-screen min-w-screen">
+
+         <div>
+        <button @click="toggleFullscreen" class="text-white absolute top-4 right-4 z-20 p-2 bg-white rounded-full hover:bg-opacity-75 transition">
+            <svg  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="m160 96.064 192 .192a32 32 0 0 1 0 64l-192-.192V352a32 32 0 0 1-64 0V96h64zm0 831.872V928H96V672a32 32 0 1 1 64 0v191.936l192-.192a32 32 0 1 1 0 64zM864 96.064V96h64v256a32 32 0 1 1-64 0V160.064l-192 .192a32 32 0 1 1 0-64l192-.192zm0 831.872-192-.192a32 32 0 0 1 0-64l192 .192V672a32 32 0 1 1 64 0v256h-64z"></path></svg>
+        </button>
+        </div> 
+        
         <CommonSlideDown :show-notification="showNotification" :is-really-online="isReallyOnline" />
         
         <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">

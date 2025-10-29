@@ -22,7 +22,7 @@ export function useAppControl(deviceId: string) {
         message: 'Resetting your session, please wait.',
         type: 'info',
       })
-            console.log('[device.control]', event)
+          console.log('[device.control]', event)
           session.endSession()
 
           // also reset dependent stores
@@ -52,6 +52,7 @@ export function useAppControl(deviceId: string) {
         default:
           console.warn('Unknown action', event.action)
       }
+      
       return true;
     })
 

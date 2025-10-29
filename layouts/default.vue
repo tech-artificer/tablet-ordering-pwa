@@ -1,6 +1,7 @@
 <script setup>
 import { useAppControl } from '@/composables/useAppControl'
-import { useSessionStore } from '@/stores/Session'
+const { isFullscreen, toggleFullscreen } = useFullscreen();
+// import { useSessionStore } from '@/stores/Session'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
 import { useDeviceStore } from '~/stores/Device'
 import { useErrorDialogStore } from '~/stores/ErrorDialog'  
@@ -88,32 +89,36 @@ const pageTransition = computed(() => ({
 // const categoryStore = useCategoryStore()
 
 onMounted(() => {
+    
+    if( !isFullscreen ) {
+        toggleFullscreen
+    }
     // categoryStore.getStaticCategories()
-    // // deviceIsMobile.value = window.innerWidth < 480
+    // deviceIsMobile.value = window.innerWidth < 480
 
-    // // Initialize route history
-    // routeHistory.value = [route.fullPath]
+    // Initialize route history
+    routeHistory.value = [route.fullPath]
 
-    // // Handle browser back button
-    // window.addEventListener('popstate', () => {
-    //     direction.value = 'back'
-    // })
+    // Handle browser back button
+    window.addEventListener('popstate', () => {
+        direction.value = 'back'
+    })
 
-    // window.addEventListener('resize', () => {
-    //     // deviceIsMobile.value = window.innerWidth < 480
-    // })
-    // window.addEventListener('online', updateOnlineStatus)
-    // window.addEventListener('offline', updateOnlineStatus)
-    // if (navigator.onLine) {
-    //     updateOnlineStatus()
-    // }
+    window.addEventListener('resize', () => {
+        // deviceIsMobile.value = window.innerWidth < 480
+    })
+    window.addEventListener('online', updateOnlineStatus)
+    window.addEventListener('offline', updateOnlineStatus)
+    if (navigator.onLine) {
+        updateOnlineStatus()
+    }
 })
 
 onUnmounted(() => {
-    // window.removeEventListener('online', updateOnlineStatus)
-    // window.removeEventListener('offline', updateOnlineStatus)
-    // window.removeEventListener('popstate', () => { })
-    // stopOfflineProgress()
+    window.removeEventListener('online', updateOnlineStatus)
+    window.removeEventListener('offline', updateOnlineStatus)
+    window.removeEventListener('popstate', () => { })
+    stopOfflineProgress()
 })
 </script>
 
@@ -142,27 +147,34 @@ onUnmounted(() => {
         </div> -->
 
     <div class="min-h-screen min-w-screen z-0 bg-black relative">
+
+        <div>
+        <button @click="toggleFullscreen" class="text-white absolute top-4 right-4 z-20 p-2 bg-white rounded-full hover:bg-opacity-75 transition">
+            <svg  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="m160 96.064 192 .192a32 32 0 0 1 0 64l-192-.192V352a32 32 0 0 1-64 0V96h64zm0 831.872V928H96V672a32 32 0 1 1 64 0v191.936l192-.192a32 32 0 1 1 0 64zM864 96.064V96h64v256a32 32 0 1 1-64 0V160.064l-192 .192a32 32 0 1 1 0-64l192-.192zm0 831.872-192-.192a32 32 0 0 1 0-64l192 .192V672a32 32 0 1 1 64 0v256h-64z"></path></svg>
+        </button>
+        </div> 
+
         <div class="absolute inset-0 pointer-events-none">
-            <img src="/gif/flame.gif" alt="flames" class="absolute opacity-60 p-0 m-0 w-full h-full" />
+            <img src="/gif/flame.gif" alt="flames" class="absolute opacity-40 p-0 m-0 w-full h-full" />
         </div>
         <!-- Floating food items -->
         <div class="absolute inset-0 pointer-events-none">
             <!-- Top left sushi -->
-            <div class="floating-food absolute animate-float-slow top-left">
+            <!-- <div class="floating-food absolute animate-float-slow top-left">
                 <CommonImage :src="CustomImage.IMAGE_1" alt="sushi rolls" class="floating-image-responsive" />
-            </div>
+            </div> -->
             <!-- Top right meat -->
-            <div class="floating-food absolute animate-float-slow top-right">
+            <!-- <div class="floating-food absolute animate-float-slow top-right">
                 <CommonImage :src="CustomImage.IMAGE_4" alt="sushi rolls" class="floating-image-responsive" />
-            </div>
+            </div> -->
             <!-- Bottom left fried item -->
-            <div class="floating-food absolute animate-float-slow bottom-left">
+            <!-- <div class="floating-food absolute animate-float-slow bottom-left">
                 <CommonImage :src="CustomImage.IMAGE_3" alt="sushi rolls" class="floating-image-responsive" />
-            </div>
+            </div> -->
             <!-- Bottom right rolled item -->
-            <div class="floating-food absolute animate-float-slow bottom-right">
+            <!-- <div class="floating-food absolute animate-float-slow bottom-right">
                 <CommonImage :src="CustomImage.IMAGE_2" alt="sushi rolls" class="floating-image-responsive" />
-            </div>
+            </div> -->
         </div>
 
         <div>

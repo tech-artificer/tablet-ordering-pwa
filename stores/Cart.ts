@@ -131,8 +131,7 @@ export const useCartStore = defineStore('cart', {
     },
 
     async placeOrder() {
-
-
+      
       try {
 
         const payload = {

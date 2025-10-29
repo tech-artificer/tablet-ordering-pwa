@@ -26,16 +26,17 @@ export const useDeviceStore = defineStore('device', {
     actions: {
 
         async authenticate() {
+            
             this.isLoading = true
             try {
                 const { token, device, table, expires_at, error } = await useMainApiAuth('/api/devices/login', {
                     method: 'GET',
                 })
 
-            
                 // backend returns { token, device }
                
                 if (device && token) {
+
                     this.device = device
                     this.token = token
                     this.table = table

@@ -72,8 +72,6 @@ export const useFullscreen = () => {
         });
     });
 
-        
-
     return {
         isFullscreen,
         enterFullscreen,
