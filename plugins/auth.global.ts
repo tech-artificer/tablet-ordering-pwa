@@ -3,18 +3,16 @@ import { useDeviceStore } from '~/stores/Device'
 
 export default defineNuxtPlugin(async () => {
 
-    
-
     const deviceStore = useDeviceStore()
     const sessionStore = useSessionStore()
 
 
-     await deviceStore.authenticate()
+    await deviceStore.verifyToken();
+    // console.log('Verify Token', response);
 
-    // sessionStore.canProceed = false
+
     if (!deviceStore.hasDevice || !deviceStore.getTableAssigned ) {
 
-    
         sessionStore.canProceed = false
 
         if(!deviceStore.hasDevice) {

@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import type { CartItem } from '~/types'
 import { useOrderStore } from './Order'
-import { useDeviceStore } from './Device'
+// import { useDeviceStore } from './Device'
 
 
 export const useCartStore = defineStore('cart', {
@@ -18,14 +18,13 @@ export const useCartStore = defineStore('cart', {
       modifiers: [] as CartItem[],
     } as CartItem,
     guestCount: 2, // Default to 2 guests
-
   }),
 
   getters: {
 
     totalItems: (state): number => state.items.map(i => i.price * i.quantity).reduce((sum, i) => sum + i, 0),
 
-    // cartItems: (state): CartItem[] => state.items,
+    getItemById: (state) => state.items.length == 0,
 
     cartItems(): CartItem[] {
       const base = [...this.items]
@@ -43,12 +42,6 @@ export const useCartStore = defineStore('cart', {
       return base
     },
 
-    // subtotal: (state): number => state.cartItems.reduce((sum, i) => sum + (i.price * i.quantity), 0),
-    // vat: (state): number => state.items.reduce((sum, i) => sum + (i.tax_amount), 0),
-
-    // total() : number {
-    //   return this.subtotal + this.vat
-    // }
     subtotal: (state): number =>
       state.items.reduce((sum, i) => sum + i.price * i.quantity, 0)
       + (state.packageSelected?.price || 0) * state.guestCount,
@@ -65,10 +58,6 @@ export const useCartStore = defineStore('cart', {
     total(): number {
       return this.subtotal + this.vat - this.discount
     }
-
-    // vat: (cartItems: CartItem[]) =>
-    //   cartItems.reduce((sum, item) => sum + item.tax_amount, 0),
-
 
   },
 
@@ -162,11 +151,10 @@ export const useCartStore = defineStore('cart', {
         current.value = response.order
         currentOrderId.value = response.order.order_id
 
-        console.log('Order placed successfully:', response) 
+        console.log('Order placed successfully:', response)
 
-        // order.setOrder(response.order) 
-        // reset
       } catch (error: any) {
+
         console.error('❌ Order failed:', error.response?.data || error.message)
 
         if (error.response?.status === 401) {
@@ -183,7 +171,7 @@ export const useCartStore = defineStore('cart', {
 
   persist: {
     key: 'cart-store',
-    storage: import.meta.client ? localStorage : undefined,
+    storage: localStorage,
     pick: ['packageSelected', 'guestCount', 'items', 'isOpen'],
   }
 

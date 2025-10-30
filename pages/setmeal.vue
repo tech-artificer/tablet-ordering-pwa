@@ -50,7 +50,7 @@ const setTier = (set: any) => {
 
 
 <template>
-    <div class="flex flex-col gap-3 justify-center min-h-screen min-w-screen p-6">
+    <div class="flex flex-col gap-3 justify-center min-h-screen min-w-screen p-4">
 
         <!-- <div class="flex flex-row items-center gap-4 justify-center ">   
             <CommonImage :src="CustomLogo.LOGO_1" alt="logo" class="w-16 h-16" />
@@ -98,10 +98,10 @@ const setTier = (set: any) => {
 
                 <div v-if="set.modifiers && set.modifiers.length > 0"
                     class="flex flex-wrap justify-evenly gap-2 mb-2 px-2 pb-2">
-                   
+                        <!-- {{ set }} -->
                        <!-- {{ set.modifiers.map((modifier) => modifier.img_url) }} -->
                         <el-scrollbar height="300px" class="w-full ml-3 p-3" >
-                            <ModifierImagePreview :modifiers="set.modifiers" />
+                            <ModifierImagePreview :modifiers="set.modifiers" :groups="['p1']" />
                         </el-scrollbar>
 
                         <!-- <div :class="[

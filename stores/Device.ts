@@ -146,6 +146,28 @@ export const useDeviceStore = defineStore('device', {
                 this.showDeviceRegistration = true
             }
         },
+
+        async verifyToken() {
+
+            try {
+                const response = await useMainApiAuth('/api/token/verify', {
+                    method: 'GET',
+                })
+                
+                const isValid = response.valid;
+
+                if( isValid ) {
+                     console.log('Token is valid');
+                }else{
+                    await this.refresh()
+                }
+
+                console.log('Verify Token', response);
+            } catch (error: any) {
+               
+            }
+
+        }
     },
 
     persist: {

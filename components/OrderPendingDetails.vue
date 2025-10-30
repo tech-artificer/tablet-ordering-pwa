@@ -19,7 +19,6 @@ const orderConfirmation = ref(false)
 const orderPlaced = computed(() => orderStore.hasOrder )
 let timer: ReturnType<typeof setInterval> | null = null
 
-
 function startCountdownAndRequest() {
 
   orderConfirmation.value = true

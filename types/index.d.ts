@@ -1,6 +1,7 @@
 // import type Menu from "~/pages/woosoo/menu.vue"
 import type { MenuItem } from '@/types/menu'
 import { OrderStatus } from '@/types/enums'
+
 export interface Menu {
     id: number,
     menu_id: number,

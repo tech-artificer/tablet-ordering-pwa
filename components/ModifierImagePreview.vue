@@ -16,8 +16,6 @@ const srcList = [
 const url =
   'https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg'
 
-
-
 </script>
 
 <template>
@@ -25,7 +23,7 @@ const url =
     <div v-for="modifier in modifiers" class="flex flex-col items-center gap-2">
       <el-image style="width: 50px; height: 50px" :src="modifier.img_url" :zoom-rate="1.2" :max-scale="7"
         :min-scale="0.2" :preview-src-list="[modifier.img_url]" show-progress :initial-index="4" fit="contain" class="w-full h-full border border-white bg-white rounded-full flex items-center justify-center" />
-      <span class="text-xs">{{ modifier.receipt_name }}</span>
+      <!-- <span class="text-xs">{{ modifier.name }}</span> -->
     </div>
   </div>
 </template>

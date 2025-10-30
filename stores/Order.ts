@@ -29,6 +29,9 @@ export const useOrderStore = defineStore('order', {
   },
 
   actions: {
+
+    
+
     // setOrder(order: DeviceOrder) {
     //   // this.current.value = order
     //   this.currentOrderId = order.order_id
