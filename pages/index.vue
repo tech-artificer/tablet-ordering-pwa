@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { useMenuStore } from '~/stores/Menu'
-import { useDeviceStore } from '~/stores/Device'
 import { CustomLogo } from '~/composables/default'
 import { useSessionStore } from '~/stores/Session'
 const sessionStore = useSessionStore()
 const { canProceed } = storeToRefs(sessionStore)
-// const { refresh } = useDeviceStore();
+const { table } = useDeviceStore();
 const menu = useMenuStore()
 // initialize menu
 await menu.init()
@@ -16,7 +15,7 @@ const changeGuestCountView = () => {
   navigateTo('guest')
   // emit('changeGuestCountView')CustomLogo
 }
-
+console.log(table);
 definePageMeta({
   middleware: [
     function (to, from) {
@@ -29,10 +28,11 @@ definePageMeta({
 </script>
 
 <template>
- 
+  
   <div class="flex flex-col justify-center items-center h-full relative z-10">
     <!-- Animated background flames -->
     <div class="min-h-screen min-w-screen flex flex-col justify-center items-center">
+       <!-- <HelpButtons /> -->
       <div>
         <CommonImage v-if="CustomLogo.LOGO_1" :src="CustomLogo.LOGO_1" alt="logo" class="w-32 h-32" />
       </div>

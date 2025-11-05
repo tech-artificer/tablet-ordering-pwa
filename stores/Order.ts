@@ -17,6 +17,7 @@ export const useOrderStore = defineStore('order', {
     currentOrderId: null as string | number | null,
     history: [] as DeviceOrder[],
     drawerOpen: false,
+    sessionOrder: null as DeviceOrder | null,
     // isListening: false,
   }),
 
@@ -30,7 +31,20 @@ export const useOrderStore = defineStore('order', {
 
   actions: {
 
-    
+    async fetchOrder(orderId: string | number) {
+
+        try {
+                const response = await useMainApiAuth('/api/device-order/1', {
+                  method: 'GET',
+
+                })
+
+                this.sessionOrder = response.order;
+                console.log('Fetched order:', this.sessionOrder);
+            } catch (error: any) {
+                console.error('Error fetching order:', error)
+            }
+    },
 
     // setOrder(order: DeviceOrder) {
     //   // this.current.value = order
@@ -115,6 +129,6 @@ export const useOrderStore = defineStore('order', {
   persist: {
     key: 'order-store',
     storage: localStorage,
-    pick: ['current', 'history', 'drawerOpen', 'currentOrderId'],
+    pick: ['current', 'history', 'drawerOpen', 'currentOrderId', 'sessionOrder'],
   },
 })

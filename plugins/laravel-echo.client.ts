@@ -55,8 +55,8 @@ export default defineNuxtPlugin((nuxtApp) => {
             broadcaster: 'reverb',
             key: config.public.reverb.appKey,
             wsHost: reverbHost,
-            wsPort,
-            wssPort,
+            wsPort: wsPort,
+            wssPort: wssPort,
             // set forceTLS based on scheme if provided
             forceTLS: String(config.public.NUXT_PUBLIC_REVERB_SCHEME || '').toLowerCase() === 'https',
             disableStats: true,
@@ -72,6 +72,13 @@ export default defineNuxtPlugin((nuxtApp) => {
 
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
+
+        
+        ElNotification({
+            title: 'Connection Successful',
+            message: 'Connected.',
+            type: 'success',
+        })
 
     } catch (err) {
 

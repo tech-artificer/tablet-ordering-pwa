@@ -1,13 +1,14 @@
 import { useSessionStore } from '~/stores/Session'
 import { useDeviceStore } from '~/stores/Device'
 
-export default defineNuxtPlugin(async () => {
-
+export default defineNuxtPlugin(async (to) => {
+  
     const deviceStore = useDeviceStore()
     const sessionStore = useSessionStore()
 
 
-    await deviceStore.verifyToken();
+    // await deviceStore.verifyToken();
+    await deviceStore.authenticate();
     // console.log('Verify Token', response);
 
 

@@ -34,7 +34,7 @@ export const useDeviceStore = defineStore('device', {
                 })
 
                 // backend returns { token, device }
-               
+                
                 if (device && token) {
 
                     this.device = device

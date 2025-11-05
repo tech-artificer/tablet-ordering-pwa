@@ -4,8 +4,8 @@
     "description": "Woosoo tablet",
     "start_url": "/",
     "display": "fullscreen",
-    "background_color": "#ffffff",
-    "theme_color": "#000000",
+    "background_color": "#d4752a",
+    "theme_color": "#F6B56D",
     "orientation": "landscape",
     "orientation-lock": "landscape",
     "icons": [

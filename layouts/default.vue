@@ -1,5 +1,6 @@
 <script setup>
 import { useAppControl } from '@/composables/useAppControl'
+import { FullScreen } from '@element-plus/icons-vue';
 const { isFullscreen, toggleFullscreen } = useFullscreen();
 // import { useSessionStore } from '@/stores/Session'
 import { useConnectionStatus } from "@/stores/ConnectionStatus"
@@ -84,15 +85,15 @@ const pageTransition = computed(() => ({
     name: direction.value === 'forward' ? 'slide-left' : 'slide-right',
     mode: 'out-in'
 }))
-
+   toggleFullscreen();
 // const deviceIsMobile = ref(false)
 // const categoryStore = useCategoryStore()
 
 onMounted(() => {
     
-    if( !isFullscreen ) {
-        toggleFullscreen
-    }
+    // if( !isFullscreen ) {
+     
+    // }
     // categoryStore.getStaticCategories()
     // deviceIsMobile.value = window.innerWidth < 480
 
@@ -147,10 +148,10 @@ onUnmounted(() => {
         </div> -->
 
     <div class="min-h-screen min-w-screen z-0 bg-black relative">
-
+        <DeviceInfoBar />
         <div>
-        <button @click="toggleFullscreen" class="text-white absolute top-4 right-4 z-20 p-2 bg-white rounded-full hover:bg-opacity-75 transition">
-            <svg  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="m160 96.064 192 .192a32 32 0 0 1 0 64l-192-.192V352a32 32 0 0 1-64 0V96h64zm0 831.872V928H96V672a32 32 0 1 1 64 0v191.936l192-.192a32 32 0 1 1 0 64zM864 96.064V96h64v256a32 32 0 1 1-64 0V160.064l-192 .192a32 32 0 1 1 0-64l192-.192zm0 831.872-192-.192a32 32 0 0 1 0-64l192 .192V672a32 32 0 1 1 64 0v256h-64z"></path></svg>
+        <button @click="toggleFullscreen" class="absolute flex justify-center align-center top-2 left-2 z-20 p-0 bg-white hover:bg-opacity-75 transition">
+             <el-icon><FullScreen /></el-icon>
         </button>
         </div> 
 
@@ -184,7 +185,7 @@ onUnmounted(() => {
         <main :class="{ 'mt-16': showNotification }" class="relative overflow-hidden">
             <NuxtPage :transition="pageTransition" />
         </main>
-
+        <div>
          <el-dialog
             v-model="isVisible"
             :title="title"
@@ -199,11 +200,11 @@ onUnmounted(() => {
                 </span>
             </template>
             </el-dialog>
-
+        </div>
     </div>
 
-    <!-- <ServiceRequest /> -->
-
+     <!-- <ServiceRequest />  -->
+    
     <!-- </body>
     </html> -->
 </template>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    /* 1. Global Reset & Full Viewport Coverage */
+    html, body, .loading {
+      margin: 0;
+      padding: 0;
+      height: 100%; 
+      width: 100%;
+      overflow: hidden; /* Prevents scrollbars while loading */
+    }
+
+    /* 2. Loader Container Styles */
+    .loading {
+      position: fixed; /* Ensures it covers the entire viewport */
+      top: 0;
+      left: 0;
+      z-index: 9999; /* Ensures it's above all other content */
+      opacity: 0.5;
+      /* Your custom colors/images */
+    background-image: url('backdrop.png');
+  background-color: #F6B56D;
+
+  /* 👇 New and Modified Background Properties 👇 */
+  
+  /* 1. Ensure the image covers the entire element */
+  background-size: cover; 
+  
+  /* 2. Center the image horizontally and vertically */
+  background-position: center center; 
+  
+  /* 3. Prevent the image from tiling/repeating */
+  background-repeat: no-repeat;
+  
+  /* 4. Optional: Fix the background so it doesn't scroll (though not needed here since the loader is fixed) */
+  /* background-attachment: fixed; */
+  
+  display: flex;
+  justify-content: center;
+  align-items: center;
+    }
+    
+    /* 3. Content Wrapper */
+    .loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #fad1a4;
+    }
+
+    /* 4. Image/Logo Styles */
+    .loading-logo {
+      width: 80px; /* Adjust size */
+      height: auto;
+      margin-bottom: 20px; /* Space between logo and spinner */
+    }
+    
+    /* 5. CSS-based Spinner Styles (More performant) */
+    .spinner-ring {
+      display: inline-block;
+      width: 64px; 
+      height: 64px;
+      margin-bottom: 15px;
+      border-radius: 50%;
+      border: 4px solid #fef3ec; /* Base ring color (lighter) */
+      border-top-color: #f8c689; /* Contrasting color for movement (darker) */
+      box-sizing: border-box;
+      animation: spin 1s linear infinite; /* Animation definition */
+    }
+
+    /* 6. Text Styles */
+    .loading-text {
+      font-family: sans-serif; /* Use a readable font */
+      font-size: 1.1em;
+      margin-top: 0; 
+    }
+
+    /* 7. Keyframes for the Spinning Animation */
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <div class="loading-content">
+      
+      <div class="spinner-ring" role="status" aria-label="Loading application"></div>
+      
+    </div>
+  </div>
+</body>
+</html>

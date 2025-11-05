@@ -61,14 +61,13 @@ const submitOrder = async () => {
 
 
 <template>
-
-    <div class="floating-menu   bg-gray-200 border border-gray-100 p-1">
-        <div class="menu-item active" disabled @click="setActiveMenu($event)">
-            <!-- <el-icon><Setting /></el-icon> -->
-            <!-- <div class="menu-icon">⚙️</div>
-            <div class="menu-label">Service</div> -->
+    <div class="floating-menu bg-gray-200 border border-gray-100 p-1">
+        <div class="menu-item active"  @click="setActiveMenu($event)">
+            <el-icon><Setting /></el-icon>
+            <div class="menu-icon">⚙️</div> 
+            <div class="menu-label">Service</div> 
         </div>
-        <!-- <div class="menu-item" @click.prevent="setActiveMenu($event)">
+        <div class="menu-item" @click.prevent="setActiveMenu($event)">
             <div class="menu-icon">📊</div>
             <div class="menu-label">Call Support</div>
         </div>
@@ -79,7 +78,7 @@ const submitOrder = async () => {
         <div class="menu-item" @click.prevent="setActiveMenu($event)">
             <div class="menu-icon">⚙️</div>
             <div class="menu-label">Clean</div>
-        </div> -->
+        </div> 
     </div>
 </template>
 

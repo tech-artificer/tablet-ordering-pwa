@@ -71,6 +71,8 @@ export interface DeviceOrder {
     table?: Table | null;
     meta: any | null;
     deleted_at?: string;
+    created_at?: any;
+    is_printed?: boolean;
     service_requests: ServiceRequest[] | []
 }
 

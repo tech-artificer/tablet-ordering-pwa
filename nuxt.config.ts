@@ -8,12 +8,6 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-06-01',
     ssr: false,
     css: ['~/assets/css/main.css'],
-    // devServer: {
-    //     https: {
-    //         key: process.env.NUXT_DEV_SERVER_HTTPS_KEY,
-    //         cert: process.env.NUXT_DEV_SERVER_HTTPS_CERT
-    //     }
-    // },
     modules: [
         '@pinia/nuxt',
         'pinia-plugin-persistedstate',
@@ -26,39 +20,6 @@ export default defineNuxtConfig({
         '@nuxt/devtools',
         '@nuxt/fonts'
     ],
-
-    pwa: {
-        "name": "Woosoo",
-        "short_name": "Woosoo",
-        "description": "Woosoo tablet",
-        "start_url": "/",
-        "display": "fullscreen",
-        "background_color": "#ffffff",
-        "theme_color": "#000000",
-        "orientation": "landscape",
-        "orientation-lock": "landscape",
-        "icons": [
-            {
-                "src": "/icons/android-launchericon-192-192.png",
-                "sizes": "192x192",
-                "type": "image/png",
-                "purpose": "any"
-            },
-            {
-                "src": "/icons/android-launchericon-512-512.png",
-                "sizes": "512x512",
-                "type": "image/png",
-                "purpose": "any"
-            },
-            {
-                "src": "/icons/android-launchericon-512-512.png",
-                "sizes": "512x512",
-                "type": "image/png",
-                "purpose": "maskable"
-            }
-        ]
-    },
-
     fonts: {
         families: [
             { name: 'Kanit', provider: 'google', weights: [300, 400, 500, 600, 700] },
@@ -74,14 +35,6 @@ export default defineNuxtConfig({
             ]
         }
     },
-
-    // devServer: {
-    //     // https: {
-    //     //     key: '../certs/localhost-key.pem',
-    //     //     cert: '../certs/localhost.pem'
-    //     // }
-    // },
-
     runtimeConfig: {
         public: {
             // App Configuration
@@ -114,4 +67,5 @@ export default defineNuxtConfig({
             }
         }
     },
+    spaLoadingTemplate: 'spa-loading-template.html',
 })

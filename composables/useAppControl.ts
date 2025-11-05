@@ -5,7 +5,7 @@ import { useSessionStore } from '~/stores/Session'
 export function useAppControl(deviceId: string) {
   
   const session = useSessionStore()
- const { $echo } = useNuxtApp()
+  const { $echo } = useNuxtApp()
 
  const channelName = `device.${deviceId}`
     console.log(`📡 Subscribing to ${channelName}`)

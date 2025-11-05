@@ -15,6 +15,7 @@ export const useSessionStore = defineStore('session', {
 
     getters: {
         sessionOpened: (state) => state.dateClosed == null,
+        getSessionId: (state) => state.sessionId,
     },
 
     actions: {

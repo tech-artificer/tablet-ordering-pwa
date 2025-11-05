@@ -96,9 +96,11 @@ definePageMeta({
                                 </h2>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" v-if="activeItems.length > 0">
                                 <MenuCard v-for="item in activeItems" :key="item.id ?? 0" :item="item" />
                             </div>
+
+                            <el-empty v-else></el-empty>
 
                             <div class="h-20"></div>
                         </div>
