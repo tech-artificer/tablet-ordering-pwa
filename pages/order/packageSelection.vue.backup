@@ -1,0 +1,390 @@
+<script setup lang="ts">
+import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
+// import { ElMessage } from 'element-plus';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import type { Package, Modifier } from "../../types";
+// import { formatCurrency } from '../../utils/formats';
+import { useMenuStore } from '../../stores/menu';
+import { useOrderStore } from '../../stores/order';
+import { useSessionStore } from '../../stores/session';
+import { useDeviceStore } from '../../stores/device';
+import PackageCard from '../../components/PackageCard.vue';
+// no modal: package details shown inline in cards
+
+const menuStore = useMenuStore();
+const router = useRouter();
+const orderStore = useOrderStore();
+const sessionStore = useSessionStore();
+const deviceStore = useDeviceStore();
+
+// Carousel state - always active for all screen sizes
+const currentIndex = ref(0)
+const packages = computed(() => menuStore.packages);
+
+const handlePackageSelection = async (packageData: Package, modifiers?: any) => {
+  // Persist selected package to order store for downstream flows
+  console.log('Selected package:', packageData, modifiers);
+
+  try {
+    orderStore.setPackage(packageData)
+  } catch (err) {
+    console.warn('Failed to persist package to order store', err)
+  }
+
+  // Start session if not already active and ensure token/menu ready
+  try {
+    const started = await sessionStore.start()
+    if (!started) {
+      console.warn('Session start failed — device may require registration')
+
+      // Only show registration if device truly lacks credentials
+      const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
+
+      if (needsRegistration) {
+        // Redirect staff to Settings (PIN-protected) to register device there
+        try {
+          await router.push('/settings')
+        } catch (e) {
+          console.error('Failed to navigate to Settings for registration', e)
+        }
+        // Stop further navigation to menu
+        return
+      }
+
+      // If device appears registered (token/table present), log and continue gracefully
+      console.warn('Session start failed but device appears registered; proceeding.')
+    }
+  } catch (err) {
+    console.warn('Session store start failed or unavailable', err)
+  }
+
+  // No modal to clear
+
+  // Show a brief toast so the user sees immediate feedback
+  // try {
+  //   // Element Plus `ElMessage` is used elsewhere in the project (no import needed)
+  //   // 1200ms gives a short visible confirmation before navigation
+  //   ElMessage.success({
+  //     message: 'Package selected — opening menu',
+  //     duration: 1200
+  //   })
+  // } catch (err) {
+  //   // ignore if ElMessage is not available
+  // }
+
+  // Navigate to the menu page with package ID in query for downstream flows
+  try {
+    // Ensure menus are loaded (session.start already attempts this, but double-check)
+    try { await menuStore.loadAllMenus() } catch (e) { /* non-fatal */ }
+
+    await router.push({
+      path: '/menu',
+      query: { packageId: packageData.id }
+    })
+  } catch (navErr) {
+    // Prevent uncaught promise rejections from bubbling to the global handler
+    console.error('Navigation to /menu failed:', navErr)
+
+    // If the navigation failed due to asset/chunk fetch, show a helpful registration UI
+    // or remain on the package selection page so the user can retry.
+    // If device looks unregistered, surface the registration modal.
+    const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
+    if (needsRegistration) {
+      try { await router.push('/settings') } catch (e) { console.error(e) }
+    }
+  }
+}
+
+// No modal/openDetails — cards handle inline preview
+
+const goBack = () => {
+  router.push('/order/start');
+};
+
+function nextPackage() {
+  if (!packages.value || packages.value.length === 0) return
+  currentIndex.value = (currentIndex.value + 1) % packages.value.length
+}
+
+function prevPackage() {
+  if (!packages.value || packages.value.length === 0) return
+  currentIndex.value = (currentIndex.value - 1 + packages.value.length) % packages.value.length
+}
+
+function goTo(index: number) {
+  currentIndex.value = Math.max(0, Math.min(index, packages.value.length - 1))
+}
+
+// Swipe support for carousel
+const touchStartX = ref<number | null>(null)
+const touchDeltaX = ref(0)
+const swipeThreshold = 50
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartX.value = e.touches?.[0]?.clientX ?? null
+  touchDeltaX.value = 0
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (touchStartX.value === null) return
+  const x = e.touches?.[0]?.clientX ?? 0
+  touchDeltaX.value = x - touchStartX.value
+}
+
+function handleTouchEnd() {
+  if (!touchStartX.value) return
+  const delta = touchDeltaX.value
+  touchStartX.value = null
+  touchDeltaX.value = 0
+  if (Math.abs(delta) < swipeThreshold) return
+  if (delta > 0) {
+    // swipe right -> previous
+    prevPackage()
+  } else {
+    // swipe left -> next
+    nextPackage()
+  }
+}
+</script>
+
+<template>
+  <div class="min-h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-black overflow-y-auto">
+    <!-- Animated background elements -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-20 left-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+      <div class="absolute bottom-20 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+    </div>
+
+    <div class="relative z-10 flex justify-center p-3 sm:p-6">
+      <div class="w-full max-w-7xl">
+        <!-- Modern header with glassmorphism -->
+        <div class="mb-4 sm:mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <button 
+              @click="goBack" 
+              class="group flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 transition-all duration-300 hover:scale-105 active:scale-95"
+            >
+              <ArrowLeft :size="20" class="group-hover:-translate-x-1 transition-transform"></ArrowLeft>
+              <span class="text-white/90 font-medium hidden sm:inline">Back</span>
+            </button>
+            
+            <div class="flex-1 text-center">
+              <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white font-raleway">
+                Choose Your
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary via-orange-400 to-primary animate-gradient">
+                  Perfect Package
+                </span>
+              </h1>
+            </div>
+            
+            <!-- Package count badge -->
+            <div class="px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-full border border-primary/20">
+              <span class="text-primary font-semibold text-sm">{{ packages.length }} Packages</span>
+            </div>
+          </div>
+
+          <div class="text-center">
+            <p class="text-base sm:text-lg text-white/60 font-kanit max-w-2xl mx-auto">
+              Select the ideal grilling experience for your table
+            </p>
+          </div>
+        </div>
+
+        <!-- Loading state with modern spinner -->
+        <div v-if="menuStore.isLoadingPackages" class="flex flex-col items-center justify-center py-20">
+          <div class="relative">
+            <div class="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-8 h-8 bg-primary/20 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+          <p class="text-white/80 mt-6 text-lg font-medium">Loading packages...</p>
+        </div>
+
+        <!-- Empty state with illustration -->
+        <div v-else-if="packages.length === 0" class="flex flex-col items-center justify-center py-20">
+          <div class="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
+            <svg class="w-12 h-12 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-2">No Packages Available</h3>
+          <p class="text-white/60 text-center max-w-md">
+            We're currently updating our menu. Please check back soon or contact our staff for assistance.
+          </p>
+        </div>
+
+        <!-- Grid layout for larger screens with stagger animation -->
+        <div 
+          v-else-if="!isCarousel" 
+          class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 pb-4"
+        >
+          <div
+            v-for="(pkg, idx) in packages"
+            :key="pkg.id"
+            class="package-card-wrapper h-full"
+            :style="{ animationDelay: `${idx * 0.1}s` }"
+          >
+            <PackageCard
+              :pkg="pkg"
+              @select="handlePackageSelection"
+              class="h-full transform hover:scale-105 transition-all duration-300"
+            ></PackageCard>
+          </div>
+        </div>
+
+        <!-- Carousel layout for small screens with modern controls -->
+        <div v-else class="relative pb-8">
+          <!-- Package card with swipe gesture -->
+          <div 
+            class="overflow-hidden rounded-2xl"
+            @touchstart="handleTouchStart"
+            @touchmove="handleTouchMove"
+            @touchend="handleTouchEnd"
+          >
+            <transition name="slide" mode="out-in">
+              <PackageCard
+                v-if="packages[currentIndex]"
+                :key="packages[currentIndex].id"
+                :pkg="packages[currentIndex]"
+                @select="handlePackageSelection"
+                class="w-full"
+              ></PackageCard>
+            </transition>
+          </div>
+
+          <!-- Modern navigation controls -->
+          <div class="flex items-center justify-between mt-8 px-4">
+            <button
+              @click="prevPackage"
+              :disabled="packages.length <= 1"
+              class="p-3 bg-gradient-to-br from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 backdrop-blur-sm rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-300 border border-white/10 active:scale-95"
+              aria-label="Previous package"
+            >
+              <ChevronLeft :size="28" class="text-white"></ChevronLeft>
+            </button>
+
+            <!-- Modern dots indicator -->
+            <div class="flex gap-3 items-center">
+              <button
+                v-for="(pkg, idx) in packages"
+                :key="pkg.id"
+                @click="goTo(idx)"
+                :class="[
+                  'transition-all duration-300 rounded-full',
+                  idx === currentIndex 
+                    ? 'w-10 h-3 bg-gradient-to-r from-primary to-orange-400' 
+                    : 'w-3 h-3 bg-white/20 hover:bg-white/40'
+                ]"
+                :aria-label="`Go to package ${idx + 1}`"
+              ></button>
+            </div>
+
+            <button
+              @click="nextPackage"
+              :disabled="packages.length <= 1"
+              class="p-3 bg-gradient-to-br from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 backdrop-blur-sm rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-300 border border-white/10 active:scale-95"
+              aria-label="Next package"
+            >
+              <ChevronRight :size="28" class="text-white"></ChevronRight>
+            </button>
+          </div>
+
+          <!-- Package counter with modern styling -->
+          <div class="text-center mt-6">
+            <div class="inline-flex items-center gap-2 px-6 py-3 bg-white/5 backdrop-blur-sm rounded-full border border-white/10">
+              <span class="text-white font-bold text-lg">{{ currentIndex + 1 }}</span>
+              <span class="text-white/40">/</span>
+              <span class="text-white/60 font-medium">{{ packages.length }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* Gradient animation for title */
+@keyframes gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
+
+/* Stagger fade-in animation for grid cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.package-card-wrapper {
+  animation: fadeInUp 0.6s ease-out backwards;
+}
+
+/* Slide transition for carousel */
+.slide-enter-active {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-enter-from {
+  opacity: 0;
+  transform: translateX(40px) scale(0.95);
+}
+
+.slide-leave-to {
+  opacity: 0;
+  transform: translateX(-40px) scale(0.95);
+}
+
+/* Custom scrollbar styling */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 10px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 107, 53, 0.4), rgba(255, 107, 53, 0.2));
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(255, 107, 53, 0.6), rgba(255, 107, 53, 0.4));
+  background-clip: padding-box;
+}
+
+/* Hover lift effect utility */
+.ui-hover-lift {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ui-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -10px rgba(255, 107, 53, 0.3);
+}
+
+.ui-hover-lift:active {
+  transform: translateY(-2px);
+}
+</style>

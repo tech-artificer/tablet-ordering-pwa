@@ -1,73 +1,446 @@
-// stores/Session.ts
 import { defineStore } from 'pinia'
-import { useOrderStore } from '~/stores/Order'
-import { useCartStore } from '~/stores/Cart'
-import { useDeviceStore } from '~/stores/Device'
-import { ElNotification } from 'element-plus'
+import { reactive } from 'vue'
+import { useApi } from '../composables/useApi'
+import { useOrderStore } from './order'
+import { useDeviceStore } from './device'
+import { useMenuStore } from './menu'
+import { logger } from '../utils/logger'
 
-export const useSessionStore = defineStore('session', {
-    state: () => ({
-        sessionId: null as number | null,
-        dateOpened: null as string | null,
-        dateClosed: null as string | null,
-        canProceed: false as boolean
-    }),
+export const useSessionStore = defineStore('session', () => {
+  const state = reactive({
+    sessionId: null as number | null,
+    orderId: null as number | null,
+    isActive: false as boolean
+  })
 
-    getters: {
-        sessionOpened: (state) => state.dateClosed == null,
-        getSessionId: (state) => state.sessionId,
-    },
+  async function fetchLatestSession() {
+    const $api = useApi();
+    try {
+      const { data } = await $api('/api/session/latest', { method: 'GET' })
+      state.sessionId = Number(data.id) || data.id
+    } catch (error: any) {
+      // ignore
+    }
+  }
 
-    actions: {
+  async function start(): Promise<boolean> {
+    // Ensure device token is present and valid before starting session
+    const deviceStore = useDeviceStore()
 
-        init() {
-            this.getLatestSession()
-        },
+    // If no token present, try authenticate (login) the device
+    if (!deviceStore.token) {
+      const ok = await deviceStore.authenticate()
+      if (!ok) {
+        // Authentication failed; caller should handle registration UI
+        return false
+      }
+    }
 
-        startSession() {
-            this.init()
+    // Parse expiration value robustly (supports ISO string, ms, or seconds)
+    const parseExpiration = (val: any): number | null => {
+      if (!val && val !== 0) return null
+      if (typeof val === 'number') {
+        // if timestamp appears to be in seconds, convert to ms
+        return val < 1e12 ? val * 1000 : val
+      }
+      const asNumber = Number(val)
+      if (!isNaN(asNumber) && asNumber !== 0) {
+        return asNumber < 1e12 ? asNumber * 1000 : asNumber
+      }
+      const parsed = Date.parse(String(val))
+      return isNaN(parsed) ? null : parsed
+    }
 
-            useOrderStore().$reset()
-            useCartStore().$reset() 
-        },
+    const expiresAt = parseExpiration(deviceStore.expiration)
+    const now = Date.now()
+    const refreshBuffer = 60 * 1000 // 1 minute buffer to avoid mid-session expiry
 
-        endSession() {
-            navigateTo('/')
-        },
+    if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
+      // Token is missing/expired/near expiry — try refreshing
+      const refreshed = await deviceStore.refresh()
+      if (!refreshed) {
+        // Refresh failed — require re-registration
+        return false
+      }
+    }
 
-        async getLatestSession() {
+    // Fetch latest session id from server to keep local state in-sync
+    try {
+      await fetchLatestSession()
+    } catch (e) {
+      // non-fatal; proceed but log
+      logger.warn('[SessionStore] fetchLatestSession failed before start:', e)
+    }
 
-            try {
-                const { session, error } = await useMainApiAuth('/api/session/latest', {
-                    method: 'GET',
-                })
+    // Preload menu data so customers don't wait when ordering
+    const menuStore = useMenuStore()
+    try {
+      await menuStore.loadAllMenus()
+    } catch (e) {
+      logger.warn('[SessionStore] preload menus failed:', e)
+    }
 
-                console.log('Session Error -', error)
-                this.sessionId = Number(session.id) || session.id
-                this.dateOpened = session.date_time_opened
-                this.dateClosed = session.date_time_closed
-                
-                if( this.dateClosed == null) {
-                    this.canProceed = true
-                }
+    // Reset order store to fresh state for new dining session
+    const orderStore = useOrderStore()
+    orderStore.setGuestCount(2)       // Default guest count
+    orderStore.cartItems = []          // Clear active cart
+    orderStore.package = {} as any     // Clear package selection
+    orderStore.currentOrder = null     // Clear current order reference
 
-            } catch (error: any) {
-                this.canProceed = false
+    state.isActive = true
+    return true
+  }
 
-                ElNotification({
-                    title: 'Warning',
-                    message: 'Error Fetching Latest Session',
-                    type: 'warning',
-                })
+  function end() {
+    logger.info('🔚 Session ending - clearing all session and order state')
+    clear()
+  }
 
-                console.log('Error Fetching Latest Session:')
-            }
-        },
-    },
+  function clear() {
+    logger.debug('🧹 Clearing session state...')
+    state.sessionId = null
+    state.orderId = null
+    state.isActive = false
+    
+    // Reset order state when session ends
+    const orderStore = useOrderStore()
+    
+    // Stop any active polling first
+    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+    
+    orderStore.setGuestCount(2)
+    orderStore.cartItems = []
+    orderStore.refillItems = []
+    orderStore.submittedItems = []
+    orderStore.package = {} as any
+    orderStore.currentOrder = null
+    orderStore.hasPlacedOrder = false
+    orderStore.isRefillMode = false
+    // Note: orderStore.history is KEPT for historical tracking
+    
+    // Force persist to localStorage immediately to avoid hydration issues
+    if (typeof localStorage !== 'undefined') {
+      try {
+        // Re-save session store with cleared values
+        localStorage.setItem('session-store', JSON.stringify({
+          sessionId: null,
+          orderId: null,
+          isActive: false
+        }))
+        
+        // Also persist cleared order store (matching its pick config)
+        localStorage.setItem('order-store', JSON.stringify({
+          guestCount: 2,
+          package: {},
+          hasPlacedOrder: false,
+          currentOrder: null,
+          submittedItems: [],
+          isRefillMode: false,
+          history: orderStore.history || [] // Keep history
+        }))
+        
+        logger.debug('✅ Session and order stores cleared and persisted')
+      } catch (e) {
+        logger.warn('Failed to persist cleared stores:', e)
+      }
+    }
+  }
 
-    persist: {
-        key: 'session-store',
-        storage: localStorage,
-        pick: ['sessionId', 'dateOpened', 'dateClosed', 'canProceed'],
-    },
+  function reset() {
+    // Full reset including history (for end of day or device reset)
+    state.sessionId = null
+    state.orderId = null
+    state.isActive = false
+    
+    const orderStore = useOrderStore()
+    
+    // Stop any active polling first
+    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+    
+    orderStore.setGuestCount(2)
+    orderStore.cartItems = []
+    orderStore.refillItems = []
+    orderStore.submittedItems = []
+    orderStore.package = {} as any
+    orderStore.currentOrder = null
+    orderStore.hasPlacedOrder = false
+    orderStore.isRefillMode = false
+    orderStore.history = []  // Only cleared on full reset
+    
+    // Force persist to localStorage immediately
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('session-store', JSON.stringify({
+          sessionId: null,
+          orderId: null,
+          isActive: false
+        }))
+        
+        // Also persist cleared order store (full reset clears history too)
+        localStorage.setItem('order-store', JSON.stringify({
+          guestCount: 2,
+          package: {},
+          hasPlacedOrder: false,
+          currentOrder: null,
+          submittedItems: [],
+          isRefillMode: false,
+          history: []
+        }))
+        
+        logger.debug('✅ Session and order stores fully reset and persisted')
+      } catch (e) {
+        logger.warn('Failed to persist reset stores:', e)
+      }
+    }
+  }
+
+  return {
+    ...state,
+    fetchLatestSession,
+    start,
+    end,
+    clear,
+    reset
+  }
+}, {
+  persist: {
+    key: 'session-store',
+    storage: (typeof localStorage !== 'undefined') ? localStorage : undefined,
+    pick: ['sessionId', 'isActive', 'orderId']
+  }
 })
+
+
+
+// // stores/session.ts
+// import { defineStore } from 'pinia'
+// import type { Session, Table, Device, Branch, ApiResponse } from '~/types'
+
+// export const useSessionStore = defineStore('session', {
+//   state: () => ({
+//     currentSession: null as Session | null,
+//     device: null as Device | null,
+//     branch: null as Branch | null,
+//     isLoading: false,
+//     error: null as string | null
+//   }),
+
+//   getters: {
+//     hasActiveSession: (state) => state.currentSession !== null,
+    
+//     currentTable: (state) => state.currentSession?.table || null,
+    
+//     sessionId: (state) => state.currentSession?.session_id || null,
+    
+//     isTableLocked: (state) => state.currentSession?.table?.is_locked || false,
+    
+//     deviceInfo: (state) => {
+//       if (!state.device) return null
+//       return {
+//         id: state.device.id,
+//         name: state.device.name,
+//         code: state.device.code
+//       }
+//     },
+
+//     branchInfo: (state) => {
+//       if (!state.branch) return null
+//       return {
+//         id: state.branch.id,
+//         name: state.branch.name
+//       }
+//     }
+//   },
+
+//   actions: {
+//     // Initialize device and branch
+//     async initializeDevice(deviceCode: string) {
+//       this.isLoading = true
+//       this.error = null
+
+//       try {
+//         const response = await $fetch<ApiResponse<{ device: Device; branch: Branch }>>(
+//           '/api/device/authenticate',
+//           {
+//             method: 'POST',
+//             body: { code: deviceCode }
+//           }
+//         )
+
+//         if (response.success) {
+//           this.device = response.data.device
+//           this.branch = response.data.branch
+          
+//           // Store device token for subsequent requests
+//           if (response.data.device.token) {
+//             localStorage.setItem('device_token', response.data.device.token)
+//           }
+
+//           return true
+//         }
+
+//         throw new Error(response.message || 'Failed to authenticate device')
+//       } catch (error: any) {
+//         this.error = error.message
+//         console.error('Device initialization error:', error)
+//         return false
+//       } finally {
+//         this.isLoading = false
+//       }
+//     },
+
+//     // Start a new session with a table
+//     async startSession(tableId: number, guestCount: number = 1) {
+//       if (!this.device || !this.branch) {
+//         throw new Error('Device not initialized')
+//       }
+
+//       this.isLoading = true
+//       this.error = null
+
+//       try {
+//         const response = await $fetch<ApiResponse<Session>>(
+//           '/api/sessions',
+//           {
+//             method: 'POST',
+//             body: {
+//               table_id: tableId,
+//               guest_count: guestCount,
+//               device_id: this.device.id,
+//               branch_id: this.branch.id
+//             }
+//           }
+//         )
+
+//         if (response.success) {
+//           this.currentSession = response.data
+//           return response.data
+//         }
+
+//         throw new Error(response.message || 'Failed to start session')
+//       } catch (error: any) {
+//         this.error = error.message
+//         console.error('Start session error:', error)
+//         throw error
+//       } finally {
+//         this.isLoading = false
+//       }
+//     },
+
+//     // Load existing session
+//     async loadSession(sessionId: number) {
+//       this.isLoading = true
+//       this.error = null
+
+//       try {
+//         const response = await $fetch<ApiResponse<Session>>(
+//           `/api/sessions/${sessionId}`
+//         )
+
+//         if (response.success) {
+//           this.currentSession = response.data
+//           return response.data
+//         }
+
+//         throw new Error(response.message || 'Failed to load session')
+//       } catch (error: any) {
+//         this.error = error.message
+//         console.error('Load session error:', error)
+//         throw error
+//       } finally {
+//         this.isLoading = false
+//       }
+//     },
+
+//     // Update session
+//     updateSession(session: Partial<Session>) {
+//       if (this.currentSession) {
+//         this.currentSession = {
+//           ...this.currentSession,
+//           ...session
+//         }
+//       }
+//     },
+
+//     // End session
+//     async endSession() {
+//       if (!this.currentSession) {
+//         throw new Error('No active session')
+//       }
+
+//       this.isLoading = true
+//       this.error = null
+
+//       try {
+//         const response = await $fetch<ApiResponse<void>>(
+//           `/api/sessions/${this.currentSession.session_id}/end`,
+//           {
+//             method: 'POST'
+//           }
+//         )
+
+//         if (response.success) {
+//           this.currentSession = null
+//           return true
+//         }
+
+//         throw new Error(response.message || 'Failed to end session')
+//       } catch (error: any) {
+//         this.error = error.message
+//         console.error('End session error:', error)
+//         return false
+//       } finally {
+//         this.isLoading = false
+//       }
+//     },
+
+//     // Lock/unlock table
+//     async toggleTableLock(locked: boolean) {
+//       if (!this.currentSession?.table) {
+//         throw new Error('No active table')
+//       }
+
+//       try {
+//         const response = await $fetch<ApiResponse<Table>>(
+//           `/api/tables/${this.currentSession.table.id}/lock`,
+//           {
+//             method: 'POST',
+//             body: { is_locked: locked }
+//           }
+//         )
+
+//         if (response.success && this.currentSession) {
+//           this.currentSession.table = response.data
+//           return true
+//         }
+
+//         return false
+//       } catch (error: any) {
+//         this.error = error.message
+//         console.error('Toggle table lock error:', error)
+//         return false
+//       }
+//     },
+
+//     // Clear session (logout)
+//     clearSession() {
+//       this.currentSession = null
+//       this.error = null
+//     },
+
+//     // Clear all data
+//     reset() {
+//       this.currentSession = null
+//       this.device = null
+//       this.branch = null
+//       this.error = null
+//       localStorage.removeItem('device_token')
+//     }
+//   },
+
+//   persist: {
+//     key: 'session-store',
+//     storage: localStorage,
+//     pick: ['currentSession', 'device', 'branch']
+//   }
+// })

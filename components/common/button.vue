@@ -1,14 +1,14 @@
 <template>
-    <el-button :type="type" :plain="plain" :round="round">
+    <button class="btn-primary ui-hover-lift" :aria-label="name">
         {{ name }}
-    </el-button>
+    </button>
 </template>
 
 <script setup>
     defineProps({
         name: {
             type: String,
-            default: 'Your Button Name / Please change name props'
+            default: 'Test'
         },
         type: {
             type: String,

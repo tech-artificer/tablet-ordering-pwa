@@ -1,138 +1,320 @@
-import { defineStore } from 'pinia'
-import type { MenuItem } from '~/types/menu'
+import { defineStore } from "pinia";
+import { useApi } from "../composables/useApi";
+import { logger } from "../utils/logger";
+import type { Menu, MenuItem, Package, Modifier } from "../types";
+
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+const toNumber = (value: unknown): number => {
+    const n = Number(value);
+    return isNaN(n) ? 0 : n;
+};
+
+const normalizePrice = <T extends { price?: unknown }>(item: T): T => ({
+    ...item,
+    price: toNumber(item.price),
+});
+
+const normalizePackage = (pkg: Package): Package => ({
+    ...(pkg as Package),
+    price: toNumber((pkg as Package).price),
+    is_popular: Boolean((pkg as Package).is_popular) || (pkg as Package).name?.toLowerCase().includes('noble'),
+    accent: String((pkg as Package).accent || ''),
+    color: String((pkg as Package).color || ''),
+    tax_amount: toNumber((pkg as Package).tax_amount),
+    modifiers: Array.isArray((pkg as Package).modifiers)
+        ? (pkg as Package).modifiers.map((m: Modifier) => normalizePrice(m))
+        : [],
+    tax: (pkg as Package).tax ? { ...(pkg as Package).tax, percentage: toNumber((pkg as Package).tax.percentage) } : (pkg as Package).tax,
+});
 
 
-export interface CarouselItem {
-  title: string
-  price: number
-  image: string
-  tag?: string
-}
-
-
-export const useMenuStore = defineStore('menu', {
+export const useMenuStore = defineStore("menu", {
     state: () => ({
+        menus: [] as Menu[],
         desserts: [] as MenuItem[],
         sides: [] as MenuItem[],
-        beverage: [] as MenuItem[],
-        sets: [] as MenuItem[],
-        modifiers: [] as MenuItem[],
-        featuredItems: {} as CarouselItem[],
-        tiers: {
-            classic: 'Basic',
-            noble: 'Best',
-            royal: 'Premium'
+        beverages: [] as MenuItem[],
+        packages: [] as Package[],
+        alacartes: [] as MenuItem[],
+        modifiers: [] as Modifier[],
+        loading: {
+            packages: false,
+            modifiers: false,
+            desserts: false,
+            sides: false,
+            alacartes: false,
+            beverages: false,
         },
-        loading: false,
-        error: null as string | null,
+        errors: {
+            packages: null as string | null,
+            modifiers: null as string | null,
+            desserts: null as string | null,
+            sides: null as string | null,
+            alacartes: null as string | null,
+            beverages: null as string | null,
+        },
+        lastFetched: null as number | null,
     }),
 
-    actions: {
-        async fetchCourses() {
-            const data = await useMainApiAuth('api/menus/course', {
-                method: 'GET',
-                params: {
-                    course: CategoryFilter.DESSERT
-                }
-            })
-
-            this.desserts = Array.isArray(data) ? data : data.data
-        },
-
-        async fetchGroups() {
-            const data = await useMainApiAuth('api/menus/group', {
-                method: 'GET',
-                params: {
-                    group: CategoryFilter.SIDES
-                }
-            })
-
-            this.sides = Array.isArray(data) ? data : data.data
-        },
-
-        async fetchCategories() {
-            const data = await useMainApiAuth('api/menus/category', {
-                method: 'GET',
-                params: {
-                    category: CategoryFilter.BEVERAGE
-                }
-            })
-
-            this.beverage = Array.isArray(data) ? data : data.data
-        },
-        async fetchModifiers() {
-            const data = await useMainApiAuth('api/menus/modifiers')
-        },
-
-        async fetchSets() {
-            const data = await useMainApiAuth('api/menus/with-modifiers')
-            this.sets = Array.isArray(data) ? data : data.data
-            // each set has modifiers. seet[0].modifiers
-          this.modifiers = this.sets.reduce<MenuItem[]>((accumulator, currentSet) => {
-            return [...accumulator, ...currentSet.modifiers];
-            }, []);
-        },
-
-        async getFeaturedItems() {
-            this.featuredItems = [
-                { title: 'Sushi Platter', price: 999, image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=1000&h=1000&fit=crop', tag: 'Chef’s Pick' },
-                { title: 'Breakfast Special', price: 499, image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=1000&h=1000&fit=crop', tag: 'Best Seller' },
-                { title: 'Samgyupsal Set', price: 799, image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=1000&h=1000&fit=crop', tag: 'Limited' },
-            ]
-        },
-
-
-        reset() {
-            // this.items = []
-            this.sets = [],
-                this.modifiers = [],
-                this.desserts = [],
-                this.sides = [],
-                this.beverage = [],
-                this.loading = false
-            this.error = null
-        },
-
-        async init() {
-            this.loading = true
-            try {
-                await Promise.all([
-                    this.fetchCourses(),
-                    this.fetchGroups(),
-                    this.fetchCategories(),
-                    this.fetchModifiers(),
-                    this.fetchSets(),
-                    this.getFeaturedItems()
-                ])
-            } catch (err) {
-                console.error(err)
-                this.error = 'Failed to load menu data'
-            } finally {
-                this.loading = false
-            }
+    getters: {
+        activeMenu: (state: any) => state.menus.find((m) => m.is_active),
+        isLoading: (state: any) => Object.values(state.loading).some(Boolean),
+        isLoadingPackages: (state: any) => state.loading.packages,
+        isLoadingAlacartes: (state: any) => state.loading.alacartes,    
+        isLoadingModifiers: (state: any) => state.loading.modifiers,
+        isLoadingDesserts: (state: any) => state.loading.desserts,
+        isLoadingSides: (state: any) => state.loading.sides,
+        isLoadingBeverages: (state: any) => state.loading.beverages,
+        hasErrors: (state: any) => Object.values(state.errors).some(error => error !== null),
+        isCacheStale: (state: any) => {
+            if (!state.lastFetched) return true;
+            return Date.now() - state.lastFetched > CACHE_DURATION;
         },
     },
 
-    getters: {
-        // Items grouped by course → group → category
-        menuSets: (state) => state.sets,
-        menuSides: (state) => state.sides,
-        menuDesserts: (state) => state.desserts,
-        menuBeverage: (state) => state.beverage,
-        menuModifiers: (state) => {
-            const cartStore = useCartStore()
-            if (cartStore.packageSelected.modifiers.length > 0) {
-                return cartStore.packageSelected.modifiers    
+    actions: {
+        async fetchPackages(this: any) {
+            this.loading.packages = true;       
+            this.errors.packages = null;
+            const api = useApi();
+            try {
+                const { data } = await api.get('/api/menus/with-modifiers');
+                this.packages = Array.isArray(data) ? data.map(normalizePackage) : [];
+                logger.debug('✅ Packages loaded:', this.packages.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || 'Failed to fetch packages';
+                this.errors.packages = errorMessage;
+                logger.error('❌ Packages error:', error);
+                throw new Error(errorMessage);
+            } finally {
+                this.loading.packages = false;
+            }
+        },
+
+        async fetchModifiers(this: any) {
+            this.loading.modifiers = true;
+            this.errors.modifiers = null;
+            const api = useApi();
+            try {
+                const { data } = await api.get('/api/menus/modifiers');
+                this.modifiers = Array.isArray(data) ? data.map(normalizePrice) : [];
+                logger.debug('✅ Modifiers loaded:', this.modifiers.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || 'Failed to fetch modifiers';
+                this.errors.modifiers = errorMessage;
+                logger.error('❌ Modifiers error:', error);
+                throw new Error(errorMessage);
+            } finally {
+                this.loading.modifiers = false;
+            }
+        },
+
+        async fetchDesserts(this: any) {
+            this.loading.desserts = true;
+            this.errors.desserts = null;
+            const api = useApi();
+            try {
+                const { data } = await api.get('/api/menus/course', { params: { course: 'dessert' } });
+                this.desserts = Array.isArray(data) ? data.map(normalizePrice) : [];
+                logger.debug('✅ Desserts loaded:', this.desserts.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || 'Failed to fetch desserts';
+                this.errors.desserts = errorMessage;
+                logger.error('❌ Desserts error:', error);
+                throw new Error(errorMessage);
+            } finally {
+                this.loading.desserts = false;
+            }
+        },
+
+        async fetchSides(this: any) {
+            this.loading.sides = true;
+            this.errors.sides = null;
+            const api = useApi();
+            try {
+                const { data } = await api.get('/api/menus/group', { params: { group: 'sides' } });
+                this.sides = Array.isArray(data) ? data.map(normalizePrice) : [];
+                logger.debug('✅ Sides loaded:', this.sides.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || 'Failed to fetch sides';
+                this.errors.sides = errorMessage;
+                logger.error('❌ Sides error:', error);
+                throw new Error(errorMessage);
+            } finally {
+                this.loading.sides = false;
+            }
+        },
+
+        async fetchAlacartes(this: any) {
+            this.loading.alacartes = true;
+            this.errors.alacartes = null;
+            const api = useApi();
+            try {
+                const { data } = await api.get('/api/menus/category', { params: { category: 'alacarte' } });
+                this.alacartes = Array.isArray(data) ? data.map(normalizePrice) : [];
+                logger.debug('✅ Alacartes loaded:', this.alacartes.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || 'Failed to fetch alacartes';
+                this.errors.alacartes = errorMessage;
+                logger.error('❌ Alacartes error:', error);
+                throw new Error(errorMessage);
+            }
+            finally {
+                this.loading.alacartes = false;
+            }
+        },
+
+        async fetchBeverages(this: any) {
+            this.loading.beverages = true;
+            this.errors.beverages = null;
+            const api = useApi();
+            try {
+                const { data } = await api.get('/api/menus/category', { params: { category: 'beverage' } });
+                this.beverages = Array.isArray(data) ? data.map(normalizePrice) : [];
+                logger.debug('✅ Beverages loaded:', this.beverages.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || 'Failed to fetch beverages';
+                this.errors.beverages = errorMessage;
+                logger.error('❌ Beverages error:', error);
+                throw new Error(errorMessage);
+            } finally {
+                this.loading.beverages = false;
+            }
+        },
+
+        async loadAllMenus(this: any, forceRefresh = false) {
+            if (!forceRefresh && !this.isCacheStale && this.packages.length > 0) {
+                logger.debug('📦 Using cached menu data');
+                return { success: true, fromCache: true };
             }
 
-            return state.modifiers
+            logger.debug('🔄 Fetching fresh menu data...');
+            const fetches = [
+                this.fetchPackages(),
+                this.fetchModifiers(),
+                this.fetchDesserts(),
+                this.fetchAlacartes(),
+                this.fetchSides(),
+                this.fetchBeverages(),
+            ];
+
+            const results = await Promise.allSettled(fetches);
+            const allSucceeded = results.every(r => r.status === 'fulfilled');
+
+            if (allSucceeded) {
+                this.lastFetched = Date.now();
+            }
+
+            return {
+                success: allSucceeded,
+                fromCache: false,
+                errors: results
+                    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+                    .map(r => r.reason),
+            };
+        },
+
+        async refreshMenus(this: any) {
+            return this.loadAllMenus(true);
+        },
+
+        setActive(this: any, id: number) {
+            this.menus.forEach((menu) => {
+                menu.is_active = menu.id === id;
+            });
+        },
+
+        extractModifierGroups(pkg: Package) {
+            if (!pkg?.modifiers) return [];
+
+            // Collect unique group names
+            const groups = [...new Set(pkg.modifiers.map((m) => m.group || 'Other'))];
+
+            // If any group looks like a 'meat' umbrella, split by meat keywords
+            const hasMeatGroup = groups.some(g => /meat/i.test(String(g)));
+
+            if (!hasMeatGroup) return groups;
+
+            // Split modifiers into PORK / BEEF / CHICKEN where possible, otherwise fall back
+            const mods = pkg.modifiers || [];
+            const byKeyword = {
+                PORK: mods.filter((m: any) => /pork/i.test(m.name || '')),
+                BEEF: mods.filter((m: any) => /beef/i.test(m.name || '')),
+                CHICKEN: mods.filter((m: any) => /chicken/i.test(m.name || '')),
+            } as Record<string, any[]>;
+
+            const other = mods.filter((m: any) => !/pork|beef|chicken/i.test(m.name || ''));
+
+            const result: string[] = [];
+            if (byKeyword.PORK.length) result.push('PORK');
+            if (byKeyword.BEEF.length) result.push('BEEF');
+            if (byKeyword.CHICKEN.length) result.push('CHICKEN');
+            if (other.length) result.push('Other');
+
+            // If splitting failed (no keywords matched), return the original groups
+            return result.length ? result : groups;
+        },
+
+        clearError(this: any, key: string) {
+            this.errors[key] = null;
+        },
+
+        clearAllErrors(this: any) {
+            this.errors = {
+                packages: null,
+                modifiers: null,
+                alacartes: null,
+                desserts: null,
+                sides: null,
+                beverages: null,
+            };
+        },
+
+        clear(this: any) {
+            this.packages = [];
+            this.sides = [];
+            this.beverages = [];
+            this.desserts = [];
+            this.alacartes = [];
+            this.modifiers = [];
+            this.menus = [];
+            this.lastFetched = null;
+            this.errors = {
+                packages: null,
+                modifiers: null,
+                alacartes: null,
+                desserts: null,
+                sides: null,
+                beverages: null,
+            };
+            this.loading = {
+                packages: false,
+                modifiers: false,
+                alacartes: false,
+                desserts: false,
+                sides: false,
+                beverages: false,
+            };
+        },
+
+        clearCache(this: any) {
+            this.clear();
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('menu-store');
+            }
         },
     },
 
     persist: {
-        key: 'menu-store',
-        storage: localStorage,
-        pick: ['sides', 'desserts', 'beverage', 'sets', 'modifiers', 'featuredItems'],
+        key: "menu-store",
+        storage: (typeof window !== 'undefined') ? localStorage : undefined,
+        pick: ["menus", "packages", "modifiers", "alacartes", "beverages", "sides", "desserts", "lastFetched"],
     },
-})
-
+});

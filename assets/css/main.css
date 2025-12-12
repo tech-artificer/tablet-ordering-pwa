@@ -1,238 +1,354 @@
+@import "./btn-primary.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-    font-family: 'Kanit', sans-serif;
-    /* Primary Colors - Using your primary color #F6B56D */
-    --el-color-primary: #F6B56D!important;
-    --el-color-primary-light-3: #f8c689!important;
-    --el-color-primary-light-5: #fad1a4!important;
-    --el-color-primary-light-7: #fcdcbf!important;
-    --el-color-primary-light-8: #fde7d7!important;
-    --el-color-primary-light-9: #fef3ec!important;
-    --el-color-primary-dark-2: #d4752a!important; /* Using your accent color */
-
-    /* Success Colors - Using your success/darkGreen #4AD775 */
-    --el-color-success: #4AD775!important;
-    --el-color-success-light-3: #6fe390!important;
-    --el-color-success-light-5: #94efab!important;
-    --el-color-success-light-7: #b9f5c6!important;
-    --el-color-success-light-8: #d4fad8!important;
-    --el-color-success-light-9: #eafceb!important;
-    --el-color-success-dark-2: #3bb85e!important;
-
-    /* Warning Colors - Using your warning #FFB01D */
-    --el-color-warning: #FFB01D!important;
-    --el-color-warning-light-3: #ffc04a!important;
-    --el-color-warning-light-5: #ffd077!important;
-    --el-color-warning-light-7: #ffe0a4!important;
-    --el-color-warning-light-8: #ffebc7!important;
-    --el-color-warning-light-9: #fff5ea!important;
-    --el-color-warning-dark-2: #d99617!important;
-
-    /* Danger/Error Colors - Using your error #dc2626 */
-    --el-color-danger: #dc2626!important;
-    --el-color-danger-light-3: #e45151!important;
-    --el-color-danger-light-5: #ec7c7c!important;
-    --el-color-danger-light-7: #f4a7a7!important;
-    --el-color-danger-light-8: #f8c3c3!important;
-    --el-color-danger-light-9: #fce1e1!important;
-    --el-color-danger-dark-2: #b91c1c!important;
-
-    /* Info Colors - Using your info #3b82f6 */
-    --el-color-info: #3b82f6!important;
-    --el-color-info-light-3: #629bf8!important;
-    --el-color-info-light-5: #89b4fa!important;
-    --el-color-info-light-7: #b0cdfc!important;
-    --el-color-info-light-8: #c8ddfd!important;
-    --el-color-info-light-9: #e1eefe!important;
-    --el-color-info-dark-2: #2563eb!important;
-
-    /* Background Colors */
-    --el-bg-color: #ffffff!important; /* cardBackground */
-    --el-bg-color-page: #fefcfa!important; /* background */
-    --el-bg-color-overlay: #ffffff!important; /* cardBackground */
-
-    /* Surface and Fill Colors */
-    --el-fill-color: #f8f5f1!important; /* surface */
-    --el-fill-color-light: #fefcfa!important; /* background */
-    --el-fill-color-lighter: #ffffff!important; /* cardBackground */
-    --el-fill-color-extra-light: #ffffff!important;
-    --el-fill-color-dark: #f0e6db!important; /* hover */
-    --el-fill-color-darker: #e8ddd4!important; /* border */
-    --el-fill-color-blank: #ffffff!important;
-
-    /* Text Colors */
-    --el-text-color-primary: #2d1b12!important; /* textDarkPrimary */
-    --el-text-color-regular: #6b5b4d!important; /* textDarkSecondary */
-    --el-text-color-secondary: #8b7355!important; /* secondary */
-    --el-text-color-placeholder: #D3D3D3!important; /* muted/textLightSecondary */
-    --el-text-color-disabled: #D3D3D3!important; /* muted */
-
-    /* Border Colors */
-    --el-border-color: #e8ddd4!important; /* border */
-    --el-border-color-light: #f0e6db!important; /* hover */
-    --el-border-color-lighter: #f8f5f1!important; /* surface */
-    --el-border-color-extra-light: #fefcfa!important; /* background */
-    --el-border-color-dark: #d4752a!important; /* accent */
-    --el-border-color-darker: #8b7355!important; /* secondary */
-
-    /* Custom Properties for Special Colors */
-    --el-color-rose: #FFA0A2!important; /* rose */
-    --el-color-light-rose: #FCCCCC!important; /* lightRose */
-    --el-color-peach-puff: #FFD88E!important; /* PeachPuff */
-    --el-color-text-light: #efc086!important; /* textLight */
-
-    /* Component Specific Overrides */
-    --el-component-size-large: 40px!important;
-    --el-component-size: 32px!important;
-    --el-component-size-small: 24px!important;
-
-    /* Border Radius */
-    --el-border-radius-base: 6px!important;
-    --el-border-radius-small: 4px!important;
-    --el-border-radius-round: 20px!important;
-    --el-border-radius-circle: 100%!important;
-
-    /* Box Shadow */
-    --el-box-shadow: 0 2px 4px rgba(45, 27, 18, 0.12), 0 0 6px rgba(45, 27, 18, 0.04)!important;
-    --el-box-shadow-light: 0 2px 12px 0 rgba(45, 27, 18, 0.1)!important;
-    --el-box-shadow-base: 0 2px 4px rgba(45, 27, 18, 0.12), 0 0 6px rgba(45, 27, 18, 0.04)!important;
-    --el-box-shadow-dark: 0 4px 8px rgba(45, 27, 18, 0.15)!important;
+:root { 
+  --primary: #F6B56D; 
+  --primary-dark: #C78B45;
+  --kbbq-flame: #FF5C00; 
+  --panel: #252525;
+  --touch-min: 48px; /* Minimum touch target size */
 }
 
-:root {
-    --breakpoint-xs: 375px;
-    --breakpoint-sm: 640px;
-    --breakpoint-md: 768px;
-    --breakpoint-lg: 1024px;
-    --breakpoint-xl: 1280px;
-    --breakpoint-2xl: 1536px;
-    
-    /* Spacing system */
-    --spacing-xs: 0.25rem;
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-    --spacing-2xl: 3rem;
+.bg-panel {
+  background: #252525;
 }
 
-@layer components {
-  .responsive-grid {
-    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
+body { 
+  -webkit-touch-callout: none; 
+  -webkit-user-select: none; 
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none; /* Prevent pull-to-refresh */
+}
+
+@media (min-width: 1100px) and (max-width: 1400px) and (orientation: landscape) {
+  :root { font-size: 16px; }
+}
+
+/* ============================================
+   MOBILE APP-LIKE UTILITIES
+   ============================================ */
+
+/* Touch-friendly button base - minimum 48px touch target */
+.touch-btn {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch-btn:active {
+  transform: scale(0.95);
+  opacity: 0.9;
+}
+
+/* Circular touch button (for navigation arrows, counters, etc) */
+.touch-btn-circle {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch-btn-circle:active {
+  transform: scale(0.92);
+}
+
+/* Icon button with subtle background */
+.icon-btn {
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+/* Subtle hover lift effect */
+.ui-hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ui-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.ui-hover-lift:active {
+  transform: translateY(0);
+}
+
+/* Active state indicator */
+.active-glow {
+  box-shadow: 0 0 20px rgba(246, 181, 109, 0.4);
+  border-color: var(--primary) !important;
+}
+
+/* ============================================
+   PAGE TRANSITIONS - Enhanced for app-like feel
+   ============================================ */
+
+/* Fade with lift */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.page-fade-enter-to,
+.page-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Slide left (forward navigation) */
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: opacity 250ms ease-out, transform 250ms ease-out;
+}
+.slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.slide-left-enter-to,
+.slide-left-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Slide right (back navigation) */
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: opacity 250ms ease-out, transform 250ms ease-out;
+}
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.slide-right-enter-to,
+.slide-right-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Scale pop (for modals, cards) */
+.scale-pop-enter-active,
+.scale-pop-leave-active {
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+.scale-pop-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+.scale-pop-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
+}
+.scale-pop-enter-to,
+.scale-pop-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-fade-enter-active,
+  .page-fade-leave-active,
+  .slide-left-enter-active,
+  .slide-left-leave-active,
+  .slide-right-enter-active,
+  .slide-right-leave-active,
+  .scale-pop-enter-active,
+  .scale-pop-leave-active {
+    transition: none;
   }
-  
-  .responsive-text {
-    @apply text-sm sm:text-base md:text-lg lg:text-xl;
-  }
-  
-  .responsive-padding {
-    @apply p-4 sm:p-6 md:p-8 lg:p-10;
-  }
-  
-  .section-container {
-    @apply container mx-auto px-4 sm:px-6 lg:px-8;
-  }
 }
 
-/* Utility classes for common patterns */
-@layer utilities {
-  .aspect-ratio-16-9 {
-    aspect-ratio: 16 / 9;
-  }
-  
-  .aspect-ratio-4-3 {
-    aspect-ratio: 4 / 3;
-  }
-  
-  .aspect-ratio-square {
-    aspect-ratio: 1 / 1;
-  }
+/* ============================================
+   CONSISTENT HEADER STYLING
+   ============================================ */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(20, 20, 20, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-
-/* Additional Component Customizations */
-.el-button {
-    border-radius: var(--el-border-radius-base);
-    font-weight: 500;
+.app-header-title {
+  font-family: 'Kanit', sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
 }
 
-.el-button--primary {
-    background-color: var(--el-color-primary);
-    border-color: var(--el-color-primary);
-    color: var(--el-text-color-primary);
+/* ============================================
+   TOAST & MESSAGES
+   ============================================ */
+.toast-success {
+  background: linear-gradient(135deg, #10B981, #059669) !important;
+  border: none !important;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3) !important;
 }
 
-.el-button--primary:hover {
-    background-color: var(--el-color-primary-light-3);
-    border-color: var(--el-color-primary-light-3);
+.el-message {
+  min-width: 300px !important;
+  padding: 16px 20px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
 }
 
-.el-card {
-    background-color: var(--el-bg-color);
-    border: 1px solid var(--el-border-color);
-    box-shadow: var(--el-box-shadow-light);
+.el-message--success {
+  background: linear-gradient(135deg, #10B981, #059669) !important;
+  border: none !important;
 }
 
-.el-input__wrapper {
-    background-color: var(--el-fill-color-lighter);
-    border: 1px solid var(--el-border-color);
+/* ============================================
+   SCROLLING & OVERFLOW
+   ============================================ */
+.overflow-y-auto {
+  scroll-behavior: smooth;
 }
 
-.el-input__wrapper:hover {
-    border-color: var(--el-color-primary);
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
-.el-input__wrapper.is-focus {
-    border-color: var(--el-color-primary);
-    box-shadow: 0 0 0 2px rgba(246, 181, 109, 0.2);
+/* Custom thin scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
 }
 
-/* Custom utility classes using your color palette */
-.bg-peach-puff {
-    background-color: var(--el-color-peach-puff);
-}
-
-.text-rose {
-    color: var(--el-color-rose);
-}
-
-.bg-light-rose {
-    background-color: var(--el-color-light-rose);
-}
-
-.text-light {
-    color: var(--el-color-text-light);
-}
-.font-inter {
-    font-family: 'Inter', sans-serif;
-}
-
-.font-kanit {
-    font-family: 'Kanit', sans-serif;
-}
-
-.font-raleway {
-    font-family: 'Raleway', sans-serif;
-}
-/* Custom scrollbar for all */
-*::-webkit-scrollbar {
-    width: 8px;
-}
-*::-webkit-scrollbar-track {
-    background: #ffffff;
-}
-*::-webkit-scrollbar-thumb {
-    background: #ffffff;
-    border-radius: 4px;
-}
-*::-webkit-scrollbar-thumb:hover {
-    background: #ffffff;
-}
-/* Ensure smooth transitions when switching themes */
+/* ============================================
+   TAP HIGHLIGHTS
+   ============================================ */
 * {
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  -webkit-tap-highlight-color: rgba(246, 181, 109, 0.15);
+}
+
+/* Ripple effect for buttons (optional enhancement) */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.4s ease-out, opacity 0.3s ease-out;
+}
+
+.ripple:active::after {
+  transform: scale(2);
+  opacity: 1;
+  transition: transform 0s, opacity 0s;
+}
+
+/* ============================================
+   SAFE AREA PADDING (for notched devices)
+   ============================================ */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.safe-area-left {
+  padding-left: env(safe-area-inset-left, 0);
+}
+.safe-area-right {
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+/* ============================================
+   ELEMENT PLUS DRAWER OVERRIDES (Dark Theme)
+   ============================================ */
+.el-drawer {
+  --el-drawer-bg-color: #0a0a0a !important;
+  background: linear-gradient(to bottom, #1a1a1a, #0a0a0a) !important;
+}
+
+.el-drawer__body {
+  background: linear-gradient(to bottom, #1a1a1a, #0a0a0a) !important;
+}
+
+.el-drawer__container {
+  background: transparent !important;
+}
+
+.el-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
 }
 
