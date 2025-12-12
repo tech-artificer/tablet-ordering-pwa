@@ -28,12 +28,12 @@
 - **POST**: `/devices/refresh` : `DeviceAuthApiController@refresh` — refresh device token.
 - **POST**: `/devices/logout` : `DeviceAuthApiController@logout` — revoke device token.
 - **POST**: `/devices/create-order` : `DeviceOrderApiController` (single-action) — Request: `StoreDeviceOrderRequest` (see schema below).
-- **POST**: `/devices/order/current` : `DeviceOrderManagementApiController@getCurrentOrder` — Request body: `{ sessionId: int }` (validated inline).
-- **POST**: `/devices/check-update` : `DeviceOrderManagementApiController@checkOrderUpdate` — Request body: `{ orderId, sessionId }` (inline parameters, optional behaviour documented in controller).
+- **POST**: `/devices/order/current` : `DeviceOrderManagementApiController@getCurrentOrder` — Request body: `{ session_id: int }` (validated inline).
+- **POST**: `/devices/check-update` : `DeviceOrderManagementApiController@checkOrderUpdate` — Request body: `{ order_id, session_id }` (inline parameters, optional behaviour documented in controller).
 - **GET**: `/tables/services` : `TableServiceApiController@index` — list of services for tables.
 - **POST**: `/service/request` : `ServiceRequestApiController@store` — Request: `StoreServiceRequest` (see schema below). Broadcasts `ServiceRequestNotification`.
 - **GET**: `/session/latest` : `TerminalSessionApiController@getLatestSession`
-- **POST**: `/devices/heartbeat` : Inline closure — updates device last seen in cache. Body: `deviceID`, `timestamp`.
+- **POST**: `/devices/heartbeat` : Inline closure — updates device last seen in cache. Body: `device_id`, `timestamp`.
 
 **Printer API Group (middleware: `auth:device`)** — For Flutter Printer App
 - **POST**: `/orders/{orderId}/printed` : `PrinterApiController@markPrinted` — Mark single order as printed (idempotent). Requires Bearer token (`auth:device`). Response includes `printed_at` and `printed_by`.
@@ -41,7 +41,7 @@
 - **POST**: `/orders/printed/bulk` : `PrinterApiController@markPrintedBulk` — Bulk mark orders as printed (optional). Response returns `{ updated, already_printed, not_found }`.
 - **POST**: `/printer/heartbeat` : `PrinterApiController@heartbeat` — Track active printer devices (optional). Heartbeat cached for 2 minutes; response includes `session_active`.
 
-- **Note:** There is a legacy route `POST /order/{orderId}/printed` used by the admin web dashboard — retain for compatibility but endorse plural `orders/*` for printer apps.
+- **Deprecation:** `POST /order/{orderId}/printed` (singular) is a legacy route used by the admin web dashboard — retained for compatibility. Clients should use `POST /orders/{orderId}/printed` (plural) instead.
 
 **FormRequest Schemas (exact validation rules)**
 - **`DeviceRegisterRequest`** (`app/Http/Requests/DeviceRegisterRequest.php`)
@@ -65,6 +65,8 @@
   - `items.*.subtotal`: required, numeric, min:0
   - `items.*.tax`: nullable, numeric, min:0
   - `items.*.discount`: nullable, numeric, min:0
+
+> Canonical JSON fields: the API favors snake_case JSON keys (e.g., `total_amount`, `device_id`) and consistent object shapes. When in doubt, prefer `total_amount` for order totals and `device_id` for device references. Response objects use canonical objects (e.g., `table`: `{ id, name }`) rather than plain strings.
 
 - **`StoreServiceRequest`** (`app/Http/Requests/StoreServiceRequest.php`)
   - `table_service_id`: required, integer
@@ -96,6 +98,7 @@
 
 **Notes & Next Steps**
 - **Auth groups**: Endpoints under `auth:device` require a valid device personal access token (see `/token/verify`).
+  - **Auth header**: Device-authenticated endpoints require the `Authorization: Bearer <token>` header. Tokens are personal access tokens created by `/token/create`.
 - **Broadcasting**: `POST /service/request` broadcasts a `ServiceRequestNotification` event — ensure `BROADCAST_CONNECTION` is set to `reverb` (or intended driver) at runtime and config cache is cleared for Reverb to receive events.
 - **Missing / Inline validations**: Several `BrowseMenuApiController` methods use inline `$request->validate()` calls — their parameter requirements are noted near each route above.
 - If you want, I can:
@@ -103,6 +106,95 @@
   - Extract response resource field lists (e.g., `MenuResource`, `MenuModifierResource`, `DeviceOrderResource`) and include sample JSON for each endpoint.
 
 Generated from `routes/api.php` and the FormRequest classes in `app/Http/Requests`.
+
+**Common Error Responses**
+
+- **401 Unauthorized** — when no or invalid `Authorization` header is provided:
+
+```
+HTTP/1.1 401 Unauthorized
+{
+  "success": false,
+  "message": "Unauthenticated"
+}
+```
+
+- **422 Validation Error** — on invalid request payload (example for order creation):
+
+```
+HTTP/1.1 422 Unprocessable Entity
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "items.0.menu_id": ["The items.0.menu_id field is required."]
+  }
+}
+```
+
+- **404 Not Found** — when resources cannot be located:
+
+```
+HTTP/1.1 404 Not Found
+{
+  "success": false,
+  "message": "Resource not found"
+}
+```
+
+**Printer API Examples (sample responses)**
+
+- `GET /orders/unprinted`:
+
+```
+HTTP/1.1 200 OK
+{
+  "data": [ { /* DeviceOrderResource objects */ } ],
+  "meta": { "count": 3 }
+}
+```
+
+- `POST /orders/{orderId}/printed` (single):
+
+```
+HTTP/1.1 200 OK
+{
+  "success": true,
+  "order_id": 1001,
+  "printed_at": "2025-12-13T07:00:00Z",
+  "printed_by": { "id": 7, "name": "Kitchen Printer 1" }
+}
+```
+
+- `POST /orders/printed/bulk`:
+
+```
+HTTP/1.1 200 OK
+{
+  "updated": 3,
+  "already_printed": 1,
+  "not_found": [12345]
+}
+```
+
+**Other clarifications**
+
+- `/menus` may return paginated results using `data` and `meta` where applicable. Check `BrowseMenuApiController@getMenus` for exact behavior.
+- `/token/create` returns a token; example:
+
+```
+HTTP/1.1 200 OK
+{
+  "success": true,
+  "token": "personal-access-token",
+  "expires_at": "2025-12-13T07:00:00Z",
+  "device": { "id": 1, "device_uuid": "..." }
+}
+```
+
+**API Conventions / Notes**
+
+- Use snake_case JSON keys (e.g., `total_amount`, `device_id`).
+- Prefer the `orders/*` plural printer endpoints; legacy singular `POST /order/{orderId}/printed` is unsupported for new clients.
 
 **Sample Responses (from Resource classes)**
 
@@ -114,7 +206,7 @@ Generated from `routes/api.php` and the FormRequest classes in `app/Http/Request
   "device_uuid": "e7a1f8d4-...",
   "branch": "Main Branch",
   "name": "Device 01",
-  "table": "Table 5"
+  "table": { "id": 5, "name": "Table 5" }
 }
 ```
 
@@ -132,7 +224,7 @@ Generated from `routes/api.php` and the FormRequest classes in `app/Http/Request
   "subtotal": 18.00,
   "guest_count": 2,
   "notes": null,
-  "total": 19.80,
+  "total_amount": 19.80,
   "is_printed": 0,
   "status": "CONFIRMED",
   "order_items": [
