@@ -1,47 +1,44 @@
+import defaultTheme from 'tailwindcss/defaultTheme'
+
 /** @type {import('tailwindcss').Config} */
 export default {
+    darkMode: 'class',
     content: [
-        "./components/**/*.{js,vue,ts}",
-        "./layouts/**/*.vue",
-        "./pages/**/*.vue",
-        "./plugins/**/*.{js,ts}",
-        "./nuxt.config.{js,ts}",
-        "./app.vue"
+        './components/**/*.{vue,js,ts}',
+        './layouts/**/*.vue',
+        './pages/**/*.vue',
+        './plugins/**/*.{js,ts}',
+        './app.vue',
+        './nuxt.config.{js,ts}'
     ],
     theme: {
         extend: {
-            colors: {
-                background: '#fefcfa',
-                primary: '#F6B56D',
-                secondary: '#8b7355',
-                lightGreen: '#A5D6A7',
-                darkGreen: '#4AD775',
-                accent: '#d4752a',
-                surface: '#f8f5f1',
-                textLightPrimary: '#f8f5f1',
-                textLightSecondary: '#D3D3D3',
-                textDarkPrimary: '#2d1b12',
-                textDarkSecondary: '#6b5b4d',
-                rose: '#FFA0A2',
-                lightRose: '#FCCCCC',
-                textLight: '#efc086',
-                border: '#e8ddd4',
-                success: '#4AD775',
-                warning: '#FFB01D',
-                error: '#dc2626',
-                info: '#3b82f6',
-                muted: '#D3D3D3',
-                PeachPuff: '#FFD88E',
-                cardBackground: '#ffffff',
-                hover: '#f0e6db',
-            },
             fontFamily: {
-                custom: ['Inter'],
+                kanit: ['Kanit', ...defaultTheme.fontFamily.sans],
+                raleway: ['Raleway', ...defaultTheme.fontFamily.sans]
             },
-            fontSize: {
-                'responsive-sm': 'calc(2vmin)',
+            colors: {
+                'primary': '#F6B56D',       // Your main orange-gold color
+                'primary-dark': '#C78B45', // Darker shade for hover/active
+                'primary-light': '#F9D0A1',// Lighter shade for subtle accents
+
+                'secondary': '#252525',    // Your main dark/black color
+                'secondary-dark': '#1C1C1C',// Darker for deep backgrounds
+                'secondary-light': '#4A4A4A',// Lighter for borders/muted text
+
+                'white': '#FFFFFF',
+                'black': '#000000',
+
+                // System/Utility colors
+                'success': '#10B981',
+                'error': '#EF4444',
             },
-        }
+            backdropBlur: {
+                'xs': '2px',
+                'sm': '4px',
+                'DEFAULT': '8px',
+            }
+        },
     },
     plugins: []
 }

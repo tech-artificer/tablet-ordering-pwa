@@ -1,33 +1,47 @@
 {
-  "name": "nuxt-app",
+  "name": "wooserve",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "dev": "npx nuxi dev --host 0.0.0.0",
+    "test": "vitest",
+    "build": "npx nuxi build",
+    "generate": "npx nuxi generate",
+    "preview": "npx nuxi preview --host 0.0.0.0",
+    "postinstall": "nuxi prepare",
+    "clean": "rm -rf .nuxt .output node_modules package-lock.json"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@pinia/nuxt": "^0.11.2",
+    "axios": "^1.5.0",
+    "clsx": "^2.1.1",
+    "element-plus": "^2.3.0",
     "laravel-echo": "^2.1.5",
+    "lucide-vue-next": "^0.553.0",
     "nuxt": "^3.17.4",
+    "pinia": "^3.0.3",
+    "pinia-plugin-persistedstate": "^4.3.0",
     "pusher-js": "^8.4.0",
-    "vue": "^3.5.14",
+    "tailwind-merge": "^3.4.0",
+    "vue": "^3.5.24",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@element-plus/nuxt": "^1.1.2",
-    "@formkit/auto-animate": "^0.8.2",
     "@nuxt/devtools": "^2.4.1",
-    "@nuxt/eslint": "^1.7.1",
     "@nuxt/fonts": "^0.11.4",
     "@nuxt/icon": "^1.13.0",
     "@nuxt/image": "^1.10.0",
     "@nuxtjs/tailwindcss": "^6.14.0",
-    "@pinia/nuxt": "^0.11.0",
+    "@types/node": "^24.10.1",
     "@vite-pwa/nuxt": "^1.0.1",
-    "nuxt-charts": "^0.1.9",
-    "pinia-plugin-persistedstate": "^4.3.0"
+    "typescript": "^5.4.0"
+  ,
+    "vitest": "^1.0.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.0.0-0",
+    "jsdom": "^21.1.0"
   }
 }

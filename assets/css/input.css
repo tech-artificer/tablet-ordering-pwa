@@ -1,3 +1,195 @@
+/* Removed missing import 'tw-animate-css' which caused PostCSS ENOENT errors. */
+@custom-variant dark (&:is(.dark *));
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  /* Light theme / default */
+  --background: #FFFFFF; /* page background */
+  --foreground: #111827; /* neutral-900 */
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+
+  /* Brand colors (from tailwind.config.js) */
+  --primary: #F6B56D;       /* primary */
+  --primary-dark: #C78B45;  /* primary-dark */
+  --primary-light: #F9D0A1; /* primary-light */
+  --primary-foreground: #000000;
+
+  --secondary: #252525;     /* dark panel */
+  --secondary-dark: #1C1C1C;
+  --secondary-light: #4A4A4A;
+  --secondary-foreground: #FFFFFF;
+
+  --muted: #F3F4F6;
+  --muted-foreground: #6B7280;
+  --accent: var(--primary);
+  --accent-foreground: #000000;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E5E7EB; /* neutral-200 */
+  --input: #F9FAFB;
+  --ring: #F6B56D;
+
+  --chart-1: #F87171;
+  --chart-2: #60A5FA;
+  --chart-3: #A78BFA;
+  --chart-4: #F59E0B;
+  --chart-5: #F97316;
+
+  --radius: 0.625rem;
+
+  /* Sidebar uses secondary palette */
+  --sidebar: var(--secondary);
+  --sidebar-foreground: var(--secondary-foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--primary-light);
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: var(--secondary-light);
+  --sidebar-ring: var(--primary-light);
+
+  /* Element Plus color tokens (light) */
+  --el-color-primary: var(--primary);
+  --el-color-primary-dark-2: var(--primary-dark);
+  --el-color-primary-light-3: var(--primary-light);
+  --el-text-color-primary: var(--primary-foreground);
+  --el-color-success: #10B981;
+  --el-color-danger: #EF4444;
+}
+
+.dark {
+  /* Dark theme */
+  --background: #121212; /* very dark */
+  --foreground: #FFFFFF;
+  --card: #1F1F1F;
+  --card-foreground: #FFFFFF;
+  --popover: #1F1F1F;
+  --popover-foreground: #FFFFFF;
+
+  --primary: #F6B56D;
+  --primary-dark: #C78B45;
+  --primary-light: #F9D0A1;
+  --primary-foreground: #000000;
+
+  --secondary: #252525;
+  --secondary-dark: #1C1C1C;
+  --secondary-light: #4A4A4A;
+  --secondary-foreground: #FFFFFF;
+
+  --muted: #374151;
+  --muted-foreground: #9CA3AF;
+  --accent: var(--primary);
+  --accent-foreground: #000000;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #2A2A2A;
+  --input: #1F1F1F;
+  --ring: #C78B45;
+
+  --chart-1: #F87171;
+  --chart-2: #60A5FA;
+  --chart-3: #A78BFA;
+  --chart-4: #F59E0B;
+  --chart-5: #F97316;
+
+  --radius: 0.625rem;
+
+  --sidebar: var(--secondary);
+  --sidebar-foreground: var(--secondary-foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--primary-light);
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: var(--secondary-dark);
+  --sidebar-ring: var(--primary-light);
+
+  /* Element Plus color tokens (dark) */
+  --el-color-primary: var(--primary);
+  --el-color-primary-dark-2: var(--primary-dark);
+  --el-color-primary-light-3: var(--primary-light);
+  --el-text-color-primary: var(--primary-foreground);
+  --el-color-success: #10B981;
+  --el-color-danger: #EF4444;
+}
+
+@layer base {
+  /* Use explicit CSS here instead of tailwind-only utilities to avoid
+     build-time errors for custom classes that may not be generated. */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    /* default border color for components */
+    border-color: var(--border);
+  }
+
+  /* Use theme variables directly for global background and text color */
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* Semantic color utility classes backed by CSS variables */
+.text-on { color: var(--foreground) !important; }
+.text-muted { color: var(--muted-foreground) !important; }
+.text-muted-60 { color: rgba(255,255,255,0.6) !important; }
+.bg-backdrop { background: rgba(0,0,0,0.5) !important; }
+.bg-backdrop-30 { background: rgba(0,0,0,0.3) !important; }
+.bg-backdrop-40 { background: rgba(0,0,0,0.4) !important; }
+.bg-backdrop-60 { background: rgba(0,0,0,0.6) !important; }
+.bg-backdrop-70 { background: rgba(0,0,0,0.7) !important; }
+.bg-backdrop-80 { background: rgba(0,0,0,0.8) !important; }
+.bg-surface-10 { background: rgba(255,255,255,0.1) !important; }
+.bg-surface-5 { background: rgba(255,255,255,0.05) !important; }
+.border-surface-10 { border-color: rgba(255,255,255,0.1) !important; }
+.border-surface-20 { border-color: rgba(255,255,255,0.2) !important; }
+.text-accent { color: var(--accent) !important; }
+.bg-accent { background: var(--accent) !important; }
+

@@ -16,10 +16,15 @@ export enum CategoryFilter {
     VEGETARIAN = 'vegetarian',
     SEAFOOD = 'seafood',
     SIDES = 'sides',
-    DESSERT = 'dessert',
     BEST = 'best',
     NEW = 'new',
     STAFF_CHOICE = 'staff choice',
+    PROMOS = 'promos',
+    MEATS = 'meats',
+    SIDES_BANCHAN = 'sides (banchan)',
+    A_LA_CARTE = 'a la carte',
+    DESSERT = 'dessert',
+    BEVERAGE = 'beverage',
 }
 
 export enum OrderStatus {
@@ -31,4 +36,21 @@ export enum OrderStatus {
     READY = 'ready',
     SERVED = 'served',
     VOIDED = 'voided',
+}
+
+export enum CustomLogo {
+    LOGO_1 = '/logo/logo1.png',
+    LOGO_2 = '/logo/logo2.png',
+    ICON_1 = '/logo/icon1.png',
+}
+
+export enum CustomImage {
+    IMAGE_1 = '/images/1.png',
+    IMAGE_2 = '/images/2.png',
+    IMAGE_3 = '/images/3.png',
+    IMAGE_4 = '/images/4.png',
+}
+
+export enum TestSite {
+    GOOGLE = 'https://www.google.com/favicon.ico',
 }
