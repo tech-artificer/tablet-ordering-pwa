@@ -19,8 +19,11 @@ const handleOrderSubmitted = async () => {
     const sessionStore = useSessionStore()
     await sessionStore.start()
   } catch (e) {
-    // Fallback: set lightweight flag if store not available
-    try { localStorage.setItem('session_active', 'true') } catch (_e) { /* ignore */ }
+    // Fallback: do NOT write session_active directly; log instead
+    // Session store should centralize persistence of the flag.
+    // Using console.warn keeps this safe in environments without logger.
+    // eslint-disable-next-line no-console
+    console.warn('sessionStore.start() failed; not setting session_active flag', e)
   }
 
   // 1. Navigate to the In-Session (Refill/Support) screen, replacing the history entry

@@ -156,13 +156,9 @@ export const useSessionStore = defineStore('session', () => {
         logger.warn('Failed to persist cleared stores:', e)
       }
     }
-    // Also remove lightweight active flag
+    // Remove lightweight active flag from localStorage (SSR-safe)
     if (typeof window !== 'undefined' && window.localStorage) {
       try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
-    }
-    // Also remove lightweight active flag
-    if (typeof localStorage !== 'undefined') {
-      try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
     }
   }
 
@@ -215,9 +211,6 @@ export const useSessionStore = defineStore('session', () => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
     }
-    if (typeof localStorage !== 'undefined') {
-      try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
-    }
   }
 
   return {
@@ -232,7 +225,7 @@ export const useSessionStore = defineStore('session', () => {
 }, {
   persist: {
     key: 'session-store',
-    storage: (typeof localStorage !== 'undefined') ? localStorage : undefined,
+    storage: (typeof window !== 'undefined' && window.localStorage) ? window.localStorage : undefined,
     pick: ['sessionId', 'isActive', 'orderId']
   }
 })
