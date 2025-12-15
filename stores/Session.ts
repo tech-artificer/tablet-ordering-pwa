@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { reactive } from 'vue'
+import { reactive, toRefs } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useOrderStore } from './order'
 import { useDeviceStore } from './device'
@@ -88,12 +88,24 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.currentOrder = null     // Clear current order reference
 
     state.isActive = true
+
+    // Centralized lightweight flag to signal session is active for simple pages
+    // Avoid direct localStorage writes from pages/components — use this store instead
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
+    }
+
     return true
   }
 
   function end() {
     logger.info('🔚 Session ending - clearing all session and order state')
     clear()
+  }
+
+  // Compatibility alias used by some callers
+  function endSession() {
+    try { return end() } catch (e) { logger.warn('[SessionStore] endSession failed', e) }
   }
 
   function clear() {
@@ -144,6 +156,10 @@ export const useSessionStore = defineStore('session', () => {
         logger.warn('Failed to persist cleared stores:', e)
       }
     }
+    // Also remove lightweight active flag
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+    }
   }
 
   function reset() {
@@ -192,13 +208,17 @@ export const useSessionStore = defineStore('session', () => {
         logger.warn('Failed to persist reset stores:', e)
       }
     }
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+    }
   }
 
   return {
-    ...state,
+    ...toRefs(state),
     fetchLatestSession,
     start,
     end,
+    endSession,
     clear,
     reset
   }
