@@ -11,7 +11,7 @@ describe('session end behavior', () => {
     try { globalThis.localStorage.clear() } catch (e) {}
   })
 
-  it('end() clears order store and removes session_active flag', () => {
+  it('end() clears order store and removes session_active flag', async () => {
     const order = useOrderStore()
     const session = useSessionStore()
 
@@ -25,7 +25,7 @@ describe('session end behavior', () => {
     order.currentOrder = { order: { order_id: 123 } }
 
     // Act: end session
-    session.end()
+    await session.end()
 
     // Assert: session cleared
     expect(session.isActive).toBe(false)

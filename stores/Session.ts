@@ -91,8 +91,8 @@ export const useSessionStore = defineStore('session', () => {
 
     // Centralized lightweight flag to signal session is active for simple pages
     // Avoid direct localStorage writes from pages/components — use this store instead
-    if (typeof localStorage !== 'undefined') {
-      try { localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
     }
 
     return true
@@ -131,17 +131,17 @@ export const useSessionStore = defineStore('session', () => {
     // Note: orderStore.history is KEPT for historical tracking
     
     // Force persist to localStorage immediately to avoid hydration issues
-    if (typeof localStorage !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       try {
         // Re-save session store with cleared values
-        localStorage.setItem('session-store', JSON.stringify({
+        window.localStorage.setItem('session-store', JSON.stringify({
           sessionId: null,
           orderId: null,
           isActive: false
         }))
         
         // Also persist cleared order store (matching its pick config)
-        localStorage.setItem('order-store', JSON.stringify({
+        window.localStorage.setItem('order-store', JSON.stringify({
           guestCount: 2,
           package: {},
           hasPlacedOrder: false,
@@ -155,6 +155,10 @@ export const useSessionStore = defineStore('session', () => {
       } catch (e) {
         logger.warn('Failed to persist cleared stores:', e)
       }
+    }
+    // Also remove lightweight active flag
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
     }
     // Also remove lightweight active flag
     if (typeof localStorage !== 'undefined') {
@@ -184,16 +188,16 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.history = []  // Only cleared on full reset
     
     // Force persist to localStorage immediately
-    if (typeof localStorage !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        localStorage.setItem('session-store', JSON.stringify({
+        window.localStorage.setItem('session-store', JSON.stringify({
           sessionId: null,
           orderId: null,
           isActive: false
         }))
         
         // Also persist cleared order store (full reset clears history too)
-        localStorage.setItem('order-store', JSON.stringify({
+        window.localStorage.setItem('order-store', JSON.stringify({
           guestCount: 2,
           package: {},
           hasPlacedOrder: false,
@@ -207,6 +211,9 @@ export const useSessionStore = defineStore('session', () => {
       } catch (e) {
         logger.warn('Failed to persist reset stores:', e)
       }
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
     }
     if (typeof localStorage !== 'undefined') {
       try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-const handleOrderSubmitted = () => {
+const handleOrderSubmitted = async () => {
   // Logic after the API call succeeds in the child component
   // ElNotification({
   //   title: 'Order Confirmed! 🥳',
@@ -15,7 +15,7 @@ const handleOrderSubmitted = () => {
 
   // Mark session active via Session store (centralized localStorage writes)
   try {
-    const { useSessionStore } = await import('@/stores/session')
+    const { useSessionStore } = await import('../../stores/session')
     const sessionStore = useSessionStore()
     await sessionStore.start()
   } catch (e) {
