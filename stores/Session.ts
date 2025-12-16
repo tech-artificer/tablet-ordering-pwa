@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { reactive } from 'vue'
+import { reactive, toRefs } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useOrderStore } from './order'
 import { useDeviceStore } from './device'
@@ -88,12 +88,24 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.currentOrder = null     // Clear current order reference
 
     state.isActive = true
+
+    // Centralized lightweight flag to signal session is active for simple pages
+    // Avoid direct localStorage writes from pages/components — use this store instead
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
+    }
+
     return true
   }
 
   function end() {
     logger.info('🔚 Session ending - clearing all session and order state')
     clear()
+  }
+
+  // Compatibility alias used by some callers
+  function endSession() {
+    try { return end() } catch (e) { logger.warn('[SessionStore] endSession failed', e) }
   }
 
   function clear() {
@@ -119,17 +131,17 @@ export const useSessionStore = defineStore('session', () => {
     // Note: orderStore.history is KEPT for historical tracking
     
     // Force persist to localStorage immediately to avoid hydration issues
-    if (typeof localStorage !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       try {
         // Re-save session store with cleared values
-        localStorage.setItem('session-store', JSON.stringify({
+        window.localStorage.setItem('session-store', JSON.stringify({
           sessionId: null,
           orderId: null,
           isActive: false
         }))
         
         // Also persist cleared order store (matching its pick config)
-        localStorage.setItem('order-store', JSON.stringify({
+        window.localStorage.setItem('order-store', JSON.stringify({
           guestCount: 2,
           package: {},
           hasPlacedOrder: false,
@@ -143,6 +155,14 @@ export const useSessionStore = defineStore('session', () => {
       } catch (e) {
         logger.warn('Failed to persist cleared stores:', e)
       }
+    }
+    // Also remove lightweight active flag
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+    }
+    // Also remove lightweight active flag
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
     }
   }
 
@@ -168,16 +188,16 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.history = []  // Only cleared on full reset
     
     // Force persist to localStorage immediately
-    if (typeof localStorage !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        localStorage.setItem('session-store', JSON.stringify({
+        window.localStorage.setItem('session-store', JSON.stringify({
           sessionId: null,
           orderId: null,
           isActive: false
         }))
         
         // Also persist cleared order store (full reset clears history too)
-        localStorage.setItem('order-store', JSON.stringify({
+        window.localStorage.setItem('order-store', JSON.stringify({
           guestCount: 2,
           package: {},
           hasPlacedOrder: false,
@@ -192,13 +212,20 @@ export const useSessionStore = defineStore('session', () => {
         logger.warn('Failed to persist reset stores:', e)
       }
     }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+    }
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+    }
   }
 
   return {
-    ...state,
+    ...toRefs(state),
     fetchLatestSession,
     start,
     end,
+    endSession,
     clear,
     reset
   }

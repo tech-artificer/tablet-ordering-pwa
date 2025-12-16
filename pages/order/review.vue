@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-const handleOrderSubmitted = () => {
+const handleOrderSubmitted = async () => {
   // Logic after the API call succeeds in the child component
   // ElNotification({
   //   title: 'Order Confirmed! 🥳',
@@ -13,8 +13,15 @@ const handleOrderSubmitted = () => {
   //   duration: 3500,
   // });
 
-  // Set the session state flag (important!)
-  localStorage.setItem('session_active', 'true'); 
+  // Mark session active via Session store (centralized localStorage writes)
+  try {
+    const { useSessionStore } = await import('../../stores/session')
+    const sessionStore = useSessionStore()
+    await sessionStore.start()
+  } catch (e) {
+    // Fallback: set lightweight flag if store not available
+    try { localStorage.setItem('session_active', 'true') } catch (_e) { /* ignore */ }
+  }
 
   // 1. Navigate to the In-Session (Refill/Support) screen, replacing the history entry
   router.replace('/order/in-session');

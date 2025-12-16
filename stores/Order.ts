@@ -264,7 +264,8 @@ export const useOrderStore = defineStore('order', () => {
     logger.debug('📦 Order Payload:', body)
     
     try {
-      const resp = await api.post('/api/devices/create-order', body)
+      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? (crypto as any).randomUUID() : `idemp-${Date.now()}-${Math.random().toString(36).slice(2,10)}`
+      const resp = await api.post('/api/devices/create-order', body, { headers: { 'X-Idempotency-Key': idempotencyKey } })
       logger.info('✅ Order submission SUCCESS')
       logger.debug('📥 Response:', resp.data)
       
@@ -367,7 +368,8 @@ export const useOrderStore = defineStore('order', () => {
     console.log('[Refill] Submitting to /api/order/' + currentOrderId + '/refill', refillPayload)
     
     try {
-      const resp = await api.post(`/api/order/${currentOrderId}/refill`, payload ?? refillPayload)
+      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? (crypto as any).randomUUID() : `idemp-${Date.now()}-${Math.random().toString(36).slice(2,10)}`
+      const resp = await api.post(`/api/order/${currentOrderId}/refill`, payload ?? refillPayload, { headers: { 'X-Idempotency-Key': idempotencyKey } })
       state.refillItems = []
       state.isRefillMode = false
       state.history = [...state.history, { ...resp.data, type: 'refill' }]
@@ -507,12 +509,41 @@ export const useOrderStore = defineStore('order', () => {
                 const { useSessionStore } = await import('./session')
                 const sessionStore = useSessionStore()
                 
-                // Small delay to allow any final UI updates
+                // Small delay to allow any final UI updates. Await session end
+                // and clear order state immediately to avoid a refill UI loop.
                 setTimeout(async () => {
-                  sessionStore.end()
-                  // Navigate to home page without reload to preserve fullscreen
-                  const nuxtApp = useNuxtApp()
-                  await nuxtApp.$router.replace('/')
+                  try {
+                    // Load fresh session store instance and call end
+                    const { useSessionStore } = await import('./session')
+                    const sessionStore = useSessionStore()
+
+                    // If end returns a promise, await it
+                    try {
+                      const res = sessionStore.end && sessionStore.end()
+                      if (res && typeof (res as any).then === 'function') await res
+                    } catch (e) {
+                      logger.warn('sessionStore.end() threw:', e)
+                    }
+
+                    // Immediately clear local order state to prevent UI flicker/loop
+                    try {
+                      state.cartItems = []
+                      state.refillItems = []
+                      state.submittedItems = []
+                      state.package = {} as any
+                      state.currentOrder = null
+                      state.hasPlacedOrder = false
+                      state.isRefillMode = false
+                    } catch (e) {
+                      logger.warn('Failed to clear order state after completion:', e)
+                    }
+
+                    // Navigate to home page without reload to preserve fullscreen
+                    const nuxtApp = useNuxtApp()
+                    await nuxtApp.$router.replace('/')
+                  } catch (e) {
+                    logger.warn('Failed to end session on order completion:', e)
+                  }
                 }, 2000)
               } catch (e) {
                 logger.warn('Failed to end session on order completion:', e)
@@ -544,14 +575,23 @@ export const useOrderStore = defineStore('order', () => {
       stateCurrentOrder: !!state.currentOrder
     })
     
-    // If no orderId in session, reset stale hasPlacedOrder flag
+    // If no orderId in session, reset stale hasPlacedOrder flag after a short grace
     if (!sessionStore.orderId) {
       if (state.hasPlacedOrder || state.currentOrder || state.isRefillMode) {
-        logger.info('🔁 No session.orderId found, resetting stale order state')
-        state.hasPlacedOrder = false
-        state.currentOrder = null
-        state.isRefillMode = false
-        state.submittedItems = []
+        logger.info('🔁 No session.orderId found, resetting stale order state (with grace)')
+        // Apply a short grace period to avoid clearing during quick transitions
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        // Re-check the session store in case orderId was set during grace
+        const { useSessionStore: useSessionStore2 } = await import('./session')
+        const refreshed = useSessionStore2()
+        if (!refreshed.orderId) {
+          state.hasPlacedOrder = false
+          state.currentOrder = null
+          state.isRefillMode = false
+          state.submittedItems = []
+        } else {
+          logger.debug('initializeFromSession: session.orderId appeared during grace, skipping clear')
+        }
       }
       return
     }

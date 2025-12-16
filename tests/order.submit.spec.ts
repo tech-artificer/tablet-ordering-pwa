@@ -49,7 +49,7 @@ describe('stores/order - submitOrder', () => {
     expect(mockPost).toHaveBeenCalledWith('/api/devices/create-order', expect.objectContaining({
       guest_count: expect.any(Number),
       items: expect.any(Array)
-    }))
+    }), expect.any(Object))
 
     // Store updated: currentOrder should be the full response data
     expect(order.currentOrder).toEqual(apiResp)
