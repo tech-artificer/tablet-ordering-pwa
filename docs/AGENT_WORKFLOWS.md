@@ -1,4 +1,24 @@
-﻿# Agent Workflows (PWA)
+﻿# Agent Workflows (tablet-ordering-pwa)
+
+This document describes the expected local workflow for Copilot-style agents working on the PWA repository.
+
+Local workflow (agent)
+----------------------
+1. Ensure you do NOT modify `nuxt.config.ts` or any service worker files in this task.
+2. Create a new branch:
+
+   git switch -c chore/copilot-guidelines
+
+3. Add only the guideline and docs files under `.github/` and `docs/`.
+
+4. Commit and run verification:
+
+   npm ci
+   npm run lint || true
+   npm run test || true
+
+5. Prepare PR body and include *offline-testing notes* describing how to validate the change while offline.
+# Agent Workflows (PWA)
 
 Verification commands (tablet-ordering-pwa)
 -----------------------------------------

@@ -1,4 +1,41 @@
-﻿# Copilot Agent Guidelines (PWA)
+﻿# Copilot Agent Prompt Guidelines (tablet-ordering-pwa)
+
+This file mirrors the repository-level guidelines and includes PWA-specific notes.
+
+Important PWA notes
+-------------------
+- Do NOT modify `nuxt.config.ts`, service worker files, or other offline runtime configuration in this PR.
+- Include *offline-testing notes* in the PR body describing how a human can verify behavior without network access.
+
+General rules
+-------------
+- Follow the same rules as the repository-level `.github/COPILOT_PROMPT_GUIDELINES.md`.
+
+[PR-TEMPLATE] (required)
+title: chore: add Copilot agent guidelines and enforcement
+motivation: Enforce consistent, safe AI-agent behavior for the PWA while preserving offline functionality.
+changes:
+
+- .github/COPILOT_PROMPT_GUIDELINES.md: add strict agent rules and repo purpose
+- .github/PROMPT_TEMPLATES.md: add required prompt templates
+- docs/AGENT_WORKFLOWS.md: add workflows and verification commands
+- docs/EXAMPLES.md: add examples and expected deliverables
+- .github/workflows/pr_template_check.yml: add PR-body validation Action
+
+verification:
+run: npm ci
+run: npm run lint || true
+run: npm run test || true
+
+acceptance_criteria:
+All five files present on branch chore/copilot-guidelines
+PR contains the [PR-TEMPLATE] skeleton and offline-testing notes
+No modifications to service worker or `nuxt.config.ts` in this PR
+
+risk_level: low
+
+tests: NONE
+# Copilot Agent Guidelines (PWA)
 
 Purpose
 -------

@@ -1,4 +1,23 @@
-﻿# Examples (PWA)
+﻿# Examples (tablet-ordering-pwa)
+
+Offline testing notes
+---------------------
+- Describe how to run the app in offline mode and which flows to verify (e.g., place order, session end behavior, refill UI loop). Provide the exact `npm` commands and any environment variables.
+
+Example verification commands
+
+npm ci
+npm run lint || true
+npm run test || true
+
+Example PR body (include `[PR-TEMPLATE]`)
+
+[PR-TEMPLATE]
+title: chore: add Copilot agent guidelines and enforcement
+motivation: Enforce consistent, safe AI-agent behavior for the PWA while preserving offline functionality.
+changes:
+... (see template)
+# Examples (PWA)
 
 PR-TEMPLATE (PWA) - include offline-testing notes
 

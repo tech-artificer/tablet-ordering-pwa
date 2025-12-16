@@ -1,4 +1,29 @@
-﻿# Prompt Templates (PWA)
+﻿PR and agent prompt templates (tablet-ordering-pwa)
+===============================================
+
+This file contains the required `[PR-TEMPLATE]` skeleton and common prompt templates agents should use for the PWA.
+
+[PR-TEMPLATE]
+title: chore: add Copilot agent guidelines and enforcement
+motivation: Enforce consistent, safe AI-agent behavior for the PWA while preserving offline functionality.
+changes:
+
+- .github/COPILOT_PROMPT_GUIDELINES.md: add strict agent rules and repo purpose
+- .github/PROMPT_TEMPLATES.md: add required prompt templates
+- docs/AGENT_WORKFLOWS.md: add workflows and verification commands
+- docs/EXAMPLES.md: add examples and expected deliverables
+- .github/workflows/pr_template_check.yml: add PR-body validation Action
+
+verification:
+run: npm ci
+run: npm run lint || true
+run: npm run test || true
+
+Agent prompt templates (examples)
+--------------------------------
+
+Prompt: "Add the five Copilot guideline files to `tablet-ordering-pwa`, ensure no service worker or `nuxt.config.ts` changes, run `npm ci` and `npm run lint`, and prepare the PR body including offline-testing notes."
+# Prompt Templates (PWA)
 
 Use these when asking an agent to work on the PWA. Be explicit about files that may be edited and include `run_commands`.
 
