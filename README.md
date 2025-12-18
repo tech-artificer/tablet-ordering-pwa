@@ -1,15 +1,30 @@
-Wooserve KBBQ — Kiosk Nuxt 3 app (Galaxy Tab A9 - landscape)
+Wooserve Kiosk — Nuxt 3 tablet ordering app
 
-Quick start:
-1. npm install
-2. npx nuxi prepare
-3. npm run dev
+Nuxt 3-based kiosk client for Woosoo Nexus. Intended to run on landscape tablets (for example Galaxy Tab A9).
+Connects to the Laravel API to display menus and submit orders. Includes a fullscreen PWA manifest for kiosk mode.
 
-Env:
-- MAIN_API_URL -> your Laravel API base (/api)
-- NUXT_PUBLIC_PUSHER_KEY / CLUSTER -> Echo config
+Quick start (development)
+1. Ensure Node.js 18+ and npm are installed.
+2. cd tablet-ordering-pwa
+3. npm ci
+4. cp .env.example .env and set `MAIN_API_URL` to your Laravel app base URL (e.g. http://127.0.0.1:8000)
+5. npm run dev
 
-Notes:
-- Fullscreen kiosk manifest is in public/manifest.json (display fullscreen & orientation landscape)
-- Pinia persistence enabled via pinia-plugin-persistedstate
-- Use `npx nuxi dev` to run on the tablet or emulate with device-specific CSS media query
+Build & preview
+- `npm run build` — build the production output
+- `npm run preview` — preview the production build (server binds to 0.0.0.0)
+
+Scripts of interest
+- `dev`: development server (`npx nuxi dev --host 0.0.0.0`)
+- `build`: `npx nuxi build`
+- `preview`: `npx nuxi preview --host 0.0.0.0`
+- `test`: `vitest`
+- `rebuild:esbuild`: refreshes esbuild native binary (run automatically during `postinstall`)
+
+Environment variables
+- `MAIN_API_URL`: Laravel API base URL used by the client (API routes under `/api`)
+- `NUXT_PUBLIC_PUSHER_KEY` / `NUXT_PUBLIC_PUSHER_CLUSTER`: Pusher/Echo realtime configuration
+
+Notes
+- `public/manifest.json` is configured for fullscreen and landscape orientation.
+- Pinia is used for state management with persisted state plugin enabled.
