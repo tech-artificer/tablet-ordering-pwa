@@ -62,7 +62,6 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue';
-// import { ElMessage } from 'element-plus';
 
 const emit = defineEmits(['selectionsComplete']);
 

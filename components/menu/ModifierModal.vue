@@ -29,11 +29,12 @@
 </template>
 
 <script setup lang="ts">
-// import { ref } from 'vue'
-// const props = defineProps({ visible: Boolean, item: Object, modifiers: Array })
-// const emit = defineEmits(['update:visible','confirm'])
-// const selected = ref({})
+import { ref } from 'vue'
 
-// const cancel = () => emit('update:visible', false)
-// const confirm = () => { emit('confirm', { item: props.item, selected: selected.value }); emit('update:visible', false) }
+const props = defineProps({ visible: Boolean, item: Object, modifiers: Array })
+const emit = defineEmits(['update:visible','confirm'])
+const selected = ref({})
+
+const cancel = () => emit('update:visible', false)
+const confirm = () => { emit('confirm', { item: props.item, selected: selected.value }); emit('update:visible', false) }
 </script>

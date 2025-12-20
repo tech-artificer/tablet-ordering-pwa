@@ -23,7 +23,6 @@ const openCart = () => emit('open-cart')
       <el-badge :value="cartCount" class="cursor-pointer">
         <el-button circle class="bg-panel ui-hover-lift"  @click="openCart"><ShoppingBasket /></el-button>
       </el-badge>
-      <!-- <UiFlameButton @click="openCart">Cart</UiFlameButton> -->
     </div>
   </div>
 </template>
