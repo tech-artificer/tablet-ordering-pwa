@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();

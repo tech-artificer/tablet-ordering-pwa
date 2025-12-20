@@ -9,14 +9,6 @@ const props = defineProps<{
     item: MenuItem
 }>()
 
-// const addToCart = () => {
-//     order.addToCart(props.item)
-// }
-
-// const getQuantity = (item: CartItem) => {
-//     return order.cart.find(i => i.id === item.id)?.quantity ?? 0
-// }
-
 // Increase/decrease for a specific item
 const increase = (item: CartItem) => {
     updateQuantity(item.id, getCartItemQuantity(item.id) + 1)

@@ -1,23 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useMenuStore } from '../../stores/menu';
-// import { Minus, Plus, Check } from '@element-plus/icons-vue';
-// import { ElMessage } from 'element-plus';
-// import PreOrderSelection from './PreOrderSelection.vue';
-// import QuickButtons from './QuickButtons.vue';
 import { 
-  // ShoppingBag, 
-  // Dish, 
-  // CoffeeCup, 
-  // Headset, 
-  // Phone, 
-  // Watermelon, 
-//   Fire, 
   User, 
-  // Document,
   House,
   ShoppingCart,
-  // ArrowRight
 } from '@element-plus/icons-vue'
 import PackageCard from './PackageCard.vue';
 
@@ -36,41 +23,19 @@ const emit = defineEmits(['packageConfirmed']);
 const guestCount = ref(4);
 const selectedPackageId = ref('premium'); // Default selection for demonstration
 
-// --- Package Data matching the image structure ---
-// const packages = [
-//   // P599 Group (Two items stacked vertically)
-//   { id: 'standard', name: 'Standard Package', price: 599, group: 'P599', features: ['Pork Belly, Marinated Chicken', '3 Basic Sides'] },
-//   { id: 'premium', name: 'Premium Package', price: 899, group: 'P599', features: ['Prime Beef Cuts, Pork, Wagyu Cubes', 'Seafood, Side Dishes'] },
-//   // P899 Group (One main item)
-//   { id: 'ultimate', name: 'Ultimate Feast', price: 899, group: 'P899', features: ['All Meats, Prawns, Scallops', 'Premium Sides'] },
-// ];
-
-// Computed Properties
-// const selectedPackage = computed(() => {
-//   return packages.find(pkg => pkg.id === selectedPackageId.value);
-// });
-
-// const totalPrice = computed(() => {
-//   return selectedPackage.value ? selectedPackage.value.price * guestCount.value : 0;
-// });
-
 // Methods
 const selectPackage = (packageId: string) => {
-  // If the user selects the "Ultimate Feast" (which has the same price as Premium)
-  // we must ensure they select a unique ID.
   selectedPackageId.value = packageId;
 };
 
 const confirmAndProceed = () => {
   if (!selectedPackageId.value) {
-    // ElMessage.error('Please select a package to begin!');
     return;
   }
 
   const packageDetails = {
     guestCount: guestCount.value,
     packageId: selectedPackageId.value,
-    // totalPrice: totalPrice.value,
   };
 
   emit('packageConfirmed', packageDetails);
