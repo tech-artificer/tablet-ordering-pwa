@@ -368,69 +368,7 @@ const authenticateDevice = async () => {
   }
 }
 
-// PIN modal state: when redirected with ?requirePin=1 and device is not authenticated,
-// require staff to enter a PIN before viewing settings content.
-import { useRoute, useRouter } from 'vue-router'
-const route = useRoute()
-const router = useRouter()
-const showPinModal = ref(false)
-const pinInput = ref('')
-const pinError = ref('')
-const PIN_STORAGE_KEY = 'settings.pin'
-const storedPin = ref<string | null>(null)
-const DEFAULT_PIN = '4321'
-
-const needPin = computed(() => {
-  const q = route.query?.requirePin
-  return (!!q && (q === '1' || q === 'true')) && !deviceStore.isAuthenticated
-})
-
-const closePinModal = () => {
-  showPinModal.value = false
-  pinInput.value = ''
-  pinError.value = ''
-  // refresh stored PIN (or default)
-  storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
-}
-
-const verifyPin = () => {
-  pinError.value = ''
-  // Ensure storedPin is current; default to DEFAULT_PIN if not set
-  storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
-
-  if (pinInput.value === storedPin.value) {
-    closePinModal()
-    router.replace({ path: route.path, query: {} }).catch(() => {})
-    return
-  }
-  pinError.value = 'Incorrect PIN'
-}
-
-// Show PIN modal on mount when required
-onMounted(() => {
-  if (needPin.value) {
-    // load stored PIN or use default
-    storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
-    showPinModal.value = true
-  }
-})
-
-// Calculator-style keypad helpers (prevents OS keyboard by using readonly display)
-const maskedPin = computed(() => '•'.repeat(pinInput.value.length))
-const MAX_PIN_LENGTH = 6
-const appendDigit = (d: string) => {
-  if (pinInput.value.length >= MAX_PIN_LENGTH) return
-  pinInput.value = (pinInput.value || '') + d
-  pinError.value = ''
-}
-const backspace = () => {
-  pinInput.value = (pinInput.value || '').slice(0, -1)
-  pinError.value = ''
-}
-const clearPin = () => {
-  pinInput.value = ''
-  pinError.value = ''
-}
+// PIN modal removed - now handled on home page (index.vue)
 
 const logout = async () => {
   try {
@@ -666,40 +604,6 @@ onMounted(async () => {
           >
             ← Back to Home
           </NuxtLink>
-        </div>
-      </div>
-
-      <!-- PIN modal overlay (appears when ?requirePin=1 and device not registered) -->
-      <div v-if="showPinModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <div class="bg-white/5 rounded-lg border border-white/10 p-6 w-full max-w-md">
-          <h3 class="text-xl font-semibold mb-3">Enter Settings PIN</h3>
-          <p class="text-sm text-white/60 mb-4">Enter staff PIN to access Settings. If no PIN exists you will create one.</p>
-
-          <!-- Readonly masked display prevents virtual keyboard from opening -->
-          <div class="mb-4">
-            <input readonly :value="maskedPin" placeholder="Enter PIN" class="w-full px-4 py-2 rounded bg-white/5 text-xl tracking-widest text-center" />
-          </div>
-
-          <div class="grid grid-cols-3 gap-2 mb-3">
-            <button @click.prevent="appendDigit('1')" class="px-4 py-3 rounded bg-white/10 text-xl">1</button>
-            <button @click.prevent="appendDigit('2')" class="px-4 py-3 rounded bg-white/10 text-xl">2</button>
-            <button @click.prevent="appendDigit('3')" class="px-4 py-3 rounded bg-white/10 text-xl">3</button>
-            <button @click.prevent="appendDigit('4')" class="px-4 py-3 rounded bg-white/10 text-xl">4</button>
-            <button @click.prevent="appendDigit('5')" class="px-4 py-3 rounded bg-white/10 text-xl">5</button>
-            <button @click.prevent="appendDigit('6')" class="px-4 py-3 rounded bg-white/10 text-xl">6</button>
-            <button @click.prevent="appendDigit('7')" class="px-4 py-3 rounded bg-white/10 text-xl">7</button>
-            <button @click.prevent="appendDigit('8')" class="px-4 py-3 rounded bg-white/10 text-xl">8</button>
-            <button @click.prevent="appendDigit('9')" class="px-4 py-3 rounded bg-white/10 text-xl">9</button>
-            <button @click.prevent="backspace()" class="px-4 py-3 rounded bg-white/10 text-xl">⌫</button>
-            <button @click.prevent="appendDigit('0')" class="px-4 py-3 rounded bg-white/10 text-xl">0</button>
-            <button @click.prevent="clearPin()" class="px-4 py-3 rounded bg-white/10 text-xl">Clear</button>
-          </div>
-
-          <p v-if="pinError" class="text-sm text-red-400 mb-2">{{ pinError }}</p>
-          <div class="flex items-center justify-end gap-3">
-            <button @click="showPinModal = false; clearPin()" class="px-3 py-2 rounded bg-white/10">Cancel</button>
-            <button @click.prevent="verifyPin()" class="px-3 py-2 rounded bg-primary/20">Enter</button>
-          </div>
         </div>
       </div>
 
