@@ -14,9 +14,15 @@ const deviceStore = useDeviceStore();
 const router = useRouter();
 const { channelStatus } = useBroadcasts();
 
-const SETTINGS_CODE = '1234'; // Static code for accessing settings
-
 const isWebSocketConnected = ref(false);
+
+// PIN modal state for settings access
+const showPinModal = ref(false)
+const pinInput = ref('')
+const pinError = ref('')
+const PIN_STORAGE_KEY = 'settings.pin'
+const storedPin = ref<string | null>(null)
+const DEFAULT_PIN = '0711'
 
 // Check WebSocket connection status for Reverb/Pusher
 const checkWebSocketStatus = () => {
@@ -68,25 +74,46 @@ const start = () => {
   router.replace('/order/start')
 }
 
-const openSettings = async () => {
-  try {
-    const { value } = await ElMessageBox.prompt('Enter access code to continue', 'Settings Access', {
-      confirmButtonText: 'OK',
-      cancelButtonText: 'Cancel',
-      inputPattern: /^\d{4}$/,
-      inputErrorMessage: 'Please enter a 4-digit code',
-      inputType: 'password',
-      customClass: 'settings-prompt'
-    })
-    
-    if (value === SETTINGS_CODE) {
-      router.push('/settings')
-    } else {
-      // ElMessage.error('Invalid access code')
-    }
-  } catch {
-    // User cancelled
+const openSettings = () => {
+  // Load stored PIN or use default
+  storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+  showPinModal.value = true
+}
+
+const closePinModal = () => {
+  showPinModal.value = false
+  pinInput.value = ''
+  pinError.value = ''
+  storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+}
+
+const verifyPin = () => {
+  pinError.value = ''
+  storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+
+  if (pinInput.value === storedPin.value) {
+    closePinModal()
+    router.push('/settings')
+    return
   }
+  pinError.value = 'Incorrect PIN'
+}
+
+// Calculator-style keypad helpers
+const maskedPin = computed(() => '•'.repeat(pinInput.value.length))
+const MAX_PIN_LENGTH = 6
+const appendDigit = (d: string) => {
+  if (pinInput.value.length >= MAX_PIN_LENGTH) return
+  pinInput.value = (pinInput.value || '') + d
+  pinError.value = ''
+}
+const backspace = () => {
+  pinInput.value = (pinInput.value || '').slice(0, -1)
+  pinError.value = ''
+}
+const clearPin = () => {
+  pinInput.value = ''
+  pinError.value = ''
 }
 
 const clearDeviceAuth = () => {
@@ -105,6 +132,40 @@ const clearDeviceAuth = () => {
 <template>
   <div class="flex h-screen w-screen p-4 relative overflow-hidden">
     
+    <!-- PIN modal overlay -->
+    <div v-if="showPinModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div class="bg-white/5 rounded-lg border border-white/10 p-6 w-full max-w-md">
+        <h3 class="text-xl font-semibold mb-3">Enter Settings PIN</h3>
+        <p class="text-sm text-white/60 mb-4">Enter staff PIN to access Settings.</p>
+
+        <!-- Readonly masked display prevents virtual keyboard from opening -->
+        <div class="mb-4">
+          <input readonly :value="maskedPin" placeholder="Enter PIN" class="w-full px-4 py-2 rounded bg-white/5 text-xl tracking-widest text-center" />
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <button @click.prevent="appendDigit('1')" class="px-4 py-3 rounded bg-white/10 text-xl">1</button>
+          <button @click.prevent="appendDigit('2')" class="px-4 py-3 rounded bg-white/10 text-xl">2</button>
+          <button @click.prevent="appendDigit('3')" class="px-4 py-3 rounded bg-white/10 text-xl">3</button>
+          <button @click.prevent="appendDigit('4')" class="px-4 py-3 rounded bg-white/10 text-xl">4</button>
+          <button @click.prevent="appendDigit('5')" class="px-4 py-3 rounded bg-white/10 text-xl">5</button>
+          <button @click.prevent="appendDigit('6')" class="px-4 py-3 rounded bg-white/10 text-xl">6</button>
+          <button @click.prevent="appendDigit('7')" class="px-4 py-3 rounded bg-white/10 text-xl">7</button>
+          <button @click.prevent="appendDigit('8')" class="px-4 py-3 rounded bg-white/10 text-xl">8</button>
+          <button @click.prevent="appendDigit('9')" class="px-4 py-3 rounded bg-white/10 text-xl">9</button>
+          <button @click.prevent="backspace()" class="px-4 py-3 rounded bg-white/10 text-xl">⌫</button>
+          <button @click.prevent="appendDigit('0')" class="px-4 py-3 rounded bg-white/10 text-xl">0</button>
+          <button @click.prevent="clearPin()" class="px-4 py-3 rounded bg-white/10 text-xl">Clear</button>
+        </div>
+
+        <p v-if="pinError" class="text-sm text-red-400 mb-2">{{ pinError }}</p>
+        <div class="flex items-center justify-end gap-3">
+          <button @click="closePinModal()" class="px-3 py-2 rounded bg-white/10">Cancel</button>
+          <button @click.prevent="verifyPin()" class="px-3 py-2 rounded bg-primary/20">Enter</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Connection Status Indicator -->
     <div class="absolute top-4 left-4 z-50 flex items-center gap-3 glass-card px-4 py-2.5">
       <div class="flex items-center gap-2">
