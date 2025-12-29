@@ -123,10 +123,11 @@ export function useCapacitor() {
       await configureStatusBar()
       await setupAppListeners()
       
-      // Hide splash screen after a short delay
+      // Hide splash screen after a short delay to ensure app is ready
+      const SPLASH_SCREEN_DELAY_MS = 500
       setTimeout(async () => {
         await hideSplashScreen()
-      }, 500)
+      }, SPLASH_SCREEN_DELAY_MS)
     }
   }
 

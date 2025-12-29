@@ -74,8 +74,10 @@ function hapticWeb(type: HapticType): void {
  */
 export function haptic(type: HapticType = 'light'): void {
   if (isCapacitor()) {
-    // Use Capacitor Haptics in native context
-    hapticCapacitor(type)
+    // Use Capacitor Haptics in native context (async, but fire-and-forget for haptics)
+    hapticCapacitor(type).catch(() => {
+      // Silently fail - haptics are optional enhancement
+    })
   } else {
     // Fallback to Web Vibration API
     hapticWeb(type)
