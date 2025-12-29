@@ -44,15 +44,15 @@ This will install all Capacitor dependencies including:
 - `@capacitor/status-bar` - Status bar control
 - `@capacitor/splash-screen` - Splash screen management
 
-### 2. Build the Web App
+### 2. Generate Static Files
 
-Before adding platforms, build the Nuxt app:
+Before adding platforms, generate static files from the Nuxt app:
 
 ```bash
-npm run build
+npm run generate
 ```
 
-This generates the web assets in `.output/public/` which Capacitor will wrap.
+**Important:** Use `generate` not `build` for Capacitor. This creates static HTML/JS/CSS files in `.output/public/` that Capacitor can wrap. The `build` command creates a Node.js server which won't work in a native app context.
 
 ### 3. Add Native Platforms
 
@@ -128,14 +128,19 @@ npm run cap:run:ios
 
 ### Android APK/AAB
 
-1. **Build the web app:**
+1. **Generate static files:**
    ```bash
-   npm run build
+   npm run generate
    ```
 
 2. **Sync to Android:**
    ```bash
    npm run cap:sync:android
+   ```
+
+   Or use the combined script:
+   ```bash
+   npm run cap:run:android  # Generates + syncs + runs
    ```
 
 3. **Open Android Studio:**
@@ -159,9 +164,9 @@ npm run cap:run:ios
 
 ### iOS IPA
 
-1. **Build the web app:**
+1. **Generate static files:**
    ```bash
-   npm run build
+   npm run generate
    ```
 
 2. **Sync to iOS:**
@@ -258,9 +263,9 @@ MAIN_API_URL=http://192.168.1.100:8000/api
 **For Production Native Apps:**
 Edit `capacitor.config.ts` if you need to whitelist specific domains or configure CORS differently. The `server.allowNavigation` array can include your API domain if needed.
 
-Alternatively, set environment variables before building:
+Alternatively, set environment variables before generating:
 ```bash
-MAIN_API_URL=https://api.wooserve.com/api npm run build
+MAIN_API_URL=https://api.wooserve.com/api npm run generate
 npm run cap:sync
 ```
 
@@ -269,8 +274,8 @@ npm run cap:sync
 When you make code changes:
 
 ```bash
-# 1. Build the web app
-npm run build
+# 1. Generate static files
+npm run generate
 
 # 2. Sync to native platforms
 npm run cap:sync
@@ -321,7 +326,7 @@ For automated builds:
 **Android:**
 ```bash
 npm ci
-npm run build
+npm run generate
 npx cap sync android
 cd android && ./gradlew assembleRelease
 ```
@@ -329,7 +334,7 @@ cd android && ./gradlew assembleRelease
 **iOS (requires macOS runner):**
 ```bash
 npm ci
-npm run build
+npm run generate
 npx cap sync ios
 cd ios/App && pod install
 xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath App.xcarchive archive
