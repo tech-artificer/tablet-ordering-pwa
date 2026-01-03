@@ -14,12 +14,12 @@ import OrderSummaryDrawer from '../components/order/OrderSummaryDrawer.vue';
 import SupportFab from '../components/menu/SupportFab.vue';
 import RefillButton from '../components/menu/RefillButton.vue';
 import { useGuestReset } from '../composables/useGuestReset';
-import { useSessionStore } from '../stores/session';
+import { useSessionStore } from '../stores/Session';
 import { logger } from '../utils/logger';
 import { notifyWarning } from '../composables/useNotifier';
-import { useDeviceStore } from '../stores/device';
-import { useMenuStore } from '../stores/menu';
-import { useOrderStore } from '../stores/order';
+import { useDeviceStore } from '../stores/Device';
+import { useMenuStore } from '../stores/Menu';
+import { useOrderStore } from '../stores/Order';
 
 const menuStore = useMenuStore();
 const orderStore = useOrderStore();

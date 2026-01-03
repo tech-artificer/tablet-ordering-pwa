@@ -32,6 +32,26 @@ export default {
                 // System/Utility colors
                 'success': '#10B981',
                 'error': '#EF4444',
+
+                // Surface colors - for cards and containers
+                'surface': {
+                    '5': 'rgba(255, 255, 255, 0.05)',
+                    '10': 'rgba(255, 255, 255, 0.10)',
+                    '20': 'rgba(255, 255, 255, 0.20)',
+                },
+
+                // Text colors
+                'on': '#FFFFFF',           // Text on dark backgrounds
+                'muted': {
+                    DEFAULT: 'rgba(255, 255, 255, 0.60)',
+                    '60': 'rgba(255, 255, 255, 0.60)',
+                },
+
+                // Backdrop colors - for overlays
+                'backdrop': {
+                    '40': 'rgba(0, 0, 0, 0.40)',
+                    '80': 'rgba(0, 0, 0, 0.80)',
+                },
             },
             backdropBlur: {
                 'xs': '2px',

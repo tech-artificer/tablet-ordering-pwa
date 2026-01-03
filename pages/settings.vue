@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessageBox, ElNotification } from 'element-plus'
-import { useDeviceStore } from '../stores/device'
+import { useDeviceStore } from '../stores/Device'
 import { useRuntimeConfig } from '#app'
 import { logger } from '../utils/logger'
 

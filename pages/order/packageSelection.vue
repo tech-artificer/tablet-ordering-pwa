@@ -3,10 +3,10 @@ import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import type { Package, Modifier } from "../../types";
-import { useMenuStore } from '../../stores/menu';
-import { useOrderStore } from '../../stores/order';
-import { useSessionStore } from '../../stores/session';
-import { useDeviceStore } from '../../stores/device';
+import { useMenuStore } from '../../stores/Menu';
+import { useOrderStore } from '../../stores/Order';
+import { useSessionStore } from '../../stores/Session';
+import { useDeviceStore } from '../../stores/Device';
 import { logger } from '../../utils/logger'
 import PackageCard from '../../components/PackageCard.vue';
 import PackageModal from '../../components/PackageModal.vue';

@@ -1,6 +1,6 @@
 import { defineNuxtPlugin } from '#app'
 import axios from 'axios'
-import { useDeviceStore } from '../stores/device'
+import { useDeviceStore } from '../stores/Device'
 import { useRuntimeConfig } from '#imports'
 import { logger } from '../utils/logger'
 import type { InternalAxiosRequestConfig } from 'axios'

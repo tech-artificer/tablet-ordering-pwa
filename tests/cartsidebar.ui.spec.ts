@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import CartSidebar from '../components/order/CartSidebar.vue'
-import { useOrderStore } from '../stores/order'
+import { useOrderStore } from '../stores/Order'
 // device store not required for this test; avoid importing to prevent helper type errors
-import { useDeviceStore } from '../stores/device'
-import { useSessionStore } from '../stores/session'
+import { useDeviceStore } from '../stores/Device'
+import { useSessionStore } from '../stores/Session'
 
 // Minimal stubs for child components used in CartSidebar
 const globalStubs = {

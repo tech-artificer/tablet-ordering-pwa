@@ -18,8 +18,8 @@ const mockGet = vi.fn()
 const mockPost = vi.fn()
 vi.mock('../composables/useApi', () => ({ useApi: () => ({ get: mockGet, post: mockPost }) }))
 
-import { useOrderStore } from '../stores/order'
-import { useSessionStore } from '../stores/session'
+import { useOrderStore } from '../stores/Order'
+import { useSessionStore } from '../stores/Session'
 
 describe('order polling fallback', () => {
   beforeEach(() => {

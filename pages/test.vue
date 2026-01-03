@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useMenuStore } from '../stores/menu'
+import { useMenuStore } from '../stores/Menu'
 import { ShoppingCart, Clock, Info, Plus } from "lucide-vue-next";
 import type { Modifier, Menu, MenuItem, Package } from '../types'
 

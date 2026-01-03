@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FlameButton from '../../components/ui/FlameButton.vue'
-import { useOrderStore } from '../../stores/order'
+import { useOrderStore } from '../../stores/Order'
 import { useApi } from '../../composables/useApi'
 import { logger } from '../../utils/logger'
 

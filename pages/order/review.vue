@@ -15,7 +15,7 @@ const handleOrderSubmitted = async () => {
 
   // Mark session active via Session store (centralized localStorage writes)
   try {
-    const { useSessionStore } = await import('../../stores/session')
+    const { useSessionStore } = await import('../../stores/Session')
     const sessionStore = useSessionStore()
     await sessionStore.start()
   } catch (e) {

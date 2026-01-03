@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Minus, Plus } from 'lucide-vue-next'
-import { useOrderStore } from '../../stores/order';
+import { useOrderStore } from '../../stores/Order';
 
 const orderStore = useOrderStore();
 const guestCount = computed(() => orderStore.guestCount);

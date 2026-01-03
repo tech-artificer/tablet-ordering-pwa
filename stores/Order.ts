@@ -218,7 +218,7 @@ export const useOrderStore = defineStore('order', () => {
     }
     state.isSubmitting = true
     // 🔒 VALIDATION: Ensure everything is set before submitting
-    const { useDeviceStore } = await import('./device')
+    const { useDeviceStore } = await import('./Device')
     const deviceStore = useDeviceStore()
     
     logger.debug('🔍 Pre-submission validation:', {
@@ -270,7 +270,7 @@ export const useOrderStore = defineStore('order', () => {
       logger.debug('📥 Response:', resp.data)
       
       // Update session with order ID from response
-      const { useSessionStore } = await import('./session')
+      const { useSessionStore } = await import('./Session')
       const sessionStore = useSessionStore()
       
       // Check for success flag first
@@ -384,7 +384,7 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   async function setOrderCreated(respData: any) {
-    const { useSessionStore } = await import('./session')
+    const { useSessionStore } = await import('./Session')
     const sessionStore = useSessionStore()
 
     const orderNumber = respData?.order?.order_number || respData?.order_number || respData?.order?.id
@@ -491,7 +491,7 @@ export const useOrderStore = defineStore('order', () => {
           state.hasPlacedOrder = true
           // Persist session order id if missing
           try {
-            const { useSessionStore } = await import('./session')
+            const { useSessionStore } = await import('./Session')
             const sessionStore = useSessionStore()
             sessionStore.orderId = orderObj?.order_id || orderObj?.id || sessionStore.orderId
           } catch (e) {
@@ -506,7 +506,7 @@ export const useOrderStore = defineStore('order', () => {
             // End session and navigate to home on completed status
             if (status === 'completed') {
               try {
-                const { useSessionStore } = await import('./session')
+                const { useSessionStore } = await import('./Session')
                 const sessionStore = useSessionStore()
                 
                 // Small delay to allow any final UI updates. Await session end
@@ -514,7 +514,7 @@ export const useOrderStore = defineStore('order', () => {
                 setTimeout(async () => {
                   try {
                     // Load fresh session store instance and call end
-                    const { useSessionStore } = await import('./session')
+                    const { useSessionStore } = await import('./Session')
                     const sessionStore = useSessionStore()
 
                     // If end returns a promise, await it
@@ -566,7 +566,7 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   async function initializeFromSession() {
-    const { useSessionStore } = await import('./session')
+    const { useSessionStore } = await import('./Session')
     const sessionStore = useSessionStore()
     
     logger.debug('🔁 initializeFromSession called:', {
@@ -582,7 +582,7 @@ export const useOrderStore = defineStore('order', () => {
         // Apply a short grace period to avoid clearing during quick transitions
         await new Promise(resolve => setTimeout(resolve, 1500))
         // Re-check the session store in case orderId was set during grace
-        const { useSessionStore: useSessionStore2 } = await import('./session')
+        const { useSessionStore: useSessionStore2 } = await import('./Session')
         const refreshed = useSessionStore2()
         if (!refreshed.orderId) {
           state.hasPlacedOrder = false

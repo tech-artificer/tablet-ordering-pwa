@@ -4,9 +4,9 @@ import { computed } from 'vue';
 import type { Package, CartItem } from '../../types';
 import { ElBadge, ElEmpty } from 'element-plus';
 import CartItemCard from '../menu/CartItemCard.vue';
-import { useDeviceStore } from '../../stores/device';
-import { useSessionStore } from '../../stores/session';
-import { useOrderStore } from '../../stores/order';
+import { useDeviceStore } from '../../stores/Device';
+import { useSessionStore } from '../../stores/Session';
+import { useOrderStore } from '../../stores/Order';
 import { RefreshCw, Clock, ChefHat, CheckCircle, AlertCircle } from 'lucide-vue-next';
 
 const deviceStore = useDeviceStore();

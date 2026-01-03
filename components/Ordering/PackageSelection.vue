@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useMenuStore } from '../../stores/menu';
+import { useMenuStore } from '../../stores/Menu';
 import { 
   User, 
   House,

@@ -4,7 +4,7 @@ import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 // @ts-ignore - Nuxt macro imports
 import { useRuntimeConfig } from '#imports'
-import { useDeviceStore } from '../stores/device'
+import { useDeviceStore } from '../stores/Device'
 import { logger } from '../utils/logger'
 
 export default defineNuxtPlugin((nuxtApp: any) => {
