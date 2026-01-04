@@ -23,8 +23,20 @@ logs
 .env.*
 !.env.example
 
-#certs
+# Certs
 certs/
 *.pem
 *.key
 *.crt
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+.nova
+.zed
+
+# Lock files (optional - comment out if tracking)
+# package-lock.json
+# pnpm-lock.yaml
