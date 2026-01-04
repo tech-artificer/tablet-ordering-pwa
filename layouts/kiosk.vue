@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { useMenuStore } from '~/stores/menu';
+import { useMenuStore } from '~/stores/Menu';
 import { logger } from '~/utils/logger';
 const menuStore = useMenuStore();
 

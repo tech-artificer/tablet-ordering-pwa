@@ -1,6 +1,6 @@
 import { watch } from 'vue'
-import { useSessionStore } from '../stores/session'
-import { useOrderStore } from '../stores/order'
+import { useSessionStore } from '../stores/Session'
+import { useOrderStore } from '../stores/Order'
 
 export function useGuestReset() {
   const sessionStore = useSessionStore()

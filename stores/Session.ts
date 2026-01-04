@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 import { useApi } from '../composables/useApi'
-import { useOrderStore } from './order'
-import { useDeviceStore } from './device'
-import { useMenuStore } from './menu'
+import { useOrderStore } from './Order'
+import { useDeviceStore } from './Device'
+import { useMenuStore } from './Menu'
 import { logger } from '../utils/logger'
 
 export const useSessionStore = defineStore('session', () => {

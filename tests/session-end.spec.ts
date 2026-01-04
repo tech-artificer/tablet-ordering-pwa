@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
-import { useOrderStore } from '../stores/order'
-import { useSessionStore } from '../stores/session'
+import { useOrderStore } from '../stores/Order'
+import { useSessionStore } from '../stores/Session'
 
 describe('session end behavior', () => {
   beforeEach(() => {

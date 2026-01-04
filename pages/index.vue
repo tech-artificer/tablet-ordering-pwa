@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useDeviceStore } from '~/stores/device';
-import { useSessionStore } from '~/stores/session'
+import { useDeviceStore } from '~/stores/Device';
+import { useSessionStore } from '~/stores/Session'
 import WoosooLogo from '~/components/WoosooLogo.vue';
 import PrimaryButton from '~/components/common/PrimaryButton.vue';
 import { ElMessageBox } from 'element-plus';

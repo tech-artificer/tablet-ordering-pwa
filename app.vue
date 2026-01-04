@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDeviceStore } from '~/stores/device'
+import { useDeviceStore } from '~/stores/Device'
 import { useBroadcasts } from '~/composables/useBroadcasts'
 import { useNetworkStatus } from '~/composables/useNetworkStatus'
 import { logger } from '~/utils/logger'

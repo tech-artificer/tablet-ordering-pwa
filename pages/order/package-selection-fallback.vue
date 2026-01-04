@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { useMenuStore } from '~/stores/menu'
-import { useOrderStore } from '~/stores/order'
+import { useMenuStore } from '~/stores/Menu'
+import { useOrderStore } from '~/stores/Order'
 import { ref } from 'vue'
 
 const router = useRouter()

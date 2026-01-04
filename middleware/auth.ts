@@ -1,5 +1,5 @@
 // @ts-ignore - Nuxt auto-imports
-import { useDeviceStore } from '~/stores/device'
+import { useDeviceStore } from '~/stores/Device'
 import { logger } from '~/utils/logger'
 
 // @ts-ignore - Nuxt auto-imports

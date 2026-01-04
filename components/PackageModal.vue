@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import type { Package, Modifier } from '../types'
 import { formatCurrency } from '../utils/formats'
-import { useMenuStore } from '../stores/menu'
+import { useMenuStore } from '../stores/Menu'
 
 const menuStore = useMenuStore()
 const { extractModifierGroups } = menuStore
