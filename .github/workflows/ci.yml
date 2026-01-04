@@ -8,9 +8,6 @@ jobs:
   pwa-ci:
     name: Tablet Ordering PWA
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tablet-ordering-pwa
 
     steps:
       - name: Checkout
@@ -23,7 +20,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: tablet-ordering-pwa/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
