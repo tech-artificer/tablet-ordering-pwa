@@ -1,9 +1,13 @@
 // utils/haptics.ts
 // Haptic feedback utility for app-like touch responses
+// Supports both Web Vibration API and Capacitor Haptics
+
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics'
+import { Capacitor } from '@capacitor/core'
 
 type HapticType = 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'
 
-// Vibration patterns (in milliseconds)
+// Vibration patterns (in milliseconds) - fallback for Web API
 const patterns: Record<HapticType, number | number[]> = {
   light: 10,
   medium: 20,
@@ -14,9 +18,46 @@ const patterns: Record<HapticType, number | number[]> = {
 }
 
 /**
- * Trigger haptic feedback if device supports vibration
+ * Check if running in Capacitor native context
  */
-export function haptic(type: HapticType = 'light'): void {
+function isCapacitor(): boolean {
+  return Capacitor.isNativePlatform()
+}
+
+/**
+ * Trigger haptic feedback using Capacitor when available, fallback to Web API
+ */
+async function hapticCapacitor(type: HapticType): Promise<void> {
+  try {
+    switch (type) {
+      case 'light':
+        await Haptics.impact({ style: ImpactStyle.Light })
+        break
+      case 'medium':
+        await Haptics.impact({ style: ImpactStyle.Medium })
+        break
+      case 'heavy':
+        await Haptics.impact({ style: ImpactStyle.Heavy })
+        break
+      case 'success':
+        await Haptics.notification({ type: NotificationType.Success })
+        break
+      case 'warning':
+        await Haptics.notification({ type: NotificationType.Warning })
+        break
+      case 'error':
+        await Haptics.notification({ type: NotificationType.Error })
+        break
+    }
+  } catch (e) {
+    // Silently fail - haptics are optional enhancement
+  }
+}
+
+/**
+ * Trigger haptic feedback using Web Vibration API
+ */
+function hapticWeb(type: HapticType): void {
   if (typeof navigator === 'undefined') return
   if (!navigator.vibrate) return
 
@@ -25,6 +66,21 @@ export function haptic(type: HapticType = 'light'): void {
     navigator.vibrate(pattern)
   } catch (e) {
     // Silently fail - haptics are optional enhancement
+  }
+}
+
+/**
+ * Trigger haptic feedback if device supports vibration
+ */
+export function haptic(type: HapticType = 'light'): void {
+  if (isCapacitor()) {
+    // Use Capacitor Haptics in native context (async, but fire-and-forget for haptics)
+    hapticCapacitor(type).catch(() => {
+      // Silently fail - haptics are optional enhancement
+    })
+  } else {
+    // Fallback to Web Vibration API
+    hapticWeb(type)
   }
 }
 
@@ -53,6 +109,11 @@ export function hapticError(): void {
  * Check if haptic feedback is supported
  */
 export function isHapticSupported(): boolean {
+  // Check Capacitor first
+  if (isCapacitor()) {
+    return true // Capacitor Haptics is always available on native platforms
+  }
+  // Fallback to Web API check
   return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
 }
 
