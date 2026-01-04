@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDeviceStore } from '~/stores/device';
 import { useSessionStore } from '~/stores/session'
@@ -133,35 +133,44 @@ const clearDeviceAuth = () => {
   <div class="flex h-screen w-screen p-4 relative overflow-hidden">
     
     <!-- PIN modal overlay -->
-    <div v-if="showPinModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div class="bg-white/5 rounded-lg border border-white/10 p-6 w-full max-w-md">
-        <h3 class="text-xl font-semibold mb-3">Enter Settings PIN</h3>
-        <p class="text-sm text-white/60 mb-4">Enter staff PIN to access Settings.</p>
+    <div
+      v-if="showPinModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xl backdrop-brightness-75 transition-opacity"
+    >
+      <div class="bg-slate-900/90 text-white shadow-2xl shadow-black/40 ring-1 ring-white/10 rounded-2xl p-8 w-full max-w-md space-y-4 border-t-2 border-primary/60">
+        <h3 class="text-xl font-semibold">Enter Settings PIN</h3>
+        <p class="text-sm text-white/60">Enter staff PIN to access Settings.</p>
 
         <!-- Readonly masked display prevents virtual keyboard from opening -->
-        <div class="mb-4">
-          <input readonly :value="maskedPin" placeholder="Enter PIN" class="w-full px-4 py-2 rounded bg-white/5 text-xl tracking-widest text-center" />
+        <div>
+          <input
+            readonly
+            aria-live="polite"
+            :value="maskedPin"
+            placeholder="Enter PIN"
+            class="w-full px-4 py-3 rounded-xl bg-white/10 ring-1 ring-white/15 text-2xl tracking-[0.35em] text-center"
+          />
         </div>
 
-        <div class="grid grid-cols-3 gap-2 mb-3">
-          <button @click.prevent="appendDigit('1')" class="px-4 py-3 rounded bg-white/10 text-xl">1</button>
-          <button @click.prevent="appendDigit('2')" class="px-4 py-3 rounded bg-white/10 text-xl">2</button>
-          <button @click.prevent="appendDigit('3')" class="px-4 py-3 rounded bg-white/10 text-xl">3</button>
-          <button @click.prevent="appendDigit('4')" class="px-4 py-3 rounded bg-white/10 text-xl">4</button>
-          <button @click.prevent="appendDigit('5')" class="px-4 py-3 rounded bg-white/10 text-xl">5</button>
-          <button @click.prevent="appendDigit('6')" class="px-4 py-3 rounded bg-white/10 text-xl">6</button>
-          <button @click.prevent="appendDigit('7')" class="px-4 py-3 rounded bg-white/10 text-xl">7</button>
-          <button @click.prevent="appendDigit('8')" class="px-4 py-3 rounded bg-white/10 text-xl">8</button>
-          <button @click.prevent="appendDigit('9')" class="px-4 py-3 rounded bg-white/10 text-xl">9</button>
-          <button @click.prevent="backspace()" class="px-4 py-3 rounded bg-white/10 text-xl">⌫</button>
-          <button @click.prevent="appendDigit('0')" class="px-4 py-3 rounded bg-white/10 text-xl">0</button>
-          <button @click.prevent="clearPin()" class="px-4 py-3 rounded bg-white/10 text-xl">Clear</button>
+        <div class="grid grid-cols-3 gap-3">
+          <button @click.prevent="appendDigit('1')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">1</button>
+          <button @click.prevent="appendDigit('2')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">2</button>
+          <button @click.prevent="appendDigit('3')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">3</button>
+          <button @click.prevent="appendDigit('4')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">4</button>
+          <button @click.prevent="appendDigit('5')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">5</button>
+          <button @click.prevent="appendDigit('6')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">6</button>
+          <button @click.prevent="appendDigit('7')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">7</button>
+          <button @click.prevent="appendDigit('8')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">8</button>
+          <button @click.prevent="appendDigit('9')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">9</button>
+          <button @click.prevent="backspace()" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">⌫</button>
+          <button @click.prevent="appendDigit('0')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">0</button>
+          <button @click.prevent="clearPin()" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Clear</button>
         </div>
 
-        <p v-if="pinError" class="text-sm text-red-400 mb-2">{{ pinError }}</p>
+        <p v-if="pinError" class="text-sm text-red-300 bg-red-500/10 rounded-lg px-3 py-2">{{ pinError }}</p>
         <div class="flex items-center justify-end gap-3">
-          <button @click="closePinModal()" class="px-3 py-2 rounded bg-white/10">Cancel</button>
-          <button @click.prevent="verifyPin()" class="px-3 py-2 rounded bg-primary/20">Enter</button>
+          <button @click="closePinModal()" class="px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25">Cancel</button>
+          <button @click.prevent="verifyPin()" class="px-4 py-3 rounded-xl bg-primary text-slate-950 hover:bg-primary/90">Enter</button>
         </div>
       </div>
     </div>
@@ -215,17 +224,30 @@ const clearDeviceAuth = () => {
       </div>
       
       <div class="flex flex-col items-center gap-3">
-        <PrimaryButton
-          class="!px-12 !py-4 !text-lg ripple"
+        <button
           :disabled="!deviceStore.isAuthenticated"
-          :class="!deviceStore.isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''"
+          :class="[
+            'px-14 py-5 text-lg font-semibold rounded-full transition-all duration-200 flex items-center gap-2',
+            deviceStore.isAuthenticated 
+              ? 'bg-gradient-to-r from-primary to-primary/85 text-white shadow-lg shadow-primary/40 hover:from-primary/95 hover:to-primary/80 active:scale-98' 
+              : 'bg-transparent border-2 border-primary/40 text-primary/50 cursor-not-allowed'
+          ]"
           @click="start()"
         >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.378 1.602a.75.75 0 00-.756 0L3 6.632l9 5.25 9-5.25-8.622-5.03zM21.75 7.93l-9 5.25v9l8.628-5.032a.75.75 0 00.372-.648V7.93zM11.25 22.18v-9l-9-5.25v8.57a.75.75 0 00.372.648l8.628 5.033z" />
+          </svg>
           Start Order
-        </PrimaryButton>
+        </button>
         <p v-if="!deviceStore.isAuthenticated" class="text-sm text-white/60 mt-3 text-center">
           Device is not registered. You must register the device in Settings before starting an order.
-          <NuxtLink to="/settings?requirePin=1" class="underline ml-2">Open Settings</NuxtLink>
+          <button
+            type="button"
+            class="underline ml-2 text-primary hover:text-primary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60"
+            @click.prevent="openSettings"
+          >
+            Open Settings
+          </button>
         </p>
 
         <div v-if="!deviceStore.isAuthenticated" class="mt-4 text-sm text-white/60 text-center">

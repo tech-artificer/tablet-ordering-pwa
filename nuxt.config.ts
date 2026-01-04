@@ -152,7 +152,7 @@ export default defineNuxtConfig({
             appEnv: process.env.APP_ENV || 'development',
             
             // API Configuration
-            mainApiUrl: process.env.MAIN_API_URL || "http://localhost:8000/api",
+            mainApiUrl: process.env.MAIN_API_URL || "http://127.0.0.1:8000",
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
             
             // Broadcasting Configuration
@@ -162,17 +162,17 @@ export default defineNuxtConfig({
             reverb: {
                 appId: process.env.NUXT_PUBLIC_REVERB_APP_ID || '',
                 appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY || '',
-                host: process.env.NUXT_PUBLIC_REVERB_HOST || 'localhost',
+                host: process.env.NUXT_PUBLIC_REVERB_HOST || '127.0.0.1:8000',
                 port: parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || "6001"),
                 scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME || 'http',
-                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || 'localhost',
+                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || '127.0.0.1:8000',
                 serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || "6001"),
                 serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || "",
             },
             
             // Laravel Echo Configuration
             echo: {
-                host: process.env.NUXT_PUBLIC_ECHO_HOST || 'localhost',
+                host: process.env.NUXT_PUBLIC_ECHO_HOST || '127.0.0.1:8000',
                 port: parseInt(process.env.NUXT_PUBLIC_ECHO_PORT || "6001"),
                 encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === "true",
             },
