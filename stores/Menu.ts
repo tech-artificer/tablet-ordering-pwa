@@ -74,119 +74,58 @@ export const useMenuStore = defineStore("menu", {
     },
 
     actions: {
-        async fetchPackages(this: any) {
-            this.loading.packages = true;       
-            this.errors.packages = null;
-            const api = useApi();
+        /**
+         * Generic fetch function for all menu item types
+         * Eliminates code duplication across 6 fetch methods
+         */
+        async _fetchMenuItem(
+            this: any,
+            key: 'packages' | 'modifiers' | 'desserts' | 'sides' | 'alacartes' | 'beverages',
+            endpoint: string,
+            params: Record<string, string> = {},
+            normalizer: (item: any) => any = normalizePrice
+        ) {
+            this.loading[key] = true
+            this.errors[key] = null
+            const api = useApi()
+            
             try {
-                const { data } = await api.get('/api/menus/with-modifiers');
-                this.packages = Array.isArray(data) ? data.map(normalizePackage) : [];
-                logger.debug('✅ Packages loaded:', this.packages.length);
-                return { success: true };
+                const { data } = await api.get(endpoint, params ? { params } : undefined)
+                this[key] = Array.isArray(data) ? data.map(normalizer) : []
+                logger.debug(`✅ ${key.charAt(0).toUpperCase() + key.slice(1)} loaded:`, this[key].length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch packages';
-                this.errors.packages = errorMessage;
-                logger.error('❌ Packages error:', error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || `Failed to fetch ${key}`
+                this.errors[key] = errorMessage
+                logger.error(`❌ ${key.charAt(0).toUpperCase() + key.slice(1)} error:`, error)
+                throw new Error(errorMessage)
             } finally {
-                this.loading.packages = false;
+                this.loading[key] = false
             }
+        },
+
+        async fetchPackages(this: any) {
+            return this._fetchMenuItem('packages', '/api/menus/with-modifiers', {}, normalizePackage)
         },
 
         async fetchModifiers(this: any) {
-            this.loading.modifiers = true;
-            this.errors.modifiers = null;
-            const api = useApi();
-            try {
-                const { data } = await api.get('/api/menus/modifiers');
-                this.modifiers = Array.isArray(data) ? data.map(normalizePrice) : [];
-                logger.debug('✅ Modifiers loaded:', this.modifiers.length);
-                return { success: true };
-            } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch modifiers';
-                this.errors.modifiers = errorMessage;
-                logger.error('❌ Modifiers error:', error);
-                throw new Error(errorMessage);
-            } finally {
-                this.loading.modifiers = false;
-            }
+            return this._fetchMenuItem('modifiers', '/api/menus/modifiers')
         },
 
         async fetchDesserts(this: any) {
-            this.loading.desserts = true;
-            this.errors.desserts = null;
-            const api = useApi();
-            try {
-                const { data } = await api.get('/api/menus/course', { params: { course: 'dessert' } });
-                this.desserts = Array.isArray(data) ? data.map(normalizePrice) : [];
-                logger.debug('✅ Desserts loaded:', this.desserts.length);
-                return { success: true };
-            } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch desserts';
-                this.errors.desserts = errorMessage;
-                logger.error('❌ Desserts error:', error);
-                throw new Error(errorMessage);
-            } finally {
-                this.loading.desserts = false;
-            }
+            return this._fetchMenuItem('desserts', '/api/menus/course', { course: 'dessert' })
         },
 
         async fetchSides(this: any) {
-            this.loading.sides = true;
-            this.errors.sides = null;
-            const api = useApi();
-            try {
-                const { data } = await api.get('/api/menus/group', { params: { group: 'sides' } });
-                this.sides = Array.isArray(data) ? data.map(normalizePrice) : [];
-                logger.debug('✅ Sides loaded:', this.sides.length);
-                return { success: true };
-            } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch sides';
-                this.errors.sides = errorMessage;
-                logger.error('❌ Sides error:', error);
-                throw new Error(errorMessage);
-            } finally {
-                this.loading.sides = false;
-            }
+            return this._fetchMenuItem('sides', '/api/menus/group', { group: 'sides' })
         },
 
         async fetchAlacartes(this: any) {
-            this.loading.alacartes = true;
-            this.errors.alacartes = null;
-            const api = useApi();
-            try {
-                const { data } = await api.get('/api/menus/category', { params: { category: 'alacarte' } });
-                this.alacartes = Array.isArray(data) ? data.map(normalizePrice) : [];
-                logger.debug('✅ Alacartes loaded:', this.alacartes.length);
-                return { success: true };
-            } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch alacartes';
-                this.errors.alacartes = errorMessage;
-                logger.error('❌ Alacartes error:', error);
-                throw new Error(errorMessage);
-            }
-            finally {
-                this.loading.alacartes = false;
-            }
+            return this._fetchMenuItem('alacartes', '/api/menus/category', { category: 'alacarte' })
         },
 
         async fetchBeverages(this: any) {
-            this.loading.beverages = true;
-            this.errors.beverages = null;
-            const api = useApi();
-            try {
-                const { data } = await api.get('/api/menus/category', { params: { category: 'beverage' } });
-                this.beverages = Array.isArray(data) ? data.map(normalizePrice) : [];
-                logger.debug('✅ Beverages loaded:', this.beverages.length);
-                return { success: true };
-            } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch beverages';
-                this.errors.beverages = errorMessage;
-                logger.error('❌ Beverages error:', error);
-                throw new Error(errorMessage);
-            } finally {
-                this.loading.beverages = false;
-            }
+            return this._fetchMenuItem('beverages', '/api/menus/category', { category: 'beverage' })
         },
 
         async loadAllMenus(this: any, forceRefresh = false) {

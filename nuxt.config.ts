@@ -17,7 +17,7 @@ export default defineNuxtConfig({
     
     css: [
         "./assets/css/input.css",
-        "./assets/css/main.css"
+        "./assets/css/main.css" 
     ],
     
     modules: [

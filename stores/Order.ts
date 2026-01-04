@@ -3,6 +3,7 @@ import { reactive, computed, toRefs } from 'vue'
 import { useApi } from '../composables/useApi'
 import { logger } from '../utils/logger'
 import { notifyBlockedAction } from '../composables/useNotifier'
+import { extractOrderId, getCurrentOrderId, extractOrderNumber } from '../utils/orderHelpers'
 import type { CartItem, Package, MenuItem } from '../types'
 
 export const useOrderStore = defineStore('order', () => {
@@ -68,6 +69,17 @@ export const useOrderStore = defineStore('order', () => {
       return
     }
 
+    // Validate category in refill mode - only meats and sides allowed
+    if (state.isRefillMode) {
+      const itemCategory = opts?.category || item.category
+      const allowedCategories = ['meats', 'sides']
+      if (!itemCategory || !allowedCategories.includes(itemCategory)) {
+        logger.warn(`addToCart blocked in refill mode: category "${itemCategory}" not allowed`)
+        notifyBlockedAction('Only Meats and Sides can be refilled')
+        return
+      }
+    }
+
     if ((state.package as Package)?.id === item.id) {
       state.guestCount = Number(state.guestCount) + 1
       return
@@ -115,6 +127,17 @@ export const useOrderStore = defineStore('order', () => {
     const targetCart = state.isRefillMode ? state.refillItems : state.cartItems
     const existing = targetCart.find(i => i.id === id)
     if (!existing) return
+
+    // Validate category in refill mode - prevent modifications to non-refillable items
+    if (state.isRefillMode) {
+      const itemCategory = existing.category
+      const allowedCategories = ['meats', 'sides']
+      if (!itemCategory || !allowedCategories.includes(itemCategory)) {
+        logger.warn(`updateQuantity blocked in refill mode: category "${itemCategory}" not allowed`)
+        notifyBlockedAction('Only Meats and Sides quantities can be modified in Refill mode')
+        return
+      }
+    }
     
     const UNLIMITED_ITEM_CAP = 5
     const max = existing.isUnlimited ? UNLIMITED_ITEM_CAP : 99
@@ -345,7 +368,7 @@ export const useOrderStore = defineStore('order', () => {
     const api = useApi()
     
     // Use order_id (business ID) - goes in URL path
-    const currentOrderId = state.currentOrder?.order?.order_id || state.currentOrder?.order?.id || state.currentOrder?.order_id || state.currentOrder?.id
+    const currentOrderId = getCurrentOrderId(state.currentOrder)
     
     if (!currentOrderId) {
       state.isSubmitting = false
@@ -387,12 +410,12 @@ export const useOrderStore = defineStore('order', () => {
     const { useSessionStore } = await import('./session')
     const sessionStore = useSessionStore()
 
-    const orderNumber = respData?.order?.order_number || respData?.order_number || respData?.order?.id
+    const orderNumber = extractOrderNumber(respData)
     // Use order_id (business ID like 19583), not order_number or internal id
-    const orderId = respData?.order?.order_id || respData?.order_id || respData?.order?.id || respData?.id
+    const orderId = extractOrderId(respData)
 
     // Store the numeric order_id in session for API lookups
-    sessionStore.orderId = orderId
+    if (orderId) sessionStore.orderId = Number(orderId)
     state.hasPlacedOrder = true
     state.currentOrder = respData
     
@@ -493,7 +516,8 @@ export const useOrderStore = defineStore('order', () => {
           try {
             const { useSessionStore } = await import('./session')
             const sessionStore = useSessionStore()
-            sessionStore.orderId = orderObj?.order_id || orderObj?.id || sessionStore.orderId
+            const polledOrderId = extractOrderId(orderObj)
+            if (polledOrderId) sessionStore.orderId = Number(polledOrderId)
           } catch (e) {
             // ignore
           }

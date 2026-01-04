@@ -77,7 +77,7 @@ export default defineNuxtPlugin(() => {
     return req
   })
 
-  // Add response interceptor to log errors and successes
+  // Add response interceptor to log errors and handle 401 token refresh
   api.interceptors.response.use(
     (response) => {
       logger.debug('📥 API Response SUCCESS:', {
@@ -90,7 +90,9 @@ export default defineNuxtPlugin(() => {
       })
       return response
     },
-    (error) => {
+    async (error) => {
+      const originalRequest = error.config
+
       logger.error('❌ API Error:', {
         url: error.config?.url,
         method: error.config?.method,
@@ -101,6 +103,38 @@ export default defineNuxtPlugin(() => {
         requestHeaders: error.config?.headers,
         message: error.message
       })
+
+      // Handle 401 Unauthorized - token expired, refresh and retry once
+      if (error.response?.status === 401 && originalRequest && !originalRequest._isRetry) {
+        originalRequest._isRetry = true
+        
+        logger.warn('🔄 401 Unauthorized - Attempting token refresh...')
+        
+        try {
+          const deviceStore = useDeviceStore()
+          const refreshSuccess = await deviceStore.refresh()
+          
+          if (refreshSuccess && deviceStore.token) {
+            // Update Authorization header with new token
+            originalRequest.headers['Authorization'] = `Bearer ${deviceStore.token}`
+            logger.debug('✅ Token refreshed, retrying request')
+            
+            // Retry the original request with new token
+            return api(originalRequest)
+          } else {
+            logger.error('❌ Token refresh failed, redirecting to home')
+            if (typeof window !== 'undefined') {
+              window.location.href = '/'
+            }
+          }
+        } catch (refreshError) {
+          logger.error('❌ Token refresh exception:', refreshError)
+          if (typeof window !== 'undefined') {
+            window.location.href = '/'
+          }
+        }
+      }
+
       return Promise.reject(error)
     }
   )

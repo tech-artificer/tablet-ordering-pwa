@@ -39,19 +39,41 @@ onMounted(() => {
   checkWebSocketStatus();
   // Check every 3 seconds
   const interval = setInterval(checkWebSocketStatus, 3000);
-  
+
   // Also listen to Echo connection state changes
   if ((window as any).Echo?.connector?.pusher) {
     (window as any).Echo.connector.pusher.connection.bind('state_change', (states: any) => {
       isWebSocketConnected.value = states.current === 'connected';
     });
   }
-  
+
   // Cleanup on unmount
   onUnmounted(() => clearInterval(interval));
 });
 
 const start = () => {
+  logger.debug('Start clicked - checking network and Reverb connectivity');
+
+  // Check online status
+  if (!navigator.onLine) {
+    ElMessageBox.alert(
+      'Network connection required to process orders.',
+      'No Network Connection',
+      { type: 'error' }
+    );
+    return;
+  }
+
+  // Check Reverb/WebSocket connection
+  if (!isWebSocketConnected.value) {
+    ElMessageBox.alert(
+      'Broadcasting service connection required. Please wait or restart the app.',
+      'Connection Unavailable',
+      { type: 'error' }
+    );
+    return;
+  }
+
   logger.debug('Start clicked - Device Store:', {
     token: deviceStore.token,
     table: deviceStore.table,
@@ -60,7 +82,7 @@ const start = () => {
     'table.value?.id': deviceStore.table.value?.id,
     isAuthenticated: deviceStore.isAuthenticated
   })
-  
+
   // Use isAuthenticated computed property instead of manual checks
   if (!deviceStore.isAuthenticated) {
     logger.debug('Not authenticated, redirecting to Settings (PIN)')
@@ -68,7 +90,7 @@ const start = () => {
     router.replace({ path: '/settings', query: { requirePin: '1' } })
     return
   }
-  
+
   logger.debug('Starting session...')
   session.start()
   router.replace('/order/start')
@@ -131,7 +153,7 @@ const clearDeviceAuth = () => {
 
 <template>
   <div class="flex h-screen w-screen p-4 relative overflow-hidden">
-    
+
     <!-- PIN modal overlay -->
     <div v-if="showPinModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div class="bg-white/5 rounded-lg border border-white/10 p-6 w-full max-w-md">
@@ -140,7 +162,8 @@ const clearDeviceAuth = () => {
 
         <!-- Readonly masked display prevents virtual keyboard from opening -->
         <div class="mb-4">
-          <input readonly :value="maskedPin" placeholder="Enter PIN" class="w-full px-4 py-2 rounded bg-white/5 text-xl tracking-widest text-center" />
+          <input readonly :value="maskedPin" placeholder="Enter PIN"
+            class="w-full px-4 py-2 rounded bg-white/5 text-xl tracking-widest text-center" />
         </div>
 
         <div class="grid grid-cols-3 gap-2 mb-3">
@@ -169,35 +192,34 @@ const clearDeviceAuth = () => {
     <!-- Connection Status Indicator -->
     <div class="absolute top-4 left-4 z-50 flex items-center gap-3 glass-card px-4 py-2.5">
       <div class="flex items-center gap-2">
-        <div 
-          :class="[
-            'w-3 h-3 rounded-full transition-all',
-            isWebSocketConnected ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-red-500'
-          ]"
-        ></div>
+        <div :class="[
+          'w-3 h-3 rounded-full transition-all',
+          isWebSocketConnected ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-red-500'
+        ]"></div>
         <span class="text-sm font-medium" :class="isWebSocketConnected ? 'text-green-400' : 'text-red-400'">
           {{ isWebSocketConnected ? 'Connected' : 'Offline' }}
         </span>
       </div>
       <div v-if="channelStatus.device || channelStatus.deviceControl" class="text-white/30 text-sm">|</div>
       <div v-if="channelStatus.device || channelStatus.deviceControl" class="flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
         </svg>
         <span class="text-sm text-primary font-medium">
-          {{ (channelStatus.device ? 1 : 0) + (channelStatus.deviceControl ? 1 : 0) + (channelStatus.order ? 1 : 0) + (channelStatus.serviceRequest ? 1 : 0) }} channels
+          {{ (channelStatus.device ? 1 : 0) + (channelStatus.deviceControl ? 1 : 0) + (channelStatus.order ? 1 : 0) +
+            (channelStatus.serviceRequest ? 1 : 0) }} channels
         </span>
       </div>
     </div>
 
     <!-- Exit/Settings Button - Enhanced touch target -->
-    <button
-      @click="openSettings"
-      class="icon-btn absolute top-4 right-4 z-50 !w-12 !h-12 text-white/60 hover:text-white"
-      title="Settings"
-    >
+    <button @click="openSettings"
+      class="icon-btn absolute top-4 right-4 z-50 !w-12 !h-12 text-white/60 hover:text-white" title="Settings">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     </button>
@@ -206,21 +228,18 @@ const clearDeviceAuth = () => {
       <div class="z-10 flex flex-col justify-center items-center gap-4 text-center">
         <WoosooLogo />
         <div class="space-y-3">
-          <h2 class="text-4xl lg:text-5xl font-extrabold font-raleway tracking-tight text-white flex flex-col leading-tight">
+          <h2
+            class="text-4xl lg:text-5xl font-extrabold font-raleway tracking-tight text-white flex flex-col leading-tight">
             <span>The grill is hot,</span>
             <span>the meat is marinated,</span>
             <span>and the feast awaits.</span>
           </h2>
         </div>
       </div>
-      
+
       <div class="flex flex-col items-center gap-3">
-        <PrimaryButton
-          class="!px-12 !py-4 !text-lg ripple"
-          :disabled="!deviceStore.isAuthenticated"
-          :class="!deviceStore.isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''"
-          @click="start()"
-        >
+        <PrimaryButton class="!px-12 !py-4 !text-lg ripple" :disabled="!deviceStore.isAuthenticated"
+          :class="!deviceStore.isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''" @click="start()">
           Start Order
         </PrimaryButton>
         <p v-if="!deviceStore.isAuthenticated" class="text-sm text-white/60 mt-3 text-center">

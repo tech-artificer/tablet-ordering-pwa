@@ -9,6 +9,7 @@ import MenuCategoryTabs from '../components/menu/MenuCategoryTabs.vue';
 import GroupedMeatsList from '../components/menu/GroupedMeatsList.vue';
 import MenuItemGrid from '../components/menu/MenuItemGrid.vue';
 import CartSidebar from '../components/order/CartSidebar.vue';
+import OrderPlacedBadge from '../components/order/OrderPlacedBadge.vue';
 import AssistanceDrawer from '../components/menu/AssistanceDrawer.vue';
 import OrderSummaryDrawer from '../components/order/OrderSummaryDrawer.vue';
 import SupportFab from '../components/menu/SupportFab.vue';
@@ -20,6 +21,11 @@ import { notifyWarning } from '../composables/useNotifier';
 import { useDeviceStore } from '../stores/device';
 import { useMenuStore } from '../stores/menu';
 import { useOrderStore } from '../stores/order';
+
+// Protect this page with route guard
+definePageMeta({
+  middleware: 'order-guard',
+});
 
 const menuStore = useMenuStore();
 const orderStore = useOrderStore();
@@ -40,14 +46,14 @@ onMounted(async () => {
 
   try {
     await orderStore.initializeFromSession()
-    
+
     // Debug: Log state after initialization
     console.log('[Menu] After initializeFromSession:', {
       'sessionStore.orderId': sessionStore.orderId,
       'orderStore.hasPlacedOrder': orderStore.hasPlacedOrder,
       'orderStore.currentOrder': orderStore.currentOrder
     })
-    
+
     // Check if order is already completed - if so, end session and redirect
     const orderStatus = orderStore.currentOrder?.order?.status || orderStore.currentOrder?.status
     if (orderStatus === 'completed' || orderStatus === 'cancelled' || orderStatus === 'voided') {
@@ -151,14 +157,14 @@ const displayItems = computed(() => {
         return [];
     }
   })();
-  
+
   // In refill mode, only show unlimited items (meats and sides)
   if (orderStore.isRefillMode) {
-    return baseItems.filter((item: any) => 
+    return baseItems.filter((item: any) =>
       activeCategory.value === 'meats' || activeCategory.value === 'sides'
     );
   }
-  
+
   return baseItems;
 });
 
@@ -246,10 +252,8 @@ const handleSupportRequest = async (type: string) => {
 
   try {
     await api.post('/api/service/request', payload)
-    // ElMessage.success('Staff will assist you shortly')
   } catch (err) {
     logger.warn('Support request failed:', err)
-    // ElMessage.warning('Request queued — staff will be notified')
   } finally {
     isSendingSupport.value = false
   }
@@ -266,32 +270,47 @@ const getServiceTypeId = (type: string): number => {
   return serviceMap[type] || 4
 }
 
-// Refill mode toggle
-const toggleRefillMode = () => {
+// Refill mode toggle with improved error handling
+const toggleRefillMode = async () => {
   // Check if order has been placed AND confirmed by server
   if (!orderStore.hasPlacedOrder) {
     console.log('[Refill] Blocked: hasPlacedOrder =', orderStore.hasPlacedOrder)
-    ElMessage.warning('Please place and confirm your order first before requesting refills')
+    notifyWarning('Please place and confirm your order first before requesting refills')
     return
   }
-  
-  // Verify we have an order ID from the server
+
+  // Verify we have an order ID from the server with timeout
   if (!sessionStore.orderId) {
-    console.log('[Refill] Blocked: sessionStore.orderId =', sessionStore.orderId)
-    ElMessage.warning('Waiting for order confirmation from server...')
-    return
+    console.log('[Refill] Waiting for order ID confirmation...')
+    notifyWarning('Confirming your order with server...')
+
+    // Wait up to 5 seconds for orderId to be populated
+    let retries = 0
+    const maxRetries = 50 // 5 seconds with 100ms intervals
+
+    while (!sessionStore.orderId && retries < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      retries++
+    }
+
+    // Check again after waiting
+    if (!sessionStore.orderId) {
+      console.log('[Refill] Timeout waiting for orderId after', retries * 100, 'ms')
+      notifyWarning('Order confirmation delayed. Please try again in a moment.')
+      return
+    }
   }
-  
-  console.log('[Refill] Toggling refill mode, current:', orderStore.isRefillMode)
+
+  console.log('[Refill] Toggling refill mode, current:', orderStore.isRefillMode, 'orderId:', sessionStore.orderId)
   const newMode = !orderStore.isRefillMode
   orderStore.toggleRefillMode(newMode)
-  
+
   if (newMode) {
     // Switch to meats category when entering refill mode
     activeCategory.value = 'meats'
-    ElMessage.info('Refill mode: Only unlimited items available')
+    ElMessage.success('🔄 Refill mode activated - Only unlimited items available')
   } else {
-    ElMessage.info('Back to regular menu')
+    ElMessage.info('← Back to regular menu')
   }
 }
 
@@ -317,7 +336,7 @@ const categoryError = computed(() => {
     case 'sides':
       return menuStore.errors.sides;
     case 'alacartes':
-      return menuStore.errors.alacartes;  
+      return menuStore.errors.alacartes;
     case 'desserts':
       return menuStore.errors.desserts;
     case 'beverages':
@@ -391,15 +410,13 @@ async function confirmOrder() {
     if (orderStore.isRefillMode) {
       // Submit refill order
       await orderStore.submitRefill()
-      // ElMessage.success('Refill order placed successfully!')
     } else {
       // Submit regular order
       const payload = orderStore.buildPayload()
       logger.debug('Order Payload:', payload)
       await orderStore.submitOrder(payload)
-      // ElMessage.success('Order placed successfully!')
     }
-    
+
     isSubmitting.value = false
     isCountingDown.value = false
     isOrderDrawerOpen.value = false
@@ -417,7 +434,6 @@ async function confirmOrder() {
     isCountingDown.value = false
     placeOrderError.value = err?.message || String(err)
     const errorMsg = orderStore.isRefillMode ? 'Failed to place refill order' : 'Failed to place order'
-    // ElMessage.error(placeOrderError.value || errorMsg)
   }
 }
 
@@ -436,6 +452,9 @@ function modifyDuringCountdown() {
       <!-- Category Filter Tabs -->
       <div class="sticky top-0 z-10">
         <div class="max-w-7xl mx-auto">
+          <!-- Order Placed Badge -->
+          <order-placed-badge v-if="orderStore.hasPlacedOrder" />
+
           <!-- Refill Mode Indicator -->
           <div v-if="orderStore.isRefillMode" class="bg-green-500/20 border-b border-green-500/30 px-6 py-3">
             <div class="flex items-center justify-between">
@@ -446,20 +465,13 @@ function modifyDuringCountdown() {
                   <p class="text-sm text-green-300/80">Only unlimited items available (Meats & Sides)</p>
                 </div>
               </div>
-              <refill-button 
-                :has-placed-order="orderStore.hasPlacedOrder"
-                :is-refill-mode="orderStore.isRefillMode"
-                @toggle-refill-mode="toggleRefillMode"
-              />
+              <refill-button :has-placed-order="orderStore.hasPlacedOrder" :is-refill-mode="orderStore.isRefillMode"
+                @toggle-refill-mode="toggleRefillMode" />
             </div>
           </div>
-          
-          <menu-category-tabs 
-            :categories="availableCategories" 
-            :active-category="activeCategory" 
-            :sticky="true"
-            @select="setCategory" 
-          />
+
+          <menu-category-tabs :categories="availableCategories" :active-category="activeCategory" :sticky="true"
+            @select="setCategory" />
         </div>
       </div>
 
@@ -508,77 +520,54 @@ function modifyDuringCountdown() {
     </div>
 
     <!-- Order Summary Sidebar -->
-    
-    <cart-sidebar 
-      :selected-package="selectedPackage" 
-      :guest-count="guestCount" 
-      :cart-items="orderStore.activeCart"
-      :package-total="orderStore.isRefillMode ? 0 : packageTotal" 
-      :add-ons-total="orderStore.isRefillMode ? orderStore.refillTotal : addOnsTotal" 
-      :tax-amount="orderStore.isRefillMode ? 0 : taxAmount" 
+
+    <cart-sidebar :selected-package="selectedPackage" :guest-count="guestCount" :cart-items="orderStore.activeCart"
+      :package-total="orderStore.isRefillMode ? 0 : packageTotal"
+      :add-ons-total="orderStore.isRefillMode ? orderStore.refillTotal : addOnsTotal"
+      :tax-amount="orderStore.isRefillMode ? 0 : taxAmount"
       :grand-total="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal"
-      :unlimited-item-cap="UNLIMITED_ITEM_CAP" 
-      :is-refill-mode="orderStore.isRefillMode"
-      :has-placed-order="orderStore.hasPlacedOrder"
-      @update-quantity="updateQuantity" 
-      @remove-item="removeFromOrder"
-      @set-guest-count="(count) => orderStore.setGuestCount(count)"
-      @submit-order="openOrderDrawer"
-      @toggle-refill-mode="toggleRefillMode"
-    />
+      :unlimited-item-cap="UNLIMITED_ITEM_CAP" :is-refill-mode="orderStore.isRefillMode"
+      :has-placed-order="orderStore.hasPlacedOrder" @update-quantity="updateQuantity" @remove-item="removeFromOrder"
+      @set-guest-count="(count) => orderStore.setGuestCount(count)" @submit-order="openOrderDrawer"
+      @toggle-refill-mode="toggleRefillMode" />
 
   </div>
 
   <!-- Order Confirmation Drawer (component) -->
-  <order-summary-drawer 
-    v-model="isOrderDrawerOpen" 
-    :selectedPackage="selectedPackage" 
-    :guestCount="guestCount"
-    :cartItems="orderStore.activeCart" 
-    :packageTotal="orderStore.isRefillMode ? 0 : packageTotal" 
-    :addOnsTotal="orderStore.isRefillMode ? orderStore.refillTotal : addOnsTotal" 
+  <order-summary-drawer v-model="isOrderDrawerOpen" :selectedPackage="selectedPackage" :guestCount="guestCount"
+    :cartItems="orderStore.activeCart" :packageTotal="orderStore.isRefillMode ? 0 : packageTotal"
+    :addOnsTotal="orderStore.isRefillMode ? orderStore.refillTotal : addOnsTotal"
     :taxAmount="orderStore.isRefillMode ? 0 : taxAmount"
-    :grandTotal="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal" 
-    :isCountingDown="isCountingDown" 
-    :countdown="countdown" 
-    :placeOrderError="placeOrderError"
-    :isSubmitting="orderStore.isSubmitting" 
-    :is-refill-mode="orderStore.isRefillMode"
-    @confirm="confirmOrder"
+    :grandTotal="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal" :isCountingDown="isCountingDown"
+    :countdown="countdown" :placeOrderError="placeOrderError" :isSubmitting="orderStore.isSubmitting"
+    :is-refill-mode="orderStore.isRefillMode" @confirm="confirmOrder"
     @cancel="() => { if (isCountingDown) cancelCountdown(); else isOrderDrawerOpen = false }"
-    @modify="modifyDuringCountdown" 
-  />
+    @modify="modifyDuringCountdown" />
 
   <!-- Support FAB -->
   <support-fab @request-support="handleSupportRequest" />
-  
+
   <!-- Refill Toggle Button (floating, visible after order placed) -->
   <div v-if="canRequestRefill && !orderStore.isRefillMode" class="fixed bottom-24 left-24 z-40">
-    <refill-button 
-      :has-placed-order="canRequestRefill"
-      :is-refill-mode="orderStore.isRefillMode"
-      @toggle-refill-mode="toggleRefillMode"
-    />
+    <refill-button :has-placed-order="canRequestRefill" :is-refill-mode="orderStore.isRefillMode"
+      @toggle-refill-mode="toggleRefillMode" />
   </div>
 
   <!-- Assistance Drawer (legacy - can be removed if not needed) -->
-  <assistance-drawer 
-    v-model="assistanceDrawerVisible" 
-    :support-requests="supportRequests"
-    :is-sending="isSendingSupport" 
-    @send-request="handleSupportRequest" 
-  />
+  <assistance-drawer v-model="assistanceDrawerVisible" :support-requests="supportRequests"
+    :is-sending="isSendingSupport" @send-request="handleSupportRequest" />
 
   <!-- Order Success Banner -->
   <Transition name="slide-down">
-    <div 
-      v-if="showSuccessBanner" 
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-    >
-      <div class="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce-once pointer-events-auto">
+    <div v-if="showSuccessBanner"
+      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div
+        class="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce-once pointer-events-auto">
         <span class="text-3xl">✅</span>
         <div>
-          <p class="font-bold text-lg">{{ orderStore.isRefillMode ? 'Refill Order Placed!' : 'Order Placed Successfully!' }}</p>
+          <p class="font-bold text-lg">
+            {{ orderStore.isRefillMode ? 'Refill Order Placed!' : 'Order Placed Successfully!' }}
+          </p>
           <p class="text-sm text-green-100">Your order is being prepared</p>
         </div>
       </div>
@@ -639,13 +628,16 @@ function modifyDuringCountdown() {
 .slide-down-enter-active {
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
 .slide-down-leave-active {
   transition: all 0.3s ease-in;
 }
+
 .slide-down-enter-from {
   transform: translateY(-100%);
   opacity: 0;
 }
+
 .slide-down-leave-to {
   transform: translateY(-50%);
   opacity: 0;
@@ -653,11 +645,25 @@ function modifyDuringCountdown() {
 
 /* Bounce once animation */
 @keyframes bounce-once {
-  0%, 100% { transform: translateY(0); }
-  25% { transform: translateY(-8px); }
-  50% { transform: translateY(0); }
-  75% { transform: translateY(-4px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  25% {
+    transform: translateY(-8px);
+  }
+
+  50% {
+    transform: translateY(0);
+  }
+
+  75% {
+    transform: translateY(-4px);
+  }
 }
+
 .animate-bounce-once {
   animation: bounce-once 0.6s ease-out 0.2s;
 }
