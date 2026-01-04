@@ -34,7 +34,7 @@ if (process.client) {
 
 <template>
   <div class="min-h-screen min-w-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-hidden">
-    <Transition name="page-fade" mode="out-in" appear>
+    <Transition name="slide-left" mode="out-in" appear>
       <div :key="$route.path" class="h-screen w-screen z-10 safe-area-top safe-area-bottom">
         <slot />
       </div>
