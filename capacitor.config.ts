@@ -8,7 +8,6 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     iosScheme: 'https',
     hostname: 'wooserve.app',
-    // Allow loading content from external API
     allowNavigation: []
   },
   android: {
