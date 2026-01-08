@@ -50,7 +50,10 @@ async function hapticCapacitor(type: HapticType): Promise<void> {
         break
     }
   } catch (e) {
-    // Silently fail - haptics are optional enhancement
+    // Log error for debugging, but don't break the app
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Haptics] Capacitor haptic failed:', e)
+    }
   }
 }
 
@@ -75,8 +78,11 @@ function hapticWeb(type: HapticType): void {
 export function haptic(type: HapticType = 'light'): void {
   if (isCapacitor()) {
     // Use Capacitor Haptics in native context (async, but fire-and-forget for haptics)
-    hapticCapacitor(type).catch(() => {
-      // Silently fail - haptics are optional enhancement
+    hapticCapacitor(type).catch((e) => {
+      // Log error for debugging, but don't break the app
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[Haptics] Failed to trigger haptic:', e)
+      }
     })
   } else {
     // Fallback to Web Vibration API

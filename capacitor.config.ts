@@ -6,23 +6,19 @@ const config: CapacitorConfig = {
   webDir: '.output/public',
   server: {
     androidScheme: 'https',
-    iosScheme: 'https',
     hostname: 'wooserve.app',
+    // Add API domains here if needed for cross-origin requests
     allowNavigation: []
   },
   android: {
-    allowMixedContent: true,
-    // Tablet optimizations
-    webContentsDebuggingEnabled: true,
+    // Only allow mixed HTTP/HTTPS content in development builds
+    allowMixedContent: process.env.NODE_ENV !== 'production',
+    // Enable web debugging only in development
+    webContentsDebuggingEnabled: process.env.NODE_ENV !== 'production',
     // Keep screen on for kiosk mode
     overrideUserAgent: 'Mozilla/5.0 (Linux; Android 10; Tablet) Wooserve/1.0'
   },
-  ios: {
-    contentInset: 'automatic',
-    // Tablet optimizations
-    scrollEnabled: true,
-    overrideUserAgent: 'Mozilla/5.0 (iPad; CPU OS 15_0 like Mac OS X) Wooserve/1.0'
-  },
+  // iOS configuration removed - only Android is supported for this kiosk app
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,
@@ -32,7 +28,6 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
       androidSpinnerStyle: 'large',
-      iosSpinnerStyle: 'small',
       spinnerColor: '#F6B56D',
       splashFullScreen: true,
       splashImmersive: true

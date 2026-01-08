@@ -8,7 +8,9 @@ Connects to the Laravel API to display menus and submit orders. Includes a fulls
 This app can be deployed in two ways:
 
 1. **Progressive Web App (PWA)** - Deploy to a web server and access via browser
-2. **Native Mobile App** - Build as Android/iOS app using Capacitor (see [docs/CAPACITOR.md](docs/CAPACITOR.md))
+2. **Native Android App** - Build as Android tablet app using Capacitor (see [docs/CAPACITOR.md](docs/CAPACITOR.md))
+
+> **Note:** iOS is not supported. This app is designed specifically for Android tablets.
 
 Quick start (development)
 1. Ensure Node.js 18+ and npm are installed.
@@ -28,14 +30,13 @@ Scripts of interest
 - `test`: `vitest`
 - `rebuild:esbuild`: refreshes esbuild native binary (run automatically during `postinstall`)
 
-Capacitor scripts (for native builds)
-- `cap:sync` - Build web app and sync to native platforms
+Capacitor scripts (for native Android builds)
+- `cap:sync:android` - Generate web app and sync to Android
 - `cap:run:android` - Build and run on Android device/emulator
-- `cap:run:ios` - Build and run on iOS device/simulator
 - `cap:open:android` - Open project in Android Studio
-- `cap:open:ios` - Open project in Xcode
+- `cap:build:android` - Build Android release APK
 
-See [docs/CAPACITOR.md](docs/CAPACITOR.md) for complete native build instructions.
+See [docs/CAPACITOR.md](docs/CAPACITOR.md) for complete Android build instructions.
 
 Environment variables
 - `MAIN_API_URL`: Laravel API base URL used by the client (API routes under `/api`)

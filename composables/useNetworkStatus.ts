@@ -3,7 +3,7 @@
 // Enhanced with Capacitor Network plugin when available
 
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { Network } from '@capacitor/network'
+import { Network, type PluginListenerHandle } from '@capacitor/network'
 import { Capacitor } from '@capacitor/core'
 import { logger } from '~/utils/logger'
 
@@ -12,7 +12,7 @@ const wasOffline = ref(false) // Track if we recovered from offline
 const connectionType = ref<string | null>(null)
 
 let initialized = false
-let capacitorListener: any = null
+let capacitorListener: PluginListenerHandle | null = null
 
 /**
  * Check if running in Capacitor native context
@@ -76,6 +76,8 @@ export function useNetworkStatus() {
   onMounted(async () => {
     if (typeof window === 'undefined') return
     if (initialized) return
+    
+    // Set initialized flag immediately to prevent race conditions
     initialized = true
 
     if (isCapacitor()) {
@@ -98,12 +100,14 @@ export function useNetworkStatus() {
   onBeforeUnmount(() => {
     if (typeof window === 'undefined') return
     
-    if (isCapacitor() && capacitorListener) {
-      // Remove Capacitor listener
+    // Clean up Capacitor listener if it exists
+    if (capacitorListener) {
       capacitorListener.remove()
       capacitorListener = null
-    } else {
-      // Remove Web API listeners
+    }
+    
+    // Also clean up web API listeners (in case of platform switch or fallback)
+    if (typeof window !== 'undefined') {
       window.removeEventListener('online', updateOnlineStatus)
       window.removeEventListener('offline', updateOnlineStatus)
 
