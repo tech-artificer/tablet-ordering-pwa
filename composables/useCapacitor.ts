@@ -2,6 +2,7 @@
 // Capacitor platform detection and utilities
 
 import { ref, onMounted } from 'vue'
+import { useRuntimeConfig } from '#app'
 import { Capacitor } from '@capacitor/core'
 import { App } from '@capacitor/app'
 import { StatusBar, Style } from '@capacitor/status-bar'
@@ -123,11 +124,14 @@ export function useCapacitor() {
       await configureStatusBar()
       await setupAppListeners()
       
-      // Hide splash screen after a short delay to ensure app is ready
-      const SPLASH_SCREEN_DELAY_MS = 500
+      // Hide splash screen after configurable delay to ensure app is ready
+      // Can be customized via NUXT_PUBLIC_SPLASH_DELAY environment variable
+      const config = useRuntimeConfig()
+      const delayMs = config.public.capacitor?.splashScreenDelayMs || 500
+      
       setTimeout(async () => {
         await hideSplashScreen()
-      }, SPLASH_SCREEN_DELAY_MS)
+      }, delayMs)
     }
   }
 

@@ -155,6 +155,11 @@ export default defineNuxtConfig({
             mainApiUrl: process.env.MAIN_API_URL || "http://localhost:8000/api",
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
             
+            // Capacitor Configuration
+            capacitor: {
+                splashScreenDelayMs: parseInt(process.env.NUXT_PUBLIC_SPLASH_DELAY || "500"),
+            },
+            
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || "pusher",
             
