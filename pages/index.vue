@@ -253,18 +253,14 @@ const clearDeviceAuth = () => {
       </div>
 
       <div class="flex flex-col items-center gap-3">
-        <button :disabled="!deviceStore.isAuthenticated" :class="[
-          'px-14 py-5 text-lg font-semibold rounded-full transition-all duration-200 flex items-center gap-2',
-          deviceStore.isAuthenticated
-            ? 'bg-gradient-to-r from-primary to-primary/85 text-white shadow-lg shadow-primary/40 hover:from-primary/95 hover:to-primary/80 active:scale-98'
-            : 'bg-transparent border-2 border-primary/40 text-primary/50 cursor-not-allowed'
-        ]" @click="start()">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+        <PrimaryButton :disabled="!deviceStore.isAuthenticated" size="lg"
+          class="!px-14 !py-5 !text-lg !rounded-full !font-kanit" @click="start()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
             <path
               d="M12.378 1.602a.75.75 0 00-.756 0L3 6.632l9 5.25 9-5.25-8.622-5.03zM21.75 7.93l-9 5.25v9l8.628-5.032a.75.75 0 00.372-.648V7.93zM11.25 22.18v-9l-9-5.25v8.57a.75.75 0 00.372.648l8.628 5.033z" />
           </svg>
           Start Order
-        </button>
+        </PrimaryButton>
         <p v-if="!deviceStore.isAuthenticated" class="text-sm text-white/60 mt-3 text-center">
           Device is not registered. You must register the device in Settings before starting an order.
           <button type="button"

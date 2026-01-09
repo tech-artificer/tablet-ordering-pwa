@@ -51,7 +51,7 @@ export const useDeviceStore = defineStore('device', () => {
                             stopTablePolling()
                             return
                         }
-                        const response = await api.get('/api/devices/login')
+                        const response = await api.post('/api/devices/refresh')
                     const resp = response.data || {}
                     // store raw response for diagnostics
                     lastAuthResponse.value = resp
@@ -247,15 +247,59 @@ export const useDeviceStore = defineStore('device', () => {
         }
     }
 
+    async function refresh(): Promise<boolean> {
+        isLoading.value = true
+        errorMessage.value = null
+        
+        try {
+            const api = useApi()
+            
+            const response = await api.post('/api/devices/refresh')
+            const { token: authToken, device: authDevice, table: authTable, expires_at } = response.data
+            const ipUsedFromServer: string | undefined = response.data?.ip_used
+
+            // Update whatever the server provided. Accept missing table (may be assigned later).
+            if (authDevice) {
+                if (ipUsedFromServer) (authDevice as any).ip_address = ipUsedFromServer
+                device.value = authDevice
+            }
+
+            if (authToken) {
+                token.value = authToken
+                try { if (typeof window !== 'undefined' && (window as any).updateEchoAuth) (window as any).updateEchoAuth(token.value) } catch (e) { logger.debug('[DeviceStore] updateEchoAuth not available') }
+            }
+            if (expires_at) expiration.value = expires_at
+
+            if (authTable) {
+                table.value = normalizeTable(authTable)
+                // if server provided a table id or name, we are no longer waiting
+                waitingForTable.value = !( (table.value as any).id || (table.value as any).name )
+            } else {
+                // keep waitingForTable true if we still lack table
+                if (!table.value) waitingForTable.value = true
+            }
+
+                // return true if we at least have a token (device is authenticated)
+            return !!authToken
+
+        } catch (error: any) {
+            logger.error('[DeviceStore] Token refresh failed:', error)
+            errorMessage.value = error?.response?.data?.message || 'Token refresh failed'
+            return false
+        } finally {
+            isLoading.value = false
+        }
+    }
+
         // Checks if the server has assigned a table after registration.
-        // Calls `authenticate()` to fetch latest device info and returns true when a table is present.
+        // Calls `refresh()` to fetch latest device info and returns true when a table is present.
         async function checkTableAssignment(): Promise<boolean> {
             // If we don't have any device or token at all, nothing to check
                 if (!device.value && !token.value) return false
                 logger.debug('[DeviceStore] checkTableAssignment running — device present?', !!device.value, 'token?', !!token.value)
 
             try {
-                const ok = await authenticate()
+                const ok = await refresh()
                 const t = table.value as any
                 if (t && (t.id || t.name)) {
                     waitingForTable.value = false
@@ -291,8 +335,8 @@ export const useDeviceStore = defineStore('device', () => {
         expiration,
         isLoading,
         errorMessage,
-            waitingForTable,
-            isPollingForTable,
+        waitingForTable,
+        isPollingForTable,
         
         // Getters
         isAuthenticated,
@@ -301,6 +345,7 @@ export const useDeviceStore = defineStore('device', () => {
         // Actions
         authenticate,
         register,
+        refresh,
         checkTableAssignment,
         startTablePolling,
         stopTablePolling,

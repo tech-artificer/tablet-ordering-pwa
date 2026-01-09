@@ -10,7 +10,7 @@ import { useOrderStore } from '~/stores/order'
 import { useSessionStore } from '~/stores/session'
 import { logger } from '~/utils/logger'
 
-export default defineRouteMiddleware((to, from) => {
+export default defineNuxtRouteMiddleware((to, from) => {
   // Only protect specific routes
   const protectedRoutes = ['/menu', '/order/in-session']
   
