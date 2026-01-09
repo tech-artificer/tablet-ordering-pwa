@@ -271,17 +271,15 @@ const clearDeviceAuth = () => {
         </p>
 
         <div v-if="!deviceStore.isAuthenticated" class="mt-4 text-sm text-white/60 text-center">
-          <div>Registered: <span class="text-red-400">No</span></div>
+          <!-- <div>Registered: <span class="text-red-400">No</span></div> -->
           <div v-if="deviceStore.device && deviceStore.device.value" class="mt-1 font-mono text-xs">
             ID: {{ deviceStore.device.value.id || '—' }} &nbsp; Code: {{ deviceStore.device.value.code || '—' }}
           </div>
-          <div class="mt-3">
+          <!-- <div class="mt-3">
             <button @click.prevent="clearDeviceAuth" class="px-3 py-2 rounded bg-white/10">Reset Device Auth</button>
-          </div>
+          </div> -->
         </div>
-        <p class="text-white/80 text-sm font-kanit text-center">
-          Tap to begin your <span class="font-bold text-primary">Ultimate K-BBQ experience</span>
-        </p>
+
       </div>
     </div>
   </div>
