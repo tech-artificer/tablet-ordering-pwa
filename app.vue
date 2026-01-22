@@ -65,6 +65,8 @@ onUnmounted(() => {
     <!-- Network status indicator -->
     <NetworkStatus />
     
-    <NuxtPage />
+    <Transition name="page-fade" mode="out-in">
+      <NuxtPage :key="$route.path" />
+    </Transition>
   </NuxtLayout>
 </template>

@@ -1,10 +1,25 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import confetti from 'canvas-confetti';
 // import { ElNotification } from 'element-plus';
 
 const router = useRouter();
 
+const triggerCelebration = () => {
+  const colors = ['#F6B56D', '#10B981', '#FFFFFF'];
+  confetti({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.6 },
+    colors: colors,
+    duration: 2000
+  });
+};
+
 const handleOrderSubmitted = async () => {
+  // Trigger celebration confetti
+  triggerCelebration();
+  
   // Logic after the API call succeeds in the child component
   // ElNotification({
   //   title: 'Order Confirmed! 🥳',

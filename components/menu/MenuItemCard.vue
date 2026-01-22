@@ -5,7 +5,14 @@
   ]">
     
     <!-- Quantity Badge -->
-    <div v-if="quantity > 0" class="absolute -top-2 -right-2 bg-primary text-secondary text-sm font-bold w-7 h-7 rounded-full shadow-lg flex items-center justify-center z-10 animate-bounce-in">
+    <div 
+      v-if="quantity > 0" 
+      v-motion
+      :initial="{ scale: 0 }"
+      :enter="{ scale: 1 }"
+      :transition="{ type: 'spring', stiffness: 200, damping: 10 }"
+      class="absolute -top-2 -right-2 bg-primary text-secondary text-sm font-bold w-7 h-7 rounded-full shadow-lg flex items-center justify-center z-10"
+    >
       {{ quantity }}
     </div>
 
@@ -33,9 +40,13 @@
             <span>{{ item.is_available === false ? 'Unavailable' : 'Add' }}</span>
           </span>
         </FlameButton>
-        <FlameButton variant="secondary" @click="$emit('view', item)" class="flex-1 !py-2 !text-sm" :disabled="item.is_available === false">
+        <button 
+          @click="$emit('view', item)" 
+          class="flex-1 px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm font-medium transition-all duration-150 active:scale-95"
+          :disabled="item.is_available === false"
+        >
           Options
-        </FlameButton>
+        </button>
       </div>
     </div>
   </div>

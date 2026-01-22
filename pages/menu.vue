@@ -468,11 +468,12 @@ function modifyDuringCountdown() {
         <div class="max-w-7xl mx-auto">
 
           <!-- Loading State -->
-          <div v-if="isLoading" class="flex items-center justify-center py-20">
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mx-auto mb-4"></div>
-              <p class="text-on text-xl">Loading {{ activeCategory }}...</p>
-            </div>
+          <div v-if="isLoading" class="space-y-6">
+            <component 
+              v-for="i in 3" 
+              :key="`skeleton-${i}`" 
+              :is="() => import('~/components/ui/SkeletonCard.vue')" 
+            />
           </div>
 
           <!-- Error State -->

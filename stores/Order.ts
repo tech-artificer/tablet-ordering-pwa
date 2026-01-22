@@ -679,6 +679,6 @@ export const useOrderStore = defineStore('order', () => {
   persist: {
     key: 'order-store',
     storage: (typeof localStorage !== 'undefined') ? localStorage : undefined,
-    pick: ['guestCount', 'package', 'hasPlacedOrder', 'currentOrder', 'submittedItems', 'isRefillMode', 'history']
+    pick: ['guestCount', 'package', 'hasPlacedOrder', 'currentOrder', 'submittedItems', 'isRefillMode', 'history', 'cartItems', 'refillItems']
   }
 })

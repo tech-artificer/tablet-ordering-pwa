@@ -66,7 +66,7 @@ export default defineNuxtPlugin((nuxtApp: any) => {
             wsPort: wsPort,
             wssPort: wssPort,
             // set forceTLS based on scheme if provided
-            forceTLS: String(config.public.NUXT_PUBLIC_REVERB_SCHEME || '').toLowerCase() === 'https',
+            forceTLS: String(config.public.reverb.scheme || '').toLowerCase() === 'https',
             disableStats: true,
             enabledTransports: ['ws', 'wss'],
             authEndpoint,

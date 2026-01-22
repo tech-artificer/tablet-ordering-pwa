@@ -29,7 +29,8 @@ export default defineNuxtConfig({
         "@element-plus/nuxt",
         "@nuxt/devtools",
         "@nuxt/fonts",
-        '@vite-pwa/nuxt'
+        '@vite-pwa/nuxt',
+        '@vueuse/motion/nuxt'
     ],
     
     typescript: {
@@ -67,6 +68,7 @@ export default defineNuxtConfig({
             globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
             navigateFallback: "/",
             navigateFallbackDenylist: [/^\/api/],
+            cleanupOutdatedCaches: true,
             
             runtimeCaching: [
                 {
