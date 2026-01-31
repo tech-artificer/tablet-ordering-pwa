@@ -10,8 +10,66 @@ export const useSessionStore = defineStore('session', () => {
   const state = reactive({
     sessionId: null as number | null,
     orderId: null as number | null,
-    isActive: false as boolean
+    isActive: false as boolean,
+    sessionStartedAt: null as number | null,
+    sessionEndsAt: null as number | null,
+    remainingMs: 0 as number,
+    timerExpired: false as boolean
   })
+
+  const SESSION_DURATION_MS = 60 * 60 * 1000
+  let sessionTimerId: number | null = null
+
+  const stopTimerInterval = () => {
+    if (sessionTimerId) {
+      try { clearInterval(sessionTimerId) } catch (e) { logger.debug('[SessionStore] clearInterval failed', e) }
+      sessionTimerId = null
+    }
+  }
+
+  const expireSession = () => {
+    state.timerExpired = true
+    clear()
+  }
+
+  const updateRemaining = () => {
+    if (!state.sessionEndsAt) {
+      state.remainingMs = 0
+      return
+    }
+    const remaining = Math.max(0, Number(state.sessionEndsAt) - Date.now())
+    state.remainingMs = remaining
+    if (remaining <= 0 && state.isActive) {
+      expireSession()
+    }
+  }
+
+  const startTimerInterval = () => {
+    if (sessionTimerId || typeof window === 'undefined') return
+    sessionTimerId = window.setInterval(updateRemaining, 1000)
+  }
+
+  const startTimer = (durationMs: number = SESSION_DURATION_MS) => {
+    const now = Date.now()
+    state.sessionStartedAt = now
+    state.sessionEndsAt = now + durationMs
+    state.timerExpired = false
+    updateRemaining()
+    startTimerInterval()
+  }
+
+  const ensureTimer = () => {
+    if (!state.isActive) {
+      stopTimerInterval()
+      return
+    }
+    if (!state.sessionEndsAt) {
+      startTimer()
+      return
+    }
+    updateRemaining()
+    startTimerInterval()
+  }
 
   async function fetchLatestSession() {
     const $api = useApi();
@@ -24,6 +82,10 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function start(): Promise<boolean> {
+    if (state.isActive && state.sessionStartedAt && state.sessionEndsAt) {
+      ensureTimer()
+      return true
+    }
     // Ensure device token is present and valid before starting session
     const deviceStore = useDeviceStore()
 
@@ -88,6 +150,8 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.currentOrder = null     // Clear current order reference
 
     state.isActive = true
+    state.timerExpired = false
+    startTimer()
 
     // Centralized lightweight flag to signal session is active for simple pages
     // Avoid direct localStorage writes from pages/components — use this store instead
@@ -100,6 +164,7 @@ export const useSessionStore = defineStore('session', () => {
 
   function end() {
     logger.info('🔚 Session ending - clearing all session and order state')
+    state.timerExpired = false
     clear()
   }
 
@@ -113,12 +178,16 @@ export const useSessionStore = defineStore('session', () => {
     state.sessionId = null
     state.orderId = null
     state.isActive = false
+    state.sessionStartedAt = null
+    state.sessionEndsAt = null
+    state.remainingMs = 0
+    stopTimerInterval()
     
     // Reset order state when session ends
     const orderStore = useOrderStore()
     
     // Stop any active polling first
-    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
     
     orderStore.setGuestCount(2)
     orderStore.cartItems = []
@@ -158,7 +227,7 @@ export const useSessionStore = defineStore('session', () => {
     }
     // Remove lightweight active flag from localStorage (SSR-safe)
     if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+      try { window.localStorage.removeItem('session_active') } catch (e) { logger.debug('[SessionStore] failed to remove session_active', e) }
     }
   }
 
@@ -167,11 +236,16 @@ export const useSessionStore = defineStore('session', () => {
     state.sessionId = null
     state.orderId = null
     state.isActive = false
+    state.sessionStartedAt = null
+    state.sessionEndsAt = null
+    state.remainingMs = 0
+    state.timerExpired = false
+    stopTimerInterval()
     
     const orderStore = useOrderStore()
     
     // Stop any active polling first
-    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
     
     orderStore.setGuestCount(2)
     orderStore.cartItems = []
@@ -209,7 +283,7 @@ export const useSessionStore = defineStore('session', () => {
       }
     }
     if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+      try { window.localStorage.removeItem('session_active') } catch (e) { logger.debug('[SessionStore] failed to remove session_active', e) }
     }
   }
 
@@ -220,12 +294,14 @@ export const useSessionStore = defineStore('session', () => {
     end,
     endSession,
     clear,
-    reset
+    reset,
+    startTimer,
+    ensureTimer
   }
 }, {
   persist: {
     key: 'session-store',
     storage: (typeof window !== 'undefined' && window.localStorage) ? window.localStorage : undefined,
-    pick: ['sessionId', 'isActive', 'orderId']
+    pick: ['sessionId', 'isActive', 'orderId', 'sessionStartedAt', 'sessionEndsAt']
   }
 })

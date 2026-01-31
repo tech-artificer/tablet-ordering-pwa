@@ -107,7 +107,16 @@ const onClose = () => {
         <!-- Left: visual and quick highlights -->
         <div class="col-span-1">
           <div class="rounded-lg overflow-hidden shadow-md">
-            <img :src="props.pkg.img_url" :alt="props.pkg.name" class="w-full h-48 object-cover" />
+            <NuxtImg
+              v-if="props.pkg.img_url"
+              :src="props.pkg.img_url"
+              :alt="props.pkg.name || 'Package image'"
+              class="w-full h-48 object-cover"
+              loading="lazy"
+              sizes="(max-width: 1024px) 100vw, 300px"
+              format="webp"
+            />
+            <div v-else class="w-full h-48 bg-gradient-to-br from-gray-800 to-gray-900"></div>
             <div class="p-4 bg-white/3">
               <h4 class="text-lg font-semibold text-white mb-2">Included Highlights</h4>
               <ul class="text-sm text-white/80 space-y-2">
@@ -138,7 +147,15 @@ const onClose = () => {
                        :class="['modifier-card p-3 rounded-lg cursor-pointer transition', isSelected(mod) ? 'selected' : '']">
 
                     <div class="flex items-center gap-3">
-                      <img v-if="mod.img_url" :src="mod.img_url" class="w-14 h-14 object-cover rounded-md" :alt="mod.name" />
+                      <NuxtImg
+                        v-if="mod.img_url"
+                        :src="mod.img_url"
+                        class="w-14 h-14 object-cover rounded-md"
+                        :alt="mod.name || 'Menu item'"
+                        loading="lazy"
+                        sizes="56px"
+                        format="webp"
+                      />
                       <div v-else class="w-14 h-14 bg-gray-700/40 rounded-md flex items-center justify-center text-sm text-white">No image</div>
 
                       <div class="flex-1">

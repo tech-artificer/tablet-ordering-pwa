@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, toRef, watch, onMounted } from 'vue';
+import { ref, computed, toRef, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { formatCurrency } from '../utils/formats';
@@ -21,6 +21,7 @@ import { notifyWarning } from '../composables/useNotifier';
 import { useDeviceStore } from '../stores/device';
 import { useMenuStore } from '../stores/menu';
 import { useOrderStore } from '../stores/order';
+import { haptic } from '../utils/haptics'
 
 // Protect this page with route guard
 definePageMeta({
@@ -111,6 +112,9 @@ const categories = [
   { id: 'beverages', label: 'Beverages', icon: '🥤' }
 ] as const;
 
+const refillAllowedCategories: MenuCategory[] = ['meats', 'sides']
+const isCategoryLocked = (category: MenuCategory) => orderStore.isRefillMode && !refillAllowedCategories.includes(category)
+
 // Support request buttons
 const supportRequests = [
   { id: 'clean', label: 'Clean Table', icon: '🧹', type: 'warning' },
@@ -158,22 +162,7 @@ const displayItems = computed(() => {
     }
   })();
 
-  // In refill mode, only show unlimited items (meats and sides)
-  if (orderStore.isRefillMode) {
-    return baseItems.filter((item: any) =>
-      activeCategory.value === 'meats' || activeCategory.value === 'sides'
-    );
-  }
-
   return baseItems;
-});
-
-// Filter categories in refill mode
-const availableCategories = computed(() => {
-  if (orderStore.isRefillMode) {
-    return categories.filter(cat => cat.id === 'meats' || cat.id === 'sides');
-  }
-  return categories;
 });
 
 const isUnlimitedCategory = computed(() => activeCategory.value === 'meats' || activeCategory.value === 'sides')
@@ -187,6 +176,10 @@ const grandTotal = computed(() => orderStore.grandTotal)
 
 logger.debug(selectedPackage)
 const setCategory = (category: MenuCategory) => {
+  if (isCategoryLocked(category)) {
+    notifyWarning('Refill mode: only Meats and Sides are available')
+    return
+  }
   activeCategory.value = category;
   // If user navigates to a category and data is empty, attempt to fetch it on-demand
   (async () => {
@@ -213,6 +206,10 @@ const setCategory = (category: MenuCategory) => {
 
 // Add item to order
 const addToOrder = (item: any) => {
+  if (orderStore.isRefillMode && isCategoryLocked(activeCategory.value)) {
+    notifyWarning('Refill mode: only Meats and Sides can be added')
+    return
+  }
   const isUnlimited = activeCategory.value === 'meats' || activeCategory.value === 'sides'
   const category = activeCategory.value
   orderStore.addToCart(item, { isUnlimited, category })
@@ -372,13 +369,30 @@ const orderSnapshot = ref<any | null>(null)
 const showSuccessBanner = ref(false)
 const countdownIntervalId = ref<number | null>(null)
 const undoTimerId = ref<number | null>(null)
+const lastHapticSecond = ref<number | null>(null)
+
+onBeforeUnmount(() => {
+  if (countdownIntervalId.value) {
+    try { clearInterval(countdownIntervalId.value) } catch (e) { logger.debug('[Menu] clearInterval failed', e) }
+    countdownIntervalId.value = null
+  }
+  if (undoTimerId.value) {
+    try { clearTimeout(undoTimerId.value) } catch (e) { logger.debug('[Menu] clearTimeout failed', e) }
+    undoTimerId.value = null
+  }
+})
 
 function startCountdown() {
   if (isSubmitting.value) return
   countdown.value = 5
   isCountingDown.value = true
+  lastHapticSecond.value = null
   countdownIntervalId.value = window.setInterval(() => {
     countdown.value = countdown.value - 1
+    if ([3, 2, 1].includes(countdown.value) && lastHapticSecond.value !== countdown.value) {
+      haptic('medium')
+      lastHapticSecond.value = countdown.value
+    }
     if (countdown.value <= 0) {
       if (countdownIntervalId.value) { clearInterval(countdownIntervalId.value); countdownIntervalId.value = null }
       confirmOrder()
@@ -390,6 +404,7 @@ function cancelCountdown() {
   if (countdownIntervalId.value) { clearInterval(countdownIntervalId.value); countdownIntervalId.value = null }
   isCountingDown.value = false
   countdown.value = 5
+  lastHapticSecond.value = null
 }
 
 async function confirmOrder() {
@@ -404,7 +419,7 @@ async function confirmOrder() {
     guestCount: Number(orderStore.guestCount),
     isRefill: orderStore.isRefillMode
   }
-  try { sessionStorage.setItem('orderSnapshot', JSON.stringify(orderSnapshot.value)) } catch (e) { }
+  try { sessionStorage.setItem('orderSnapshot', JSON.stringify(orderSnapshot.value)) } catch (e) { logger.debug('[Menu] failed to persist orderSnapshot', e) }
 
   try {
     if (orderStore.isRefillMode) {
@@ -422,19 +437,29 @@ async function confirmOrder() {
     isOrderDrawerOpen.value = false
 
     showSuccessBanner.value = true
-    try { sessionStorage.setItem('orderSnapshot', JSON.stringify(orderSnapshot.value)) } catch (e) { }
+    try { sessionStorage.setItem('orderSnapshot', JSON.stringify(orderSnapshot.value)) } catch (e) { logger.debug('[Menu] failed to persist orderSnapshot', e) }
     undoTimerId.value = window.setTimeout(() => {
       showSuccessBanner.value = false
       orderSnapshot.value = null
-      try { sessionStorage.removeItem('orderSnapshot') } catch (e) { }
+      try { sessionStorage.removeItem('orderSnapshot') } catch (e) { logger.debug('[Menu] failed to clear orderSnapshot', e) }
       undoTimerId.value = null
     }, 5000)
   } catch (err: any) {
     isSubmitting.value = false
     isCountingDown.value = false
-    placeOrderError.value = err?.message || String(err)
+    const baseMessage = err?.message || String(err)
+    placeOrderError.value = `${baseMessage} — Please check the connection, retry, or call staff.`
     const errorMsg = orderStore.isRefillMode ? 'Failed to place refill order' : 'Failed to place order'
   }
+}
+
+const retryOrder = () => {
+  if (isSubmitting.value) return
+  confirmOrder()
+}
+
+const requestOrderHelp = () => {
+  handleSupportRequest('support')
 }
 
 function modifyDuringCountdown() {
@@ -470,8 +495,14 @@ function modifyDuringCountdown() {
             </div>
           </div>
 
-          <menu-category-tabs :categories="availableCategories" :active-category="activeCategory" :sticky="true"
-            @select="setCategory" />
+          <menu-category-tabs
+            :categories="categories"
+            :active-category="activeCategory"
+            :sticky="true"
+            :is-refill-mode="orderStore.isRefillMode"
+            :refill-allowed-categories="refillAllowedCategories"
+            @select="setCategory"
+          />
         </div>
       </div>
 
@@ -479,16 +510,8 @@ function modifyDuringCountdown() {
       <div class="flex-1 overflow-y-auto p-6">
         <div class="max-w-7xl mx-auto">
 
-          <!-- Loading State -->
-          <div v-if="isLoading" class="flex items-center justify-center py-20">
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mx-auto mb-4"></div>
-              <p class="text-on text-xl">Loading {{ activeCategory }}...</p>
-            </div>
-          </div>
-
           <!-- Error State -->
-          <div v-else-if="categoryError" class="flex justify-center">
+          <div v-if="categoryError" class="flex justify-center">
             <el-card class="max-w-md bg-red-500/20">
               <template #header>
                 <span class="text-on font-semibold">Error Loading {{ activeCategory }}</span>
@@ -503,15 +526,29 @@ function modifyDuringCountdown() {
 
           <!-- Meats View (Grouped by Category) -->
           <div v-else-if="activeCategory === 'meats'">
-            <grouped-meats-list :meats="meats" :get-item-quantity="getItemQuantity" :max-quantity="UNLIMITED_ITEM_CAP"
-              @add-item="addToOrder" />
+            <grouped-meats-list
+              :meats="meats"
+              :get-item-quantity="getItemQuantity"
+              :max-quantity="UNLIMITED_ITEM_CAP"
+              :loading="isLoading"
+              @add-item="addToOrder"
+            />
           </div>
 
           <!-- Other Categories View -->
           <div v-else>
-            <menu-item-grid :items="displayItems" :category-type="activeCategory"
-              :is-unlimited-category="isUnlimitedCategory" :get-item-quantity="getItemQuantity"
-              :max-quantity="UNLIMITED_ITEM_CAP" :loading="isLoading" @add-item="addToOrder" />
+            <menu-item-grid
+              :items="displayItems"
+              :category-type="activeCategory"
+              :is-unlimited-category="isUnlimitedCategory"
+              :get-item-quantity="getItemQuantity"
+              :max-quantity="UNLIMITED_ITEM_CAP"
+              :loading="isLoading"
+              :is-refill-mode="orderStore.isRefillMode"
+              :is-category-locked="isCategoryLocked(activeCategory)"
+              :locked-reason="'Locked in refill mode'"
+              @add-item="addToOrder"
+            />
           </div>
 
         </div>
@@ -540,7 +577,7 @@ function modifyDuringCountdown() {
     :taxAmount="orderStore.isRefillMode ? 0 : taxAmount"
     :grandTotal="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal" :isCountingDown="isCountingDown"
     :countdown="countdown" :placeOrderError="placeOrderError" :isSubmitting="orderStore.isSubmitting"
-    :is-refill-mode="orderStore.isRefillMode" @confirm="confirmOrder"
+    :is-refill-mode="orderStore.isRefillMode" @confirm="confirmOrder" @retry="retryOrder" @request-support="requestOrderHelp"
     @cancel="() => { if (isCountingDown) cancelCountdown(); else isOrderDrawerOpen = false }"
     @modify="modifyDuringCountdown" />
 

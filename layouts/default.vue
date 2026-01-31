@@ -1,6 +1,54 @@
 <script setup lang="ts">
-// Smooth page transitions are handled by CSS in main.css
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import NetworkIndicator from '~/components/NetworkIndicator.vue'
+import SessionTimerBanner from '~/components/common/SessionTimerBanner.vue'
+import SessionCompletionOverlay from '~/components/common/SessionCompletionOverlay.vue'
+import { useOrderStore } from '~/stores/order'
+import { useSessionStore } from '~/stores/session'
+
+const orderStore = useOrderStore()
+const sessionStore = useSessionStore()
+const router = useRouter()
+
+const showCompletionOverlay = ref(false)
+let completionTimeoutId: number | null = null
+
+const orderStatus = computed(() => orderStore.currentOrder?.order?.status || orderStore.currentOrder?.status)
+
+const acknowledgeCompletion = async () => {
+  if (completionTimeoutId) {
+    try { clearTimeout(completionTimeoutId) } catch (e) { /* ignore */ }
+    completionTimeoutId = null
+  }
+  showCompletionOverlay.value = false
+  sessionStore.end()
+  await router.replace('/')
+}
+
+const triggerCompletionOverlay = () => {
+  showCompletionOverlay.value = true
+  if (completionTimeoutId) {
+    try { clearTimeout(completionTimeoutId) } catch (e) { /* ignore */ }
+    completionTimeoutId = null
+  }
+  completionTimeoutId = window.setTimeout(() => {
+    acknowledgeCompletion()
+  }, 2000)
+}
+
+watch(orderStatus, (status) => {
+  if (status === 'completed') {
+    triggerCompletionOverlay()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (completionTimeoutId) {
+    try { clearTimeout(completionTimeoutId) } catch (e) { /* ignore */ }
+    completionTimeoutId = null
+  }
+})
 </script>
 
 <template>
@@ -8,9 +56,12 @@ import NetworkIndicator from '~/components/NetworkIndicator.vue'
     <NetworkIndicator />
     <Transition name="slide-left" mode="out-in" appear>
       <div :key="$route.path" class="h-screen w-screen z-10 overflow-hidden relative bg-gray-950/80 backdrop-blur-sm safe-area-top safe-area-bottom">
+        <SessionTimerBanner />
         <slot />
       </div>
     </Transition>
+
+    <SessionCompletionOverlay :visible="showCompletionOverlay" @acknowledge="acknowledgeCompletion" />
 
     <!-- Ambient flame effect -->
     <div class="absolute inset-0 pointer-events-none">

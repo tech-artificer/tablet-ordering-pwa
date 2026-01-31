@@ -1,5 +1,5 @@
 ﻿import { defineStore } from 'pinia'
-import { reactive, computed, toRefs } from 'vue'
+import { reactive, computed, toRefs, onScopeDispose } from 'vue'
 import { useApi } from '../composables/useApi'
 import { logger } from '../utils/logger'
 import { notifyBlockedAction } from '../composables/useNotifier'
@@ -24,6 +24,49 @@ export const useOrderStore = defineStore('order', () => {
     pollInflight: false as boolean,
     pollingOrderId: null as string | null
   })
+
+  let submitOrderMutex: Promise<any> | null = null
+  let submitRefillMutex: Promise<any> | null = null
+  let completionTimeoutId: number | null = null
+  let pollingStartedAt: number | null = null
+  const maxPollingRuntimeMs = 15 * 60 * 1000
+
+  const validateOrderState = (source: string) => {
+    const issues: string[] = []
+
+    if (state.isRefillMode && !state.hasPlacedOrder) {
+      state.isRefillMode = false
+      state.refillItems = []
+      issues.push('refillModeWithoutOrder')
+    }
+
+    if (state.hasPlacedOrder && !state.currentOrder) {
+      state.hasPlacedOrder = false
+      state.submittedItems = []
+      issues.push('hasPlacedOrderWithoutCurrentOrder')
+    }
+
+    if (state.isPolling && !state.pollTimerId) {
+      state.isPolling = false
+      state.pollInflight = false
+      state.pollingOrderId = null
+      issues.push('pollingFlagWithoutTimer')
+    }
+
+    if (!state.isPolling && state.pollTimerId) {
+      try {
+        clearInterval(state.pollTimerId as any)
+      } catch (e) {
+        logger.debug('[OrderStore] validateOrderState: clearInterval failed', e)
+      }
+      state.pollTimerId = null
+      issues.push('timerWithoutPollingFlag')
+    }
+
+    if (issues.length > 0) {
+      logger.warn('[OrderStore] State recovery applied', { source, issues })
+    }
+  }
 
   const getCartItemQuantity = (id: number) => {
     const items = state.isRefillMode ? state.refillItems : state.cartItems
@@ -235,11 +278,64 @@ export const useOrderStore = defineStore('order', () => {
     return payload
   }
 
-  async function submitOrder(payload?: any) {
-    if (state.hasPlacedOrder && !state.isRefillMode) {
-      throw new Error('An initial order has already been placed for this session. Use refill instead.')
+  function buildRefillPayload() {
+    state.refillItems.forEach((item: any, index: number) => {
+      if (item?.category && !['meats', 'sides'].includes(item.category)) {
+        throw new Error(`Invalid refill item[${index}].category: only meats and sides are allowed`)
+      }
+    })
+
+    const items = state.refillItems.map((i: any, index: number) => ({
+      menu_id: i.id ? Number(i.id) : undefined,
+      name: i.name,
+      quantity: Number(i.quantity),
+      price: i.price !== undefined ? Number(i.price) : 0,
+      index: index + 1,
+      seat_number: 1,
+      note: i.note || 'Refill'
+    }))
+
+    const payload = { items }
+
+    logger.debug('🔍 Validating refill payload structure...')
+
+    if (!Array.isArray(payload.items) || payload.items.length === 0) {
+      throw new Error('Invalid refill items: must be a non-empty array')
     }
-    state.isSubmitting = true
+
+    payload.items.forEach((item, index) => {
+      if (!item.menu_id || typeof item.menu_id !== 'number') {
+        throw new Error(`Invalid refill item[${index}].menu_id: must be a number`)
+      }
+      if (!item.name || typeof item.name !== 'string') {
+        throw new Error(`Invalid refill item[${index}].name: must be a non-empty string`)
+      }
+      if (!item.quantity || item.quantity < 1) {
+        throw new Error(`Invalid refill item[${index}].quantity: must be at least 1`)
+      }
+      if (typeof item.price !== 'number' || item.price < 0) {
+        throw new Error(`Invalid refill item[${index}].price: must be a non-negative number`)
+      }
+    })
+
+    logger.debug('✅ Refill payload validation passed')
+    return payload
+  }
+
+  async function submitOrder(payload?: any) {
+    if (submitOrderMutex) {
+      logger.warn('submitOrder already in progress; awaiting existing submission')
+      return submitOrderMutex
+    }
+
+    submitOrderMutex = (async () => {
+      if (state.hasPlacedOrder && !state.isRefillMode) {
+        throw new Error('An initial order has already been placed for this session. Use refill instead.')
+      }
+      if (state.isSubmitting) {
+        throw new Error('Order submission already in progress. Please wait.')
+      }
+      state.isSubmitting = true
     // 🔒 VALIDATION: Ensure everything is set before submitting
     const { useDeviceStore } = await import('./device')
     const deviceStore = useDeviceStore()
@@ -292,10 +388,6 @@ export const useOrderStore = defineStore('order', () => {
       logger.info('✅ Order submission SUCCESS')
       logger.debug('📥 Response:', resp.data)
       
-      // Update session with order ID from response
-      const { useSessionStore } = await import('./session')
-      const sessionStore = useSessionStore()
-      
       // Check for success flag first
       if (!resp.data?.success) {
         logger.error('❌ Server returned success=false:', resp.data)
@@ -318,7 +410,7 @@ export const useOrderStore = defineStore('order', () => {
       
       return resp.data
     } catch (error: any) {
-      logger.error('❌ Order submission failed:', error.message)
+      logger.error('❌ Order submission failed:', error?.message || error)
       
       // Handle authentication errors specifically
       if (error.response?.status === 401 || error.response?.data?.exception === 'authentication') {
@@ -358,51 +450,131 @@ export const useOrderStore = defineStore('order', () => {
     } finally {
       state.isSubmitting = false
     }
+    })()
+
+    try {
+      return await submitOrderMutex
+    } finally {
+      submitOrderMutex = null
+    }
   }
   
   async function submitRefill(payload?: any) {
-    if (!state.currentOrder && !state.hasPlacedOrder) {
-      throw new Error('No existing order found — cannot submit a refill.')
+    if (submitRefillMutex) {
+      logger.warn('submitRefill already in progress; awaiting existing submission')
+      return submitRefillMutex
     }
-    state.isSubmitting = true
-    const api = useApi()
-    
-    // Use order_id (business ID) - goes in URL path
-    const currentOrderId = getCurrentOrderId(state.currentOrder)
-    
-    if (!currentOrderId) {
-      state.isSubmitting = false
-      throw new Error('Cannot submit refill: missing order ID')
-    }
-    
-    // Build payload matching POST /api/order/{orderId}/refill spec
-    const refillPayload = {
-      items: state.refillItems.map((i: any, index: number) => ({
-        menu_id: i.id ? Number(i.id) : undefined,
-        name: i.name,
-        quantity: Number(i.quantity),
-        price: i.price !== undefined ? Number(i.price) : undefined,
-        index: index + 1,
-        seat_number: 1,
-        note: i.note || 'Refill'
-      }))
-    }
-    
-    console.log('[Refill] Submitting to /api/order/' + currentOrderId + '/refill', refillPayload)
-    
+
+    submitRefillMutex = (async () => {
+      if (!state.currentOrder && !state.hasPlacedOrder) {
+        throw new Error('No existing order found — cannot submit a refill.')
+      }
+      if (state.isSubmitting) {
+        throw new Error('Order submission already in progress. Please wait.')
+      }
+      state.isSubmitting = true
+
+      const { useDeviceStore } = await import('./device')
+      const deviceStore = useDeviceStore()
+
+      logger.debug('🔍 Refill pre-submission validation:', {
+        hasPlacedOrder: state.hasPlacedOrder,
+        currentOrder: !!state.currentOrder,
+        refillItemsCount: state.refillItems.length,
+        isAuthenticated: deviceStore.isAuthenticated
+      })
+
+      if (!deviceStore.token) {
+        throw new Error('❌ Device not authenticated - missing token. Please register device first.')
+      }
+
+      const tableData = deviceStore.table?.value || deviceStore.table
+      const tableId = (tableData as any)?.id
+      const tableName = (tableData as any)?.name
+
+      logger.debug('🔍 Table validation (refill):', { tableId, tableName })
+
+      if (!tableId) {
+        logger.error('❌ Table validation failed (refill) - no table ID found')
+        throw new Error('❌ No table assigned to this device. Please contact staff.')
+      }
+
+      if (!Array.isArray(state.refillItems) || state.refillItems.length === 0) {
+        throw new Error('❌ No refill items selected. Please add items to refill.')
+      }
+
+      const { useSessionStore } = await import('./session')
+      const sessionStore = useSessionStore()
+
+      // Use order_id (business ID) - goes in URL path
+      const currentOrderId = getCurrentOrderId(state.currentOrder) ?? sessionStore.orderId
+
+      if (!currentOrderId) {
+        throw new Error('Cannot submit refill: missing order ID')
+      }
+
+      const api = useApi()
+      const refillPayload = payload ?? buildRefillPayload()
+
+      logger.debug('📦 Refill Payload:', refillPayload)
+
+      try {
+        const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? (crypto as any).randomUUID() : `idemp-${Date.now()}-${Math.random().toString(36).slice(2,10)}`
+        const resp = await api.post(`/api/order/${currentOrderId}/refill`, refillPayload, { headers: { 'X-Idempotency-Key': idempotencyKey } })
+        logger.info('✅ Refill submission SUCCESS')
+        logger.debug('📥 Refill Response:', resp.data)
+
+        if (resp.data?.success === false) {
+          logger.error('❌ Refill server returned success=false:', resp.data)
+          throw new Error(resp.data?.message || 'Refill processing failed on server')
+        }
+
+        state.refillItems = []
+        state.isRefillMode = false
+        state.history = [...state.history, { ...resp.data, type: 'refill' }]
+        return resp.data
+      } catch (error: any) {
+        logger.error('❌ Refill submission failed:', error?.message || error)
+
+        if (error.response?.status === 401 || error.response?.data?.exception === 'authentication') {
+          logger.error('🔐 Authentication error - token invalid or expired')
+          throw new Error('❌ Your session has expired. Please re-register this device in Settings.')
+        }
+
+        if (error.response?.status === 422) {
+          const validationErrors = error.response?.data?.errors
+          logger.error('📋 Validation errors:', validationErrors)
+          const errorMessages = Object.values(validationErrors || {}).flat().join(', ')
+          throw new Error(`❌ Validation failed: ${errorMessages}`)
+        }
+
+        if (error.response?.status === 500) {
+          const serverMessage = error.response?.data?.message || 'Internal server error'
+          logger.error('🔴 SERVER ERROR (500) - Backend crashed')
+          throw new Error(
+            `❌ ${serverMessage}\n\n` +
+            `🔧 Backend debugging needed:\n` +
+            `1. Check Laravel logs (storage/logs/laravel.log)\n` +
+            `2. Enable APP_DEBUG=true in .env\n` +
+            `3. Verify database schema and OrderService\n\n` +
+            `Use Settings > Backend Diagnostics to test directly.`
+          )
+        }
+
+        if (!error.response) {
+          throw new Error('❌ Network error: Cannot reach backend server. Check if Laravel is running.')
+        }
+
+        throw error
+      } finally {
+        state.isSubmitting = false
+      }
+    })()
+
     try {
-      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? (crypto as any).randomUUID() : `idemp-${Date.now()}-${Math.random().toString(36).slice(2,10)}`
-      const resp = await api.post(`/api/order/${currentOrderId}/refill`, payload ?? refillPayload, { headers: { 'X-Idempotency-Key': idempotencyKey } })
-      state.refillItems = []
-      state.isRefillMode = false
-      state.history = [...state.history, { ...resp.data, type: 'refill' }]
-      console.log('[Refill] Success:', resp.data)
-      return resp.data
-    } catch (error: any) {
-      console.error('[Refill] Failed:', error?.response?.data || error)
-      throw error
+      return await submitRefillMutex
     } finally {
-      state.isSubmitting = false
+      submitRefillMutex = null
     }
   }
 
@@ -460,12 +632,21 @@ export const useOrderStore = defineStore('order', () => {
         clearInterval(state.pollTimerId as any)
       }
     } catch (e) {
-      // ignore
+      logger.debug('stopOrderPolling: clearInterval failed', e)
     }
     state.pollTimerId = null
     state.isPolling = false
     state.pollInflight = false
     state.pollingOrderId = null
+    pollingStartedAt = null
+    if (completionTimeoutId) {
+      try {
+        clearTimeout(completionTimeoutId)
+      } catch (e) {
+        logger.debug('stopOrderPolling: clearTimeout failed', e)
+      }
+      completionTimeoutId = null
+    }
     logger.debug('✅ Order polling stopped')
   }
 
@@ -493,9 +674,17 @@ export const useOrderStore = defineStore('order', () => {
 
     state.isPolling = true
     state.pollingOrderId = orderId
+    pollingStartedAt = Date.now()
 
     const tick = async () => {
       if (state.pollInflight) return
+      if (!state.isPolling || state.pollingOrderId !== orderId) return
+
+      if (pollingStartedAt && (Date.now() - pollingStartedAt) > maxPollingRuntimeMs) {
+        logger.warn('startOrderPolling: max runtime exceeded, stopping polling', { orderId, maxPollingRuntimeMs })
+        stopOrderPolling()
+        return
+      }
       state.pollInflight = true
       try {
         const api = useApi()
@@ -519,7 +708,7 @@ export const useOrderStore = defineStore('order', () => {
             const polledOrderId = extractOrderId(orderObj)
             if (polledOrderId) sessionStore.orderId = Number(polledOrderId)
           } catch (e) {
-            // ignore
+            logger.debug('startOrderPolling: failed to sync session orderId', e)
           }
 
           // Stop polling if terminal status observed
@@ -535,7 +724,11 @@ export const useOrderStore = defineStore('order', () => {
                 
                 // Small delay to allow any final UI updates. Await session end
                 // and clear order state immediately to avoid a refill UI loop.
-                setTimeout(async () => {
+                if (completionTimeoutId) {
+                  try { clearTimeout(completionTimeoutId) } catch (e) { logger.debug('order completion timeout clear failed', e) }
+                  completionTimeoutId = null
+                }
+                completionTimeoutId = window.setTimeout(async () => {
                   try {
                     // Load fresh session store instance and call end
                     const { useSessionStore } = await import('./session')
@@ -567,6 +760,8 @@ export const useOrderStore = defineStore('order', () => {
                     await nuxtApp.$router.replace('/')
                   } catch (e) {
                     logger.warn('Failed to end session on order completion:', e)
+                  } finally {
+                    completionTimeoutId = null
                   }
                 }, 2000)
               } catch (e) {
@@ -583,8 +778,8 @@ export const useOrderStore = defineStore('order', () => {
     }
 
     // Run immediately, then every 5s
-    tick().catch(() => {})
-    const timerId = setInterval(() => tick().catch(() => {}), 5000) as unknown as number
+    tick().catch((e) => logger.warn('Order polling initial tick failed:', e))
+    const timerId = setInterval(() => tick().catch((e) => logger.warn('Order polling interval tick failed:', e)), 5000) as unknown as number
     state.pollTimerId = timerId
     logger.info('✅ Order polling started for', orderId)
   }
@@ -617,6 +812,7 @@ export const useOrderStore = defineStore('order', () => {
           logger.debug('initializeFromSession: session.orderId appeared during grace, skipping clear')
         }
       }
+      validateOrderState('initializeFromSession:no-session')
       return
     }
     
@@ -647,6 +843,7 @@ export const useOrderStore = defineStore('order', () => {
       logger.warn('🔁 Failed to fetch order during initializeFromSession:', err)
     }
     logger.debug('🔁 Initialized order state from session.orderId:', sessionStore.orderId)
+    validateOrderState('initializeFromSession:completed')
   }
 
   // Broadcast event handlers
@@ -669,6 +866,16 @@ export const useOrderStore = defineStore('order', () => {
   // Return refs so Pinia unwraps them at runtime. Cast to `any` so
   // TypeScript callers (tests) can assign values directly without
   // needing to work with `Ref<T>` types.
+  validateOrderState('init')
+
+  onScopeDispose(() => {
+    stopOrderPolling()
+    if (completionTimeoutId) {
+      try { clearTimeout(completionTimeoutId) } catch (e) { logger.debug('OrderStore dispose: clearTimeout failed', e) }
+      completionTimeoutId = null
+    }
+  })
+
   return ({
     ...toRefs(state),
     getCartItemQuantity,

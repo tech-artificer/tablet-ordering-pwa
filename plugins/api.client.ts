@@ -1,11 +1,14 @@
-import { defineNuxtPlugin } from '#app'
+import { defineNuxtPlugin, navigateTo } from '#app'
 import axios from 'axios'
 import { useDeviceStore } from '../stores/device'
 import { useRuntimeConfig } from '#imports'
 import { logger } from '../utils/logger'
 import type { InternalAxiosRequestConfig } from 'axios'
+import { ElNotification } from 'element-plus'
 
 export default defineNuxtPlugin(() => {
+  let authRedirectInProgress = false
+  let authRedirectTimeoutId: number | null = null
   
   const config = useRuntimeConfig()
 
@@ -78,6 +81,28 @@ export default defineNuxtPlugin(() => {
   })
 
   // Add response interceptor to log errors and handle 401 token refresh
+  const redirectToSettings = () => {
+    if (authRedirectInProgress) return
+    authRedirectInProgress = true
+
+    if (typeof window !== 'undefined') {
+      ElNotification.warning({
+        title: 'Session expired',
+        message: 'Device authentication expired. Please re-register from Settings.',
+        duration: 4000
+      })
+
+      if (authRedirectTimeoutId) {
+        try { clearTimeout(authRedirectTimeoutId) } catch (e) { logger.debug('redirectToSettings: clearTimeout failed', e) }
+        authRedirectTimeoutId = null
+      }
+      authRedirectTimeoutId = window.setTimeout(() => {
+        navigateTo({ path: '/settings', query: { requirePin: '1' } })
+        authRedirectTimeoutId = null
+      }, 1500)
+    }
+  }
+
   api.interceptors.response.use(
     (response) => {
       logger.debug('📥 API Response SUCCESS:', {
@@ -122,16 +147,12 @@ export default defineNuxtPlugin(() => {
             // Retry the original request with new token
             return api(originalRequest)
           } else {
-            logger.error('❌ Re-authentication failed, redirecting to home')
-            if (typeof window !== 'undefined') {
-              window.location.href = '/'
-            }
+            logger.error('❌ Re-authentication failed, redirecting to settings')
+            redirectToSettings()
           }
         } catch (refreshError) {
           logger.error('❌ Re-authentication exception:', refreshError)
-          if (typeof window !== 'undefined') {
-            window.location.href = '/'
-          }
+          redirectToSettings()
         }
       }
 

@@ -250,7 +250,18 @@ function handleTouchEnd() {
         </div>
 
         <!-- Package info bar - name, badge, price, select button -->
-        <div v-if="packages[currentIndex]" class="flex items-center justify-between gap-4 mb-3 px-2">
+        <div v-if="menuStore.isLoadingPackages" class="flex items-center justify-between gap-4 mb-3 px-2">
+          <div class="flex-1 min-w-0 space-y-2">
+            <div class="h-6 w-64 bg-white/10 rounded animate-pulse"></div>
+            <div class="h-3 w-80 bg-white/10 rounded animate-pulse"></div>
+          </div>
+          <div class="flex items-center gap-4 flex-shrink-0">
+            <div class="h-12 w-32 bg-white/10 rounded-xl animate-pulse"></div>
+            <div class="h-12 w-40 bg-white/10 rounded-xl animate-pulse"></div>
+          </div>
+        </div>
+
+        <div v-else-if="packages[currentIndex]" class="flex items-center justify-between gap-4 mb-3 px-2">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-3 mb-1">
               <h2 class="text-white font-bold text-xl truncate">{{ packages[currentIndex].name }}</h2>
@@ -283,10 +294,13 @@ function handleTouchEnd() {
         </div>
 
         <!-- Loading state -->
-        <div v-if="menuStore.isLoadingPackages" class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <div class="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
-            <p class="text-white/80 mt-4 text-base">Loading packages...</p>
+        <div v-if="menuStore.isLoadingPackages" class="flex-1 min-h-0">
+          <div class="h-full bg-white/5 border border-white/10 rounded-2xl p-6 animate-pulse">
+            <div class="h-6 w-48 bg-white/10 rounded mb-4"></div>
+            <div class="h-4 w-80 bg-white/10 rounded mb-8"></div>
+            <div class="grid grid-cols-3 gap-4">
+              <div v-for="n in 6" :key="n" class="h-20 bg-white/10 rounded-xl"></div>
+            </div>
           </div>
         </div>
 

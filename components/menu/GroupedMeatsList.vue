@@ -8,6 +8,7 @@ const props = defineProps<{
   meats: Modifier[];
   getItemQuantity: (id: number) => number;
   maxQuantity?: number;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -40,7 +41,18 @@ const groupsArray = computed(() => {
 </script>
 
 <template>
-  <div v-if="groupsArray.length > 0" class="space-y-8">
+  <div v-if="props.loading" class="space-y-6">
+    <menu-item-grid
+      :items="[]"
+      category-type="meats"
+      :is-unlimited-category="true"
+      :get-item-quantity="getItemQuantity"
+      :max-quantity="maxQuantity"
+      :loading="true"
+    />
+  </div>
+
+  <div v-else-if="groupsArray.length > 0" class="space-y-8">
     <div v-for="group in groupsArray" :key="group.category" class="space-y-4">
       <!-- Section header -->
       <div class="flex items-center gap-3">

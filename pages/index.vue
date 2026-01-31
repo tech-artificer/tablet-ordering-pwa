@@ -142,7 +142,7 @@ const clearDeviceAuth = () => {
   try {
     // Clear Pinia persisted device store and in-memory state
     if (typeof localStorage !== 'undefined') localStorage.removeItem('device-store')
-    try { deviceStore.clearAuth() } catch (e) { /* ignore */ }
+    try { deviceStore.clearAuth() } catch (e) { logger.debug('clearDeviceAuth: clearAuth failed', e) }
     // reload to ensure UI reflects cleared state
     window.location.reload()
   } catch (e) {
@@ -158,48 +158,67 @@ const clearDeviceAuth = () => {
     <div v-if="showPinModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xl backdrop-brightness-75 transition-opacity">
       <div
-        class="bg-slate-900/90 text-white shadow-2xl shadow-black/40 ring-1 ring-white/10 rounded-2xl p-8 w-full max-w-md space-y-4 border-t-2 border-primary/60">
-        <h3 class="text-xl font-semibold">Enter Settings PIN</h3>
-        <p class="text-sm text-white/60">Enter staff PIN to access Settings.</p>
+        class="bg-slate-900/90 text-white shadow-2xl shadow-black/40 ring-1 ring-white/10 rounded-2xl p-6 w-full max-w-sm space-y-3 border-t-2 border-primary/60">
+        <h3 class="text-lg font-semibold">Enter Settings PIN</h3>
+        <p class="text-xs text-white/60">Enter staff PIN to access Settings.</p>
 
         <!-- Readonly masked display prevents virtual keyboard from opening -->
         <div>
-          <input readonly aria-live="polite" :value="maskedPin" placeholder="Enter PIN"
-            class="w-full px-4 py-3 rounded-xl bg-white/10 ring-1 ring-white/15 text-2xl tracking-[0.35em] text-center" />
+          <input
+            readonly
+            aria-live="polite"
+            aria-label="Settings PIN input"
+            :value="maskedPin"
+            placeholder="Enter PIN"
+            class="w-full px-4 py-3 rounded-lg bg-white/10 ring-2 ring-primary/30 text-2xl tracking-[0.4em] text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            style="min-width:160px; min-height:48px;"
+          />
         </div>
 
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-3 gap-2.5 mt-2">
           <button @click.prevent="appendDigit('1')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">1</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">1</button>
           <button @click.prevent="appendDigit('2')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">2</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">2</button>
           <button @click.prevent="appendDigit('3')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">3</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">3</button>
           <button @click.prevent="appendDigit('4')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">4</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">4</button>
           <button @click.prevent="appendDigit('5')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">5</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">5</button>
           <button @click.prevent="appendDigit('6')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">6</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">6</button>
           <button @click.prevent="appendDigit('7')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">7</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">7</button>
           <button @click.prevent="appendDigit('8')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">8</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">8</button>
           <button @click.prevent="appendDigit('9')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">9</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">9</button>
           <button @click.prevent="backspace()"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">⌫</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">⌫</button>
           <button @click.prevent="appendDigit('0')"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">0</button>
+            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">0</button>
           <button @click.prevent="clearPin()"
-            class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Clear</button>
+            class="h-12 w-full text-base font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            style="min-width:48px; min-height:48px;">Clear</button>
         </div>
 
-        <p v-if="pinError" class="text-sm text-red-300 bg-red-500/10 rounded-lg px-3 py-2">{{ pinError }}</p>
-        <div class="flex items-center justify-end gap-3">
-          <button @click="closePinModal()" class="px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25">Cancel</button>
+        <p v-if="pinError" class="text-xs text-red-300 bg-red-500/10 rounded-lg px-3 py-1.5">{{ pinError }}</p>
+        <div class="flex items-center justify-end gap-2">
+          <button @click="closePinModal()" class="px-3 py-2 text-sm rounded-lg bg-white/15 hover:bg-white/25">Cancel</button>
           <button @click.prevent="verifyPin()"
-            class="px-4 py-3 rounded-xl bg-primary text-slate-950 hover:bg-primary/90">Enter</button>
+            class="px-3 py-2 text-sm rounded-lg bg-primary text-slate-950 hover:bg-primary/90">Enter</button>
         </div>
       </div>
     </div>

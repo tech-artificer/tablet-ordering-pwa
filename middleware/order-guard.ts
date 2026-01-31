@@ -11,32 +11,48 @@ import { useSessionStore } from '~/stores/session'
 import { logger } from '~/utils/logger'
 
 export default defineNuxtRouteMiddleware((to, from) => {
-  // Only protect specific routes
-  const protectedRoutes = ['/menu', '/order/in-session']
-  
-  if (!protectedRoutes.includes(to.path)) {
-    return // Route doesn't need order guard
-  }
-
   const orderStore = useOrderStore()
   const sessionStore = useSessionStore()
   
-  // Check if an order has been placed and confirmed
-  if (!orderStore.hasPlacedOrder) {
-    logger.warn(`🚫 Route ${to.path} blocked: no order placed`)
-    logger.debug('Order state:', {
-      hasPlacedOrder: orderStore.hasPlacedOrder,
-      orderId: sessionStore.orderId,
-      currentOrder: !!orderStore.currentOrder
-    })
+  // /menu route: requires package selection (not order submission)
+  if (to.path === '/menu') {
+    // Allow access if package is selected (has valid package ID)
+    const hasPackage = !!(orderStore.package && (orderStore.package as any).id)
     
-    // Redirect to order start
-    return navigateTo('/order/start')
+    if (!hasPackage) {
+      logger.warn('🚫 Route /menu blocked: no package selected')
+      logger.debug('Order state:', {
+        hasPackage,
+        packageId: (orderStore.package as any)?.id,
+        guestCount: orderStore.guestCount
+      })
+      
+      // Redirect to package selection
+      return navigateTo('/order/packageSelection')
+    }
+    
+    return // Allow /menu access
   }
   
-  // Additional check for /order/in-session - must have orderId from server
-  if (to.path === '/order/in-session' && !sessionStore.orderId) {
-    logger.warn('🚫 Route /order/in-session blocked: waiting for server confirmation')
-    return navigateTo('/menu')
+  // /order/in-session route: requires order to be submitted
+  if (to.path === '/order/in-session') {
+    // Check if order has been placed and confirmed by backend
+    if (!orderStore.hasPlacedOrder) {
+      logger.warn('🚫 Route /order/in-session blocked: no order placed')
+      logger.debug('Order state:', {
+        hasPlacedOrder: orderStore.hasPlacedOrder,
+        orderId: sessionStore.orderId,
+        currentOrder: !!orderStore.currentOrder
+      })
+      
+      // Redirect to menu to place order first
+      return navigateTo('/menu')
+    }
+    
+    // Additional check: must have orderId from server
+    if (!sessionStore.orderId) {
+      logger.warn('🚫 Route /order/in-session blocked: waiting for server confirmation')
+      return navigateTo('/menu')
+    }
   }
 })

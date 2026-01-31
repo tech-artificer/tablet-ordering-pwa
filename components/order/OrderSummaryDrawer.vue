@@ -25,7 +25,7 @@ const props = defineProps({
   isRefillMode: { type: Boolean as PropType<boolean>, default: false }
 })
 
-const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'modify'])
+const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'modify', 'retry', 'request-support'])
 
 const visible = computed({
   get: () => props.modelValue,
@@ -47,6 +47,14 @@ function onCancel() {
 function onModify() {
   emit('modify')
 }
+
+function onRetry() {
+  emit('retry')
+}
+
+function onRequestSupport() {
+  emit('request-support')
+}
 </script>
 
 <template>
@@ -65,19 +73,22 @@ function onModify() {
           <div class="text-9xl font-bold text-primary animate-pulse-scale">{{ countdown }}</div>
           <div class="absolute inset-0 blur-3xl bg-primary/30 animate-pulse"></div>
         </div>
-        <p class="text-xl text-white/90 font-medium">Placing your order...</p>
+        <p class="text-xl text-white/90 font-medium">
+          Order will be placed in {{ countdown }}...
+        </p>
+        <p class="text-sm text-white/60">Cancel now to stop, or modify your order.</p>
         <div class="flex gap-4 justify-center mt-8">
           <button
             @click="onCancel"
-            class="px-8 py-4 rounded-xl font-bold text-lg transition-all bg-red-500/20 text-red-400 border-2 border-red-500/30 hover:bg-red-500/30 active:scale-95 shadow-lg hover:shadow-red-500/20"
+            class="px-8 py-4 min-h-[44px] rounded-xl font-bold text-lg transition-all bg-red-500/20 text-red-400 border-2 border-red-500/30 hover:bg-red-500/30 active:scale-95 shadow-lg hover:shadow-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400"
           >
             ✕ Cancel
           </button>
           <button
             @click="onModify"
-            class="px-8 py-4 rounded-xl font-bold text-lg transition-all bg-yellow-500/20 text-yellow-400 border-2 border-yellow-500/30 hover:bg-yellow-500/30 active:scale-95 shadow-lg hover:shadow-yellow-500/20"
+            class="px-8 py-4 min-h-[44px] rounded-xl font-bold text-lg transition-all bg-yellow-500/20 text-yellow-400 border-2 border-yellow-500/30 hover:bg-yellow-500/30 active:scale-95 shadow-lg hover:shadow-yellow-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
           >
-            ✎ Modify Order
+            ✎ Review Order
           </button>
         </div>
       </div>
@@ -108,8 +119,22 @@ function onModify() {
         </div>
 
         <!-- Error Message -->
-        <div v-if="placeOrderError" class="bg-red-500/20 border border-red-500/30 rounded-lg px-4 py-3">
+        <div v-if="placeOrderError" class="bg-red-500/20 border border-red-500/30 rounded-lg px-4 py-3 space-y-3">
           <p class="text-red-400 text-sm">{{ placeOrderError }}</p>
+          <div class="flex flex-wrap gap-3">
+            <button
+              @click="onRetry"
+                class="px-4 py-2 min-h-[44px] rounded-lg font-semibold bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Retry Order
+            </button>
+            <button
+              @click="onRequestSupport"
+                class="px-4 py-2 min-h-[44px] rounded-lg font-semibold bg-white/10 text-white border border-white/20 hover:bg-white/20 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              Request Staff
+            </button>
+          </div>
         </div>
 
         <!-- Action Buttons -->
@@ -117,13 +142,13 @@ function onModify() {
           <button
             @click="onConfirm"
             :disabled="isSubmitting"
-            class="flex-1 py-5 rounded-xl font-bold text-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-primary to-primary-dark text-white hover:shadow-2xl active:scale-95 hover:from-primary-dark hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex-1 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-primary to-primary-dark text-white hover:shadow-2xl active:scale-95 hover:from-primary-dark hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {{ isRefillMode ? '🔄 Confirm Refill' : '🔥 Confirm Order' }}
           </button>
           <button
             @click="onCancel"
-            class="px-8 py-5 rounded-xl font-bold text-xl transition-all duration-300 bg-white/10 text-white hover:bg-white/20 active:scale-95 border-2 border-white/20"
+            class="px-8 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 bg-white/10 text-white hover:bg-white/20 active:scale-95 border-2 border-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Cancel
           </button>

@@ -56,8 +56,22 @@ export default defineNuxtPlugin((nuxtApp: any) => {
             headers.Authorization = `Bearer ${token}`
         }
 
-        const wsPort = config.public.reverb.port ?? 6001
-        const wssPort = wsPort
+        // Dynamically select protocol based on current page
+        // Always select protocol based on browser context, not .env
+        let wsProtocol = 'ws';
+        let forceTLS = false;
+        let wsPort = config.public.reverb.port;
+        let wssPort = config.public.reverb.port;
+        
+        if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+            wsProtocol = 'wss';
+            forceTLS = true;
+            // When HTTPS, connect via nginx proxy (port 8000) for TLS termination
+            wsPort = 8000;
+            wssPort = 8000;
+        }
+        
+        logger.info(`[Echo] Connecting to Reverb: ${wsProtocol}://${reverbHost}:${wsPort}/reverb`)
 
         const echo = new Echo({
             broadcaster: 'reverb',
@@ -65,8 +79,8 @@ export default defineNuxtPlugin((nuxtApp: any) => {
             wsHost: reverbHost,
             wsPort: wsPort,
             wssPort: wssPort,
-            // set forceTLS based on scheme if provided
-            forceTLS: String(config.public.NUXT_PUBLIC_REVERB_SCHEME || '').toLowerCase() === 'https',
+            wsPath: '/reverb',  // CRITICAL: Use nginx proxy path for TLS termination
+            forceTLS,
             disableStats: true,
             enabledTransports: ['ws', 'wss'],
             authEndpoint,
@@ -83,6 +97,22 @@ export default defineNuxtPlugin((nuxtApp: any) => {
 
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
+
+        // Add connection health monitoring
+        if (echo.connector?.pusher) {
+            echo.connector.pusher.connection.bind('connected', () => {
+                logger.info('[Echo] ✅ WebSocket connected')
+            })
+            echo.connector.pusher.connection.bind('disconnected', () => {
+                logger.warn('[Echo] ⚠️ WebSocket disconnected')
+            })
+            echo.connector.pusher.connection.bind('error', (err: any) => {
+                logger.error('[Echo] 🔴 WebSocket error:', err)
+            })
+            echo.connector.pusher.connection.bind('failed', () => {
+                logger.error('[Echo] 🔴 WebSocket connection failed permanently')
+            })
+        }
 
         // Expose a helper to update Echo auth header when token changes
         // Usage: window.updateEchoAuth(tokenString | null)

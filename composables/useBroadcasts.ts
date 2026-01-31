@@ -96,6 +96,8 @@ export const useBroadcasts = () => {
   let orderChannel: any = null
   let serviceRequestChannel: any = null
   let deviceControlChannel: any = null
+  let orderCompletionTimeoutId: number | null = null
+  let reloadTimeoutId: number | null = null
 
   // Channel connection status
   const channelStatus = ref({
@@ -228,14 +230,24 @@ export const useBroadcasts = () => {
       orderStore.updateOrderStatus(event.status)
       // If this is a terminal status, stop the polling fallback
       if (event.status === 'completed' || event.status === 'cancelled' || event.status === 'voided') {
-        try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+        try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
         
         // End session and navigate to home on completed
         if (event.status === 'completed') {
           logger.info('✅ Order completed via broadcast - ending session in 2s')
-          setTimeout(async () => {
-            sessionStore.end()
-            await router.replace('/')
+          if (orderCompletionTimeoutId) {
+            try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] clearTimeout failed', e) }
+            orderCompletionTimeoutId = null
+          }
+          orderCompletionTimeoutId = window.setTimeout(async () => {
+            try {
+              sessionStore.end()
+              await router.replace('/')
+            } catch (e) {
+              logger.warn('[Broadcasts] Failed to end session after order completion', e)
+            } finally {
+              orderCompletionTimeoutId = null
+            }
           }, 2000)
         }
       }
@@ -261,13 +273,23 @@ export const useBroadcasts = () => {
     
     if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
       orderStore.completeOrder()
-      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
       
       // End session and navigate to home after a short delay
       logger.info('✅ Order completed via broadcast - ending session in 2s')
-      setTimeout(async () => {
-        sessionStore.end()
-        await router.replace('/')
+      if (orderCompletionTimeoutId) {
+        try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] clearTimeout failed', e) }
+        orderCompletionTimeoutId = null
+      }
+      orderCompletionTimeoutId = window.setTimeout(async () => {
+        try {
+          sessionStore.end()
+          await router.replace('/')
+        } catch (e) {
+          logger.warn('[Broadcasts] Failed to end session after order completion', e)
+        } finally {
+          orderCompletionTimeoutId = null
+        }
       }, 2000)
     }
   }
@@ -285,7 +307,7 @@ export const useBroadcasts = () => {
     // Clear order from store
     if (orderStore.currentOrder?.order_id === event.order.order_id) {
       orderStore.clearOrder()
-      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
     }
   }
 
@@ -315,7 +337,11 @@ export const useBroadcasts = () => {
       case 'restart':
       case 'reload':
         ElMessage.warning('App will restart in 3 seconds...')
-        setTimeout(() => {
+        if (reloadTimeoutId) {
+          try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] clearTimeout failed', e) }
+          reloadTimeoutId = null
+        }
+        reloadTimeoutId = window.setTimeout(() => {
           window.location.reload()
         }, 3000)
         break
@@ -509,6 +535,14 @@ export const useBroadcasts = () => {
 
   // Cleanup on unmount
   const cleanup = () => {
+    if (orderCompletionTimeoutId) {
+      try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
+      orderCompletionTimeoutId = null
+    }
+    if (reloadTimeoutId) {
+      try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
+      reloadTimeoutId = null
+    }
     unsubscribeFromOrderChannel()
     if (deviceChannel) {
       (window as any).Echo.leave(deviceChannel.name)
@@ -521,6 +555,10 @@ export const useBroadcasts = () => {
       channelStatus.value.deviceControl = false
     }
   }
+
+  onUnmounted(() => {
+    cleanup()
+  })
 
   return {
     initializeBroadcasts,

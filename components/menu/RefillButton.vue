@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import Button from '../ui/Button.vue'
 
 const props = defineProps<{
   hasPlacedOrder: boolean
@@ -21,17 +22,22 @@ const buttonIcon = computed(() => {
 </script>
 
 <template>
-  <button :class="[
-    'refill-button',
-    isRefillMode && 'active',
-    !hasPlacedOrder && 'disabled'
-  ]" @click="emit('toggleRefillMode')" :disabled="!hasPlacedOrder">
+  <Button
+    :class="[
+      'refill-button',
+      isRefillMode && 'active',
+      !hasPlacedOrder && 'disabled'
+    ]"
+    :disabled="!hasPlacedOrder"
+    aria-label="Toggle refill mode"
+    @click="emit('toggleRefillMode')"
+  >
     <span class="refill-icon">{{ buttonIcon }}</span>
     <span class="refill-text">{{ buttonText }}</span>
 
     <!-- Shine effect -->
     <div v-if="hasPlacedOrder && !isRefillMode" class="shine" />
-  </button>
+  </Button>
 </template>
 
 <style scoped>

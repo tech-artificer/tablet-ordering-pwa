@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import { useMenuStore } from '~/stores/menu'
 import { useOrderStore } from '~/stores/order'
 import { ref } from 'vue'
+import { logger } from '~/utils/logger'
 
 const router = useRouter()
 const menuStore = useMenuStore()
@@ -18,8 +19,8 @@ function toggle(i: number) {
 async function selectPackage(p: any) {
   try {
     orderStore.setPackage(p)
-  } catch (e) { /* ignore */ }
-  try { await menuStore.loadAllMenus() } catch {}
+  } catch (e) { logger.debug('[PackageFallback] setPackage failed', e) }
+  try { await menuStore.loadAllMenus() } catch (e) { logger.debug('[PackageFallback] loadAllMenus failed', e) }
   await router.push({ path: '/menu', query: { packageId: p.id } })
 }
 </script>

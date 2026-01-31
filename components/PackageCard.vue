@@ -89,11 +89,16 @@ const handleViewDetails = () => {
     
     <!-- Hero background image with overlay -->
     <div class="absolute inset-0 z-0">
-      <img 
-        :src="props.pkg.img_url" 
-        :alt="props.pkg.name" 
+      <NuxtImg
+        v-if="props.pkg.img_url"
+        :src="props.pkg.img_url"
+        :alt="props.pkg.name || 'Package image'"
         class="w-full h-full object-cover"
+        loading="lazy"
+        sizes="100vw"
+        format="webp"
       />
+      <div v-else class="w-full h-full bg-gradient-to-br from-gray-800 via-gray-900 to-black"></div>
       <div class="absolute inset-0 bg-gradient-to-b from-black/50 via-black/70 to-black/90"></div>
     </div>
 
@@ -134,11 +139,14 @@ const handleViewDetails = () => {
           >
             <!-- Category image or emoji -->
             <div class="relative">
-              <img 
+              <NuxtImg
                 v-if="getCategoryImage(category)"
                 :src="getCategoryImage(category)!"
-                :alt="category"
+                :alt="`${category} item`"
                 class="w-10 h-10 rounded-xl object-cover ring-2 ring-white/30"
+                loading="lazy"
+                sizes="80px"
+                format="webp"
               />
               <div 
                 v-else
@@ -180,11 +188,14 @@ const handleViewDetails = () => {
                   :key="mod.id"
                   class="flex-shrink-0 w-28 flex flex-col items-center text-center p-3 rounded-xl bg-white/5 border border-white/10 hover:border-primary/40 transition-all duration-200"
                 >
-                  <img 
+                  <NuxtImg
                     v-if="mod.img_url" 
                     :src="mod.img_url" 
-                    :alt="mod.name" 
+                    :alt="mod.name || 'Menu item'" 
                     class="w-16 h-16 rounded-lg object-cover ring-1 ring-white/30 mb-2"
+                    loading="lazy"
+                    sizes="96px"
+                    format="webp"
                   />
                   <div 
                     v-else 

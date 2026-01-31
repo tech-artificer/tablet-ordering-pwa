@@ -77,11 +77,17 @@ const groupModifiersByCategory = (modifiers: any[]) => {
           class="bg-surface-10 backdrop-blur-md rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer border-2 border-surface-20 hover:border-surface-10 group">
           <!-- Package Image -->
           <div class="relative h-32 overflow-hidden">
-            <img 
-              :src="item.img_url" 
-              :alt="item.name"
+            <NuxtImg
+              v-if="item.img_url"
+              :src="item.img_url"
+              :alt="item.name || 'Package image'"
               class="w-full h-full object-cover transition-all duration-500"
-              @error="(e) => (e.target as HTMLImageElement).src = '/images/placeholder.jpg'" />
+              loading="lazy"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              format="webp"
+              @error="(e) => (e.target as HTMLImageElement).src = '/images/placeholder.jpg'"
+            />
+            <div v-else class="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900"></div>
               
             
             <!-- Availability Badge -->

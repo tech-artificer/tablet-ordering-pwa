@@ -126,6 +126,14 @@ const removeItem = (itemId: number) => {
 import { logger } from '../../utils/logger'
 
 const submitOrder = () => {
+  if (orderStore.isSubmitting) {
+    logger.warn('CartSidebar submitOrder blocked: submission already in progress')
+    return
+  }
+  if (!canSubmit.value) {
+    logger.warn('CartSidebar submitOrder blocked: cannot submit in current state')
+    return
+  }
   logger.debug('CartSidebar submitOrder clicked')
   emit('submitOrder');
 };
@@ -168,11 +176,11 @@ const submitOrder = () => {
         <span class="text-primary font-semibold text-sm">{{ selectedPackage.name }}</span>
         <div v-if="!orderStore.hasPlacedOrder" class="flex items-center gap-1.5 bg-white/10 rounded-lg px-2 py-1">
           <button @click="emit('setGuestCount', Math.max(2, guestCount - 1))"
-            class="touch-btn-circle !min-w-[28px] !min-h-[28px] w-7 h-7 text-white font-bold bg-white/10 active:bg-white/30"
+            class="touch-btn-circle !min-w-[44px] !min-h-[44px] w-11 h-11 text-white font-bold bg-white/10 active:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             :disabled="guestCount <= 2">−</button>
           <span class="text-white font-semibold min-w-[2ch] text-center text-sm">{{ guestCount }}</span>
           <button @click="emit('setGuestCount', Math.min(20, guestCount + 1))"
-            class="touch-btn-circle !min-w-[28px] !min-h-[28px] w-7 h-7 text-white font-bold bg-white/10 active:bg-white/30"
+            class="touch-btn-circle !min-w-[44px] !min-h-[44px] w-11 h-11 text-white font-bold bg-white/10 active:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             :disabled="guestCount >= 20">+</button>
           <span class="text-white/70 text-[10px] ml-0.5">Guests</span>
         </div>
@@ -195,8 +203,16 @@ const submitOrder = () => {
           <div class="space-y-2">
             <div v-for="item in orderedItems" :key="item.id || item.menu_item_id"
               class="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center gap-2">
-              <img v-if="item.img_url || item.image" :src="item.img_url || item.image" :alt="item.name"
-                class="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
+              <NuxtImg
+                v-if="item.img_url || item.image"
+                :src="item.img_url || item.image"
+                :alt="item.name || 'Order item'"
+                class="w-10 h-10 object-cover rounded-lg flex-shrink-0"
+                loading="lazy"
+                sizes="40px"
+                format="webp"
+              />
+              <div v-else class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-xs text-white/60">🍽️</div>
               <div class="flex-1 min-w-0">
                 <p class="text-white font-medium text-xs truncate">{{ item.name || item.menu_item?.name }}</p>
                 <p class="text-white/50 text-[10px]">Qty: {{ item.quantity }}</p>
@@ -225,7 +241,7 @@ const submitOrder = () => {
               <el-badge :value="cartItems.length" class="badge-primary" />
             </h3>
             <button @click="cartItems.forEach(item => $emit('removeItem', item.id))"
-              class="text-[10px] text-red-400 hover:text-red-300 active:scale-95 transition-all px-2 py-1 rounded bg-red-500/10">
+              class="text-[10px] text-red-400 hover:text-red-300 active:scale-95 transition-all px-3 py-2 min-h-[44px] rounded bg-red-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400">
               Clear All
             </button>
           </div>

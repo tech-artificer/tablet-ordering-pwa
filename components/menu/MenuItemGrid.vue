@@ -12,17 +12,24 @@ const props = defineProps<{
   getItemQuantity: (id: number) => number;
   maxQuantity?: number;
   loading?: boolean;
+  isRefillMode?: boolean;
+  isCategoryLocked?: boolean;
+  lockedReason?: string;
 }>();
 
 const emit = defineEmits<{
   'addItem': [item: MenuItem | Modifier];
 }>();
 
+const isLocked = () => Boolean(props.isRefillMode && props.isCategoryLocked)
+
 const addItem = (item: MenuItem | Modifier) => {
+  if (isLocked()) return
   emit('addItem', item);
 };
 
 const isAddDisabled = (item: MenuItem | Modifier) => {
+  if (isLocked()) return true
   if (props.isUnlimitedCategory) {
     return props.getItemQuantity(item.id) >= (props.maxQuantity || 5);
   }
@@ -61,8 +68,10 @@ const isAvailable = (item: any) => {
       :key="item.id"
       v-bind:class="[
         'relative bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden transition-all duration-200 border border-white/10 shadow-lg',
-        (isAvailable(item) ? 'cursor-pointer active:scale-95 hover:bg-white/10' : 'cursor-not-allowed opacity-60')
+        (isAvailable(item) ? 'cursor-pointer active:scale-95 hover:bg-white/10' : 'cursor-not-allowed opacity-60'),
+        (isLocked() ? 'cursor-not-allowed opacity-60 grayscale' : '')
       ]"
+      :title="isLocked() ? (props.lockedReason || 'Locked during refill mode') : ''"
       @click="isAvailable(item) && addItem(item)">
       
       <!-- Quantity Badge -->
@@ -71,19 +80,38 @@ const isAvailable = (item: any) => {
       </div>
 
       <!-- Unlimited Badge (for meats and sides) -->
-      <div v-if="isUnlimitedCategory" class="absolute top-2 left-2 bg-primary/90 text-secondary px-2.5 py-1 rounded-full text-xs font-bold shadow-lg z-10">
-        Unlimited
+      <div v-if="isUnlimitedCategory" class="absolute top-2 left-2 z-20">
+        <div class="unlimited-badge">
+          <span class="unlimited-dot" aria-hidden="true"></span>
+          UNLIMITED
+        </div>
       </div>
 
       <div class="relative h-40 overflow-hidden">
-        <img 
-          :src="item.img_url" 
-          :alt="item.name"
+        <NuxtImg
+          v-if="item.img_url"
+          :src="item.img_url"
+          :alt="item.name || 'Menu item'"
           class="w-full h-full object-cover"
-          @error="(e) => (e.target as HTMLImageElement).src = '/images/placeholder.jpg'" />
+          loading="lazy"
+          sizes="(max-width: 768px) 100vw, 33vw"
+          format="webp"
+          @error="(e) => ((e.target as HTMLImageElement).src = '/images/placeholder.jpg')"
+        />
         
+        <div v-else class="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+          <span class="text-2xl">🍽️</span>
+        </div>
+
         <div v-if="!isAvailable(item)" class="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
           <span class="text-white font-semibold text-lg">Unavailable</span>
+        </div>
+
+        <div v-if="isLocked()" class="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
+          <div class="text-center text-white/90">
+            <div class="text-2xl">🔒</div>
+            <div class="text-sm font-semibold">Locked in Refill</div>
+          </div>
         </div>
 
         <!-- Price badge with gradient -->
@@ -100,8 +128,10 @@ const isAvailable = (item: any) => {
         <button
           :disabled="isAddDisabled(item) || !isAvailable(item)"
           @click.stop="addItem(item)"
-          class="mt-3 w-full bg-primary text-secondary font-semibold py-2 px-4 rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
-          <span v-if="!isAvailable(item)">Unavailable</span>
+          :aria-disabled="isAddDisabled(item) || !isAvailable(item)"
+          class="mt-3 w-full bg-primary text-secondary font-semibold py-2 px-4 rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[44px]">
+          <span v-if="isLocked()">Locked in Refill</span>
+          <span v-else-if="!isAvailable(item)">Unavailable</span>
           <span v-else-if="!isAddDisabled(item)" class="flex items-center justify-center gap-1">
             <span>+</span>
             <span>Add to Order</span>
@@ -140,5 +170,33 @@ const isAvailable = (item: any) => {
 
 .active\:scale-95:active {
   transform: scale(0.95);
+}
+
+.unlimited-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #052e16;
+  background: linear-gradient(135deg, #22c55e, #4ade80);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.45);
+  text-transform: uppercase;
+}
+
+.unlimited-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #052e16;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.4); opacity: 1; }
 }
 </style>

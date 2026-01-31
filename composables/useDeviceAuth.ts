@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useDeviceStore } from '~/stores/device'
 import { useApi } from './useApi'
+import { logger } from '../utils/logger'
 export const useDeviceAuth = () => {
 
   const device = useDeviceStore()
@@ -13,8 +14,8 @@ export const useDeviceAuth = () => {
       const res = await api.post('/api/devices/register', payload)
       // assume backend returns token + device
       // Update nested refs on the device store
-      try { device.device.value = res.data.device || device.device.value } catch (e) { /* ignore */ }
-      try { device.token.value = res.data.token ?? device.token.value } catch (e) { /* ignore */ }
+      try { device.device.value = res.data.device || device.device.value } catch (e) { logger.debug('[DeviceAuth] device update failed', e) }
+      try { device.token.value = res.data.token ?? device.token.value } catch (e) { logger.debug('[DeviceAuth] token update failed', e) }
       return res.data
     } finally {
       loading.value = false
@@ -28,6 +29,7 @@ export const useDeviceAuth = () => {
       const res = await api.get('/api/token/verify')
       return res.data
     } catch (err) {
+      logger.debug('[DeviceAuth] verifyToken failed', err)
       return null
     }
   }
