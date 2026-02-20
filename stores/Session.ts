@@ -10,8 +10,66 @@ export const useSessionStore = defineStore('session', () => {
   const state = reactive({
     sessionId: null as number | null,
     orderId: null as number | null,
-    isActive: false as boolean
+    isActive: false as boolean,
+    sessionStartedAt: null as number | null,
+    sessionEndsAt: null as number | null,
+    remainingMs: 0 as number,
+    timerExpired: false as boolean
   })
+
+  const SESSION_DURATION_MS = 60 * 60 * 1000
+  let sessionTimerId: number | null = null
+
+  const stopTimerInterval = () => {
+    if (sessionTimerId) {
+      try { clearInterval(sessionTimerId) } catch (e) { logger.debug('[SessionStore] clearInterval failed', e) }
+      sessionTimerId = null
+    }
+  }
+
+  const expireSession = () => {
+    state.timerExpired = true
+    clear()
+  }
+
+  const updateRemaining = () => {
+    if (!state.sessionEndsAt) {
+      state.remainingMs = 0
+      return
+    }
+    const remaining = Math.max(0, Number(state.sessionEndsAt) - Date.now())
+    state.remainingMs = remaining
+    if (remaining <= 0 && state.isActive) {
+      expireSession()
+    }
+  }
+
+  const startTimerInterval = () => {
+    if (sessionTimerId || typeof window === 'undefined') return
+    sessionTimerId = window.setInterval(updateRemaining, 1000)
+  }
+
+  const startTimer = (durationMs: number = SESSION_DURATION_MS) => {
+    const now = Date.now()
+    state.sessionStartedAt = now
+    state.sessionEndsAt = now + durationMs
+    state.timerExpired = false
+    updateRemaining()
+    startTimerInterval()
+  }
+
+  const ensureTimer = () => {
+    if (!state.isActive) {
+      stopTimerInterval()
+      return
+    }
+    if (!state.sessionEndsAt) {
+      startTimer()
+      return
+    }
+    updateRemaining()
+    startTimerInterval()
+  }
 
   async function fetchLatestSession() {
     const $api = useApi();
@@ -24,6 +82,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function start(): Promise<boolean> {
+    const timestamp = new Date().toISOString()
     // Ensure device token is present and valid before starting session
     const deviceStore = useDeviceStore()
 
@@ -32,6 +91,7 @@ export const useSessionStore = defineStore('session', () => {
       const ok = await deviceStore.authenticate()
       if (!ok) {
         // Authentication failed; caller should handle registration UI
+        console.log(`[❌ Device Auth Failed] Cannot start session without token at ${timestamp}`)
         return false
       }
     }
@@ -57,11 +117,14 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
       // Token is missing/expired/near expiry — try refreshing
+      console.log(`[🔄 Token Refresh] Token expired or missing, refreshing at ${timestamp}`)
       const refreshed = await deviceStore.refresh()
       if (!refreshed) {
         // Refresh failed — require re-registration
+        console.log(`[❌ Token Refresh Failed] Cannot refresh token at ${timestamp}`)
         return false
       }
+      console.log(`[✅ Token Refreshed] Valid token obtained at ${timestamp}`)
     }
 
     // Fetch latest session id from server to keep local state in-sync
@@ -75,7 +138,9 @@ export const useSessionStore = defineStore('session', () => {
     // Preload menu data so customers don't wait when ordering
     const menuStore = useMenuStore()
     try {
+      console.log(`[📦 Menu Preload] Loading menus for quick response at ${timestamp}`)
       await menuStore.loadAllMenus()
+      console.log(`[✅ Menu Preloaded] Ready for ordering at ${timestamp}`)
     } catch (e) {
       logger.warn('[SessionStore] preload menus failed:', e)
     }
@@ -88,6 +153,8 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.currentOrder = null     // Clear current order reference
 
     state.isActive = true
+    state.timerExpired = false
+    startTimer()
 
     // Centralized lightweight flag to signal session is active for simple pages
     // Avoid direct localStorage writes from pages/components — use this store instead
@@ -95,12 +162,23 @@ export const useSessionStore = defineStore('session', () => {
       try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
     }
 
+    console.log(`[✅ Session Started] Ready for guest ordering flow at ${timestamp}`)
+    logger.info('[SessionStore] Session started')
+
     return true
   }
 
   function end() {
+    const timestamp = new Date().toISOString()
+    const orderStore = useOrderStore()
+    const currentOrderId = state.orderId
+    const finalStatus = orderStore.currentOrder?.order?.status || 'unknown'
+    
+    console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
     logger.info('🔚 Session ending - clearing all session and order state')
+    state.timerExpired = false
     clear()
+    console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
   }
 
   // Compatibility alias used by some callers
@@ -109,10 +187,15 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function clear() {
+    const timestamp = new Date().toISOString()
     logger.debug('🧹 Clearing session state...')
     state.sessionId = null
     state.orderId = null
     state.isActive = false
+    state.sessionStartedAt = null
+    state.sessionEndsAt = null
+    state.remainingMs = 0
+    stopTimerInterval()
     
     // Reset order state when session ends
     const orderStore = useOrderStore()
@@ -129,6 +212,8 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.hasPlacedOrder = false
     orderStore.isRefillMode = false
     // Note: orderStore.history is KEPT for historical tracking
+    
+    console.log(`[📊 State Cleared] All order/cart/package data cleared at ${timestamp}`)
     
     // Force persist to localStorage immediately to avoid hydration issues
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -151,6 +236,7 @@ export const useSessionStore = defineStore('session', () => {
           history: orderStore.history || [] // Keep history
         }))
         
+        console.log(`[💾 Persisted] Session state saved at ${timestamp}`)
         logger.debug('✅ Session and order stores cleared and persisted')
       } catch (e) {
         logger.warn('Failed to persist cleared stores:', e)
@@ -167,6 +253,11 @@ export const useSessionStore = defineStore('session', () => {
     state.sessionId = null
     state.orderId = null
     state.isActive = false
+    state.sessionStartedAt = null
+    state.sessionEndsAt = null
+    state.remainingMs = 0
+    state.timerExpired = false
+    stopTimerInterval()
     
     const orderStore = useOrderStore()
     
@@ -220,13 +311,15 @@ export const useSessionStore = defineStore('session', () => {
     end,
     endSession,
     clear,
-    reset
+    reset,
+    startTimer,
+    ensureTimer
   }
 }, {
   persist: {
     key: 'session-store',
     storage: (typeof window !== 'undefined' && window.localStorage) ? window.localStorage : undefined,
-    pick: ['sessionId', 'isActive', 'orderId']
+    pick: ['sessionId', 'isActive', 'orderId', 'sessionStartedAt', 'sessionEndsAt']
   }
 })
 

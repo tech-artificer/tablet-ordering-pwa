@@ -7,6 +7,10 @@ import { logger } from '~/utils/logger'
 import { ElNotification, ElMessage } from 'element-plus'
 import { useApi } from '~/composables/useApi'
 
+// Timeout tracking for proper cleanup on unmount (prevents memory leaks)
+let orderCompletionTimeoutId: ReturnType<typeof setTimeout> | null = null
+let reloadTimeoutId: ReturnType<typeof setTimeout> | null = null
+
 interface OrderCreatedEvent {
   eventId: number
   event: 'created'
@@ -171,6 +175,8 @@ export const useBroadcasts = () => {
 
   // Event Handlers
   const handleOrderCreated = (event: OrderCreatedEvent) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[📨 .order.created] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
     logger.debug('Order created:', event.order)
     
     ElNotification({
@@ -187,6 +193,8 @@ export const useBroadcasts = () => {
   }
 
   const handleOrderUpdated = (event: OrderUpdatedEvent) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[📨 .order.updated] Received at ${timestamp}`, { order_id: event.order_id, status: event.status })
     logger.debug('Order status updated:', event)
     
     const statusMessages: Record<string, { title: string; message: string; type: any }> = {
@@ -233,7 +241,8 @@ export const useBroadcasts = () => {
         // End session and navigate to home on completed
         if (event.status === 'completed') {
           logger.info('✅ Order completed via broadcast - ending session in 2s')
-          setTimeout(async () => {
+          if (orderCompletionTimeoutId) clearTimeout(orderCompletionTimeoutId)
+          orderCompletionTimeoutId = setTimeout(async () => {
             sessionStore.end()
             await router.replace('/')
           }, 2000)
@@ -241,7 +250,9 @@ export const useBroadcasts = () => {
       }
     }
   }
-
+const timestamp = new Date().toISOString()
+    console.log(`[📨 .order.completed] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
+    
   const handleOrderCompleted = (event: OrderCompletedEvent) => {
     logger.debug('Order completed:', event.order)
     
@@ -265,13 +276,16 @@ export const useBroadcasts = () => {
       
       // End session and navigate to home after a short delay
       logger.info('✅ Order completed via broadcast - ending session in 2s')
-      setTimeout(async () => {
+      if (orderCompletionTimeoutId) clearTimeout(orderCompletionTimeoutId)
+      orderCompletionTimeoutId = setTimeout(async () => {
         sessionStore.end()
         await router.replace('/')
       }, 2000)
     }
   }
-
+const timestamp = new Date().toISOString()
+    console.log(`[📨 .order.voided/cancelled] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
+    
   const handleOrderCancelled = (event: OrderCancelledEvent) => {
     logger.debug('Order cancelled:', event.order)
     
@@ -447,12 +461,14 @@ export const useBroadcasts = () => {
   // Unsubscribe from order channels
   const unsubscribeFromOrderChannel = () => {
     if (orderChannel) {
-      (window as any).Echo.leave(orderChannel.name)
+      console.log(`[🔕 Unsubscribing] Channel: ${orderChannel.name} at ${new Date().toISOString()}`)
+      ;(window as any).Echo.leave(orderChannel.name)
       orderChannel = null
       channelStatus.value.order = false
     }
     if (serviceRequestChannel) {
-      (window as any).Echo.leave(serviceRequestChannel.name)
+      console.log(`[🔕 Unsubscribing] Channel: ${serviceRequestChannel.name} at ${new Date().toISOString()}`)
+      ;(window as any).Echo.leave(serviceRequestChannel.name)
       serviceRequestChannel = null
       channelStatus.value.serviceRequest = false
     }
@@ -481,9 +497,12 @@ export const useBroadcasts = () => {
       
       // Reverb uses state_change event instead of direct bind
       pusher.connection.bind('state_change', (states: any) => {
+        const timestamp = new Date().toISOString()
+        console.log(`[🔗 WebSocket State Change] ${states.previous || '?'} → ${states.current} at ${timestamp}`)
         logger.debug('WebSocket state change:', states.current)
         
         if (states.current === 'connected') {
+          console.log(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
           logger.debug('✅ WebSocket connected')
           ElNotification({
             title: '✅ Connected',
@@ -509,6 +528,15 @@ export const useBroadcasts = () => {
 
   // Cleanup on unmount
   const cleanup = () => {
+    // Clear any pending timeouts to prevent memory leaks in kitchen environment
+    if (orderCompletionTimeoutId) {
+      try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
+      orderCompletionTimeoutId = null
+    }
+    if (reloadTimeoutId) {
+      try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
+      reloadTimeoutId = null
+    }
     unsubscribeFromOrderChannel()
     if (deviceChannel) {
       (window as any).Echo.leave(deviceChannel.name)
@@ -521,6 +549,10 @@ export const useBroadcasts = () => {
       channelStatus.value.deviceControl = false
     }
   }
+
+  onUnmounted(() => {
+    cleanup()
+  })
 
   return {
     initializeBroadcasts,
