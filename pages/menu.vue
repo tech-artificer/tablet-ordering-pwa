@@ -59,6 +59,17 @@ onMounted(async () => {
   } catch (e) {
     console.error('[Menu] initializeFromSession error:', e)
   }
+
+  // Load package details with allowed menus
+  if (selectedPackageId.value) {
+    try {
+      logger.info('[Menu] Loading package details for package:', selectedPackageId.value);
+      await menuStore.fetchPackageDetails(Number(selectedPackageId.value));
+      logger.info('[Menu] Package details loaded');
+    } catch (error) {
+      logger.error('[Menu] Failed to load package details:', error);
+    }
+  }
 })
 
 // Get selected package from route or store
@@ -127,10 +138,21 @@ const getItemQuantity = (itemId: number) => {
   return orderStore.getCartItemQuantity(Number(itemId))
 };
 
-// Get meats from selected package modifiers
+// Get meats from selected package allowed menus (from API)
 const meats = computed(() => {
-  if (!selectedPackage.value?.modifiers) return [];
-  return selectedPackage.value.modifiers.flat();
+  if (!selectedPackageId.value) return [];
+  
+  const packageDetails = menuStore.packageDetails[Number(selectedPackageId.value)];
+  if (packageDetails?.allowed_menus?.meat) {
+    return packageDetails.allowed_menus.meat;
+  }
+  
+  // Fallback to old modifiers structure if package details not loaded yet
+  if (selectedPackage.value?.modifiers) {
+    return selectedPackage.value.modifiers.flat();
+  }
+  
+  return [];
 });
 
 // Get items based on active category for MenuItemGrid

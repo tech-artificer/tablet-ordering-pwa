@@ -161,24 +161,40 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   function buildPayload() {
-    const items = state.cartItems.map((i: any) => ({
-      menu_id: Number(i.id),
-      ordered_menu_id: i.category === 'meats' ? (state.package as any)?.id : null,
-      name: i.name,
-      quantity: Number(i.quantity),
-      price: Number(i.price),
-      note: i.note ?? null,
-      subtotal: Number(i.price) * Number(i.quantity),
-      tax: 0,
-      discount: 0
-    }))
+    // Separate package item with nested modifiers from add-ons
+    const meatItems = state.cartItems.filter((i: any) => i.category === 'meats')
+    const addOnItems = state.cartItems.filter((i: any) => i.category !== 'meats')
+    
+    const items: any[] = []
+    
+    // 1. Package item with meat modifiers (parent-child structure)
+    if (state.package?.id) {
+      items.push({
+        menu_id: Number(state.package.id),
+        quantity: Number(state.guestCount),
+        is_package: true,
+        notes: null,
+        modifiers: meatItems.map((meat: any) => ({
+          menu_id: Number(meat.id),
+          quantity: Number(meat.quantity)
+        }))
+      })
+    }
+    
+    // 2. Add-on items (sides, drinks, desserts) as separate top-level items
+    addOnItems.forEach((item: any) => {
+      items.push({
+        menu_id: Number(item.id),
+        quantity: Number(item.quantity),
+        is_package: false,
+        notes: item.note ?? null,
+        modifiers: []
+      })
+    })
     
     const payload = {
+      table_id: null,  // Will be populated from deviceStore in submitOrder
       guest_count: Number(state.guestCount),
-      subtotal: Number(packageTotal.value) + Number(addOnsTotal.value),
-      tax: Number(taxAmount.value),
-      discount: 0,
-      total_amount: Number(grandTotal.value),
       items
     }
     
@@ -197,14 +213,24 @@ export const useOrderStore = defineStore('order', () => {
       if (!item.menu_id || typeof item.menu_id !== 'number') {
         throw new Error(`Invalid item[${index}].menu_id: must be a number`)
       }
-      if (!item.name || typeof item.name !== 'string') {
-        throw new Error(`Invalid item[${index}].name: must be a non-empty string`)
-      }
       if (!item.quantity || item.quantity < 1) {
         throw new Error(`Invalid item[${index}].quantity: must be at least 1`)
       }
-      if (typeof item.price !== 'number' || item.price < 0) {
-        throw new Error(`Invalid item[${index}].price: must be a non-negative number`)
+      if (typeof item.is_package !== 'boolean') {
+        throw new Error(`Invalid item[${index}].is_package: must be a boolean`)
+      }
+      if (item.is_package && (!Array.isArray(item.modifiers) || item.modifiers.length === 0)) {
+        throw new Error(`Invalid item[${index}].modifiers: package items must have at least one modifier`)
+      }
+      if (item.is_package && item.modifiers) {
+        item.modifiers.forEach((mod: any, modIndex: number) => {
+          if (!mod.menu_id || typeof mod.menu_id !== 'number') {
+            throw new Error(`Invalid item[${index}].modifiers[${modIndex}].menu_id: must be a number`)
+          }
+          if (!mod.quantity || mod.quantity < 1) {
+            throw new Error(`Invalid item[${index}].modifiers[${modIndex}].quantity: must be at least 1`)
+          }
+        })
       }
     })
     
@@ -259,7 +285,15 @@ export const useOrderStore = defineStore('order', () => {
     logger.debug('✅ All validations passed - proceeding with order submission')
     
     const api = useApi()
-    const body = payload ?? buildPayload()
+    let body = payload ?? buildPayload()
+    
+    // Inject table_id from deviceStore if not already set
+    if (!body.table_id) {
+      body = {
+        ...body,
+        table_id: tableId
+      }
+    }
     
     logger.debug('📦 Order Payload:', body)
     
@@ -353,16 +387,18 @@ export const useOrderStore = defineStore('order', () => {
     }
     
     // Build payload matching POST /api/order/{orderId}/refill spec
+    // Use same structure as initial order with is_package and modifiers
     const refillPayload = {
-      items: state.refillItems.map((i: any, index: number) => ({
-        menu_id: i.id ? Number(i.id) : undefined,
-        name: i.name,
-        quantity: Number(i.quantity),
-        price: i.price !== undefined ? Number(i.price) : undefined,
-        index: index + 1,
-        seat_number: 1,
-        note: i.note || 'Refill'
-      }))
+      items: state.refillItems.map((i: any) => {
+        const isMeat = i.category === 'meats'
+        return {
+          menu_id: Number(i.id),
+          quantity: Number(i.quantity),
+          is_package: false,  // Refills are standalone items, not packages
+          notes: i.note ?? 'Refill',
+          modifiers: []
+        }
+      })
     }
     
     console.log('[Refill] Submitting to /api/order/' + currentOrderId + '/refill', refillPayload)

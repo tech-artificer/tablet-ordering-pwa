@@ -17,6 +17,17 @@ const orderStore = useOrderStore();
 const sessionStore = useSessionStore();
 const deviceStore = useDeviceStore();
 
+// Load packages on mount
+onMounted(async () => {
+  logger.info('[PackageSelection] Loading packages from API...');
+  try {
+    await menuStore.loadAllMenus();
+    logger.info('[PackageSelection] Packages loaded:', menuStore.packages.length);
+  } catch (error) {
+    logger.error('[PackageSelection] Failed to load packages:', error);
+  }
+});
+
 // Modal state
 const modalRef = ref<InstanceType<typeof PackageModal> | null>(null)
 const selectedPackageForModal = ref<Package | null>(null)
