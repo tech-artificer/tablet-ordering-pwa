@@ -3,11 +3,18 @@ import path from 'path';
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    devtools: { enabled: true },
+    serverMiddleware: [
+        '~/server/middleware/security.ts',
+    ],
+    devtools: { enabled: process.env.NODE_ENV !== 'production' },
     
-    debug: true,
+    debug: false,
     
     compatibilityDate: "2025-01-01",
+
+    experimental: {
+        payloadExtraction: false,
+    },
     
     ssr: false,
     
@@ -37,7 +44,15 @@ export default defineNuxtConfig({
         strict: false,
         typeCheck: false
     },
-    
+
+    // Canonical static output directory — nginx serves from this path.
+    // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/public).
+    nitro: {
+        output: {
+            publicDir: 'public',
+        },
+    },
+
     pwa: {
         registerType: "autoUpdate",
         
@@ -54,11 +69,19 @@ export default defineNuxtConfig({
                     src: "/icons/pwa-icon-192.png",
                     sizes: "192x192",
                     type: "image/png",
+                    purpose: "any",
                 },
                 {
                     src: "/icons/pwa-icon-512.png",
                     sizes: "512x512",
                     type: "image/png",
+                    purpose: "any",
+                },
+                {
+                    src: "/icons/pwa-icon-maskable.png",
+                    sizes: "512x512",
+                    type: "image/png",
+                    purpose: "maskable",
                 },
             ],
         },
@@ -104,6 +127,9 @@ export default defineNuxtConfig({
     },
     
     vite: {
+        build: {
+            chunkSizeWarningLimit: 1800,
+        },
         // Ensure Vite dev server listens on network interfaces and allow
         // HMR to be configured via environment variables when testing on LAN.
         server: {
@@ -151,32 +177,33 @@ export default defineNuxtConfig({
         public: {
             // App Configuration
             appVersion: process.env.APP_VERSION || '1.0.0',
-            appEnv: process.env.APP_ENV || 'development',
-            
+            appEnv: process.env.APP_ENV || 'production',
+
             // API Configuration
-            mainApiUrl: process.env.MAIN_API_URL || "http://127.0.0.1:8000",
+            mainApiUrl: process.env.MAIN_API_URL || 'https://192.168.100.7:8443',
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
-            
+
             // Broadcasting Configuration
-            broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || "pusher",
-            
-            // Reverb Configuration
+            broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
+
+            // Reverb WebSocket Configuration
+            // Client connects via nginx TLS termination on port 8443 — NOT directly to Reverb (6002).
             reverb: {
-                appId: process.env.NUXT_PUBLIC_REVERB_APP_ID || '',
-                appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY || '',
-                host: process.env.NUXT_PUBLIC_REVERB_HOST || '127.0.0.1:8000',
-                port: parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || "6001"),
-                scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME || 'http',
-                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || '127.0.0.1:8000',
-                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || "6001"),
-                serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || "",
+                appId:      process.env.NUXT_PUBLIC_REVERB_APP_ID     || '',
+                appKey:     process.env.NUXT_PUBLIC_REVERB_APP_KEY    || '',
+                host:       process.env.NUXT_PUBLIC_REVERB_HOST       || '192.168.100.7',
+                port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '8443'),
+                scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'https',
+                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || '192.168.100.7',
+                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6002'),
+                serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || '',
             },
-            
-            // Laravel Echo Configuration
+
+            // Laravel Echo (mirrors reverb config — kept for backwards compat)
             echo: {
-                host: process.env.NUXT_PUBLIC_ECHO_HOST || '127.0.0.1:8000',
-                port: parseInt(process.env.NUXT_PUBLIC_ECHO_PORT || "6001"),
-                encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === "true",
+                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || '192.168.100.7',
+                port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '8443'),
+                encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true',
             },
         },
     },

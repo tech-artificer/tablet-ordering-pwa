@@ -187,8 +187,8 @@ export const useBroadcasts = () => {
     })
 
     // Update session order ID
-    if (sessionStore.sessionId === event.order.session_id) {
-      sessionStore.orderId = event.order.id
+    if (sessionStore.sessionId.value === event.order.session_id) {
+      sessionStore.orderId.value = event.order.id
     }
   }
 
@@ -250,9 +250,7 @@ export const useBroadcasts = () => {
       }
     }
   }
-const timestamp = new Date().toISOString()
-    console.log(`[📨 .order.completed] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
-    
+
   const handleOrderCompleted = (event: OrderCompletedEvent) => {
     logger.debug('Order completed:', event.order)
     
@@ -283,9 +281,7 @@ const timestamp = new Date().toISOString()
       }, 2000)
     }
   }
-const timestamp = new Date().toISOString()
-    console.log(`[📨 .order.voided/cancelled] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
-    
+
   const handleOrderCancelled = (event: OrderCancelledEvent) => {
     logger.debug('Order cancelled:', event.order)
     
@@ -432,19 +428,6 @@ const timestamp = new Date().toISOString()
     console.log('[Echo] ✅ Subscribed to channel: orders.' + orderId)
     logger.debug(`✅ Subscribed to orders.${orderId}`)
 
-    // Realtime is authoritative now — stop any polling fallback for this order
-    try {
-      const numericId = Number(orderId)
-      if (!Number.isNaN(numericId)) {
-        orderStore.stopOrderPolling && orderStore.stopOrderPolling()
-      } else {
-        // still stop generic polling if implemented
-        orderStore.stopOrderPolling && orderStore.stopOrderPolling()
-      }
-    } catch (e) {
-      logger.warn('subscribeToOrderChannel: failed to stop polling', e)
-    }
-
     // Subscribe to service requests for this order
     console.log('[Echo] Subscribing to channel: service-requests.' + orderId)
     serviceRequestChannel = (window as any).Echo.channel(`service-requests.${orderId}`)
@@ -460,15 +443,20 @@ const timestamp = new Date().toISOString()
 
   // Unsubscribe from order channels
   const unsubscribeFromOrderChannel = () => {
+    const canLeave = typeof (window as any).Echo?.leave === 'function'
     if (orderChannel) {
       console.log(`[🔕 Unsubscribing] Channel: ${orderChannel.name} at ${new Date().toISOString()}`)
-      ;(window as any).Echo.leave(orderChannel.name)
+      if (canLeave) {
+        ;(window as any).Echo.leave(orderChannel.name)
+      }
       orderChannel = null
       channelStatus.value.order = false
     }
     if (serviceRequestChannel) {
       console.log(`[🔕 Unsubscribing] Channel: ${serviceRequestChannel.name} at ${new Date().toISOString()}`)
-      ;(window as any).Echo.leave(serviceRequestChannel.name)
+      if (canLeave) {
+        ;(window as any).Echo.leave(serviceRequestChannel.name)
+      }
       serviceRequestChannel = null
       channelStatus.value.serviceRequest = false
     }
@@ -538,13 +526,18 @@ const timestamp = new Date().toISOString()
       reloadTimeoutId = null
     }
     unsubscribeFromOrderChannel()
+    const canLeave = typeof (window as any).Echo?.leave === 'function'
     if (deviceChannel) {
-      (window as any).Echo.leave(deviceChannel.name)
+      if (canLeave) {
+        (window as any).Echo.leave(deviceChannel.name)
+      }
       deviceChannel = null
       channelStatus.value.device = false
     }
     if (deviceControlChannel) {
-      (window as any).Echo.leave(deviceControlChannel.name)
+      if (canLeave) {
+        (window as any).Echo.leave(deviceControlChannel.name)
+      }
       deviceControlChannel = null
       channelStatus.value.deviceControl = false
     }

@@ -1,0 +1,1 @@
+import{g as t}from"./C5fFPZMh.js";const r=t("arrow-left",[["path",{d:"m12 19-7-7 7-7",key:"1l729n"}],["path",{d:"M19 12H5",key:"x3x0zl"}]]);const o=t("chevron-right",[["path",{d:"m9 18 6-6-6-6",key:"mthhwq"}]]);export{r as A,o as C};

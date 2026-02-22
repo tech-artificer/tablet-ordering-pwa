@@ -59,6 +59,17 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         const wsPort = config.public.reverb.port ?? 6001
         const wssPort = wsPort
 
+        // Log Reverb configuration
+        console.log('[🔴 Echo Init] Config:', {
+            key: config.public.reverb.appKey?.substring(0, 8) + '...',
+            host: reverbHost,
+            wsPort,
+            forceTLS: String(config.public.reverb.scheme || '').toLowerCase() === 'https',
+            authEndpoint,
+            hasAuthToken: !!token,
+            timestamp: new Date().toISOString()
+        })
+
         const echo = new Echo({
             broadcaster: 'reverb',
             key: config.public.reverb.appKey,
@@ -84,6 +95,29 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
 
+        // Monitor connection state
+        if (echo && (echo as any).connector) {
+            const connector = (echo as any).connector
+            console.log('[✅ Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
+            
+            // Hook into connection success/failure if available
+            try {
+                if (typeof connector.socket?.on === 'function') {
+                    connector.socket.on('connect', () => {
+                        console.log('[🟢 Echo Connected] WebSocket connected at', new Date().toISOString())
+                    })
+                    connector.socket.on('disconnect', () => {
+                        console.log('[🔴 Echo Disconnected] WebSocket disconnected at', new Date().toISOString())
+                    })
+                    connector.socket.on('error', (err: any) => {
+                        console.error('[🔴 Echo Error]', err?.message || err, 'at', new Date().toISOString())
+                    })
+                }
+            } catch (e) {
+                logger.debug('[Echo] Connection hooks unavailable', e)
+            }
+        }
+
         // Expose a helper to update Echo auth header when token changes
         // Usage: window.updateEchoAuth(tokenString | null)
         // This avoids re-initializing Echo and allows the device store
@@ -99,8 +133,10 @@ export default defineNuxtPlugin((nuxtApp: any) => {
                     if (bearer) (window as any).Echo.connector.options.auth.headers.Authorization = bearer
                     else delete (window as any).Echo.connector.options.auth.headers.Authorization
                 }
+                console.log('[📡 Echo Auth Updated] Bearer token', newToken ? 'SET' : 'CLEARED', 'at', new Date().toISOString())
             } catch (e) {
                 logger.warn('[Echo] updateEchoAuth failed', e)
+                console.error('[❌ Echo Auth Update Failed]', e)
             }
         }
 

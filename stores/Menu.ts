@@ -176,7 +176,7 @@ export const useMenuStore = defineStore("menu", {
             try {
                 // Find dessert category slug from tabletCategories
                 const category = this.tabletCategories.find((c: TabletCategory) => 
-                    c.slug === 'dessert' || c.name.toLowerCase() === 'dessert'
+                    c.slug === 'dessert' || c.name.toLowerCase().includes('dessert')
                 );
                 
                 if (category) {
@@ -205,7 +205,7 @@ export const useMenuStore = defineStore("menu", {
             try {
                 // Find sides category slug from tabletCategories
                 const category = this.tabletCategories.find((c: TabletCategory) => 
-                    c.slug === 'sides' || c.name.toLowerCase() === 'sides'
+                    c.slug === 'sides' || c.name.toLowerCase().includes('side')
                 );
                 
                 if (category) {

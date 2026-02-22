@@ -117,8 +117,10 @@ export const useDeviceStore = defineStore('device', () => {
         
         try {
             const api = useApi()
+            const authStart = performance.now()
             
             const response = await api.get('/api/devices/login')
+            const authMs = (performance.now() - authStart).toFixed(1)
             const { token: authToken, device: authDevice, table: authTable, expires_at } = response.data
             // store raw response for diagnostics
             lastAuthResponse.value = response.data
@@ -133,17 +135,25 @@ export const useDeviceStore = defineStore('device', () => {
                 }
                 device.value = authDevice
                 token.value = authToken
+                
                 // notify Echo plugin (if available) to update auth header
                 try { if (typeof window !== 'undefined' && (window as any).updateEchoAuth) (window as any).updateEchoAuth(token.value) } catch (e) { logger.debug('[DeviceStore] updateEchoAuth not available') }
+                
                 table.value = normalizeTable(authTable)
                 expiration.value = expires_at
+                
+                console.log(`[✅ Device Authenticated] device_id=${authDevice.id} table_id=${authTable?.id} table_name=${authTable?.name} latency=${authMs}ms at ${new Date().toISOString()}`)
+                logger.info(`[Device] Authenticated as device_id=${authDevice.id}`)
+                
                 return true
             }
             
             // Device not found or incomplete response
+            console.log(`[⚠️ Device Auth Failed] Incomplete response at ${new Date().toISOString()}`)
             return false
 
         } catch (error: any) {
+            console.error(`[❌ Device Auth Error] ${error?.message} at ${new Date().toISOString()}`)
             logger.error('[DeviceStore] Authentication failed:', error)
             errorMessage.value = error?.response?.data?.message || 'Authentication failed'
             return false

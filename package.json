@@ -10,7 +10,7 @@
     "dev": "npx nuxi dev --host 0.0.0.0",
     "test": "vitest",
     "build": "npx nuxi build",
-    "generate": "npx nuxi generate",
+    "generate": "npx nuxi build && npx nuxi generate && node -e \"const fs=require('fs'), path=require('path'); const src='.output/public', dst='public'; fs.existsSync(src) && fs.cpSync(src, dst, {recursive: true, force: true})\"",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "rebuild:esbuild": "npm rebuild esbuild --update-binary || true",
     "postinstall": "nuxi prepare && npm run rebuild:esbuild",
@@ -47,6 +47,7 @@
     "@vue/test-utils": "^2.0.0-0",
     "jsdom": "^21.1.0",
     "playwright": "^1.40.1",
+    "sharp": "^0.34.5",
     "typescript": "^5.4.0",
     "vitest": "^1.0.0"
   }

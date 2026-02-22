@@ -22,7 +22,7 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     try {
       logger.debug('Auth middleware: Token present — attempting refresh')
       const refreshed = await deviceStore.refresh()
-      if (refreshed && deviceStore.token && deviceStore.table?.value?.id) {
+      if (refreshed && deviceStore.token && deviceStore.table?.id) {
         logger.debug('Auth middleware: Refresh successful')
         return
       }
@@ -36,7 +36,7 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   try {
     logger.debug('Auth middleware: Attempting authenticate()')
     const ok = await deviceStore.authenticate()
-    if (ok && deviceStore.token && deviceStore.table?.value?.id) {
+    if (ok && deviceStore.token && deviceStore.table?.id) {
       logger.debug('Auth middleware: Authentication successful')
       return
     }

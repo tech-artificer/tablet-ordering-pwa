@@ -7,6 +7,7 @@ import WoosooLogo from '~/components/WoosooLogo.vue';
 import PrimaryButton from '~/components/common/PrimaryButton.vue';
 import { ElMessageBox } from 'element-plus';
 import { useBroadcasts } from '~/composables/useBroadcasts';
+import { recoverActiveOrderState } from '~/composables/useActiveOrderRecovery'
 import { logger } from '../utils/logger'
 
 const session = useSessionStore();
@@ -35,7 +36,13 @@ const checkWebSocketStatus = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  const recovery = await recoverActiveOrderState('index')
+  if (recovery.hasActiveOrder) {
+    await router.replace('/menu')
+    return
+  }
+
   checkWebSocketStatus();
   // Check every 3 seconds
   const interval = setInterval(checkWebSocketStatus, 3000);
@@ -52,6 +59,10 @@ onMounted(() => {
 });
 
 const start = () => {
+  const timestamp = new Date().toISOString()
+  console.log(`[🎬 Session START] Welcome screen → Start button clicked at ${timestamp}`)
+  console.log(`[📋 Device Status] authenticated=${deviceStore.isAuthenticated} device_id=${deviceStore.device?.id} table_id=${(deviceStore.table as any)?.id}`)
+  
   logger.debug('Start clicked - Device Store:', {
     token: deviceStore.token,
     table: deviceStore.table,
@@ -63,12 +74,14 @@ const start = () => {
   
   // Use isAuthenticated computed property instead of manual checks
   if (!deviceStore.isAuthenticated) {
+    console.log(`[⚠️ Device Auth Failed] Not authenticated, redirecting to Settings at ${timestamp}`)
     logger.debug('Not authenticated, redirecting to Settings (PIN)')
     // Redirect to Settings and require staff PIN before revealing registration
     router.replace({ path: '/settings', query: { requirePin: '1' } })
     return
   }
   
+  console.log(`[✅ Device Ready] Starting session at ${timestamp}`)
   logger.debug('Starting session...')
   session.start()
   router.replace('/order/start')
@@ -218,7 +231,7 @@ const clearDeviceAuth = () => {
           <h2 class="text-4xl lg:text-5xl font-extrabold font-raleway tracking-tight text-white flex flex-col leading-tight">
             <span>The grill is hot,</span>
             <span>the meat is marinated,</span>
-            <span>and the feast awaits.</span>
+            <span class="font-bold text-primary"> and the feast awaits.</span>
           </h2>
         </div>
       </div>
@@ -259,7 +272,7 @@ const clearDeviceAuth = () => {
             <button @click.prevent="clearDeviceAuth" class="px-3 py-2 rounded bg-white/10">Reset Device Auth</button>
           </div>
         </div>
-        <p class="text-white/80 text-sm font-kanit text-center">
+        <p class="text-white/80 text-sm font-kanit text-center mt-4">
           Tap to begin your <span class="font-bold text-primary">Ultimate K-BBQ experience</span>
         </p>
       </div>

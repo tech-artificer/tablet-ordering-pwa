@@ -1,0 +1,1 @@
+import{_ as o}from"./MlxO0YMg.js";import{j as t,q as r,K as s,o as n}from"./C5fFPZMh.js";import"./DRYTQK6t.js";/* empty css        */const f=t({__name:"register",setup(a){return s(),(_,c)=>{const e=o;return n(),r(e)}}});export{f as default};

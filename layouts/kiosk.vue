@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useMenuStore } from '~/stores/Menu';
 import { logger } from '~/utils/logger';
 const menuStore = useMenuStore();
+import flameSrc from '~/assets/images/flame.gif'
+const showFlame = ref(true)
 
 const retryLoad = async () => {
   menuStore.clearAllErrors();
@@ -42,7 +44,14 @@ if (process.client) {
     
     <!-- Ambient flame effect -->
     <div class="absolute inset-0 pointer-events-none z-5">
-      <img src="/gif/flame.gif" alt="" class="absolute opacity-60 p-0 m-0 w-full h-full z-3" aria-hidden="true" />
+      <img
+        v-if="showFlame"
+        :src="flameSrc"
+        alt=""
+        class="absolute opacity-60 p-0 m-0 w-full h-full z-3"
+        aria-hidden="true"
+        @error="showFlame = false"
+      />
     </div>
   </div>
 </template>

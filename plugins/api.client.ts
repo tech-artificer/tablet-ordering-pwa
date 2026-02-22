@@ -5,6 +5,10 @@ import { useRuntimeConfig } from '#imports'
 import { logger } from '../utils/logger'
 import type { InternalAxiosRequestConfig } from 'axios'
 
+type RetriableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean
+}
+
 export default defineNuxtPlugin(() => {
   
   const config = useRuntimeConfig()
@@ -15,6 +19,8 @@ export default defineNuxtPlugin(() => {
     baseURL: (String(config.public.mainApiUrl || '')).replace(/\/+$/, '') + '/',
     timeout: 15000
   })
+
+  let reauthPromise: Promise<boolean> | null = null
 
   api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
     const device = useDeviceStore()
@@ -90,11 +96,67 @@ export default defineNuxtPlugin(() => {
       })
       return response
     },
-    (error) => {
+    async (error) => {
+      const device = useDeviceStore()
+      const originalRequest = error?.config as RetriableRequestConfig | undefined
+      const status = error?.response?.status
+
+      if (
+        status === 401 &&
+        originalRequest &&
+        !originalRequest._retry &&
+        !String(originalRequest.url || '').includes('/api/devices/login') &&
+        !String(originalRequest.url || '').includes('/api/devices/register') &&
+        !String(originalRequest.url || '').includes('/api/devices/refresh')
+      ) {
+        originalRequest._retry = true
+
+        try {
+          if (!reauthPromise) {
+            reauthPromise = (async () => {
+              logger.warn('🔄 API 401 detected; attempting device re-authentication')
+
+              // Try token refresh first when a token exists
+              if (device.token) {
+                const refreshed = await device.refresh()
+                if (refreshed && device.token) {
+                  return true
+                }
+              }
+
+              // Fallback: login by device IP mapping (server-side)
+              return await device.authenticate()
+            })().finally(() => {
+              reauthPromise = null
+            })
+          }
+
+          const recovered = await reauthPromise
+
+          if (recovered && device.token) {
+            if (!originalRequest.headers) {
+              originalRequest.headers = {} as InternalAxiosRequestConfig['headers']
+            }
+
+            const headers = originalRequest.headers as Record<string, string>
+            headers['Authorization'] = `Bearer ${device.token}`
+
+            logger.info('✅ Re-auth succeeded; retrying original request once', {
+              url: originalRequest.url,
+              method: originalRequest.method,
+            })
+
+            return api.request(originalRequest)
+          }
+        } catch (reauthError) {
+          logger.error('❌ Re-authentication failed after 401', reauthError)
+        }
+      }
+
       logger.error('❌ API Error:', {
         url: error.config?.url,
         method: error.config?.method,
-        status: error.response?.status,
+        status,
         statusText: error.response?.statusText,
         data: error.response?.data,
         headers: error.response?.headers,

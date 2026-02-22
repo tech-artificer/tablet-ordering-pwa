@@ -1,18 +1,34 @@
 <script setup lang="ts">
 import { ChevronRight, ArrowLeft } from 'lucide-vue-next'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router';
+import { useOrderStore } from '~/stores/Order';
+import { recoverActiveOrderState } from '~/composables/useActiveOrderRecovery'
+import { logger } from '~/utils/logger';
 import PrimaryButton from '~/components/common/PrimaryButton.vue';
-// // NOTE: In a real app, you would import a Pinia store here 
-// // to save the package details before navigating.
+
 const router = useRouter();
+const orderStore = useOrderStore();
+
+onMounted(async () => {
+  const recovery = await recoverActiveOrderState('order-start')
+  if (recovery.hasActiveOrder) {
+    await router.replace('/order/in-session')
+  }
+})
 
 // // This handler receives the confirmation signal from the child component
 const handleGuestConfirmation = () => {
+  const timestamp = new Date().toISOString()
+  const guestCount = orderStore.guestCount
+  console.log(`[👥 Guest Count Selected] ${guestCount} guests at ${timestamp}`)
+  logger.info(`[Session Flow] Guest count set to ${guestCount}`)
   // Route to main package selection page (restored with richer UI)
   router.push('/order/packageSelection');
 };
 
 const goBack = () => {
+  console.log(`[↩️ Guest Counter Cancelled] User returned to welcome screen at ${new Date().toISOString()}`)
   router.push('/');
 };
 </script>
@@ -28,9 +44,9 @@ const goBack = () => {
     </button>
     
     <!-- Page Title -->
-    <div class="absolute top-4 left-1/2 -translate-x-1/2">
+    <!-- <div class="absolute top-4 left-1/2 -translate-x-1/2">
       <h1 class="text-xl font-bold font-kanit text-white">How Many Guests?</h1>
-    </div>
+    </div> -->
 
     <!-- Main Content -->
     <div class="flex flex-col items-center gap-8">
