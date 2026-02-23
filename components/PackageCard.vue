@@ -3,8 +3,6 @@ import type { Package, Modifier } from '../types'
 import { computed, ref } from 'vue'
 
 const props = defineProps<{ pkg: Package }>()
-const emit = defineEmits(['select'])
-
 // Smart categorization: group modifiers by keywords in name or group field
 const categorizedModifiers = computed(() => {
   const mods = (props.pkg?.modifiers || []) as Modifier[]
@@ -53,9 +51,7 @@ const activeCategoryLabel = computed(() => {
   return activeCategory.value.charAt(0).toUpperCase() + activeCategory.value.slice(1)
 })
 
-const handleSelect = () => {
-  emit('select', props.pkg)
-}
+
 </script>
 
 <template>
@@ -103,12 +99,10 @@ const handleSelect = () => {
 
       <div class="flex-1 overflow-y-auto pr-1">
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-          <button
+          <div
             v-for="(mod, index) in filteredModifiers"
             :key="mod.id"
-            @click="handleSelect"
             class="relative text-left rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 transition-colors overflow-hidden"
-            type="button"
           >
             <div class="relative h-36 md:h-40 bg-black/20 flex items-center justify-center overflow-hidden">
               <img
@@ -135,7 +129,7 @@ const handleSelect = () => {
               </div>
               <div class="text-white font-bold text-base leading-tight line-clamp-2">{{ mod.name }}</div>
             </div>
-          </button>
+          </div>
         </div>
 
         <div v-if="filteredModifiers.length === 0" class="text-center text-white/50 py-10 text-sm">

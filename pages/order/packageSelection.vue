@@ -313,7 +313,6 @@ function handleTouchEnd() {
               v-if="packages[currentIndex]"
               :key="packages[currentIndex].id"
               :pkg="packages[currentIndex]"
-              @select="handlePackageSelection"
               class="h-full"
             />
           </transition>

@@ -1,1 +1,0 @@
-import{av as o,I as u,aw as n,A as c}from"./C5fFPZMh.js";const d=o(async(s,i)=>{let r,a;const e=u();if(["/menu","/order","/customize"].some(t=>s.path.startsWith(t))&&(e.packages.length===0||e.isCacheStale))try{[r,a]=n(()=>e.loadAllMenus()),await r,a()}catch(t){c.error("Failed to load menu:",t)}});export{d as default};

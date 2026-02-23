@@ -181,17 +181,36 @@ export const useMenuStore = defineStore("menu", {
                 
                 if (category) {
                     const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    this.desserts = Array.isArray(data.data) ? data.data.map(normalizePrice) : [];
+
+                    // Defensive: Ensure data.data is a proper array of non-promise items
+                    if (!Array.isArray(data?.data)) {
+                        logger.warn('⚠️ Desserts API returned non-array data:', data?.data);
+                        this.desserts = [];
+                        return { success: true };
+                    }
+
+                    // Filter out any promise-like objects (if any somehow exist)
+                    const filteredArr = data.data.filter((item: any) => {
+                        if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
+                            logger.warn('⚠️ Skipping promise-like object in desserts:', item);
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    this.desserts = filteredArr.map(normalizePrice);
+                    logger.debug('✅ Desserts loaded:', this.desserts.length, '| raw items:', filteredArr);
                 } else {
                     logger.warn('⚠️ Dessert category not found in tablet categories');
                     this.desserts = [];
                 }
-                logger.debug('✅ Desserts loaded:', this.desserts.length);
+                logger.debug('✅ Desserts final state:', this.desserts);
                 return { success: true };
             } catch (error) {
                 const errorMessage = (error as Error).message || 'Failed to fetch desserts';
                 this.errors.desserts = errorMessage;
                 logger.error('❌ Desserts error:', error);
+                this.desserts = [];
                 throw new Error(errorMessage);
             } finally {
                 this.loading.desserts = false;
@@ -239,7 +258,24 @@ export const useMenuStore = defineStore("menu", {
                 
                 if (category) {
                     const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    this.alacartes = Array.isArray(data.data) ? data.data.map(normalizePrice) : [];
+                    
+                    // Defensive: Ensure data.data is a proper array of non-promise items
+                    if (!Array.isArray(data?.data)) {
+                        logger.warn('⚠️ Alacartes API returned non-array data:', data?.data);
+                        this.alacartes = [];
+                        return { success: true };
+                    }
+
+                    // Filter out any promise-like objects
+                    const filteredArr = data.data.filter((item: any) => {
+                        if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
+                            logger.warn('⚠️ Skipping promise-like object in alacartes:', item);
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    this.alacartes = filteredArr.map(normalizePrice);
                 } else {
                     logger.warn('⚠️ Alacarte category not found in tablet categories');
                     this.alacartes = [];
@@ -250,6 +286,7 @@ export const useMenuStore = defineStore("menu", {
                 const errorMessage = (error as Error).message || 'Failed to fetch alacartes';
                 this.errors.alacartes = errorMessage;
                 logger.error('❌ Alacartes error:', error);
+                this.alacartes = [];
                 throw new Error(errorMessage);
             } finally {
                 this.loading.alacartes = false;
@@ -268,7 +305,24 @@ export const useMenuStore = defineStore("menu", {
                 
                 if (category) {
                     const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    this.beverages = Array.isArray(data.data) ? data.data.map(normalizePrice) : [];
+                    
+                    // Defensive: Ensure data.data is a proper array of non-promise items
+                    if (!Array.isArray(data?.data)) {
+                        logger.warn('⚠️ Beverages API returned non-array data:', data?.data);
+                        this.beverages = [];
+                        return { success: true };
+                    }
+
+                    // Filter out any promise-like objects
+                    const filteredArr = data.data.filter((item: any) => {
+                        if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
+                            logger.warn('⚠️ Skipping promise-like object in beverages:', item);
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    this.beverages = filteredArr.map(normalizePrice);
                 } else {
                     logger.warn('⚠️ Beverage category not found in tablet categories');
                     this.beverages = [];
@@ -279,6 +333,7 @@ export const useMenuStore = defineStore("menu", {
                 const errorMessage = (error as Error).message || 'Failed to fetch beverages';
                 this.errors.beverages = errorMessage;
                 logger.error('❌ Beverages error:', error);
+                this.beverages = [];
                 throw new Error(errorMessage);
             } finally {
                 this.loading.beverages = false;

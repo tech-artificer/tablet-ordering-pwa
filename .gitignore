@@ -29,3 +29,5 @@ certs/
 *.pem
 *.key
 *.crt
+
+public/
