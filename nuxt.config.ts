@@ -45,17 +45,28 @@ export default defineNuxtConfig({
         typeCheck: false
     },
 
-    // Canonical static output directory — nginx serves from this path.
-    // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/public).
+    // Build output goes to dist/ — separate from the source public/ static assets dir.
+    // nginx serves from dist/; static assets in public/ are copied to dist/ on every build.
+    // This prevents nuxt generate from wiping static files (icons, favicon) during builds.
+    // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/dist).
     nitro: {
         output: {
-            publicDir: 'public',
+            publicDir: 'dist',
         },
     },
 
     pwa: {
         registerType: "autoUpdate",
-        
+
+        // Explicitly include icon files so they survive nuxt generate output
+        includeAssets: [
+            'favicon.ico',
+            'icons/pwa-icon-192.png',
+            'icons/pwa-icon-512.png',
+            'icons/pwa-icon-maskable.png',
+            'icons/apple-touch-icon.png',
+        ],
+
         manifest: {
             name: "Wooserve KBBQ Ordering",
             short_name: "Wooserve",
@@ -165,10 +176,13 @@ export default defineNuxtConfig({
                 },
                 { name: 'theme-color', content: '#F6B56D' },
                 { name: 'apple-mobile-web-app-capable', content: 'yes' },
-                { name: 'apple-mobile-web-app-status-bar-style', content: 'black' }
+                { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
+                { name: 'apple-mobile-web-app-title', content: 'Wooserve' },
             ],
             link: [
-                { rel: 'manifest', href: '/manifest.webmanifest' }
+                { rel: 'manifest', href: '/manifest.webmanifest' },
+                { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+                { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
             ],
         },
     },
