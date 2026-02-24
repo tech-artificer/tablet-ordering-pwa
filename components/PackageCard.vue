@@ -67,12 +67,12 @@ const activeCategoryLabel = computed(() => {
 
       <!-- <div class="h-px bg-white/10 my-4"></div> -->
 
-      <div class="flex flex-wrap items-center gap-2 mb-4">
-        <span class="text-white/50 text-xs tracking-[0.22em] uppercase mr-1">Filter</span>
+      <div class="flex flex-wrap items-center gap-1.5 mb-3">
+        <span class="text-white/50 text-[10px] tracking-[0.2em] uppercase mr-1">Filter</span>
         <button
           @click="activeCategory = 'all'"
           :class="[
-            'px-4 py-2 rounded-full text-xs font-bold tracking-[0.12em] uppercase border transition-colors',
+            'px-2.5 py-1 rounded-full text-[11px] leading-none font-semibold tracking-[0.08em] uppercase border transition-colors',
             activeCategory === 'all'
               ? 'bg-primary text-black border-primary'
               : 'bg-white/5 text-white/70 border-white/15 hover:bg-white/10'
@@ -85,7 +85,7 @@ const activeCategoryLabel = computed(() => {
           :key="category"
           @click="activeCategory = category"
           :class="[
-            'px-4 py-2 rounded-full text-xs font-bold tracking-[0.12em] uppercase border transition-colors',
+            'px-2.5 py-1 rounded-full text-[11px] leading-none font-semibold tracking-[0.08em] uppercase border transition-colors',
             activeCategory === category
               ? 'bg-primary text-black border-primary'
               : 'bg-white/5 text-white/70 border-white/15 hover:bg-white/10'
@@ -98,13 +98,13 @@ const activeCategoryLabel = computed(() => {
       <!-- <div class="mb-3 text-white text-2xl font-extrabold capitalize">{{ activeCategoryLabel }}</div> -->
 
       <div class="flex-1 overflow-y-auto pr-1">
-        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 md:gap-3">
           <div
             v-for="(mod, index) in filteredModifiers"
             :key="mod.id"
             class="relative text-left rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 transition-colors overflow-hidden"
           >
-            <div class="relative h-36 md:h-40 bg-black/20 flex items-center justify-center overflow-hidden">
+            <div class="relative h-24 md:h-28 bg-black/20 flex items-center justify-center overflow-hidden">
               <img
                 v-if="mod.img_url"
                 :src="mod.img_url"
@@ -118,16 +118,16 @@ const activeCategoryLabel = computed(() => {
                 {{ mod.name?.substring(0, 1) }}
               </div>
 
+              <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/15 border border-white/30 text-white text-[10px] font-extrabold tracking-[0.15em] uppercase">
+                {{ mod.receipt_name || `M${index + 1}` }}
+              </span>
               <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-primary text-black text-[10px] font-extrabold tracking-[0.15em] uppercase">
                 Included
               </span>
             </div>
 
-            <div class="p-3">
-              <div class="text-white/45 text-xs font-semibold tracking-[0.12em] uppercase mb-1">
-                {{ mod.receipt_name || `M${index + 1}` }}
-              </div>
-              <div class="text-white font-bold text-base leading-tight line-clamp-2">{{ mod.name }}</div>
+            <div class="p-2.5">
+              <div class="text-center text-white font-bold text-sm md:text-base leading-tight line-clamp-2">{{ mod.name }}</div>
             </div>
           </div>
         </div>

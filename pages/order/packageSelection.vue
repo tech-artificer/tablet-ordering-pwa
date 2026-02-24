@@ -209,8 +209,8 @@ function handleTouchEnd() {
   <div class="h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
     <div class="relative z-10 flex flex-col h-screen p-4">
       <div class="w-full max-w-7xl mx-auto flex flex-col h-full">
-        <!-- Compact header row -->
-        <div class="flex items-center justify-between gap-4 mb-3">
+        <!-- Header row -->
+        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-4">
           <!-- Back button -->
           <button 
             @click="goBack" 
@@ -219,10 +219,16 @@ function handleTouchEnd() {
             <ArrowLeft :size="22" class="text-white" />
           </button>
           
-          <!-- Title -->
-          <h1 class="text-2xl font-bold text-white font-raleway">
-            Choose Your <span class="text-primary">Package</span>
-          </h1>
+          <!-- Title block -->
+          <div class="text-center px-2">
+            <p class="text-[11px] tracking-[0.35em] uppercase text-white/45 font-semibold mb-1">Package Selection</p>
+            <h1 class="text-4xl font-bold text-white font-raleway leading-none">
+              Choose Your <span class="text-primary">Package</span>
+            </h1>
+            <p class="text-xs tracking-[0.22em] uppercase text-white/55 mt-2">
+              {{ orderStore.guestCount }} Guests · View Included Meats
+            </p>
+          </div>
           
           <!-- Package navigation -->
           <div class="flex items-center gap-2">
