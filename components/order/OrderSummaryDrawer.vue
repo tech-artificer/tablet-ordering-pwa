@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { ElDrawer, ElBadge, ElButton, ElDivider } from 'element-plus'
 import { formatCurrency } from '../../utils/formats'
 import type { PropType } from 'vue'
-import { useDeviceStore } from '../../stores/device'
-import { useSessionStore } from '../../stores/session'
+import { useDeviceStore } from '../../stores/Device'
+import { useSessionStore } from '../../stores/Session'
 
 const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()

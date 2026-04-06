@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 import { useApi } from '../composables/useApi'
-import { useOrderStore } from './order'
-import { useDeviceStore } from './device'
-import { useMenuStore } from './menu'
+import { useOrderStore } from './Order'
+import { useDeviceStore } from './Device'
+import { useMenuStore } from './Menu'
 import { logger } from '../utils/logger'
 
 export const useSessionStore = defineStore('session', () => {
@@ -82,10 +82,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function start(): Promise<boolean> {
-    if (state.isActive && state.sessionStartedAt && state.sessionEndsAt) {
-      ensureTimer()
-      return true
-    }
+    const timestamp = new Date().toISOString()
     // Ensure device token is present and valid before starting session
     const deviceStore = useDeviceStore()
 
@@ -94,6 +91,7 @@ export const useSessionStore = defineStore('session', () => {
       const ok = await deviceStore.authenticate()
       if (!ok) {
         // Authentication failed; caller should handle registration UI
+        console.log(`[❌ Device Auth Failed] Cannot start session without token at ${timestamp}`)
         return false
       }
     }
@@ -119,11 +117,14 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
       // Token is missing/expired/near expiry — try refreshing
+      console.log(`[🔄 Token Refresh] Token expired or missing, refreshing at ${timestamp}`)
       const refreshed = await deviceStore.refresh()
       if (!refreshed) {
         // Refresh failed — require re-registration
+        console.log(`[❌ Token Refresh Failed] Cannot refresh token at ${timestamp}`)
         return false
       }
+      console.log(`[✅ Token Refreshed] Valid token obtained at ${timestamp}`)
     }
 
     // Fetch latest session id from server to keep local state in-sync
@@ -137,7 +138,9 @@ export const useSessionStore = defineStore('session', () => {
     // Preload menu data so customers don't wait when ordering
     const menuStore = useMenuStore()
     try {
+      console.log(`[📦 Menu Preload] Loading menus for quick response at ${timestamp}`)
       await menuStore.loadAllMenus()
+      console.log(`[✅ Menu Preloaded] Ready for ordering at ${timestamp}`)
     } catch (e) {
       logger.warn('[SessionStore] preload menus failed:', e)
     }
@@ -159,13 +162,23 @@ export const useSessionStore = defineStore('session', () => {
       try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
     }
 
+    console.log(`[✅ Session Started] Ready for guest ordering flow at ${timestamp}`)
+    logger.info('[SessionStore] Session started')
+
     return true
   }
 
   function end() {
+    const timestamp = new Date().toISOString()
+    const orderStore = useOrderStore()
+    const currentOrderId = state.orderId
+    const finalStatus = orderStore.currentOrder?.order?.status || 'unknown'
+    
+    console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
     logger.info('🔚 Session ending - clearing all session and order state')
     state.timerExpired = false
     clear()
+    console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
   }
 
   // Compatibility alias used by some callers
@@ -174,6 +187,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function clear() {
+    const timestamp = new Date().toISOString()
     logger.debug('🧹 Clearing session state...')
     state.sessionId = null
     state.orderId = null
@@ -199,6 +213,8 @@ export const useSessionStore = defineStore('session', () => {
     orderStore.isRefillMode = false
     // Note: orderStore.history is KEPT for historical tracking
     
+    console.log(`[📊 State Cleared] All order/cart/package data cleared at ${timestamp}`)
+    
     // Force persist to localStorage immediately to avoid hydration issues
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
@@ -220,6 +236,7 @@ export const useSessionStore = defineStore('session', () => {
           history: orderStore.history || [] // Keep history
         }))
         
+        console.log(`[💾 Persisted] Session state saved at ${timestamp}`)
         logger.debug('✅ Session and order stores cleared and persisted')
       } catch (e) {
         logger.warn('Failed to persist cleared stores:', e)

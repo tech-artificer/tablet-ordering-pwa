@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { useDeviceStore } from '~/stores/device'
+import { useDeviceStore } from '~/stores/Device'
 import { useApi } from './useApi'
 import { logger } from '../utils/logger'
 export const useDeviceAuth = () => {

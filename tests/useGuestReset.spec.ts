@@ -11,8 +11,8 @@ if (typeof globalThis.localStorage === 'undefined') {
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useSessionStore } from '../stores/session'
-import { useOrderStore } from '../stores/order'
+import { useSessionStore } from '../stores/Session'
+import { useOrderStore } from '../stores/Order'
 import { useGuestReset } from '../composables/useGuestReset'
 
 describe('useGuestReset composable', () => {

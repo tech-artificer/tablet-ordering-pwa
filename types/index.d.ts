@@ -366,3 +366,74 @@ export interface PaginatedResponse<T> {
   per_page: number;
   last_page: number;
 }
+
+// New types for Tablet API integration
+export interface MeatCategory {
+  code: string;  // PORK, BEEF, CHICKEN
+  name: string;  // Display name
+  icon: string;  // Icon (emoji or URL)
+  color: string; // Hex color code
+  sort_order: number;
+}
+
+export interface TabletCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  icon_url?: string;
+  color?: string;
+  menu_count: number;
+}
+
+export interface AllowedMenu {
+  id: number;
+  description: string;
+  receipt_name: string;
+  price: number;
+  extra_price: number;
+  total_price: number;
+  is_default: boolean;
+  is_free: boolean;
+  meat_category?: MeatCategory;
+  image?: {
+    url: string;
+    alt_text?: string;
+  };
+}
+
+export interface PackageDetails {
+  package: {
+    id: number;
+    name: string;
+    description: string;
+    base_price: number;
+    limits: {
+      meat: { min: number; max: number };
+      side: { min: number; max: number };
+      dessert: { min: number; max: number };
+      beverage: { min: number; max: number };
+    };
+    has_limits: boolean;
+  };
+  allowed_menus: {
+    meat: AllowedMenu[];
+    side: AllowedMenu[];
+    dessert: AllowedMenu[];
+    beverage: AllowedMenu[];
+  };
+  default_selections: Array<{
+    menu_id: number;
+    type: string;
+  }>;
+}
+
+export interface PackageValidationResult {
+  valid: boolean;
+  errors: string[];
+  pricing: {
+    base_price: number;
+    extra_charges: number;
+    total_price: number;
+  };
+}

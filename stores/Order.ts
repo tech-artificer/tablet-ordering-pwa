@@ -3,7 +3,8 @@ import { reactive, computed, toRefs, onScopeDispose } from 'vue'
 import { useApi } from '../composables/useApi'
 import { logger } from '../utils/logger'
 import { notifyBlockedAction } from '../composables/useNotifier'
-import { extractOrderId, getCurrentOrderId, extractOrderNumber } from '../utils/orderHelpers'
+import { useDeviceStore } from './Device'
+import { useSessionStore } from './Session'
 import type { CartItem, Package, MenuItem } from '../types'
 
 export const useOrderStore = defineStore('order', () => {
@@ -227,24 +228,67 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   function buildPayload() {
-    const items = state.cartItems.map((i: any) => ({
-      menu_id: Number(i.id),
-      ordered_menu_id: i.category === 'meats' ? (state.package as any)?.id : null,
-      name: i.name,
-      quantity: Number(i.quantity),
-      price: Number(i.price),
-      note: i.note ?? null,
-      subtotal: Number(i.price) * Number(i.quantity),
-      tax: 0,
-      discount: 0
-    }))
+    // Separate package item with nested modifiers from add-ons
+    const meatItems = state.cartItems.filter((i: any) => i.category === 'meats')
+    const addOnItems = state.cartItems.filter((i: any) => i.category !== 'meats')
+    
+    const items: any[] = []
+    
+    // 1. Package item with meat modifiers (parent-child structure)
+    if (state.package?.id) {
+      const packageQuantity = Number(state.guestCount)
+      const packageUnitPrice = Number((state.package as any)?.price || 0)
+      const packageSubtotal = packageUnitPrice * packageQuantity
+
+      items.push({
+        menu_id: Number(state.package.id),
+        name: String((state.package as any)?.name || 'Package'),
+        quantity: packageQuantity,
+        price: packageUnitPrice,
+        subtotal: packageSubtotal,
+        tax: 0,
+        discount: 0,
+        note: null,
+        is_package: true,
+        modifiers: meatItems.map((meat: any) => ({
+          menu_id: Number(meat.id),
+          quantity: Number(meat.quantity)
+        }))
+      })
+    }
+    
+    // 2. Add-on items (sides, drinks, desserts) as separate top-level items
+    addOnItems.forEach((item: any) => {
+      const quantity = Number(item.quantity)
+      const unitPrice = Number(item.price || 0)
+      const subtotal = unitPrice * quantity
+
+      items.push({
+        menu_id: Number(item.id),
+        name: String(item.name || 'Item'),
+        quantity,
+        price: unitPrice,
+        subtotal,
+        tax: 0,
+        discount: 0,
+        note: item.note ?? null,
+        is_package: false,
+        modifiers: []
+      })
+    })
+
+    const subtotal = Number(packageTotal.value || 0) + Number(addOnsTotal.value || 0)
+    const tax = Number(taxAmount.value || 0)
+    const discount = 0
+    const totalAmount = Number(grandTotal.value || 0)
     
     const payload = {
+      table_id: null,  // Will be populated from deviceStore in submitOrder
       guest_count: Number(state.guestCount),
-      subtotal: Number(packageTotal.value) + Number(addOnsTotal.value),
-      tax: Number(taxAmount.value),
-      discount: 0,
-      total_amount: Number(grandTotal.value),
+      subtotal,
+      tax,
+      discount,
+      total_amount: totalAmount,
       items
     }
     
@@ -258,19 +302,54 @@ export const useOrderStore = defineStore('order', () => {
     if (!Array.isArray(payload.items) || payload.items.length === 0) {
       throw new Error('Invalid items: must be a non-empty array')
     }
+
+    if (typeof payload.subtotal !== 'number' || payload.subtotal < 0) {
+      throw new Error('Invalid subtotal: must be a non-negative number')
+    }
+
+    if (typeof payload.tax !== 'number' || payload.tax < 0) {
+      throw new Error('Invalid tax: must be a non-negative number')
+    }
+
+    if (typeof payload.discount !== 'number' || payload.discount < 0) {
+      throw new Error('Invalid discount: must be a non-negative number')
+    }
+
+    if (typeof payload.total_amount !== 'number' || payload.total_amount < 0) {
+      throw new Error('Invalid total_amount: must be a non-negative number')
+    }
     
     payload.items.forEach((item, index) => {
       if (!item.menu_id || typeof item.menu_id !== 'number') {
         throw new Error(`Invalid item[${index}].menu_id: must be a number`)
       }
       if (!item.name || typeof item.name !== 'string') {
-        throw new Error(`Invalid item[${index}].name: must be a non-empty string`)
+        throw new Error(`Invalid item[${index}].name: must be a string`)
       }
       if (!item.quantity || item.quantity < 1) {
         throw new Error(`Invalid item[${index}].quantity: must be at least 1`)
       }
       if (typeof item.price !== 'number' || item.price < 0) {
         throw new Error(`Invalid item[${index}].price: must be a non-negative number`)
+      }
+      if (typeof item.subtotal !== 'number' || item.subtotal < 0) {
+        throw new Error(`Invalid item[${index}].subtotal: must be a non-negative number`)
+      }
+      if (typeof item.is_package !== 'boolean') {
+        throw new Error(`Invalid item[${index}].is_package: must be a boolean`)
+      }
+      if (item.is_package && (!Array.isArray(item.modifiers) || item.modifiers.length === 0)) {
+        throw new Error(`Invalid item[${index}].modifiers: package items must have at least one modifier`)
+      }
+      if (item.is_package && item.modifiers) {
+        item.modifiers.forEach((mod: any, modIndex: number) => {
+          if (!mod.menu_id || typeof mod.menu_id !== 'number') {
+            throw new Error(`Invalid item[${index}].modifiers[${modIndex}].menu_id: must be a number`)
+          }
+          if (!mod.quantity || mod.quantity < 1) {
+            throw new Error(`Invalid item[${index}].modifiers[${modIndex}].quantity: must be at least 1`)
+          }
+        })
       }
     })
     
@@ -337,7 +416,6 @@ export const useOrderStore = defineStore('order', () => {
       }
       state.isSubmitting = true
     // 🔒 VALIDATION: Ensure everything is set before submitting
-    const { useDeviceStore } = await import('./device')
     const deviceStore = useDeviceStore()
     
     logger.debug('🔍 Pre-submission validation:', {
@@ -378,7 +456,15 @@ export const useOrderStore = defineStore('order', () => {
     logger.debug('✅ All validations passed - proceeding with order submission')
     
     const api = useApi()
-    const body = payload ?? buildPayload()
+    let body = payload ?? buildPayload()
+    
+    // Inject table_id from deviceStore if not already set
+    if (!body.table_id) {
+      body = {
+        ...body,
+        table_id: tableId
+      }
+    }
     
     logger.debug('📦 Order Payload:', body)
     
@@ -387,6 +473,9 @@ export const useOrderStore = defineStore('order', () => {
       const resp = await api.post('/api/devices/create-order', body, { headers: { 'X-Idempotency-Key': idempotencyKey } })
       logger.info('✅ Order submission SUCCESS')
       logger.debug('📥 Response:', resp.data)
+      
+      // Update session with order ID from response
+      const sessionStore = useSessionStore()
       
       // Check for success flag first
       if (!resp.data?.success) {
@@ -424,6 +513,33 @@ export const useOrderStore = defineStore('order', () => {
         logger.error('📋 Validation errors:', validationErrors)
         const errorMessages = Object.values(validationErrors || {}).flat().join(', ')
         throw new Error(`❌ Validation failed: ${errorMessages}`)
+      }
+
+      // Handle active-order conflicts by resuming the existing order
+      if (error.response?.status === 409) {
+        const existingOrder = error.response?.data?.order
+        if (existingOrder) {
+          logger.warn('↩️ Active order already exists for this device/session. Resuming existing order instead of creating a new one.', {
+            orderId: existingOrder?.order_id ?? existingOrder?.id,
+            status: existingOrder?.status,
+          })
+
+          const recoveredResponse = {
+            success: true,
+            resumed: true,
+            message: error.response?.data?.message || 'Existing active order found. Resuming current order.',
+            order: existingOrder,
+          }
+
+          await setOrderCreated(recoveredResponse)
+          return recoveredResponse
+        }
+
+        throw new Error(error.response?.data?.message || 'An active order already exists for this device. Please continue the existing session.')
+      }
+
+      if (error.response?.status === 503 && error.response?.data?.code === 'SESSION_NOT_FOUND') {
+        throw new Error('❌ No active POS terminal session found. Please ask staff to open a POS session, then try again.')
       }
       
       // Handle server errors with debugging guidance
@@ -464,122 +580,54 @@ export const useOrderStore = defineStore('order', () => {
       logger.warn('submitRefill already in progress; awaiting existing submission')
       return submitRefillMutex
     }
-
-    submitRefillMutex = (async () => {
-      if (!state.currentOrder && !state.hasPlacedOrder) {
-        throw new Error('No existing order found — cannot submit a refill.')
-      }
-      if (state.isSubmitting) {
-        throw new Error('Order submission already in progress. Please wait.')
-      }
-      state.isSubmitting = true
-
-      const { useDeviceStore } = await import('./device')
-      const deviceStore = useDeviceStore()
-
-      logger.debug('🔍 Refill pre-submission validation:', {
-        hasPlacedOrder: state.hasPlacedOrder,
-        currentOrder: !!state.currentOrder,
-        refillItemsCount: state.refillItems.length,
-        isAuthenticated: deviceStore.isAuthenticated
+    state.isSubmitting = true
+    const api = useApi()
+    
+    // Use order_id (business ID) - goes in URL path
+    const currentOrderId = state.currentOrder?.order?.order_id || state.currentOrder?.order?.id || state.currentOrder?.order_id || state.currentOrder?.id
+    
+    if (!currentOrderId) {
+      state.isSubmitting = false
+      throw new Error('Cannot submit refill: missing order ID')
+    }
+    
+    // Build payload matching POST /api/order/{orderId}/refill spec
+    // Use same structure as initial order with is_package and modifiers
+    const refillPayload = {
+      items: state.refillItems.map((i: any) => {
+        const isMeat = i.category === 'meats'
+        return {
+          menu_id: Number(i.id),
+          quantity: Number(i.quantity),
+          is_package: false,  // Refills are standalone items, not packages
+          note: i.note ?? 'Refill',
+          modifiers: []
+        }
       })
-
-      if (!deviceStore.token) {
-        throw new Error('❌ Device not authenticated - missing token. Please register device first.')
-      }
-
-      const tableData = deviceStore.table?.value || deviceStore.table
-      const tableId = (tableData as any)?.id
-      const tableName = (tableData as any)?.name
-
-      logger.debug('🔍 Table validation (refill):', { tableId, tableName })
-
-      if (!tableId) {
-        logger.error('❌ Table validation failed (refill) - no table ID found')
-        throw new Error('❌ No table assigned to this device. Please contact staff.')
-      }
-
-      if (!Array.isArray(state.refillItems) || state.refillItems.length === 0) {
-        throw new Error('❌ No refill items selected. Please add items to refill.')
-      }
-
-      const { useSessionStore } = await import('./session')
-      const sessionStore = useSessionStore()
-
-      // Use order_id (business ID) - goes in URL path
-      const currentOrderId = getCurrentOrderId(state.currentOrder) ?? sessionStore.orderId
-
-      if (!currentOrderId) {
-        throw new Error('Cannot submit refill: missing order ID')
-      }
-
-      const api = useApi()
-      const refillPayload = payload ?? buildRefillPayload()
-
-      logger.debug('📦 Refill Payload:', refillPayload)
-
-      try {
-        const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? (crypto as any).randomUUID() : `idemp-${Date.now()}-${Math.random().toString(36).slice(2,10)}`
-        const resp = await api.post(`/api/order/${currentOrderId}/refill`, refillPayload, { headers: { 'X-Idempotency-Key': idempotencyKey } })
-        logger.info('✅ Refill submission SUCCESS')
-        logger.debug('📥 Refill Response:', resp.data)
-
-        if (resp.data?.success === false) {
-          logger.error('❌ Refill server returned success=false:', resp.data)
-          throw new Error(resp.data?.message || 'Refill processing failed on server')
-        }
-
-        state.refillItems = []
-        state.isRefillMode = false
-        state.history = [...state.history, { ...resp.data, type: 'refill' }]
-        return resp.data
-      } catch (error: any) {
-        logger.error('❌ Refill submission failed:', error?.message || error)
-
-        if (error.response?.status === 401 || error.response?.data?.exception === 'authentication') {
-          logger.error('🔐 Authentication error - token invalid or expired')
-          throw new Error('❌ Your session has expired. Please re-register this device in Settings.')
-        }
-
-        if (error.response?.status === 422) {
-          const validationErrors = error.response?.data?.errors
-          logger.error('📋 Validation errors:', validationErrors)
-          const errorMessages = Object.values(validationErrors || {}).flat().join(', ')
-          throw new Error(`❌ Validation failed: ${errorMessages}`)
-        }
-
-        if (error.response?.status === 500) {
-          const serverMessage = error.response?.data?.message || 'Internal server error'
-          logger.error('🔴 SERVER ERROR (500) - Backend crashed')
-          throw new Error(
-            `❌ ${serverMessage}\n\n` +
-            `🔧 Backend debugging needed:\n` +
-            `1. Check Laravel logs (storage/logs/laravel.log)\n` +
-            `2. Enable APP_DEBUG=true in .env\n` +
-            `3. Verify database schema and OrderService\n\n` +
-            `Use Settings > Backend Diagnostics to test directly.`
-          )
-        }
-
-        if (!error.response) {
-          throw new Error('❌ Network error: Cannot reach backend server. Check if Laravel is running.')
-        }
-
-        throw error
-      } finally {
-        state.isSubmitting = false
-      }
-    })()
-
+    }
+    
+    logger.debug('[Refill] Submitting refill payload', {
+      orderId: currentOrderId,
+      refillPayload,
+    })
+    
     try {
-      return await submitRefillMutex
+      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? (crypto as any).randomUUID() : `idemp-${Date.now()}-${Math.random().toString(36).slice(2,10)}`
+      const resp = await api.post(`/api/order/${currentOrderId}/refill`, payload ?? refillPayload, { headers: { 'X-Idempotency-Key': idempotencyKey } })
+      state.refillItems = []
+      state.isRefillMode = false
+      state.history = [...state.history, { ...resp.data, type: 'refill' }]
+      logger.info('[Refill] Success')
+      return resp.data
+    } catch (error: any) {
+      logger.error('[Refill] Failed:', error?.response?.data || error)
+      throw error
     } finally {
       submitRefillMutex = null
     }
   }
 
   async function setOrderCreated(respData: any) {
-    const { useSessionStore } = await import('./session')
     const sessionStore = useSessionStore()
 
     const orderNumber = extractOrderNumber(respData)
@@ -686,6 +734,7 @@ export const useOrderStore = defineStore('order', () => {
         return
       }
       state.pollInflight = true
+      const tickStart = performance.now()
       try {
         const api = useApi()
         if (!api || typeof (api as any).get !== 'function') {
@@ -695,15 +744,23 @@ export const useOrderStore = defineStore('order', () => {
         }
         const url = `api/device-order/by-order-id/${orderId}`
         const resp = await api.get(url)
+        const tickMs = (performance.now() - tickStart).toFixed(1)
+        
         // Normalize returned order object
         const orderObj = resp.data?.order || resp.data?.data || resp.data
         if (orderObj) {
+          const status = orderObj?.status
+          logger.debug('[Polling] Tick', {
+            orderId,
+            status,
+            latencyMs: tickMs,
+          })
+          
           // Update currentOrder to canonical server resource
           state.currentOrder = { order: orderObj }
           state.hasPlacedOrder = true
           // Persist session order id if missing
           try {
-            const { useSessionStore } = await import('./session')
             const sessionStore = useSessionStore()
             const polledOrderId = extractOrderId(orderObj)
             if (polledOrderId) sessionStore.orderId = Number(polledOrderId)
@@ -712,14 +769,13 @@ export const useOrderStore = defineStore('order', () => {
           }
 
           // Stop polling if terminal status observed
-          const status = orderObj?.status
           if (status === 'completed' || status === 'cancelled' || status === 'voided') {
+            logger.info('[Polling] Terminal status observed', { orderId, status })
             stopOrderPolling()
             
             // End session and navigate to home on completed status
             if (status === 'completed') {
               try {
-                const { useSessionStore } = await import('./session')
                 const sessionStore = useSessionStore()
                 
                 // Small delay to allow any final UI updates. Await session end
@@ -730,8 +786,7 @@ export const useOrderStore = defineStore('order', () => {
                 }
                 completionTimeoutId = window.setTimeout(async () => {
                   try {
-                    // Load fresh session store instance and call end
-                    const { useSessionStore } = await import('./session')
+                    // Load session store instance and call end
                     const sessionStore = useSessionStore()
 
                     // If end returns a promise, await it
@@ -771,6 +826,12 @@ export const useOrderStore = defineStore('order', () => {
           }
         }
       } catch (error) {
+        const tickMs = (performance.now() - tickStart).toFixed(1)
+        logger.error('[Polling] Error', {
+          orderId,
+          error: (error as any)?.message,
+          latencyMs: tickMs,
+        })
         logger.warn('Order polling tick failed:', error)
       } finally {
         state.pollInflight = false
@@ -778,14 +839,14 @@ export const useOrderStore = defineStore('order', () => {
     }
 
     // Run immediately, then every 5s
-    tick().catch((e) => logger.warn('Order polling initial tick failed:', e))
-    const timerId = setInterval(() => tick().catch((e) => logger.warn('Order polling interval tick failed:', e)), 5000) as unknown as number
+    logger.info('[Polling] Started', { orderId, intervalMs: 5000 })
+    tick().catch(() => {})
+    const timerId = setInterval(() => tick().catch(() => {}), 5000) as unknown as number
     state.pollTimerId = timerId
     logger.info('✅ Order polling started for', orderId)
   }
 
   async function initializeFromSession() {
-    const { useSessionStore } = await import('./session')
     const sessionStore = useSessionStore()
     
     logger.debug('🔁 initializeFromSession called:', {
@@ -794,15 +855,51 @@ export const useOrderStore = defineStore('order', () => {
       stateCurrentOrder: !!state.currentOrder
     })
     
-    // If no orderId in session, reset stale hasPlacedOrder flag after a short grace
+    // If no orderId in session, attempt server-side active-order recovery first.
+    // This handles direct URL access / reloads where local storage lost orderId,
+    // but backend still has a pending/confirmed order for this tablet.
     if (!sessionStore.orderId) {
+      try {
+        const api = useApi()
+        const activeResp = await api.get('/api/device-orders', {
+          params: {
+            status: 'pending,confirmed,ready',
+            per_page: 1,
+          },
+        })
+
+        const activeOrder = activeResp?.data?.data?.data?.[0]
+        const activeOrderId = activeOrder?.order_id || activeOrder?.id
+        const activeStatus = String(activeOrder?.status || '').toLowerCase()
+
+        if (activeOrderId && !['completed', 'cancelled', 'voided'].includes(activeStatus)) {
+          sessionStore.orderId = activeOrderId
+          sessionStore.isActive = true
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try { window.localStorage.setItem('session_active', '1') } catch (e) { /* ignore */ }
+          }
+
+          state.hasPlacedOrder = true
+          state.currentOrder = { order: activeOrder }
+          logger.info('🔁 Recovered active order from /api/device-orders:', {
+            orderId: activeOrderId,
+            status: activeStatus,
+          })
+
+          startOrderPolling(String(activeOrderId))
+          return
+        }
+      } catch (err) {
+        logger.warn('🔁 Active order lookup failed; continuing local-state fallback', err)
+      }
+
+      // If still no orderId, reset stale hasPlacedOrder flag after a short grace
       if (state.hasPlacedOrder || state.currentOrder || state.isRefillMode) {
         logger.info('🔁 No session.orderId found, resetting stale order state (with grace)')
         // Apply a short grace period to avoid clearing during quick transitions
         await new Promise(resolve => setTimeout(resolve, 1500))
         // Re-check the session store in case orderId was set during grace
-        const { useSessionStore: useSessionStore2 } = await import('./session')
-        const refreshed = useSessionStore2()
+        const refreshed = useSessionStore()
         if (!refreshed.orderId) {
           state.hasPlacedOrder = false
           state.currentOrder = null
@@ -910,6 +1007,6 @@ export const useOrderStore = defineStore('order', () => {
   persist: {
     key: 'order-store',
     storage: (typeof localStorage !== 'undefined') ? localStorage : undefined,
-    pick: ['guestCount', 'package', 'hasPlacedOrder', 'currentOrder', 'submittedItems', 'isRefillMode', 'history']
+    pick: ['guestCount', 'package', 'hasPlacedOrder', 'currentOrder', 'submittedItems', 'isRefillMode', 'history', 'cartItems', 'refillItems']
   }
 })

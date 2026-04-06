@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 
-import { useDeviceStore } from '~/stores/device'
+import { useDeviceStore } from '~/stores/Device'
 import { useRouter } from 'vue-router'
 import { logger } from '../../utils/logger'
 

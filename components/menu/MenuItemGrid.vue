@@ -3,7 +3,7 @@ import { formatCurrency } from '../../utils/formats';
 import type { MenuItem, Modifier } from '../../types';
 import { ElButton, ElEmpty } from 'element-plus';
 
-type CategoryType = 'meats' | 'sides' | 'alacartes' | 'desserts' | 'beverages' ;
+type CategoryType = 'meats' | 'sides' | 'desserts' | 'beverages';
 
 const props = defineProps<{
   items: (MenuItem | Modifier)[];
@@ -121,7 +121,7 @@ const isAvailable = (item: any) => {
       </div>
 
       <div class="p-4">
-        <h3 class="text-white font-semibold text-lg mb-1 truncate">{{ item.name }}</h3>
+        <h3 class="text-white font-semibold text-lg mb-1 truncate">{{ item.name || (item as any).receipt_name || (item as any).kitchen_name }}</h3>
         <p v-if="item.description" class="text-gray-300 text-sm line-clamp-2">{{ item.description }}</p>
         
         <!-- Add to order button -->

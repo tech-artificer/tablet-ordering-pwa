@@ -1,11 +1,15 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDeviceStore } from '~/stores/device'
-import { useOrderStore } from '~/stores/order'
-import { useSessionStore } from '~/stores/session'
+import { useDeviceStore } from '~/stores/Device'
+import { useOrderStore } from '~/stores/Order'
+import { useSessionStore } from '~/stores/Session'
 import { logger } from '~/utils/logger'
 import { ElNotification, ElMessage } from 'element-plus'
 import { useApi } from '~/composables/useApi'
+
+// Timeout tracking for proper cleanup on unmount (prevents memory leaks)
+let orderCompletionTimeoutId: ReturnType<typeof setTimeout> | null = null
+let reloadTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 interface OrderCreatedEvent {
   eventId: number
@@ -173,6 +177,8 @@ export const useBroadcasts = () => {
 
   // Event Handlers
   const handleOrderCreated = (event: OrderCreatedEvent) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[📨 .order.created] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
     logger.debug('Order created:', event.order)
     
     ElNotification({
@@ -183,12 +189,14 @@ export const useBroadcasts = () => {
     })
 
     // Update session order ID
-    if (sessionStore.sessionId === event.order.session_id) {
-      sessionStore.orderId = event.order.id
+    if (sessionStore.sessionId.value === event.order.session_id) {
+      sessionStore.orderId.value = event.order.id
     }
   }
 
   const handleOrderUpdated = (event: OrderUpdatedEvent) => {
+    const timestamp = new Date().toISOString()
+    console.log(`[📨 .order.updated] Received at ${timestamp}`, { order_id: event.order_id, status: event.status })
     logger.debug('Order status updated:', event)
     
     const statusMessages: Record<string, { title: string; message: string; type: any }> = {
@@ -235,19 +243,10 @@ export const useBroadcasts = () => {
         // End session and navigate to home on completed
         if (event.status === 'completed') {
           logger.info('✅ Order completed via broadcast - ending session in 2s')
-          if (orderCompletionTimeoutId) {
-            try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] clearTimeout failed', e) }
-            orderCompletionTimeoutId = null
-          }
-          orderCompletionTimeoutId = window.setTimeout(async () => {
-            try {
-              sessionStore.end()
-              await router.replace('/')
-            } catch (e) {
-              logger.warn('[Broadcasts] Failed to end session after order completion', e)
-            } finally {
-              orderCompletionTimeoutId = null
-            }
+          if (orderCompletionTimeoutId) clearTimeout(orderCompletionTimeoutId)
+          orderCompletionTimeoutId = setTimeout(async () => {
+            sessionStore.end()
+            await router.replace('/')
           }, 2000)
         }
       }
@@ -277,19 +276,10 @@ export const useBroadcasts = () => {
       
       // End session and navigate to home after a short delay
       logger.info('✅ Order completed via broadcast - ending session in 2s')
-      if (orderCompletionTimeoutId) {
-        try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] clearTimeout failed', e) }
-        orderCompletionTimeoutId = null
-      }
-      orderCompletionTimeoutId = window.setTimeout(async () => {
-        try {
-          sessionStore.end()
-          await router.replace('/')
-        } catch (e) {
-          logger.warn('[Broadcasts] Failed to end session after order completion', e)
-        } finally {
-          orderCompletionTimeoutId = null
-        }
+      if (orderCompletionTimeoutId) clearTimeout(orderCompletionTimeoutId)
+      orderCompletionTimeoutId = setTimeout(async () => {
+        sessionStore.end()
+        await router.replace('/')
       }, 2000)
     }
   }
@@ -444,19 +434,6 @@ export const useBroadcasts = () => {
     console.log('[Echo] ✅ Subscribed to channel: orders.' + orderId)
     logger.debug(`✅ Subscribed to orders.${orderId}`)
 
-    // Realtime is authoritative now — stop any polling fallback for this order
-    try {
-      const numericId = Number(orderId)
-      if (!Number.isNaN(numericId)) {
-        orderStore.stopOrderPolling && orderStore.stopOrderPolling()
-      } else {
-        // still stop generic polling if implemented
-        orderStore.stopOrderPolling && orderStore.stopOrderPolling()
-      }
-    } catch (e) {
-      logger.warn('subscribeToOrderChannel: failed to stop polling', e)
-    }
-
     // Subscribe to service requests for this order
     console.log('[Echo] Subscribing to channel: service-requests.' + orderId)
     serviceRequestChannel = (window as any).Echo.channel(`service-requests.${orderId}`)
@@ -472,13 +449,20 @@ export const useBroadcasts = () => {
 
   // Unsubscribe from order channels
   const unsubscribeFromOrderChannel = () => {
+    const canLeave = typeof (window as any).Echo?.leave === 'function'
     if (orderChannel) {
-      (window as any).Echo.leave(orderChannel.name)
+      console.log(`[🔕 Unsubscribing] Channel: ${orderChannel.name} at ${new Date().toISOString()}`)
+      if (canLeave) {
+        ;(window as any).Echo.leave(orderChannel.name)
+      }
       orderChannel = null
       channelStatus.value.order = false
     }
     if (serviceRequestChannel) {
-      (window as any).Echo.leave(serviceRequestChannel.name)
+      console.log(`[🔕 Unsubscribing] Channel: ${serviceRequestChannel.name} at ${new Date().toISOString()}`)
+      if (canLeave) {
+        ;(window as any).Echo.leave(serviceRequestChannel.name)
+      }
       serviceRequestChannel = null
       channelStatus.value.serviceRequest = false
     }
@@ -507,9 +491,12 @@ export const useBroadcasts = () => {
       
       // Reverb uses state_change event instead of direct bind
       pusher.connection.bind('state_change', (states: any) => {
+        const timestamp = new Date().toISOString()
+        console.log(`[🔗 WebSocket State Change] ${states.previous || '?'} → ${states.current} at ${timestamp}`)
         logger.debug('WebSocket state change:', states.current)
         
         if (states.current === 'connected') {
+          console.log(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
           logger.debug('✅ WebSocket connected')
           ElNotification({
             title: '✅ Connected',
@@ -535,6 +522,7 @@ export const useBroadcasts = () => {
 
   // Cleanup on unmount
   const cleanup = () => {
+    // Clear any pending timeouts to prevent memory leaks in kitchen environment
     if (orderCompletionTimeoutId) {
       try { clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
       orderCompletionTimeoutId = null
@@ -544,13 +532,18 @@ export const useBroadcasts = () => {
       reloadTimeoutId = null
     }
     unsubscribeFromOrderChannel()
+    const canLeave = typeof (window as any).Echo?.leave === 'function'
     if (deviceChannel) {
-      (window as any).Echo.leave(deviceChannel.name)
+      if (canLeave) {
+        (window as any).Echo.leave(deviceChannel.name)
+      }
       deviceChannel = null
       channelStatus.value.device = false
     }
     if (deviceControlChannel) {
-      (window as any).Echo.leave(deviceControlChannel.name)
+      if (canLeave) {
+        (window as any).Echo.leave(deviceControlChannel.name)
+      }
       deviceControlChannel = null
       channelStatus.value.deviceControl = false
     }

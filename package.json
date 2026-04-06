@@ -10,7 +10,7 @@
     "dev": "npx nuxi dev --host 0.0.0.0",
     "test": "vitest",
     "build": "npx nuxi build",
-    "generate": "npx nuxi generate",
+    "generate": "npx nuxi build && npx nuxi generate && node -e \"const fs=require('fs'), path=require('path'); const src='.output/public', dst='public'; fs.existsSync(src) && fs.cpSync(src, dst, {recursive: true, force: true})\"",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "npx nuxi typecheck",
@@ -21,7 +21,9 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "@pinia/nuxt": "^0.11.2",
+    "@vueuse/motion": "^3.0.3",
     "axios": "^1.5.0",
+    "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "element-plus": "^2.3.0",
     "jwt-decode": "^4.0.0",
@@ -48,6 +50,7 @@
     "@vue/test-utils": "^2.0.0-0",
     "jsdom": "^21.1.0",
     "playwright": "^1.40.1",
+    "sharp": "^0.34.5",
     "typescript": "^5.4.0",
     "vitest": "^1.0.0"
   }

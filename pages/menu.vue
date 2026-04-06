@@ -15,18 +15,13 @@ import OrderSummaryDrawer from '../components/order/OrderSummaryDrawer.vue';
 import SupportFab from '../components/menu/SupportFab.vue';
 import RefillButton from '../components/menu/RefillButton.vue';
 import { useGuestReset } from '../composables/useGuestReset';
-import { useSessionStore } from '../stores/session';
+import { recoverActiveOrderState } from '../composables/useActiveOrderRecovery';
+import { useSessionStore } from '../stores/Session';
 import { logger } from '../utils/logger';
 import { notifyWarning } from '../composables/useNotifier';
-import { useDeviceStore } from '../stores/device';
-import { useMenuStore } from '../stores/menu';
-import { useOrderStore } from '../stores/order';
-import { haptic } from '../utils/haptics'
-
-// Protect this page with route guard
-definePageMeta({
-  middleware: 'order-guard',
-});
+import { useDeviceStore } from '../stores/Device';
+import { useMenuStore } from '../stores/Menu';
+import { useOrderStore } from '../stores/Order';
 
 const menuStore = useMenuStore();
 const orderStore = useOrderStore();
@@ -36,6 +31,8 @@ const router = useRouter();
 
 onMounted(async () => {
   // Debug: Log initial state before initialization
+  const timestamp = new Date().toISOString()
+  console.log(`[🍽️ Menu Screen Loaded] at ${timestamp}`)
   console.log('[Menu] onMounted - Initial state:', {
     'sessionStore.orderId': sessionStore.orderId,
     'sessionStore.sessionId': sessionStore.sessionId,
@@ -45,26 +42,81 @@ onMounted(async () => {
     'orderStore.isRefillMode': orderStore.isRefillMode
   })
 
-  try {
-    await orderStore.initializeFromSession()
 
-    // Debug: Log state after initialization
-    console.log('[Menu] After initializeFromSession:', {
-      'sessionStore.orderId': sessionStore.orderId,
-      'orderStore.hasPlacedOrder': orderStore.hasPlacedOrder,
-      'orderStore.currentOrder': orderStore.currentOrder
-    })
+  const recovery = await recoverActiveOrderState('menu')
+  const hasPackageSelection = !!route.query.packageId
+  const explicitMenuResume = route.query.resumeMenu === '1'
+  const allowMenuAccess = hasPackageSelection || orderStore.isRefillMode || explicitMenuResume
 
-    // Check if order is already completed - if so, end session and redirect
-    const orderStatus = orderStore.currentOrder?.order?.status || orderStore.currentOrder?.status
-    if (orderStatus === 'completed' || orderStatus === 'cancelled' || orderStatus === 'voided') {
-      logger.info('⚠️ Order already in terminal state:', orderStatus, '- ending session')
-      sessionStore.end()
-      router.replace('/')
-      return
+  // If an active order is recovered and not allowed to access menu, stay on menu page and enable refill mode
+  if (recovery.hasActiveOrder && !allowMenuAccess) {
+    console.log(`[↩️ Menu: Active order ${recovery.orderId} recovered, staying on menu and enabling refill mode at ${timestamp}`)
+    orderStore.toggleRefillMode(true)
+    // Optionally, show a notification
+    ElMessage.info('Active order recovered. Refill mode enabled.')
+    // Do not redirect
+    // return
+  }
+
+  // Log package details if an existing order is detected by middleware
+  if (recovery.hasActiveOrder && selectedPackageId.value) {
+    const packageId = Number(selectedPackageId.value);
+    const packageDetails = menuStore.packageDetails[packageId];
+    console.log('[Menu] API packageDetails.allowed_menus:', {
+      meat: packageDetails?.allowed_menus?.meat,
+      modifiers: packageDetails?.allowed_menus?.modifiers
+    });
+  }
+
+  // If we recovered an active order but no packageId in route, attempt to infer package from the recovered order
+  if (recovery.hasActiveOrder && !selectedPackageId.value) {
+    try {
+      const orderObj = orderStore.currentOrder?.order || orderStore.currentOrder;
+      let inferredPackageId = null;
+
+      // Check common fields first
+      if (orderObj?.package_id) inferredPackageId = Number(orderObj.package_id);
+      if (!inferredPackageId && orderObj?.menu_id) inferredPackageId = Number(orderObj.menu_id);
+
+      // Fallback: inspect order items for an item marked as package/is_package
+      if (!inferredPackageId && Array.isArray(orderObj?.items)) {
+        const pkgItem = orderObj.items.find((it: any) => it.is_package || it.isPackage || it.is_package === true);
+        if (pkgItem) inferredPackageId = Number(pkgItem.menu_id || pkgItem.menuId || pkgItem.id);
+      }
+
+      // If we found a package id, set it and fetch package details
+      if (inferredPackageId) {
+        console.log('[Menu] Inferred packageId from recovered order:', inferredPackageId);
+        selectedPackageId.value = String(inferredPackageId);
+        try {
+          const pd = await menuStore.fetchPackageDetails(inferredPackageId as number);
+          console.log('[Menu] fetchPackageDetails result:', pd);
+        } catch (err) {
+          console.warn('[Menu] fetchPackageDetails failed for inferred package:', inferredPackageId, err);
+        }
+      } else {
+        console.warn('[Menu] Could not infer packageId from recovered order; no package details will be fetched');
+      }
+    } catch (err) {
+      console.warn('[Menu] Error while inferring package from recovered order:', err);
     }
-  } catch (e) {
-    console.error('[Menu] initializeFromSession error:', e)
+  }
+
+  const orderStatus = orderStore.currentOrder?.order?.status || orderStore.currentOrder?.status
+  console.log(`[✅ Menu Ready] Order status=${orderStatus || 'none'}, ready for selections at ${timestamp}`)
+
+  // Load package details with allowed menus
+  if (selectedPackageId.value) {
+    try {
+      console.log(`[📦 Loading Package Details] package_id=${selectedPackageId.value} at ${timestamp}`);
+      logger.info('[Menu] Loading package details for package:', selectedPackageId.value);
+      await menuStore.fetchPackageDetails(Number(selectedPackageId.value));
+      console.log(`[✅ Package Details Loaded] Allowed menus available for selection at ${timestamp}`)
+      logger.info('[Menu] Package details loaded');
+    } catch (error) {
+      console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`);
+      logger.error('[Menu] Failed to load package details:', error);
+    }
   }
 })
 
@@ -100,14 +152,13 @@ watch(
 )
 
 // Menu categories
-type MenuCategory = 'meats' | 'sides' | 'alacartes' | 'desserts' | 'beverages';
+type MenuCategory = 'meats' | 'sides' | 'desserts' | 'beverages';
 
 const activeCategory = ref<MenuCategory>('meats');
 
 const categories = [
   { id: 'meats', label: 'Meats', icon: '🥩' },
   { id: 'sides', label: 'Sides', icon: '🍚' },
-  { id: 'alacartes', label: 'Alacartes', icon: '🍡' },
   { id: 'desserts', label: 'Desserts', icon: '🍰' },
   { id: 'beverages', label: 'Beverages', icon: '🥤' }
 ] as const;
@@ -137,10 +188,31 @@ const getItemQuantity = (itemId: number) => {
   return orderStore.getCartItemQuantity(Number(itemId))
 };
 
-// Get meats from selected package modifiers
+// Get meats from selected package allowed menus (from API)
 const meats = computed(() => {
-  if (!selectedPackage.value?.modifiers) return [];
-  return selectedPackage.value.modifiers.flat();
+  if (!selectedPackageId.value) return [];
+  const packageId = Number(selectedPackageId.value);
+  const packageDetails = menuStore.packageDetails[packageId];
+  // Primary: API-driven meats for this package
+  if (packageDetails && Array.isArray(packageDetails.allowed_menus?.meat) && packageDetails.allowed_menus.meat.length > 0) {
+    return packageDetails.allowed_menus.meat;
+  }
+  // Fallback: legacy modifiers for this package
+  const pkg = menuStore.packages.find(pkg => pkg.id === packageId);
+  if (pkg?.modifiers && pkg.modifiers.length > 0) {
+    return pkg.modifiers.flat();
+  }
+  // If both missing, return empty array (UI will show 'No meats available')
+  return [];
+});
+
+// Get modifiers from selected package allowed menus (from API)
+const modifiers = computed(() => {
+  if (!selectedPackageId.value) return [];
+  const packageId = Number(selectedPackageId.value);
+  const packageDetails = menuStore.packageDetails[packageId];
+  // Permanent: Only consume allowed_menus.modifiers from API contract
+  return Array.isArray(packageDetails?.allowed_menus?.modifiers) ? packageDetails.allowed_menus.modifiers : [];
 });
 
 // Get items based on active category for MenuItemGrid
@@ -151,8 +223,6 @@ const displayItems = computed(() => {
         return meats.value;
       case 'sides':
         return menuStore.sides;
-      case 'alacartes':
-        return menuStore.alacartes;
       case 'desserts':
         return menuStore.desserts;
       case 'beverages':
@@ -161,6 +231,18 @@ const displayItems = computed(() => {
         return [];
     }
   })();
+
+  // In refill mode, only show unlimited items (meats and sides)
+  if (orderStore.isRefillMode) {
+    // Filter out AllowedMenu types, only allow MenuItem or Modifier
+    return baseItems.filter((item: any) => {
+      return (activeCategory.value === 'meats' || activeCategory.value === 'sides') && (item?.group || item?.category || item?.name || item?.img_url);
+    });
+  }
+
+  // Filter out AllowedMenu types for menu-item-grid
+  return baseItems.filter((item: any) => item?.group || item?.category || item?.name || item?.img_url);
+});
 
   return baseItems;
 });
@@ -193,9 +275,6 @@ const setCategory = (category: MenuCategory) => {
           break;
         case 'beverages':
           if ((!menuStore.beverages || menuStore.beverages.length === 0) && !menuStore.loading.beverages) await menuStore.fetchBeverages();
-          break;
-        case 'alacartes':
-          if ((!menuStore.alacartes || menuStore.alacartes.length === 0) && !menuStore.loading.alacartes) await menuStore.fetchAlacartes();
           break;
       }
     } catch (e) {
@@ -316,8 +395,6 @@ const isLoading = computed((): boolean => {
   switch (activeCategory.value) {
     case 'sides':
       return Boolean(menuStore.isLoadingSides);
-    case 'alacartes':
-      return Boolean(menuStore.isLoadingAlacartes);
     case 'desserts':
       return Boolean(menuStore.isLoadingDesserts);
     case 'beverages':
@@ -332,8 +409,6 @@ const categoryError = computed(() => {
   switch (activeCategory.value) {
     case 'sides':
       return menuStore.errors.sides;
-    case 'alacartes':
-      return menuStore.errors.alacartes;
     case 'desserts':
       return menuStore.errors.desserts;
     case 'beverages':
@@ -510,6 +585,15 @@ function modifyDuringCountdown() {
       <div class="flex-1 overflow-y-auto p-6">
         <div class="max-w-7xl mx-auto">
 
+          <!-- Loading State -->
+          <div v-if="isLoading" class="space-y-6">
+            <component 
+              v-for="i in 3" 
+              :key="`skeleton-${i}`" 
+              :is="() => import('~/components/ui/SkeletonCard.vue')" 
+            />
+          </div>
+
           <!-- Error State -->
           <div v-if="categoryError" class="flex justify-center">
             <el-card class="max-w-md bg-red-500/20">
@@ -583,8 +667,8 @@ function modifyDuringCountdown() {
 
   <!-- Support FAB -->
   <support-fab @request-support="handleSupportRequest" />
-
-  <!-- Refill Toggle Button (floating, visible after order placed) -->
+  
+  <!-- Refill Toggle Button (floating, visible after order placed or recovered) -->
   <div v-if="canRequestRefill && !orderStore.isRefillMode" class="fixed bottom-24 left-24 z-40">
     <refill-button :has-placed-order="canRequestRefill" :is-refill-mode="orderStore.isRefillMode"
       @toggle-refill-mode="toggleRefillMode" />

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
-import type { Package, Modifier } from "../../types";
-import { useMenuStore } from '../../stores/menu';
-import { useOrderStore } from '../../stores/order';
-import { useSessionStore } from '../../stores/session';
-import { useDeviceStore } from '../../stores/device';
+import type { Package } from "../../types";
+import { useMenuStore } from '../../stores/Menu';
+import { useOrderStore } from '../../stores/Order';
+import { useSessionStore } from '../../stores/Session';
+import { useDeviceStore } from '../../stores/Device';
 import { logger } from '../../utils/logger'
+import { recoverActiveOrderState } from '../../composables/useActiveOrderRecovery'
 import PackageCard from '../../components/PackageCard.vue';
-import PackageModal from '../../components/PackageModal.vue';
 
 const menuStore = useMenuStore();
 const router = useRouter();
@@ -17,34 +17,38 @@ const orderStore = useOrderStore();
 const sessionStore = useSessionStore();
 const deviceStore = useDeviceStore();
 
-// Modal state
-const modalRef = ref<InstanceType<typeof PackageModal> | null>(null)
-const selectedPackageForModal = ref<Package | null>(null)
+// Load packages on mount
+onMounted(async () => {
+  const timestamp = new Date().toISOString()
+  console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
+
+  const recovery = await recoverActiveOrderState('package-selection')
+  if (recovery.hasActiveOrder) {
+    console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || 'active'} at ${timestamp}`)
+    await router.replace('/menu')
+    return
+  }
+
+  logger.info('[PackageSelection] Loading packages from API...');
+  try {
+    await menuStore.loadAllMenus();
+    console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
+    logger.info('[PackageSelection] Packages loaded:', menuStore.packages.length);
+  } catch (error) {
+    console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
+    logger.error('[PackageSelection] Failed to load packages:', error);
+  }
+});
 
 // Carousel state - force carousel mode for all screen sizes
 const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages);
-const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
-const isCarousel = ref(true) // Always show carousel mode
 
-function handleResize() {
-  windowWidth.value = window.innerWidth
-  // Keep carousel mode for all screen sizes
-  isCarousel.value = true
-}
-
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-  handleResize()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-})
-
-const handlePackageSelection = async (packageData: Package, modifiers?: any) => {
+const handlePackageSelection = async (packageData: Package) => {
   // Persist selected package to order store for downstream flows
-  logger.debug('Selected package:', packageData, modifiers);
+  const timestamp = new Date().toISOString()
+  console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
+  logger.debug('Selected package:', packageData);
 
   try {
     orderStore.setPackage(packageData)
@@ -54,14 +58,17 @@ const handlePackageSelection = async (packageData: Package, modifiers?: any) => 
 
   // Start session if not already active and ensure token/menu ready
   try {
+    console.log(`[🔄 Session Start Attempt] Starting session before navigating to menu at ${timestamp}`)
     const started = await sessionStore.start()
     if (!started) {
+      console.log(`[⚠️ Session Start Failed] But proceeding with device credentials check at ${timestamp}`)
       logger.warn('Session start failed — device may require registration')
 
       // Only show registration if device truly lacks credentials
       const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
 
       if (needsRegistration) {
+        console.log(`[🔐 Device Registration Required] Redirecting to Settings at ${timestamp}`)
         // Redirect staff to Settings (PIN-protected) to register device there
         try {
           await router.push('/settings')
@@ -73,9 +80,13 @@ const handlePackageSelection = async (packageData: Package, modifiers?: any) => 
       }
 
       // If device appears registered (token/table present), log and continue gracefully
+      console.log(`[✅ Device Has Credentials] Continuing to menu at ${timestamp}`)
       logger.warn('Session start failed but device appears registered; proceeding.')
+    } else {
+      console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
     }
   } catch (err) {
+    console.error(`[❌ Session Start Error] ${err?.message} at ${timestamp}`)
     logger.warn('Session store start failed or unavailable', err)
   }
 
@@ -98,12 +109,14 @@ const handlePackageSelection = async (packageData: Package, modifiers?: any) => 
     // Ensure menus are loaded (session.start already attempts this, but double-check)
     try { await menuStore.loadAllMenus() } catch (e) { /* non-fatal */ }
 
+    console.log(`[📍 Navigation] Going to menu with package_id=${packageData.id} at ${timestamp}`)
     await router.push({
       path: '/menu',
       query: { packageId: packageData.id }
     })
   } catch (navErr) {
     // Prevent uncaught promise rejections from bubbling to the global handler
+    console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
     logger.error('Navigation to /menu failed:', navErr)
 
     // If the navigation failed due to asset/chunk fetch, show a helpful registration UI
@@ -116,24 +129,12 @@ const handlePackageSelection = async (packageData: Package, modifiers?: any) => 
   }
 }
 
-// No modal/openDetails — cards handle inline preview
+// Cards handle inline preview directly
 
 const goBack = () => {
+  console.log(`[↩️ Package Selection Cancelled] User returned to guest counter at ${new Date().toISOString()}`)
   router.push('/order/start');
 };
-
-// Open modal for detailed view
-function openPackageDetails(pkg: Package) {
-  selectedPackageForModal.value = pkg
-  nextTick(() => {
-    modalRef.value?.open()
-  })
-}
-
-// Handle selection from modal
-function handleModalSelect(pkg: Package, selectedModifiers?: Modifier[]) {
-  handlePackageSelection(pkg, selectedModifiers)
-}
 
 function nextPackage() {
   if (!packages.value || packages.value.length === 0) return
@@ -143,10 +144,6 @@ function nextPackage() {
 function prevPackage() {
   if (!packages.value || packages.value.length === 0) return
   currentIndex.value = (currentIndex.value - 1 + packages.value.length) % packages.value.length
-}
-
-function goTo(index: number) {
-  currentIndex.value = Math.max(0, Math.min(index, packages.value.length - 1))
 }
 
 // Swipe support for carousel - only in safe zones (not buttons or scrollable areas)
@@ -212,8 +209,8 @@ function handleTouchEnd() {
   <div class="h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
     <div class="relative z-10 flex flex-col h-screen p-4">
       <div class="w-full max-w-7xl mx-auto flex flex-col h-full">
-        <!-- Compact header row -->
-        <div class="flex items-center justify-between gap-4 mb-3">
+        <!-- Header row -->
+        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-4">
           <!-- Back button -->
           <button 
             @click="goBack" 
@@ -222,10 +219,16 @@ function handleTouchEnd() {
             <ArrowLeft :size="22" class="text-white" />
           </button>
           
-          <!-- Title -->
-          <h1 class="text-2xl font-bold text-white font-raleway">
-            Choose Your <span class="text-primary">Package</span>
-          </h1>
+          <!-- Title block -->
+          <div class="text-center px-2">
+            <p class="text-[11px] tracking-[0.35em] uppercase text-white/45 font-semibold mb-1">Package Selection</p>
+            <h1 class="text-4xl font-bold text-white font-raleway leading-none">
+              Choose Your <span class="text-primary">Package</span>
+            </h1>
+            <p class="text-xs tracking-[0.22em] uppercase text-white/55 mt-2">
+              {{ orderStore.guestCount }} Guests · View Included Meats
+            </p>
+          </div>
           
           <!-- Package navigation -->
           <div class="flex items-center gap-2">
@@ -330,22 +333,12 @@ function handleTouchEnd() {
               v-if="packages[currentIndex]"
               :key="packages[currentIndex].id"
               :pkg="packages[currentIndex]"
-              @select="handlePackageSelection"
-              @view-details="openPackageDetails"
               class="h-full"
             />
           </transition>
         </div>
       </div>
     </div>
-
-    <!-- Package Details Modal -->
-    <PackageModal
-      v-if="selectedPackageForModal"
-      ref="modalRef"
-      :pkg="selectedPackageForModal"
-      @select="handleModalSelect"
-    />
   </div>
 </template>
 

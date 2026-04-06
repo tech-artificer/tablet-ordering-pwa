@@ -1,18 +1,33 @@
 <script setup lang="ts">
 import { ChevronRight, ArrowLeft } from 'lucide-vue-next'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router';
-import PrimaryButton from '~/components/common/PrimaryButton.vue';
-// // NOTE: In a real app, you would import a Pinia store here 
-// // to save the package details before navigating.
+import { useOrderStore } from '~/stores/Order';
+import { recoverActiveOrderState } from '~/composables/useActiveOrderRecovery'
+import { logger } from '~/utils/logger';
+
 const router = useRouter();
+const orderStore = useOrderStore();
+
+onMounted(async () => {
+  const recovery = await recoverActiveOrderState('order-start')
+  if (recovery.hasActiveOrder) {
+    await router.replace('/order/in-session')
+  }
+})
 
 // // This handler receives the confirmation signal from the child component
 const handleGuestConfirmation = () => {
+  const timestamp = new Date().toISOString()
+  const guestCount = orderStore.guestCount
+  console.log(`[👥 Guest Count Selected] ${guestCount} guests at ${timestamp}`)
+  logger.info(`[Session Flow] Guest count set to ${guestCount}`)
   // Route to main package selection page (restored with richer UI)
   router.push('/order/packageSelection');
 };
 
 const goBack = () => {
+  console.log(`[↩️ Guest Counter Cancelled] User returned to welcome screen at ${new Date().toISOString()}`)
   router.push('/');
 };
 </script>
@@ -28,25 +43,25 @@ const goBack = () => {
     </button>
     
     <!-- Page Title -->
-    <div class="absolute top-4 left-1/2 -translate-x-1/2">
+    <!-- <div class="absolute top-4 left-1/2 -translate-x-1/2">
       <h1 class="text-xl font-bold font-kanit text-white">How Many Guests?</h1>
-    </div>
+    </div> -->
 
     <!-- Main Content -->
     <div class="flex flex-col items-center gap-8">
       <OrderingGuestCounter />
       
       <div class="flex flex-col items-center gap-3">
-        <PrimaryButton 
-          class="!px-10 !py-4 !text-lg ripple"
+        <button
+          type="button"
+          class="px-14 py-5 text-lg font-semibold rounded-full transition-all duration-200 bg-gradient-to-r from-primary to-primary/85 text-white shadow-lg shadow-primary/40 hover:from-primary/95 hover:to-primary/80 active:scale-98"
           @click="handleGuestConfirmation"
         >
-          <span class="flex items-center gap-2">
-            Ready To Grill
-            <ChevronRight :size="20" />
-          </span>
-        </PrimaryButton>
-        <p class="text-white/60 text-sm font-kanit">Select your guest count and continue</p>
+          Ready To Grill
+        </button>
+        <p class="text-white/60 text-sm font-kanit mt-1">
+          Choose your guest count so we can keep the <span class="text-primary">sizzle going</span>.
+        </p>
       </div>
     </div>
   </div>

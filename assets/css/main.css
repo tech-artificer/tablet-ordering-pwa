@@ -4,6 +4,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   SHIMMER ANIMATION
+   ============================================ */
+@keyframes shimmer {
+  0%, 100% {
+    background-position: -1000px 0;
+  }
+  50% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background-size: 200% 100%;
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
 :root { 
   --primary: #F6B56D; 
   --primary-dark: #C78B45;

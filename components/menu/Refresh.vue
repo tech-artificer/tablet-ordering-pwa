@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useMenuStore } from '../../stores/menu';
+import { useMenuStore } from '../../stores/Menu';
 import PrimaryButton from '../common/PrimaryButton.vue';
 
 const menuStore = useMenuStore();

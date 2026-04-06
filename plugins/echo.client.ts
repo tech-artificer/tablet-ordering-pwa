@@ -4,7 +4,7 @@ import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 // @ts-ignore - Nuxt macro imports
 import { useRuntimeConfig } from '#imports'
-import { useDeviceStore } from '../stores/device'
+import { useDeviceStore } from '../stores/Device'
 import { logger } from '../utils/logger'
 
 export default defineNuxtPlugin((nuxtApp: any) => {
@@ -73,14 +73,25 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         
         logger.info(`[Echo] Connecting to Reverb: ${wsProtocol}://${reverbHost}:${wsPort}/reverb`)
 
+        // Log Reverb configuration
+        console.log('[🔴 Echo Init] Config:', {
+            key: config.public.reverb.appKey?.substring(0, 8) + '...',
+            host: reverbHost,
+            wsPort,
+            forceTLS: String(config.public.reverb.scheme || '').toLowerCase() === 'https',
+            authEndpoint,
+            hasAuthToken: !!token,
+            timestamp: new Date().toISOString()
+        })
+
         const echo = new Echo({
             broadcaster: 'reverb',
             key: config.public.reverb.appKey,
             wsHost: reverbHost,
             wsPort: wsPort,
             wssPort: wssPort,
-            wsPath: '/reverb',  // CRITICAL: Use nginx proxy path for TLS termination
-            forceTLS,
+            // set forceTLS based on scheme if provided
+            forceTLS: String(config.public.reverb.scheme || '').toLowerCase() === 'https',
             disableStats: true,
             enabledTransports: ['ws', 'wss'],
             authEndpoint,
@@ -98,20 +109,27 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
 
-        // Add connection health monitoring
-        if (echo.connector?.pusher) {
-            echo.connector.pusher.connection.bind('connected', () => {
-                logger.info('[Echo] ✅ WebSocket connected')
-            })
-            echo.connector.pusher.connection.bind('disconnected', () => {
-                logger.warn('[Echo] ⚠️ WebSocket disconnected')
-            })
-            echo.connector.pusher.connection.bind('error', (err: any) => {
-                logger.error('[Echo] 🔴 WebSocket error:', err)
-            })
-            echo.connector.pusher.connection.bind('failed', () => {
-                logger.error('[Echo] 🔴 WebSocket connection failed permanently')
-            })
+        // Monitor connection state
+        if (echo && (echo as any).connector) {
+            const connector = (echo as any).connector
+            console.log('[✅ Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
+            
+            // Hook into connection success/failure if available
+            try {
+                if (typeof connector.socket?.on === 'function') {
+                    connector.socket.on('connect', () => {
+                        console.log('[🟢 Echo Connected] WebSocket connected at', new Date().toISOString())
+                    })
+                    connector.socket.on('disconnect', () => {
+                        console.log('[🔴 Echo Disconnected] WebSocket disconnected at', new Date().toISOString())
+                    })
+                    connector.socket.on('error', (err: any) => {
+                        console.error('[🔴 Echo Error]', err?.message || err, 'at', new Date().toISOString())
+                    })
+                }
+            } catch (e) {
+                logger.debug('[Echo] Connection hooks unavailable', e)
+            }
         }
 
         // Expose a helper to update Echo auth header when token changes
@@ -129,8 +147,10 @@ export default defineNuxtPlugin((nuxtApp: any) => {
                     if (bearer) (window as any).Echo.connector.options.auth.headers.Authorization = bearer
                     else delete (window as any).Echo.connector.options.auth.headers.Authorization
                 }
+                console.log('[📡 Echo Auth Updated] Bearer token', newToken ? 'SET' : 'CLEARED', 'at', new Date().toISOString())
             } catch (e) {
                 logger.warn('[Echo] updateEchoAuth failed', e)
+                console.error('[❌ Echo Auth Update Failed]', e)
             }
         }
 

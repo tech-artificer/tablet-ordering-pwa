@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useOrderStore } from '../../stores/order';
+import { useOrderStore } from '../../stores/Order';
 import type { CartItem, MenuItem } from '../../types';
 import { formatCurrency } from '../../utils/formats';
 

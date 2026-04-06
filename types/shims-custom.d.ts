@@ -16,6 +16,12 @@ declare module '#imports' {
 // Make `useNuxtApp` available to TypeScript (simple any shim)
 declare function useNuxtApp(): any;
 
+// Allow importing image/gif assets
+declare module '*.gif' {
+  const src: string
+  export default src
+}
+
 // Allow importing .vue files in TypeScript tests and tooling
 declare module '*.vue' {
   import { DefineComponent } from 'vue'

@@ -17,8 +17,8 @@ const mockPost = vi.fn()
 vi.mock('../composables/useApi', () => ({ useApi: () => ({ post: mockPost }) }))
 
 import { setActivePinia, createPinia } from 'pinia'
-import { useDeviceStore } from '../stores/device'
-import { useOrderStore } from '../stores/order'
+import { useDeviceStore } from '../stores/Device'
+import { useOrderStore } from '../stores/Order'
 
 describe('stores/order - submitOrder', () => {
   beforeEach(async () => {

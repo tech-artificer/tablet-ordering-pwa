@@ -1,5 +1,5 @@
 import { defineNuxtRouteMiddleware } from '#app'
-import { useMenuStore } from '~/stores/menu'
+import { useMenuStore } from '~/stores/Menu'
 import { logger } from '~/utils/logger'
 
 export default defineNuxtRouteMiddleware(async (to, from) => {
