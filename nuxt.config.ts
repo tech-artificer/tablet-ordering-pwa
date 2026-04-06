@@ -3,9 +3,9 @@ import path from 'path';
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    serverMiddleware: [
-        '~/server/middleware/security.ts',
-    ],
+    // server/middleware/ is auto-scanned by Nuxt 3 — no manual registration needed.
+    // Global route middleware uses .global.ts suffix (middleware/auth.global.ts).
+
     devtools: { enabled: process.env.NODE_ENV !== 'production' },
     
     debug: false,
@@ -18,22 +18,9 @@ export default defineNuxtConfig({
     
     ssr: false,
     
-    // Nitro static preset for nginx deployment (generates index.html + 200.html fallback)
-    nitro: {
-        preset: 'static',
-        prerender: {
-            crawlLinks: false,
-            routes: ['/']
-        }
-    },
-    
-    router: {
-        middleware: ['auth']
-    },
-    
     css: [
         "./assets/css/input.css",
-        "./assets/css/main.css" 
+        "./assets/css/main.css"
     ],
     
     modules: [
@@ -181,9 +168,10 @@ export default defineNuxtConfig({
             meta: [
                 {
                     name: "viewport",
-                    content: "width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"
+                    content: "width=device-width, height=device-height, initial-scale=1.0"
                 },
                 { name: 'theme-color', content: '#F6B56D' },
+                { name: 'mobile-web-app-capable', content: 'yes' },
                 { name: 'apple-mobile-web-app-capable', content: 'yes' },
                 { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
                 { name: 'apple-mobile-web-app-title', content: 'Wooserve' },

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useOrderStore } from '../../stores/Order'
 import { ShoppingBasket } from 'lucide-vue-next'
 const orderStore = useOrderStore()

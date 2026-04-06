@@ -1,4 +1,3 @@
-import { defineNuxtRouteMiddleware } from '#app'
 import { useMenuStore } from '~/stores/Menu'
 import { logger } from '~/utils/logger'
 

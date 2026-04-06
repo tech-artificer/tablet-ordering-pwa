@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useNetworkStatus } from '~/composables/useNetworkStatus'
 
 const { isOnline, wasOffline } = useNetworkStatus()

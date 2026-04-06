@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 
 import { useDeviceStore } from '~/stores/Device'
-import { useRouter } from 'vue-router'
 import { logger } from '../../utils/logger'
 
 const props = defineProps<{ inline?: boolean }>()
@@ -22,34 +20,9 @@ const hasError = computed(() => !!deviceStore.errorMessage)
 const errorMessage = computed(() => deviceStore.errorMessage)
 const registered = ref(false)
 const attempted = ref(false)
-let navigateTimeoutId: number | null = null
 
 const waitingForTable = computed(() => deviceStore.waitingForTable)
 const isPolling = computed(() => !!(deviceStore.isPollingForTable))
-const pollProgress = computed(() => {
-  const maxAttempts = deviceStore.maxPollAttempts || 24
-  const currentAttempt = deviceStore.pollAttempts || 0
-  return Math.min(100, (currentAttempt / maxAttempts) * 100)
-})
-const timeRemaining = computed(() => {
-  const maxTime = 120 // 2 minutes
-  const elapsed = (deviceStore.pollAttempts || 0) * 5 // 5 seconds per attempt
-  return Math.max(0, maxTime - elapsed)
-})
-
-const registrationProgress = computed(() => {
-  if (isLoading.value) return 35
-  if (waitingForTable.value || isPolling.value) return 70
-  if (registered.value || deviceStore.token) return 100
-  return 0
-})
-
-const registrationStatus = computed(() => {
-  if (isLoading.value) return 'Registering device...'
-  if (waitingForTable.value || isPolling.value) return 'Waiting for table assignment...'
-  if (registered.value || deviceStore.token) return 'Device registered'
-  return 'Ready to register'
-})
 
 const checkForTable = async () => {
   try {
@@ -58,13 +31,13 @@ const checkForTable = async () => {
     const t = deviceStore.table as any
     if (t && (t.id || t.name)) {
       // stop polling if running and navigate away
-      try { deviceStore.stopTablePolling() } catch (e) { logger.debug('[DeviceRegistration] stopTablePolling failed', e) }
+      try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
       registered.value = true
       deviceStore.waitingForTable = false
       try {
         const currentPath = router.currentRoute?.value?.path
         if (currentPath !== '/settings') await router.replace('/')
-      } catch (e) { logger.debug('[DeviceRegistration] navigation failed', e) }
+      } catch (e) { /* ignore */ }
     } else {
       // still no table; UI will show waiting state
     }
@@ -81,31 +54,19 @@ watch(
     if (t && (t.id || t.name)) {
       logger.debug('[DeviceRegistration] detected table assignment', t)
       // stop background polling if running
-      try { deviceStore.stopTablePolling() } catch (e) { logger.debug('[DeviceRegistration] stopTablePolling failed', e) }
+      try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
       // mark registered and navigate after short delay
       registered.value = true
       deviceStore.waitingForTable = false
-      if (navigateTimeoutId) {
-        try { clearTimeout(navigateTimeoutId) } catch (e) { logger.debug('[DeviceRegistration] clearTimeout failed', e) }
-        navigateTimeoutId = null
-      }
-      navigateTimeoutId = window.setTimeout(async () => {
+      setTimeout(async () => {
         try {
           const currentPath = router.currentRoute?.value?.path
           if (currentPath !== '/settings') await router.replace('/')
-        } catch (e) { logger.debug('[DeviceRegistration] navigate replace failed', e) }
-        finally { navigateTimeoutId = null }
+        } catch (e) { logger.debug('navigate replace ignored', e) }
       }, 600)
     }
   }
 )
-
-onBeforeUnmount(() => {
-  if (navigateTimeoutId) {
-    try { clearTimeout(navigateTimeoutId) } catch (e) { logger.debug('[DeviceRegistration] clearTimeout failed', e) }
-    navigateTimeoutId = null
-  }
-})
 
 const resetRegistration = () => {
   registered.value = false
@@ -142,12 +103,12 @@ onMounted(() => {
         }
       }
     } catch (e) {
-      logger.debug('[DeviceRegistration] local IP detection failed', e)
+      // ignore failures and fall back to hostname
       try {
         if (!formData.value.deviceName && typeof window !== 'undefined' && window.location && window.location.hostname) {
           formData.value.deviceName = String(window.location.hostname).replace(/[^a-zA-Z0-9\-]/g, '-')
         }
-      } catch (e) { logger.debug('[DeviceRegistration] hostname fallback failed', e) }
+      } catch (e) { /* ignore */ }
     }
   })()
 })
@@ -164,11 +125,12 @@ const handleRegistration = async () => {
         try {
           const currentPath = router.currentRoute?.value?.path
           if (currentPath !== '/settings') await router.replace('/')
-        } catch (e) { logger.debug('[DeviceRegistration] navigation failed', e) }
+        } catch (e) { /* ignore */ }
       }
       return
     } catch (e) {
       logger.error('Refresh during handleRegistration failed', e)
+      return
       return
     }
   }
@@ -210,7 +172,7 @@ const handleRegistration = async () => {
           if (currentPath !== '/settings') {
             await router.replace('/')
           }
-        } catch (e) { logger.debug('[DeviceRegistration] navigation failed', e) }
+        } catch (e) { /* ignore */ }
       } else {
         // remain on page; show refresh button to check assignment
       }
@@ -237,19 +199,6 @@ const handleRegistration = async () => {
               <p class="text-light mt-2 font-kanit">Enter the unique code to assign this device to a table.</p>
             </div>
 
-            <div class="mb-6" role="status" aria-live="polite">
-              <div class="flex items-center justify-between text-xs text-white/60 mb-2">
-                <span>{{ registrationStatus }}</span>
-                <span>{{ registrationProgress }}%</span>
-              </div>
-              <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-gradient-to-r from-primary via-primary-dark to-green-400 transition-all duration-300"
-                  :style="{ width: `${registrationProgress}%` }"
-                ></div>
-              </div>
-            </div>
-
             <slot name="form">
               <el-form :model="formData" @submit.prevent="handleRegistration" class="mb-3">
                 <div class="grid gap-3">
@@ -266,47 +215,18 @@ const handleRegistration = async () => {
 
                 <div class="space-y-2">
                   <button
-                    class="w-full py-3 min-h-[44px] bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
                     @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !formData.deviceCode || registered || deviceStore.token">
                     <span>{{ isLoading ? 'Registering...' : (registered || deviceStore.token ? 'Registered' : 'Register Device') }}</span>
                   </button>
 
                   <div v-if="registered || deviceStore.token" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
                     <p class="text-sm text-white/70 mb-2">Device registered. Waiting for table assignment.</p>
-                    
-                    <!-- Progress bar when polling -->
-                    <div v-if="isPolling" class="mb-4 space-y-3">
-                      <div class="flex items-center justify-center">
-                        <svg class="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                      <p class="text-center text-white/80 font-semibold">
-                        Assigning your table...
-                      </p>
-                      <p class="text-center text-sm text-white/60">
-                        This usually takes 10-15 seconds
-                      </p>
-                      
-                      <!-- Progress bar -->
-                      <div class="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                        <div 
-                          class="bg-primary h-full transition-all duration-1000"
-                          :style="{ width: `${pollProgress}%` }"
-                        ></div>
-                      </div>
-                      
-                      <p class="text-center text-sm text-white/40">
-                        {{ timeRemaining }}s remaining
-                      </p>
-                    </div>
-                    
                     <div class="flex gap-2">
-                      <button v-if="!isPolling" @click="deviceStore.startTablePolling()" :disabled="isLoading" class="px-4 py-2 min-h-[44px] rounded bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Start Auto-Check</button>
-                      <button v-else @click="deviceStore.stopTablePolling()" class="px-4 py-2 min-h-[44px] rounded bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400">Stop Auto-Check</button>
-                      <button @click="checkForTable" :disabled="isLoading" class="px-4 py-2 min-h-[44px] rounded bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Check for Table</button>
-                      <button @click="resetRegistration" class="px-4 py-2 min-h-[44px] rounded bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Retry Register</button>
+                      <button v-if="!isPolling" @click="deviceStore.startTablePolling()" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20">Start Auto-Check</button>
+                      <button v-else @click="deviceStore.stopTablePolling()" class="px-4 py-2 rounded bg-red-500/20">Stop Auto-Check</button>
+                      <button @click="checkForTable" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20">Check for Table</button>
+                      <button @click="resetRegistration" class="px-4 py-2 rounded bg-white/10">Retry Register</button>
                     </div>
                   </div>
                 </div>
@@ -340,19 +260,6 @@ const handleRegistration = async () => {
       </div>
     </div>
 
-    <div class="mb-4" role="status" aria-live="polite">
-      <div class="flex items-center justify-between text-xs text-white/60 mb-2">
-        <span>{{ registrationStatus }}</span>
-        <span>{{ registrationProgress }}%</span>
-      </div>
-      <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-        <div
-          class="h-full bg-gradient-to-r from-primary via-primary-dark to-green-400 transition-all duration-300"
-          :style="{ width: `${registrationProgress}%` }"
-        ></div>
-      </div>
-    </div>
-
     <el-form :model="formData" @submit.prevent="handleRegistration" class="mb-3">
       <div class="grid gap-3">
           <div>
@@ -364,11 +271,11 @@ const handleRegistration = async () => {
 
       <div class="mt-4 flex gap-3">
         <button
-          class="flex-1 px-4 py-3 rounded-lg bg-primary text-white border border-primary/40 font-semibold min-h-[44px] hover:opacity-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="flex-1 px-4 py-3 rounded-lg bg-primary text-white border border-primary/40 font-semibold min-h-[44px] hover:opacity-95 transition"
           @click="handleRegistration()" :disabled="isLoading || !formData.deviceCode || registered || deviceStore.token">
           <span>{{ isLoading ? 'Registering...' : (registered || deviceStore.token ? 'Registered' : 'Register Device') }}</span>
         </button>
-        <button v-if="registered || deviceStore.token" @click="checkForTable" class="px-4 py-3 rounded bg-primary/20 min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Check for Table</button>
+        <button v-if="registered || deviceStore.token" @click="checkForTable" class="px-4 py-3 rounded bg-primary/20 min-h-[44px]">Check for Table</button>
       </div>
 
       <div v-if="hasError && attempted" class="mt-3">

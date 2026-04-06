@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { formatCurrency } from '../../utils/formats';
 import type { CartItem } from '../../types';
 import { Plus, Minus } from 'lucide-vue-next';

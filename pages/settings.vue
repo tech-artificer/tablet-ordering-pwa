@@ -1,16 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessageBox, ElNotification } from 'element-plus'
 import { useDeviceStore } from '../stores/Device'
-import { useRuntimeConfig } from '#app'
 import { logger } from '../utils/logger'
 
 // @ts-ignore - Nuxt auto-imports
 definePageMeta({
   layout: 'default'
 })
-
-import { reactive } from 'vue'
 
 const deviceStore = useDeviceStore()
 const config = useRuntimeConfig()
@@ -406,15 +402,16 @@ const saveTableOverride = async () => {
       const { useApi } = await import('~/composables/useApi')
       const api = useApi()
       // Attempt to update device's table by PUT /api/devices/{id}
-      const payload: any = {}
-
-      // If value is numeric, treat as table id
+      // UpdateDeviceRequest requires: name (required), ip_address (required), table_id (nullable)
       const asNum = Number(tableOverride.value)
+      const payload: any = {
+        name: deviceStore.device.value.name || '',
+        ip_address: deviceStore.device.value.ip_address || '',
+        port: deviceStore.device.value.port ?? null,
+      }
+
       if (!Number.isNaN(asNum) && asNum > 0) {
         payload.table_id = asNum
-      } else {
-        // otherwise send as table name (backend may need to resolve)
-        payload.table_name = tableOverride.value
       }
 
       try {

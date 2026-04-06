@@ -10,11 +10,11 @@ export const useSessionStore = defineStore('session', () => {
   const state = reactive({
     sessionId: null as number | null,
     orderId: null as number | null,
-    isActive: false as boolean,
+    isActive: false,
     sessionStartedAt: null as number | null,
     sessionEndsAt: null as number | null,
-    remainingMs: 0 as number,
-    timerExpired: false as boolean
+    remainingMs: 0,
+    timerExpired: false,
   })
 
   const SESSION_DURATION_MS = 60 * 60 * 1000
@@ -72,9 +72,9 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function fetchLatestSession() {
-    const $api = useApi();
+    const api = useApi();
     try {
-      const { data } = await $api('/api/session/latest', { method: 'GET' })
+      const { data } = await api.get('/api/session/latest')
       state.sessionId = Number(data.id) || data.id
     } catch (error: any) {
       // ignore
@@ -148,9 +148,9 @@ export const useSessionStore = defineStore('session', () => {
     // Reset order store to fresh state for new dining session
     const orderStore = useOrderStore()
     orderStore.setGuestCount(2)       // Default guest count
-    orderStore.cartItems = []          // Clear active cart
-    orderStore.package = {} as any     // Clear package selection
-    orderStore.currentOrder = null     // Clear current order reference
+    orderStore.clearCart()             // Clear active cart
+    orderStore.clearPackage()          // Clear package selection
+    orderStore.clearCurrentOrder()     // Clear current order reference
 
     state.isActive = true
     state.timerExpired = false
@@ -172,7 +172,7 @@ export const useSessionStore = defineStore('session', () => {
     const timestamp = new Date().toISOString()
     const orderStore = useOrderStore()
     const currentOrderId = state.orderId
-    const finalStatus = orderStore.currentOrder?.order?.status || 'unknown'
+    const finalStatus = orderStore.getCurrentOrderStatus() || 'unknown'
     
     console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
     logger.info('🔚 Session ending - clearing all session and order state')
@@ -204,13 +204,13 @@ export const useSessionStore = defineStore('session', () => {
     try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
     
     orderStore.setGuestCount(2)
-    orderStore.cartItems = []
-    orderStore.refillItems = []
-    orderStore.submittedItems = []
-    orderStore.package = {} as any
-    orderStore.currentOrder = null
-    orderStore.hasPlacedOrder = false
-    orderStore.isRefillMode = false
+    orderStore.clearCart()
+    orderStore.clearRefillItems()
+    orderStore.clearSubmittedItems()
+    orderStore.clearPackage()
+    orderStore.clearCurrentOrder()
+    orderStore.setHasPlacedOrder(false)
+    orderStore.setIsRefillMode(false)
     // Note: orderStore.history is KEPT for historical tracking
     
     console.log(`[📊 State Cleared] All order/cart/package data cleared at ${timestamp}`)
@@ -265,14 +265,14 @@ export const useSessionStore = defineStore('session', () => {
     try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
     
     orderStore.setGuestCount(2)
-    orderStore.cartItems = []
-    orderStore.refillItems = []
-    orderStore.submittedItems = []
-    orderStore.package = {} as any
-    orderStore.currentOrder = null
-    orderStore.hasPlacedOrder = false
-    orderStore.isRefillMode = false
-    orderStore.history = []  // Only cleared on full reset
+    orderStore.clearCart()
+    orderStore.clearRefillItems()
+    orderStore.clearSubmittedItems()
+    orderStore.clearPackage()
+    orderStore.clearCurrentOrder()
+    orderStore.setHasPlacedOrder(false)
+    orderStore.setIsRefillMode(false)
+    orderStore.clearHistory()          // Only cleared on full reset
     
     // Force persist to localStorage immediately
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -304,6 +304,15 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  // Typed cross-store mutation helpers — avoids TypeScript Ref<T> false-positives
+  // when Pinia 3 + Vue 3.5 fails to unwrap setup store return types.
+  function setOrderId(id: number | null) { state.orderId = id }
+  function setIsActive(val: boolean) { state.isActive = val }
+  function setSessionId(id: number | null) { state.sessionId = id }
+  function getOrderId(): number | null { return state.orderId }
+  function getIsActive(): boolean { return state.isActive }
+  function getSessionId(): number | null { return state.sessionId }
+
   return {
     ...toRefs(state),
     fetchLatestSession,
@@ -313,7 +322,13 @@ export const useSessionStore = defineStore('session', () => {
     clear,
     reset,
     startTimer,
-    ensureTimer
+    ensureTimer,
+    setOrderId,
+    setIsActive,
+    setSessionId,
+    getOrderId,
+    getIsActive,
+    getSessionId,
   }
 }, {
   persist: {

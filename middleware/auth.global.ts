@@ -8,9 +8,14 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   
   const deviceStore = useDeviceStore()
 
-  // Allow access to registration page and the root without authentication
-  const publicRoutes = ['/auth/register']
-  if (publicRoutes.includes(to.path) || to.path === '/' ) {
+  // Allow access to registration page, settings, and the root without authentication
+  const publicRoutes = ['/', '/settings', '/auth/register']
+  if (publicRoutes.includes(to.path)) {
+    return
+  }
+
+  // Already fully authenticated — skip all API calls on every navigation
+  if (deviceStore.isAuthenticated) {
     return
   }
 

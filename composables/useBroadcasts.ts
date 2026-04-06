@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDeviceStore } from '~/stores/Device'
 import { useOrderStore } from '~/stores/Order'
@@ -123,7 +123,7 @@ export const useBroadcasts = () => {
   // Replay missed events after reconnection
   const replayMissedEvents = async () => {
     const lastEventId = getLastEventId()
-    const deviceId = deviceStore.device.value?.id
+    const deviceId = deviceStore.getDeviceId()
 
     if (!deviceId) return
 
@@ -189,8 +189,8 @@ export const useBroadcasts = () => {
     })
 
     // Update session order ID
-    if (sessionStore.sessionId.value === event.order.session_id) {
-      sessionStore.orderId.value = event.order.id
+    if (sessionStore.getSessionId() === event.order.session_id) {
+      sessionStore.setOrderId(event.order.id)
     }
   }
 
@@ -229,7 +229,8 @@ export const useBroadcasts = () => {
 
     // Update current order status in store
     // Handle both { order: {...} } and direct order object structures
-    const currentOrderId = orderStore.currentOrder?.order?.id || orderStore.currentOrder?.order?.order_id || orderStore.currentOrder?.id || orderStore.currentOrder?.order_id
+    const currentOrderResp = orderStore.getCurrentOrder()
+    const currentOrderId = currentOrderResp?.order?.id || currentOrderResp?.order?.order_id || currentOrderResp?.id || currentOrderResp?.order_id
     const eventOrderId = event.order_id
     
     logger.debug('🔄 Order update check:', { currentOrderId, eventOrderId, status: event.status })
@@ -265,7 +266,8 @@ export const useBroadcasts = () => {
 
     // Mark order as completed in store
     // Handle both { order: {...} } and direct order object structures
-    const currentOrderId = orderStore.currentOrder?.order?.id || orderStore.currentOrder?.order?.order_id || orderStore.currentOrder?.id || orderStore.currentOrder?.order_id
+    const currentOrderResp = orderStore.getCurrentOrder()
+    const currentOrderId = currentOrderResp?.order?.id || currentOrderResp?.order?.order_id || currentOrderResp?.id || currentOrderResp?.order_id
     const eventOrderId = event.order.order_id || event.order.id
     
     logger.debug('✅ Order completed check:', { currentOrderId, eventOrderId })
@@ -295,7 +297,9 @@ export const useBroadcasts = () => {
     })
 
     // Clear order from store
-    if (orderStore.currentOrder?.order_id === event.order.order_id) {
+    const currentOrderResp = orderStore.getCurrentOrder()
+    if (currentOrderResp?.order_id === Number(event.order.order_id) ||
+        currentOrderResp?.order?.order_id === Number(event.order.order_id)) {
       orderStore.clearOrder()
       try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
     }
@@ -371,7 +375,7 @@ export const useBroadcasts = () => {
 
   // Subscribe to device-specific channel
   const subscribeToDeviceChannel = () => {
-    const deviceId = deviceStore.device.value?.id
+    const deviceId = deviceStore.getDeviceId()
     if (!deviceId || !(window as any).Echo) return
 
     // Subscribe to Device.{deviceId} for order updates
@@ -479,7 +483,7 @@ export const useBroadcasts = () => {
     subscribeToDeviceChannel()
 
     // Subscribe to current order if exists
-    const currentOrderId = sessionStore.orderId
+    const currentOrderId = sessionStore.getOrderId()
     if (currentOrderId) {
       subscribeToOrderChannel(currentOrderId.toString())
     }

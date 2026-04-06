@@ -34,7 +34,7 @@
         format="webp"
       />
       <div v-else class="w-full h-full flex items-center justify-center text-sm text-gray-400">
-        <span class="text-2xl">🍽️</span>
+        <UtensilsCrossed :size="24" :stroke-width="1.5" />
       </div>
     </div>
     
@@ -43,7 +43,7 @@
       <div class="flex justify-between items-start gap-2 mb-1">
         <h3 class="text-base font-bold truncate">{{ item.name }}</h3>
         <div class="bg-white text-secondary text-xs font-bold px-2.5 py-1 rounded-full shadow-md whitespace-nowrap flex-shrink-0">
-          {{ item.price }}
+          {{ formatCurrency(item.price) }}
         </div>
       </div>
       <p class="text-xs text-gray-300 line-clamp-2 mb-2">{{ item.description }}</p>
@@ -67,8 +67,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import FlameButton from '../../components/ui/FlameButton.vue'
+import { UtensilsCrossed } from 'lucide-vue-next'
+import { formatCurrency } from '../../utils/formats'
 
 const props = defineProps({ 
   item: Object,

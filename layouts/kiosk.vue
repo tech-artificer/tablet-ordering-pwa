@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { useMenuStore } from '~/stores/Menu';
 import { logger } from '~/utils/logger';
 const menuStore = useMenuStore();
@@ -24,7 +23,7 @@ const refreshMenu = async () => {
 };
 
 // Listen for online/offline events
-if (process.client) {
+if (import.meta.client) {
   onMounted(() => {
     window.addEventListener('online', async () => {
       logger.info('Back online, refreshing menu...');
@@ -48,7 +47,12 @@ if (process.client) {
         v-if="showFlame"
         :src="flameSrc"
         alt=""
-        class="absolute opacity-60 p-0 m-0 w-full h-full z-3"
+        role="presentation"
+        width="1400"
+        height="900"
+        loading="lazy"
+        decoding="async"
+        class="absolute opacity-60 p-0 m-0 w-full h-full z-3 object-cover"
         aria-hidden="true"
         @error="showFlame = false"
       />

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { ElDrawer, ElBadge, ElButton, ElDivider } from 'element-plus'
 import { formatCurrency } from '../../utils/formats'
 import type { PropType } from 'vue'

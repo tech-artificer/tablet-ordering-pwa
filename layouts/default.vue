@@ -1,7 +1,5 @@
 <script setup lang="ts">
 // Smooth page transitions are handled by CSS in main.css
-import { ref } from 'vue'
-import NetworkIndicator from '~/components/NetworkIndicator.vue'
 import flameSrc from '~/assets/images/flame.gif'
 const showFlame = ref(true)
 </script>

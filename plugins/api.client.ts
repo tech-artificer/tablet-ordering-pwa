@@ -1,18 +1,13 @@
-import { defineNuxtPlugin, navigateTo } from '#app'
 import axios from 'axios'
 import { useDeviceStore } from '../stores/Device'
-import { useRuntimeConfig } from '#imports'
 import { logger } from '../utils/logger'
 import type { InternalAxiosRequestConfig } from 'axios'
-import { ElNotification } from 'element-plus'
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
 
 export default defineNuxtPlugin(() => {
-  let authRedirectInProgress = false
-  let authRedirectTimeoutId: number | null = null
   
   const config = useRuntimeConfig()
 
@@ -86,29 +81,7 @@ export default defineNuxtPlugin(() => {
     return req
   })
 
-  // Add response interceptor to log errors and handle 401 token refresh
-  const redirectToSettings = () => {
-    if (authRedirectInProgress) return
-    authRedirectInProgress = true
-
-    if (typeof window !== 'undefined') {
-      ElNotification.warning({
-        title: 'Session expired',
-        message: 'Device authentication expired. Please re-register from Settings.',
-        duration: 4000
-      })
-
-      if (authRedirectTimeoutId) {
-        try { clearTimeout(authRedirectTimeoutId) } catch (e) { logger.debug('redirectToSettings: clearTimeout failed', e) }
-        authRedirectTimeoutId = null
-      }
-      authRedirectTimeoutId = window.setTimeout(() => {
-        navigateTo({ path: '/settings', query: { requirePin: '1' } })
-        authRedirectTimeoutId = null
-      }, 1500)
-    }
-  }
-
+  // Add response interceptor to log errors and successes
   api.interceptors.response.use(
     (response) => {
       logger.debug('📥 API Response SUCCESS:', {
@@ -188,34 +161,6 @@ export default defineNuxtPlugin(() => {
         requestHeaders: error.config?.headers,
         message: error.message
       })
-
-      // Handle 401 Unauthorized - token expired, re-authenticate via IP and retry once
-      if (error.response?.status === 401 && originalRequest && !originalRequest._isRetry) {
-        originalRequest._isRetry = true
-        
-        logger.warn('🔄 401 Unauthorized - Re-authenticating via IP...')
-        
-        try {
-          const deviceStore = useDeviceStore()
-          const refreshSuccess = await deviceStore.authenticate()
-          
-          if (refreshSuccess && deviceStore.token) {
-            // Update Authorization header with new token
-            originalRequest.headers['Authorization'] = `Bearer ${deviceStore.token}`
-            logger.debug('✅ Re-authenticated successfully, retrying request')
-            
-            // Retry the original request with new token
-            return api(originalRequest)
-          } else {
-            logger.error('❌ Re-authentication failed, redirecting to settings')
-            redirectToSettings()
-          }
-        } catch (refreshError) {
-          logger.error('❌ Re-authentication exception:', refreshError)
-          redirectToSettings()
-        }
-      }
-
       return Promise.reject(error)
     }
   )

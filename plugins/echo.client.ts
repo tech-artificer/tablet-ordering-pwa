@@ -1,9 +1,5 @@
-// @ts-ignore - Nuxt macro imports (editor/CI may not resolve #app in all environments)
-import { defineNuxtPlugin } from '#app'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
-// @ts-ignore - Nuxt macro imports
-import { useRuntimeConfig } from '#imports'
 import { useDeviceStore } from '../stores/Device'
 import { logger } from '../utils/logger'
 

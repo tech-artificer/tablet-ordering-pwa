@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ArrowLeft, ChevronLeft, ChevronRight, Star, Inbox } from 'lucide-vue-next';
 import type { Package } from "../../types";
 import { useMenuStore } from '../../stores/Menu';
 import { useOrderStore } from '../../stores/Order';
@@ -9,7 +7,6 @@ import { useSessionStore } from '../../stores/Session';
 import { useDeviceStore } from '../../stores/Device';
 import { logger } from '../../utils/logger'
 import { recoverActiveOrderState } from '../../composables/useActiveOrderRecovery'
-import PackageCard from '../../components/PackageCard.vue';
 
 const menuStore = useMenuStore();
 const router = useRouter();
@@ -206,168 +203,170 @@ function handleTouchEnd() {
 </script>
 
 <template>
-  <div class="h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
-    <div class="relative z-10 flex flex-col h-screen p-4">
-      <div class="w-full max-w-7xl mx-auto flex flex-col h-full">
-        <!-- Header row -->
-        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-4">
-          <!-- Back button -->
-          <button 
-            @click="goBack" 
-            class="flex items-center justify-center w-12 h-12 bg-white/10 hover:bg-white/15 backdrop-blur-sm rounded-xl border border-white/10 transition-all duration-200 active:scale-95"
+  <div class="relative h-screen w-screen flex flex-col overflow-hidden">
+    <!-- Warm Background -->
+    <div class="absolute inset-0 bg-gradient-to-br from-secondary-dark via-secondary to-accent-warm opacity-90"></div>
+
+    <!-- Content -->
+    <div class="relative z-10 flex flex-col h-full p-6 gap-6">
+      <!-- Header: Back Button + Title + Navigation -->
+      <div class="flex items-center justify-between gap-4">
+        <button 
+          @click="goBack" 
+          class="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-surface-20 hover:bg-surface-15 ring-1 ring-white/10 text-white/70 hover:text-primary transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft :size="20" stroke-width="2" />
+        </button>
+        
+        <div class="flex-1 text-center">
+          <p class="text-xs tracking-[0.3em] uppercase font-semibold text-primary/80 mb-1">Step 2</p>
+          <h1 class="text-4xl font-bold font-raleway text-white">
+            Select Your <span class="text-primary">Package</span>
+          </h1>
+          <p class="text-white/60 text-sm mt-2 font-kanit">
+            {{ orderStore.guestCount }} {{ orderStore.guestCount === 1 ? 'Guest' : 'Guests' }}  •  All Meats Included
+          </p>
+        </div>
+
+        <!-- Carousel Controls -->
+        <div class="flex-shrink-0 flex items-center gap-2">
+          <button
+            @click="prevPackage"
+            :disabled="packages.length <= 1"
+            class="flex items-center justify-center w-10 h-10 rounded-full bg-surface-20 hover:bg-primary/20 ring-1 ring-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Previous package"
           >
-            <ArrowLeft :size="22" class="text-white" />
+            <ChevronLeft :size="20" stroke-width="2" class="text-white" />
           </button>
-          
-          <!-- Title block -->
-          <div class="text-center px-2">
-            <p class="text-[11px] tracking-[0.35em] uppercase text-white/45 font-semibold mb-1">Package Selection</p>
-            <h1 class="text-4xl font-bold text-white font-raleway leading-none">
-              Choose Your <span class="text-primary">Package</span>
-            </h1>
-            <p class="text-xs tracking-[0.22em] uppercase text-white/55 mt-2">
-              {{ orderStore.guestCount }} Guests · View Included Meats
-            </p>
+          <div class="px-3 py-1.5 rounded-full bg-primary/20 ring-1 ring-primary/40">
+            <span class="text-primary text-xs font-bold">{{ currentIndex + 1 }}/{{ packages.length }}</span>
           </div>
-          
-          <!-- Package navigation -->
-          <div class="flex items-center gap-2">
-            <button
-              @click="prevPackage"
-              :disabled="packages.length <= 1 || currentIndex === 0"
-              class="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-primary/20 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 border border-white/10 active:scale-95"
-            >
-              <ChevronLeft :size="22" class="text-white" />
-            </button>
-            <div class="px-3 py-2 bg-white/10 rounded-lg min-w-[60px] text-center">
-              <span class="text-white font-bold text-sm">{{ currentIndex + 1 }}/{{ packages.length }}</span>
-            </div>
-            <button
-              @click="nextPackage"
-              :disabled="packages.length <= 1 || currentIndex === packages.length - 1"
-              class="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-primary/20 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 border border-white/10 active:scale-95"
-            >
-              <ChevronRight :size="22" class="text-white" />
-            </button>
+          <button
+            @click="nextPackage"
+            :disabled="packages.length <= 1"
+            class="flex items-center justify-center w-10 h-10 rounded-full bg-surface-20 hover:bg-primary/20 ring-1 ring-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Next package"
+          >
+            <ChevronRight :size="20" stroke-width="2" class="text-white" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="menuStore.isLoadingPackages" class="flex-1 flex items-center justify-center">
+        <div class="text-center space-y-4">
+          <div class="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
+          <p class="text-white/80 font-kanit">Loading packages...</p>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="packages.length === 0" class="flex-1 flex items-center justify-center">
+        <div class="text-center space-y-4">
+          <Inbox :size="48" stroke-width="1.5" class="text-white/40 mx-auto" />
+          <div>
+            <h3 class="text-xl font-bold text-white mb-2">No Packages Available</h3>
+            <p class="text-white/60 text-sm">Contact staff to check package availability.</p>
           </div>
         </div>
+      </div>
 
-        <!-- Package info bar - name, badge, price, select button -->
-        <div v-if="menuStore.isLoadingPackages" class="flex items-center justify-between gap-4 mb-3 px-2">
-          <div class="flex-1 min-w-0 space-y-2">
-            <div class="h-6 w-64 bg-white/10 rounded animate-pulse"></div>
-            <div class="h-3 w-80 bg-white/10 rounded animate-pulse"></div>
-          </div>
-          <div class="flex items-center gap-4 flex-shrink-0">
-            <div class="h-12 w-32 bg-white/10 rounded-xl animate-pulse"></div>
-            <div class="h-12 w-40 bg-white/10 rounded-xl animate-pulse"></div>
-          </div>
-        </div>
-
-        <div v-else-if="packages[currentIndex]" class="flex items-center justify-between gap-4 mb-3 px-2">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-3 mb-1">
-              <h2 class="text-white font-bold text-xl truncate">{{ packages[currentIndex].name }}</h2>
-              <div v-if="packages[currentIndex].is_popular" 
-                  class="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold text-white bg-amber-500">
-                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                POPULAR
+      <!-- Package Card (Premium Display) -->
+      <div 
+        v-else
+        class="flex-1 min-h-0 flex flex-col gap-4"
+        @touchstart="handleTouchStart"
+        @touchmove="handleTouchMove"
+        @touchend="handleTouchEnd"
+      >
+        <!-- Main Package Card -->
+        <transition name="fade" mode="out-in">
+          <div 
+            v-if="packages[currentIndex]" 
+            :key="packages[currentIndex].id"
+            class="flex-1 min-h-0 rounded-2xl overflow-hidden bg-gradient-to-br from-primary/15 via-white/5 to-primary/5 ring-1 ring-primary/40 flex flex-col"
+          >
+            <!-- Header with badge -->
+            <div class="p-6 space-y-2 border-b border-white/10">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h2 class="text-3xl font-bold text-white font-raleway">{{ packages[currentIndex].name }}</h2>
+                  <p v-if="packages[currentIndex].description" class="text-white/70 text-sm mt-2 line-clamp-2">
+                    {{ packages[currentIndex].description }}
+                  </p>
+                </div>
+                <div v-if="packages[currentIndex].is_popular" class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary/20 ring-1 ring-primary/40">
+                  <Star :size="16" stroke-width="0" fill="currentColor" class="text-primary" />
+                  <span class="text-primary text-xs font-bold uppercase tracking-wider">Popular</span>
+                </div>
               </div>
             </div>
-            <!-- Package description preview -->
-            <p v-if="packages[currentIndex].description" class="text-white/60 text-sm line-clamp-1 max-w-xl">
-              {{ packages[currentIndex].description }}
-            </p>
-          </div>
-          <div class="flex items-center gap-4 flex-shrink-0">
-            <div class="flex items-baseline gap-1 px-4 py-2 rounded-xl bg-primary">
-              <span class="text-gray-900 font-bold text-sm">₱</span>
-              <span class="text-gray-900 font-extrabold text-2xl">{{ packages[currentIndex].price }}</span>
-              <span class="text-gray-900/80 text-xs">/person</span>
-            </div>
-            <button
-              @click="handlePackageSelection(packages[currentIndex])"
-              class="h-12 px-6 bg-primary text-gray-900 font-bold text-base rounded-xl transition-all duration-200 shadow-lg hover:shadow-primary/50 active:scale-95 flex items-center gap-2">
-              Select Package
-              <ChevronRight :size="20" />
-            </button>
-          </div>
-        </div>
 
-        <!-- Loading state -->
-        <div v-if="menuStore.isLoadingPackages" class="flex-1 min-h-0">
-          <div class="h-full bg-white/5 border border-white/10 rounded-2xl p-6 animate-pulse">
-            <div class="h-6 w-48 bg-white/10 rounded mb-4"></div>
-            <div class="h-4 w-80 bg-white/10 rounded mb-8"></div>
-            <div class="grid grid-cols-3 gap-4">
-              <div v-for="n in 6" :key="n" class="h-20 bg-white/10 rounded-xl"></div>
+            <!-- Content: Meat List + Price + CTA -->
+            <div class="flex-1 min-h-0 flex flex-col overflow-hidden p-6 gap-6">
+              <!-- Meat List (scrollable) -->
+              <div class="flex-1 min-h-0 overflow-y-auto">
+                <div class="space-y-3">
+                  <p class="text-xs uppercase tracking-[0.2em] font-bold text-primary/80">Included Meats</p>
+                  <div v-if="packages[currentIndex].modifiers && packages[currentIndex].modifiers.length" class="space-y-2">
+                    <div 
+                      v-for="meat in packages[currentIndex].modifiers.slice(0, 8)" 
+                      :key="meat.id"
+                      class="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      <div class="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                      <span class="text-white/90 font-kanit">{{ meat.name }}</span>
+                    </div>
+                    <div v-if="packages[currentIndex].modifiers.length > 8" class="text-white/60 text-sm px-3 py-2">
+                      +{{ packages[currentIndex].modifiers.length - 8 }} more items
+                    </div>
+                  </div>
+                  <div v-else class="text-white/50 text-sm">No meats specified for this package.</div>
+                </div>
+              </div>
+
+              <!-- Footer: Price + CTA Button -->
+              <div class="flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+                <div class="space-y-1">
+                  <p class="text-white/60 text-xs uppercase tracking-wider font-kanit">Price per Person</p>
+                  <div class="flex items-baseline gap-1">
+                    <span class="text-4xl font-black text-primary">₱{{ packages[currentIndex].price }}</span>
+                    <span class="text-white/50 text-sm">/person</span>
+                  </div>
+                </div>
+                <FlameButton 
+                  variant="primary" 
+                  size="lg"
+                  class="shadow-glow"
+                  @click="handlePackageSelection(packages[currentIndex])"
+                >
+                  Select Package
+                  <ChevronRight :size="20" stroke-width="2" />
+                </FlameButton>
+              </div>
             </div>
           </div>
-        </div>
-
-        <!-- Empty state -->
-        <div v-else-if="packages.length === 0" class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-            </div>
-            <h3 class="text-xl font-bold text-white mb-2">No Packages Available</h3>
-            <p class="text-white/60 text-sm">Please check back soon or contact staff.</p>
-          </div>
-        </div>
-
-        <!-- Package card - takes remaining space -->
-        <div 
-          v-else
-          class="flex-1 min-h-0"
-          @touchstart="handleTouchStart"
-          @touchmove="handleTouchMove"
-          @touchend="handleTouchEnd"
-        >
-          <transition name="slide" mode="out-in">
-            <PackageCard
-              v-if="packages[currentIndex]"
-              :key="packages[currentIndex].id"
-              :pkg="packages[currentIndex]"
-              class="h-full"
-            />
-          </transition>
-        </div>
+        </transition>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Slide transition for carousel */
-.slide-enter-active {
-  transition: all 0.3s ease;
-}
-
-.slide-leave-active {
-  transition: all 0.2s ease;
-}
-
-.slide-enter-from {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-.slide-leave-to {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-/* Line clamp utilities */
-.line-clamp-1 {
+.line-clamp-2 {
   display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>

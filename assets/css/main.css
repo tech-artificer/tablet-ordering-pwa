@@ -23,8 +23,6 @@
 }
 
 :root { 
-  --primary: #F6B56D; 
-  --primary-dark: #C78B45;
   --kbbq-flame: #FF5C00; 
   --panel: #252525;
   --touch-min: 48px; /* Minimum touch target size */
@@ -231,6 +229,34 @@ body {
   .scale-pop-enter-active,
   .scale-pop-leave-active {
     transition: none;
+  }
+
+  .animate-shimmer {
+    animation: none;
+  }
+
+  .touch-btn:active,
+  .touch-btn-circle:active,
+  .icon-btn:active {
+    transform: none;
+  }
+
+  .ui-hover-lift:hover,
+  .ui-hover-lift:active {
+    transform: none;
+  }
+
+  .ripple::after {
+    transition: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

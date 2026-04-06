@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import Button from '../ui/Button.vue'
 
 const props = defineProps<{
   hasPlacedOrder: boolean
@@ -22,22 +20,21 @@ const buttonIcon = computed(() => {
 </script>
 
 <template>
-  <Button
+  <button
     :class="[
       'refill-button',
       isRefillMode && 'active',
       !hasPlacedOrder && 'disabled'
     ]"
-    :disabled="!hasPlacedOrder"
-    aria-label="Toggle refill mode"
     @click="emit('toggleRefillMode')"
+    :disabled="!hasPlacedOrder"
   >
     <span class="refill-icon">{{ buttonIcon }}</span>
     <span class="refill-text">{{ buttonText }}</span>
-
+    
     <!-- Shine effect -->
     <div v-if="hasPlacedOrder && !isRefillMode" class="shine" />
-  </Button>
+  </button>
 </template>
 
 <style scoped>
@@ -47,22 +44,23 @@ const buttonIcon = computed(() => {
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: #10b981;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   border: none;
   border-radius: 12px;
-  font-family: 'Kanit', sans-serif;
   font-weight: 600;
   font-size: 15px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  box-shadow: 
+    0 4px 12px rgba(16, 185, 129, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
 }
 
 .refill-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow:
+  box-shadow: 
     0 6px 20px rgba(16, 185, 129, 0.4),
     0 3px 10px rgba(0, 0, 0, 0.15);
 }
@@ -72,12 +70,14 @@ const buttonIcon = computed(() => {
 }
 
 .refill-button.active {
-  background: #252525;
-  box-shadow: 0 4px 12px rgba(37, 37, 37, 0.3);
+  background: linear-gradient(135deg, #252525 0%, #1a1a1a 100%);
+  box-shadow: 
+    0 4px 12px rgba(37, 37, 37, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .refill-button.disabled {
-  background: #6b7280;
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -107,10 +107,12 @@ const buttonIcon = computed(() => {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg,
-      transparent,
-      rgba(255, 255, 255, 0.3),
-      transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
   animation: shine 3s infinite;
 }
 
@@ -118,9 +120,7 @@ const buttonIcon = computed(() => {
   0% {
     left: -100%;
   }
-
-  20%,
-  100% {
+  20%, 100% {
     left: 100%;
   }
 }

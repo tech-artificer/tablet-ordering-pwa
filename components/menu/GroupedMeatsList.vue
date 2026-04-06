@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import  { computed } from 'vue';
 import type { MenuItem, Modifier } from '../../types';
 import MenuItemGrid from './MenuItemGrid.vue';
 import { ElBadge, ElEmpty } from 'element-plus';

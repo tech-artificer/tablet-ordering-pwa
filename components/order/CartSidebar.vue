@@ -1,9 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { formatCurrency } from '../../utils/formats';
-import { computed } from 'vue';
 import type { Package, CartItem } from '../../types';
 import { ElBadge, ElEmpty } from 'element-plus';
-import CartItemCard from '../menu/CartItemCard.vue';
 import { useDeviceStore } from '../../stores/Device';
 import { useSessionStore } from '../../stores/Session';
 import { useOrderStore } from '../../stores/Order';

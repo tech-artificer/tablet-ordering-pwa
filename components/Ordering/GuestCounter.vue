@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Minus, Plus } from 'lucide-vue-next'
 import { useOrderStore } from '../../stores/Order';
 
@@ -20,57 +19,51 @@ const decrementGuests = () => {
         orderStore.setGuestCount(guestCount.value - 1)
     }
 }
-
 </script>
 
 <template>
-    <section class="w-full max-w-md flex flex-col items-center justify-center gap-6">
-        <!-- Guest Counter Label -->
-        <div class="text-center text-white/60 text-xs uppercase tracking-widest font-semibold">
-            Guest Counter
-        </div>
-
-        <!-- Main Title -->
-        <h1 class="text-center text-5xl lg:text-6xl font-extrabold font-raleway tracking-tight text-white">
-            How Many <span class="text-primary">Guests?</span>
-        </h1>
-
+    <section class="w-full max-w-md flex flex-col items-center justify-center gap-8">
         <!-- Counter Controls -->
-        <div class="w-full flex flex-col items-center gap-6 py-8">
-            <div class="flex items-center justify-center gap-12">
-                <!-- Minus Button -->
+        <div class="w-full flex flex-col items-center gap-8">
+            <div class="flex items-center justify-center gap-16">
+                <!-- Decrement Button -->
                 <button
-                    class="touch-btn-circle w-16 h-16 border-2 border-primary font-bold bg-transparent text-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/10 active:scale-95 transition-all duration-150"
+                    class="flex items-center justify-center w-20 h-20 rounded-full border-2 border-primary/60 font-bold bg-white/5 hover:bg-primary/20 text-primary disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all duration-200"
                     :disabled="guestCount <= MIN_GUESTS" 
                     @click="decrementGuests()"
                     aria-label="Decrease guest count"
                 >
-                    <Minus :size="32" :stroke-width="2.5" />
+                    <Minus :size="36" stroke-width="2.5" />
                 </button>
                 
                 <!-- Guest Count Display -->
                 <div class="text-center">
-                    <div class="text-8xl font-black text-white mb-1">
+                    <div class="text-9xl font-black text-white leading-none mb-2">
                         {{ guestCount }}
                     </div>
-                    <div class="text-white/70 text-xs uppercase tracking-widest font-semibold">
-                        Guests
+                    <div class="text-primary text-sm uppercase tracking-[0.15em] font-bold">
+                        {{ guestCount === 1 ? 'Guest' : 'Guests' }}
                     </div>
                 </div>
 
-                <!-- Plus Button -->
+                <!-- Increment Button -->
                 <button
-                    class="touch-btn-circle w-16 h-16 border-2 border-primary font-bold bg-transparent text-primary disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/10 active:scale-95 transition-all duration-150"
+                    class="flex items-center justify-center w-20 h-20 rounded-full border-2 border-primary/60 font-bold bg-white/5 hover:bg-primary/20 text-primary disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all duration-200"
                     :disabled="guestCount >= MAX_GUESTS" 
                     @click="incrementGuests()"
                     aria-label="Increase guest count"
                 >
-                    <Plus :size="32" :stroke-width="2.5" />
+                    <Plus :size="36" stroke-width="2.5" />
                 </button>
             </div>
             
-            <!-- Range constraint -->
-            <p class="text-white/60 text-sm font-kanit">{{ MIN_GUESTS }} - {{ MAX_GUESTS }} guests per table</p>
+            <!-- Range Info -->
+            <p class="text-white/50 text-xs font-kanit tracking-wider">
+                {{ MIN_GUESTS }}–{{ MAX_GUESTS }} guests maximum per table
+            </p>
         </div>
     </section>
 </template>
+
+<style scoped>
+</style>

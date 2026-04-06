@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import type { Component } from 'vue';
+
 type MenuCategory = 'meats' | 'sides' | 'alacartes' | 'desserts' | 'beverages';
 
 interface Category {
   id: MenuCategory;
   label: string;
-  icon: string;
+  icon: Component;
 }
 
 const props = defineProps<{
@@ -53,7 +55,7 @@ const selectCategory = (category: MenuCategory) => {
               : 'bg-white/5 text-white/70 border-b-2 border-transparent active:bg-white/15 active:scale-[0.98]',
             isCategoryLocked(category.id) ? 'opacity-50 cursor-not-allowed grayscale' : ''
           ]">
-          <span class="text-xl">{{ category.icon }}</span>
+          <component :is="category.icon" :size="20" :stroke-width="2" />
           <span>{{ category.label }}</span>
           <span v-if="isCategoryLocked(category.id)" class="text-xs text-white/70">🔒</span>
         </button>

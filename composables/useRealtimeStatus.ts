@@ -1,4 +1,5 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import type { OrderApiResponse } from '../types'
 import { useDeviceStore } from '../stores/Device'
 import { useSessionStore } from '../stores/Session'
 import { useOrderStore } from '../stores/Order'
@@ -15,7 +16,7 @@ import { useOrderStore } from '../stores/Order'
 export const useRealtimeStatus = () => {
   const deviceStore = useDeviceStore()
   const sessionStore = useSessionStore()
-  const orderStore = useOrderStore() as any
+  const orderStore = useOrderStore()
 
   // Connection state
   const echoConnected = ref<boolean>(false)
@@ -37,39 +38,41 @@ export const useRealtimeStatus = () => {
 
   // Device/Table Status
   const deviceIsActive = computed(() => {
-    return !!(deviceStore.device.value?.id && deviceStore.table.value?.id && deviceStore.token.value)
+    return !!(deviceStore.getDeviceId() && deviceStore.getTableId() && deviceStore.getToken())
   })
 
   const tableInfo = computed(() => {
+    const table = deviceStore.getTable()
     return {
-      id: deviceStore.table.value?.id,
-      name: deviceStore.table.value?.name,
-      status: deviceStore.table.value?.status || 'unknown',
-      isAvailable: deviceStore.table.value?.is_available ?? false,
-      isLocked: deviceStore.table.value?.is_locked ?? false
+      id: table?.id,
+      name: table?.name,
+      status: table?.status || 'unknown',
+      isAvailable: table?.is_available ?? false,
+      isLocked: table?.is_locked ?? false
     }
   })
 
   const deviceInfo = computed(() => {
     return {
-      id: deviceStore.device.value?.id,
-      ipAddress: deviceStore.device.value?.last_ip_address || deviceStore.lastServerIpUsed,
-      hasToken: !!deviceStore.token,
+      id: deviceStore.getDeviceId(),
+      ipAddress: deviceStore.getDeviceLastIpAddress() || deviceStore.getLastServerIpUsed(),
+      hasToken: !!deviceStore.getToken(),
       expiresAt: deviceStore.expiration
     }
   })
 
   // Order status
   const currentOrderStatus = computed(() => {
-    const order = orderStore?.currentOrder?.order || orderStore?.currentOrder
+    const orderResp = orderStore.getCurrentOrder()
+    const order = (orderResp?.order || orderResp) as (OrderApiResponse['order'] & { unprinted_items_count?: number }) | null | undefined
     return {
       hasOrder: !!order?.id,
       orderId: order?.id,
       orderNumber: order?.order_number,
       status: order?.status,
       hasUnprinted: order?.unprinted_items_count > 0 || false,
-      isPolling: orderStore?.isPolling || false,
-      pollingOrderId: orderStore?.pollingOrderId || null
+      isPolling: orderStore.getIsPolling(),
+      pollingOrderId: orderStore.getPollingOrderId()
     }
   })
 

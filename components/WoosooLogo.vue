@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import logoSrc from '~/assets/images/logo/woosoo-icon-color.png'
 
 const showLogoImage = ref(true)

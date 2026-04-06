@@ -14,10 +14,11 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
     logger.warn(`[ActiveOrderRecovery:${source}] initializeFromSession failed`, error)
   }
 
-  const orderObj = orderStore.currentOrder?.order || orderStore.currentOrder
-  const orderId = orderObj?.order_id || orderObj?.id || sessionStore.orderId
+  const orderResp = orderStore.getCurrentOrder()
+  const orderObj = orderResp?.order || orderResp
+  const orderId = orderObj?.order_id || orderObj?.id || sessionStore.getOrderId()
   const status = String(orderObj?.status || '').toLowerCase()
-  const hasSessionFlag = sessionStore.isActive || (typeof window !== 'undefined' && window.localStorage?.getItem('session_active') === '1')
+  const hasSessionFlag = sessionStore.getIsActive() || (typeof window !== 'undefined' && window.localStorage?.getItem('session_active') === '1')
 
   if (!orderId) {
     return {
