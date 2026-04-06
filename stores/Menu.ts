@@ -81,22 +81,33 @@ export const useMenuStore = defineStore("menu", {
     },
 
     actions: {
-        async fetchPackages(this: any) {
-            this.loading.packages = true;       
-            this.errors.packages = null;
-            const api = useApi();
+        /**
+         * Generic fetch function for all menu item types
+         * Eliminates code duplication across 6 fetch methods
+         */
+        async _fetchMenuItem(
+            this: any,
+            key: 'packages' | 'modifiers' | 'desserts' | 'sides' | 'alacartes' | 'beverages',
+            endpoint: string,
+            params: Record<string, string> = {},
+            normalizer: (item: any) => any = normalizePrice
+        ) {
+            this.loading[key] = true
+            this.errors[key] = null
+            const api = useApi()
+            
             try {
                 const { data } = await api.get('/api/v2/tablet/packages');
                 this.packages = Array.isArray(data.data) ? data.data.map(normalizePackage) : [];
                 logger.debug('✅ Packages loaded:', this.packages.length);
                 return { success: true };
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch packages';
-                this.errors.packages = errorMessage;
-                logger.error('❌ Packages error:', error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || `Failed to fetch ${key}`
+                this.errors[key] = errorMessage
+                logger.error(`❌ ${key.charAt(0).toUpperCase() + key.slice(1)} error:`, error)
+                throw new Error(errorMessage)
             } finally {
-                this.loading.packages = false;
+                this.loading[key] = false
             }
         },
 

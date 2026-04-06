@@ -56,8 +56,22 @@ export default defineNuxtPlugin((nuxtApp: any) => {
             headers.Authorization = `Bearer ${token}`
         }
 
-        const wsPort = config.public.reverb.port ?? 6001
-        const wssPort = wsPort
+        // Dynamically select protocol based on current page
+        // Always select protocol based on browser context, not .env
+        let wsProtocol = 'ws';
+        let forceTLS = false;
+        let wsPort = config.public.reverb.port;
+        let wssPort = config.public.reverb.port;
+        
+        if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+            wsProtocol = 'wss';
+            forceTLS = true;
+            // When HTTPS, connect via nginx proxy (port 8000) for TLS termination
+            wsPort = 8000;
+            wssPort = 8000;
+        }
+        
+        logger.info(`[Echo] Connecting to Reverb: ${wsProtocol}://${reverbHost}:${wsPort}/reverb`)
 
         // Log Reverb configuration
         console.log('[🔴 Echo Init] Config:', {

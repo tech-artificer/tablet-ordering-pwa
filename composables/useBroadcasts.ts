@@ -100,6 +100,8 @@ export const useBroadcasts = () => {
   let orderChannel: any = null
   let serviceRequestChannel: any = null
   let deviceControlChannel: any = null
+  let orderCompletionTimeoutId: number | null = null
+  let reloadTimeoutId: number | null = null
 
   // Channel connection status
   const channelStatus = ref({
@@ -236,7 +238,7 @@ export const useBroadcasts = () => {
       orderStore.updateOrderStatus(event.status)
       // If this is a terminal status, stop the polling fallback
       if (event.status === 'completed' || event.status === 'cancelled' || event.status === 'voided') {
-        try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+        try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
         
         // End session and navigate to home on completed
         if (event.status === 'completed') {
@@ -270,7 +272,7 @@ export const useBroadcasts = () => {
     
     if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
       orderStore.completeOrder()
-      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
       
       // End session and navigate to home after a short delay
       logger.info('✅ Order completed via broadcast - ending session in 2s')
@@ -295,7 +297,7 @@ export const useBroadcasts = () => {
     // Clear order from store
     if (orderStore.currentOrder?.order_id === event.order.order_id) {
       orderStore.clearOrder()
-      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
     }
   }
 
@@ -325,7 +327,11 @@ export const useBroadcasts = () => {
       case 'restart':
       case 'reload':
         ElMessage.warning('App will restart in 3 seconds...')
-        setTimeout(() => {
+        if (reloadTimeoutId) {
+          try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] clearTimeout failed', e) }
+          reloadTimeoutId = null
+        }
+        reloadTimeoutId = window.setTimeout(() => {
           window.location.reload()
         }, 3000)
         break

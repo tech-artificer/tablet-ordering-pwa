@@ -244,8 +244,8 @@ const saveApiUrl = async () => {
     setTimeout(() => {
       window.location.reload()
     }, 2000)
-  } catch {
-    // User cancelled
+  } catch (e) {
+    logger.debug('[Settings] saveApiUrl canceled or failed', e)
   }
 }
 
@@ -386,8 +386,8 @@ const logout = async () => {
     tokenStatus.value = 'invalid'
     tokenMessage.value = 'Device logged out'
     logger.debug('✅ Device logged out')
-  } catch {
-    // User cancelled
+  } catch (e) {
+    logger.debug('[Settings] logout canceled or failed', e)
   }
 }
 

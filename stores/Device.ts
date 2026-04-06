@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onScopeDispose } from 'vue'
 import { useApi } from "../composables/useApi";
 import { logger } from "../utils/logger";
 import type { Device, Table } from '../types/index'
@@ -20,30 +20,51 @@ export const useDeviceStore = defineStore('device', () => {
         const waitingForTable = ref(false)
         // Polling state for waiting-for-table
         const isPollingForTable = ref(false)
+        const pollAttempts = ref(0)
+        const maxPollAttempts = ref(24)
         let pollTimerId: number | null = null
-        let pollAttempts = 0
+        let pollStartedAt: number | null = null
         const defaultPollIntervalMs = 5000
         const defaultMaxPollAttempts = 24
+        const defaultMaxPollRuntimeMs = 2 * 60 * 1000
 
         function stopTablePolling() {
             if (pollTimerId) {
-                clearInterval(pollTimerId)
+                try {
+                    clearInterval(pollTimerId)
+                } catch (e) {
+                    logger.debug('[DeviceStore] stopTablePolling: clearInterval failed', e)
+                }
                 pollTimerId = null
             }
+            pollStartedAt = null
             isPollingForTable.value = false
-            pollAttempts = 0
+            pollAttempts.value = 0
         }
 
         function startTablePolling(intervalMs = defaultPollIntervalMs, maxAttempts = defaultMaxPollAttempts) {
             // don't start if already polling
             if (isPollingForTable.value) return
+            if (typeof window === 'undefined') {
+                logger.warn('[DeviceStore] startTablePolling: window unavailable (SSR)')
+                return
+            }
             logger.debug('[DeviceStore] startTablePolling')
             isPollingForTable.value = true
             // ensure UI shows we're awaiting assignment
             waitingForTable.value = true
-            pollAttempts = 0
+            pollAttempts.value = 0
+            maxPollAttempts.value = maxAttempts
+            pollStartedAt = Date.now()
             pollTimerId = window.setInterval(async () => {
-                pollAttempts++
+                pollAttempts.value++
+
+                if (pollStartedAt && (Date.now() - pollStartedAt) > defaultMaxPollRuntimeMs) {
+                    logger.warn('[DeviceStore] table polling max runtime exceeded')
+                    stopTablePolling()
+                    return
+                }
+
                 try {
                         const api = useApi()
                         if (!api || typeof (api as any).get !== 'function') {
@@ -51,7 +72,7 @@ export const useDeviceStore = defineStore('device', () => {
                             stopTablePolling()
                             return
                         }
-                        const response = await api.post('/api/devices/refresh')
+                        const response = await api.get('/api/devices/login')
                     const resp = response.data || {}
                     // store raw response for diagnostics
                     lastAuthResponse.value = resp
@@ -80,7 +101,7 @@ export const useDeviceStore = defineStore('device', () => {
                         waitingForTable.value = false
                         logger.debug('[DeviceStore] table assigned during polling', t)
                         stopTablePolling()
-                    } else if (pollAttempts >= maxAttempts) {
+                    } else if (pollAttempts.value >= maxAttempts) {
                         // give up after max attempts
                         logger.debug('[DeviceStore] table polling max attempts reached')
                         stopTablePolling()
@@ -88,7 +109,7 @@ export const useDeviceStore = defineStore('device', () => {
                 } catch (e) {
                     // network errors: keep trying until attempts exhausted
                     logger.warn('[DeviceStore] polling error', e)
-                    if (pollAttempts >= maxAttempts) stopTablePolling()
+                    if (pollAttempts.value >= maxAttempts) stopTablePolling()
                 }
             }, intervalMs) as unknown as number
         }
@@ -257,59 +278,15 @@ export const useDeviceStore = defineStore('device', () => {
         }
     }
 
-    async function refresh(): Promise<boolean> {
-        isLoading.value = true
-        errorMessage.value = null
-        
-        try {
-            const api = useApi()
-            
-            const response = await api.post('/api/devices/refresh')
-            const { token: authToken, device: authDevice, table: authTable, expires_at } = response.data
-            const ipUsedFromServer: string | undefined = response.data?.ip_used
-
-            // Update whatever the server provided. Accept missing table (may be assigned later).
-            if (authDevice) {
-                if (ipUsedFromServer) (authDevice as any).ip_address = ipUsedFromServer
-                device.value = authDevice
-            }
-
-            if (authToken) {
-                token.value = authToken
-                try { if (typeof window !== 'undefined' && (window as any).updateEchoAuth) (window as any).updateEchoAuth(token.value) } catch (e) { logger.debug('[DeviceStore] updateEchoAuth not available') }
-            }
-            if (expires_at) expiration.value = expires_at
-
-            if (authTable) {
-                table.value = normalizeTable(authTable)
-                // if server provided a table id or name, we are no longer waiting
-                waitingForTable.value = !( (table.value as any).id || (table.value as any).name )
-            } else {
-                // keep waitingForTable true if we still lack table
-                if (!table.value) waitingForTable.value = true
-            }
-
-                // return true if we at least have a token (device is authenticated)
-            return !!authToken
-
-        } catch (error: any) {
-            logger.error('[DeviceStore] Token refresh failed:', error)
-            errorMessage.value = error?.response?.data?.message || 'Token refresh failed'
-            return false
-        } finally {
-            isLoading.value = false
-        }
-    }
-
         // Checks if the server has assigned a table after registration.
-        // Calls `refresh()` to fetch latest device info and returns true when a table is present.
+        // Calls `authenticate()` to fetch latest device info and returns true when a table is present.
         async function checkTableAssignment(): Promise<boolean> {
             // If we don't have any device or token at all, nothing to check
                 if (!device.value && !token.value) return false
                 logger.debug('[DeviceStore] checkTableAssignment running — device present?', !!device.value, 'token?', !!token.value)
 
             try {
-                const ok = await refresh()
+                const ok = await authenticate()
                 const t = table.value as any
                 if (t && (t.id || t.name)) {
                     waitingForTable.value = false
@@ -336,6 +313,10 @@ export const useDeviceStore = defineStore('device', () => {
                 waitingForTable.value = false
     }
 
+    onScopeDispose(() => {
+        stopTablePolling()
+    })
+
     return {
         // State
         device,
@@ -345,8 +326,10 @@ export const useDeviceStore = defineStore('device', () => {
         expiration,
         isLoading,
         errorMessage,
-        waitingForTable,
-        isPollingForTable,
+            waitingForTable,
+            isPollingForTable,
+            pollAttempts,
+            maxPollAttempts,
         
         // Getters
         isAuthenticated,
@@ -355,7 +338,6 @@ export const useDeviceStore = defineStore('device', () => {
         // Actions
         authenticate,
         register,
-        refresh,
         checkTableAssignment,
         startTablePolling,
         stopTablePolling,

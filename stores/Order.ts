@@ -1,5 +1,5 @@
 ﻿import { defineStore } from 'pinia'
-import { reactive, computed, toRefs } from 'vue'
+import { reactive, computed, toRefs, onScopeDispose } from 'vue'
 import { useApi } from '../composables/useApi'
 import { logger } from '../utils/logger'
 import { notifyBlockedAction } from '../composables/useNotifier'
@@ -25,6 +25,49 @@ export const useOrderStore = defineStore('order', () => {
     pollInflight: false as boolean,
     pollingOrderId: null as string | null
   })
+
+  let submitOrderMutex: Promise<any> | null = null
+  let submitRefillMutex: Promise<any> | null = null
+  let completionTimeoutId: number | null = null
+  let pollingStartedAt: number | null = null
+  const maxPollingRuntimeMs = 15 * 60 * 1000
+
+  const validateOrderState = (source: string) => {
+    const issues: string[] = []
+
+    if (state.isRefillMode && !state.hasPlacedOrder) {
+      state.isRefillMode = false
+      state.refillItems = []
+      issues.push('refillModeWithoutOrder')
+    }
+
+    if (state.hasPlacedOrder && !state.currentOrder) {
+      state.hasPlacedOrder = false
+      state.submittedItems = []
+      issues.push('hasPlacedOrderWithoutCurrentOrder')
+    }
+
+    if (state.isPolling && !state.pollTimerId) {
+      state.isPolling = false
+      state.pollInflight = false
+      state.pollingOrderId = null
+      issues.push('pollingFlagWithoutTimer')
+    }
+
+    if (!state.isPolling && state.pollTimerId) {
+      try {
+        clearInterval(state.pollTimerId as any)
+      } catch (e) {
+        logger.debug('[OrderStore] validateOrderState: clearInterval failed', e)
+      }
+      state.pollTimerId = null
+      issues.push('timerWithoutPollingFlag')
+    }
+
+    if (issues.length > 0) {
+      logger.warn('[OrderStore] State recovery applied', { source, issues })
+    }
+  }
 
   const getCartItemQuantity = (id: number) => {
     const items = state.isRefillMode ? state.refillItems : state.cartItems
@@ -68,6 +111,17 @@ export const useOrderStore = defineStore('order', () => {
       logger.warn('addToCart blocked: initial order already placed; use refill mode to add items')
       notifyBlockedAction()
       return
+    }
+
+    // Validate category in refill mode - only meats and sides allowed
+    if (state.isRefillMode) {
+      const itemCategory = opts?.category || item.category
+      const allowedCategories = ['meats', 'sides']
+      if (!itemCategory || !allowedCategories.includes(itemCategory)) {
+        logger.warn(`addToCart blocked in refill mode: category "${itemCategory}" not allowed`)
+        notifyBlockedAction('Only Meats and Sides can be refilled')
+        return
+      }
     }
 
     if ((state.package as Package)?.id === item.id) {
@@ -117,6 +171,17 @@ export const useOrderStore = defineStore('order', () => {
     const targetCart = state.isRefillMode ? state.refillItems : state.cartItems
     const existing = targetCart.find(i => i.id === id)
     if (!existing) return
+
+    // Validate category in refill mode - prevent modifications to non-refillable items
+    if (state.isRefillMode) {
+      const itemCategory = existing.category
+      const allowedCategories = ['meats', 'sides']
+      if (!itemCategory || !allowedCategories.includes(itemCategory)) {
+        logger.warn(`updateQuantity blocked in refill mode: category "${itemCategory}" not allowed`)
+        notifyBlockedAction('Only Meats and Sides quantities can be modified in Refill mode')
+        return
+      }
+    }
     
     const UNLIMITED_ITEM_CAP = 5
     const max = existing.isUnlimited ? UNLIMITED_ITEM_CAP : 99
@@ -292,11 +357,64 @@ export const useOrderStore = defineStore('order', () => {
     return payload
   }
 
-  async function submitOrder(payload?: any) {
-    if (state.hasPlacedOrder && !state.isRefillMode) {
-      throw new Error('An initial order has already been placed for this session. Use refill instead.')
+  function buildRefillPayload() {
+    state.refillItems.forEach((item: any, index: number) => {
+      if (item?.category && !['meats', 'sides'].includes(item.category)) {
+        throw new Error(`Invalid refill item[${index}].category: only meats and sides are allowed`)
+      }
+    })
+
+    const items = state.refillItems.map((i: any, index: number) => ({
+      menu_id: i.id ? Number(i.id) : undefined,
+      name: i.name,
+      quantity: Number(i.quantity),
+      price: i.price !== undefined ? Number(i.price) : 0,
+      index: index + 1,
+      seat_number: 1,
+      note: i.note || 'Refill'
+    }))
+
+    const payload = { items }
+
+    logger.debug('🔍 Validating refill payload structure...')
+
+    if (!Array.isArray(payload.items) || payload.items.length === 0) {
+      throw new Error('Invalid refill items: must be a non-empty array')
     }
-    state.isSubmitting = true
+
+    payload.items.forEach((item, index) => {
+      if (!item.menu_id || typeof item.menu_id !== 'number') {
+        throw new Error(`Invalid refill item[${index}].menu_id: must be a number`)
+      }
+      if (!item.name || typeof item.name !== 'string') {
+        throw new Error(`Invalid refill item[${index}].name: must be a non-empty string`)
+      }
+      if (!item.quantity || item.quantity < 1) {
+        throw new Error(`Invalid refill item[${index}].quantity: must be at least 1`)
+      }
+      if (typeof item.price !== 'number' || item.price < 0) {
+        throw new Error(`Invalid refill item[${index}].price: must be a non-negative number`)
+      }
+    })
+
+    logger.debug('✅ Refill payload validation passed')
+    return payload
+  }
+
+  async function submitOrder(payload?: any) {
+    if (submitOrderMutex) {
+      logger.warn('submitOrder already in progress; awaiting existing submission')
+      return submitOrderMutex
+    }
+
+    submitOrderMutex = (async () => {
+      if (state.hasPlacedOrder && !state.isRefillMode) {
+        throw new Error('An initial order has already been placed for this session. Use refill instead.')
+      }
+      if (state.isSubmitting) {
+        throw new Error('Order submission already in progress. Please wait.')
+      }
+      state.isSubmitting = true
     // 🔒 VALIDATION: Ensure everything is set before submitting
     const deviceStore = useDeviceStore()
     
@@ -381,7 +499,7 @@ export const useOrderStore = defineStore('order', () => {
       
       return resp.data
     } catch (error: any) {
-      logger.error('❌ Order submission failed:', error.message)
+      logger.error('❌ Order submission failed:', error?.message || error)
       
       // Handle authentication errors specifically
       if (error.response?.status === 401 || error.response?.data?.exception === 'authentication') {
@@ -448,11 +566,19 @@ export const useOrderStore = defineStore('order', () => {
     } finally {
       state.isSubmitting = false
     }
+    })()
+
+    try {
+      return await submitOrderMutex
+    } finally {
+      submitOrderMutex = null
+    }
   }
   
   async function submitRefill(payload?: any) {
-    if (!state.currentOrder && !state.hasPlacedOrder) {
-      throw new Error('No existing order found — cannot submit a refill.')
+    if (submitRefillMutex) {
+      logger.warn('submitRefill already in progress; awaiting existing submission')
+      return submitRefillMutex
     }
     state.isSubmitting = true
     const api = useApi()
@@ -497,19 +623,19 @@ export const useOrderStore = defineStore('order', () => {
       logger.error('[Refill] Failed:', error?.response?.data || error)
       throw error
     } finally {
-      state.isSubmitting = false
+      submitRefillMutex = null
     }
   }
 
   async function setOrderCreated(respData: any) {
     const sessionStore = useSessionStore()
 
-    const orderNumber = respData?.order?.order_number || respData?.order_number || respData?.order?.id
+    const orderNumber = extractOrderNumber(respData)
     // Use order_id (business ID like 19583), not order_number or internal id
-    const orderId = respData?.order?.order_id || respData?.order_id || respData?.order?.id || respData?.id
+    const orderId = extractOrderId(respData)
 
     // Store the numeric order_id in session for API lookups
-    sessionStore.orderId = orderId
+    if (orderId) sessionStore.orderId = Number(orderId)
     state.hasPlacedOrder = true
     state.currentOrder = respData
     
@@ -554,12 +680,21 @@ export const useOrderStore = defineStore('order', () => {
         clearInterval(state.pollTimerId as any)
       }
     } catch (e) {
-      // ignore
+      logger.debug('stopOrderPolling: clearInterval failed', e)
     }
     state.pollTimerId = null
     state.isPolling = false
     state.pollInflight = false
     state.pollingOrderId = null
+    pollingStartedAt = null
+    if (completionTimeoutId) {
+      try {
+        clearTimeout(completionTimeoutId)
+      } catch (e) {
+        logger.debug('stopOrderPolling: clearTimeout failed', e)
+      }
+      completionTimeoutId = null
+    }
     logger.debug('✅ Order polling stopped')
   }
 
@@ -587,9 +722,17 @@ export const useOrderStore = defineStore('order', () => {
 
     state.isPolling = true
     state.pollingOrderId = orderId
+    pollingStartedAt = Date.now()
 
     const tick = async () => {
       if (state.pollInflight) return
+      if (!state.isPolling || state.pollingOrderId !== orderId) return
+
+      if (pollingStartedAt && (Date.now() - pollingStartedAt) > maxPollingRuntimeMs) {
+        logger.warn('startOrderPolling: max runtime exceeded, stopping polling', { orderId, maxPollingRuntimeMs })
+        stopOrderPolling()
+        return
+      }
       state.pollInflight = true
       const tickStart = performance.now()
       try {
@@ -619,9 +762,10 @@ export const useOrderStore = defineStore('order', () => {
           // Persist session order id if missing
           try {
             const sessionStore = useSessionStore()
-            sessionStore.orderId = orderObj?.order_id || orderObj?.id || sessionStore.orderId
+            const polledOrderId = extractOrderId(orderObj)
+            if (polledOrderId) sessionStore.orderId = Number(polledOrderId)
           } catch (e) {
-            // ignore
+            logger.debug('startOrderPolling: failed to sync session orderId', e)
           }
 
           // Stop polling if terminal status observed
@@ -636,7 +780,11 @@ export const useOrderStore = defineStore('order', () => {
                 
                 // Small delay to allow any final UI updates. Await session end
                 // and clear order state immediately to avoid a refill UI loop.
-                setTimeout(async () => {
+                if (completionTimeoutId) {
+                  try { clearTimeout(completionTimeoutId) } catch (e) { logger.debug('order completion timeout clear failed', e) }
+                  completionTimeoutId = null
+                }
+                completionTimeoutId = window.setTimeout(async () => {
                   try {
                     // Load session store instance and call end
                     const sessionStore = useSessionStore()
@@ -667,6 +815,8 @@ export const useOrderStore = defineStore('order', () => {
                     await nuxtApp.$router.replace('/')
                   } catch (e) {
                     logger.warn('Failed to end session on order completion:', e)
+                  } finally {
+                    completionTimeoutId = null
                   }
                 }, 2000)
               } catch (e) {
@@ -759,6 +909,7 @@ export const useOrderStore = defineStore('order', () => {
           logger.debug('initializeFromSession: session.orderId appeared during grace, skipping clear')
         }
       }
+      validateOrderState('initializeFromSession:no-session')
       return
     }
     
@@ -789,6 +940,7 @@ export const useOrderStore = defineStore('order', () => {
       logger.warn('🔁 Failed to fetch order during initializeFromSession:', err)
     }
     logger.debug('🔁 Initialized order state from session.orderId:', sessionStore.orderId)
+    validateOrderState('initializeFromSession:completed')
   }
 
   // Broadcast event handlers
@@ -811,6 +963,16 @@ export const useOrderStore = defineStore('order', () => {
   // Return refs so Pinia unwraps them at runtime. Cast to `any` so
   // TypeScript callers (tests) can assign values directly without
   // needing to work with `Ref<T>` types.
+  validateOrderState('init')
+
+  onScopeDispose(() => {
+    stopOrderPolling()
+    if (completionTimeoutId) {
+      try { clearTimeout(completionTimeoutId) } catch (e) { logger.debug('OrderStore dispose: clearTimeout failed', e) }
+      completionTimeoutId = null
+    }
+  })
+
   return ({
     ...toRefs(state),
     getCartItemQuantity,

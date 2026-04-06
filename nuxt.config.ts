@@ -18,13 +18,22 @@ export default defineNuxtConfig({
     
     ssr: false,
     
+    // Nitro static preset for nginx deployment (generates index.html + 200.html fallback)
+    nitro: {
+        preset: 'static',
+        prerender: {
+            crawlLinks: false,
+            routes: ['/']
+        }
+    },
+    
     router: {
         middleware: ['auth']
     },
     
     css: [
         "./assets/css/input.css",
-        "./assets/css/main.css"
+        "./assets/css/main.css" 
     ],
     
     modules: [
@@ -172,7 +181,7 @@ export default defineNuxtConfig({
             meta: [
                 {
                     name: "viewport",
-                    content: "width=device-width, height=device-height, user-scalable=no, initial-scale=1.0, maximum-scale=1.0"
+                    content: "width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"
                 },
                 { name: 'theme-color', content: '#F6B56D' },
                 { name: 'apple-mobile-web-app-capable', content: 'yes' },

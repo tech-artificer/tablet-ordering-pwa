@@ -1,3 +1,5 @@
+import { logger } from './logger'
+
 export async function getLocalIp(timeout = 1500): Promise<string | null> {
   // Try to extract local LAN IP using WebRTC ICE candidates.
   // This may be blocked or return mDNS names in some browsers; handle gracefully.
@@ -14,7 +16,7 @@ export async function getLocalIp(timeout = 1500): Promise<string | null> {
     const timer = setTimeout(() => {
       if (!resolved) {
         resolved = true
-        try { pc.close() } catch (e) {}
+        try { pc.close() } catch (e) { logger.debug('[getLocalIp] pc.close failed', e) }
         resolve(null)
       }
     }, timeout)
@@ -24,7 +26,7 @@ export async function getLocalIp(timeout = 1500): Promise<string | null> {
       if (ip) {
         resolved = true
         clearTimeout(timer)
-        try { pc.close() } catch (e) {}
+        try { pc.close() } catch (e) { logger.debug('[getLocalIp] pc.close failed', e) }
         resolve(ip)
       }
     }
@@ -48,10 +50,11 @@ export async function getLocalIp(timeout = 1500): Promise<string | null> {
         }
       }
 
-      pc.createOffer().then((sdp) => pc.setLocalDescription(sdp)).catch(() => {})
+      pc.createOffer().then((sdp) => pc.setLocalDescription(sdp)).catch((e) => logger.debug('[getLocalIp] createOffer failed', e))
     } catch (e) {
       clearTimeout(timer)
-      try { pc.close() } catch (ee) {}
+      logger.debug('[getLocalIp] RTC init failed', e)
+      try { pc.close() } catch (ee) { logger.debug('[getLocalIp] pc.close failed', ee) }
       resolve(null)
     }
   })

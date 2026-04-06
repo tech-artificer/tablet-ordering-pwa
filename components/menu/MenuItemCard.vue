@@ -1,8 +1,9 @@
 <template>
   <div :class="[
     'relative p-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 text-white flex gap-3 items-center transition-all duration-150 shadow-lg border border-white/10 backdrop-blur-sm',
-    (!item.is_available || item.is_available !== false) ? 'active:scale-[0.98]' : 'opacity-60 cursor-not-allowed'
-  ]">
+    (!item.is_available || item.is_available !== false) ? 'active:scale-[0.98]' : 'opacity-60 cursor-not-allowed',
+    isLocked ? 'opacity-60 cursor-not-allowed grayscale' : ''
+  ]" :title="isLocked ? lockedReason : ''">
     
     <!-- Quantity Badge -->
     <div 
@@ -16,9 +17,22 @@
       {{ quantity }}
     </div>
 
+    <!-- Lock Badge (refill mode) -->
+    <div v-if="isLocked" class="absolute top-2 right-2 bg-black/70 text-white text-[10px] font-semibold px-2 py-1 rounded-full shadow-lg">
+      🔒 Locked
+    </div>
+
     <!-- Image -->
     <div class="w-28 h-20 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden flex-shrink-0 border border-white/10">
-      <img v-if="item.image" :src="item.image" class="w-full h-full object-cover" :alt="item.name" />
+      <NuxtImg
+        v-if="item.image || item.img_url"
+        :src="item.image || item.img_url"
+        class="w-full h-full object-cover"
+        :alt="item.name || 'Menu item'"
+        loading="lazy"
+        sizes="(max-width: 768px) 100vw, 25vw"
+        format="webp"
+      />
       <div v-else class="w-full h-full flex items-center justify-center text-sm text-gray-400">
         <span class="text-2xl">🍽️</span>
       </div>
@@ -34,10 +48,10 @@
       </div>
       <p class="text-xs text-gray-300 line-clamp-2 mb-2">{{ item.description }}</p>
       <div class="flex gap-2">
-        <FlameButton @click="handleAdd" class="flex-1 !py-2 !text-sm" :disabled="item.is_available === false">
+        <FlameButton @click="handleAdd" class="flex-1 !py-2 !text-sm" :disabled="item.is_available === false || isLocked" :aria-disabled="item.is_available === false || isLocked" :title="isLocked ? lockedReason : ''">
           <span class="flex items-center justify-center gap-1">
             <span v-if="item.is_available !== false">+</span>
-            <span>{{ item.is_available === false ? 'Unavailable' : 'Add' }}</span>
+            <span>{{ isLocked ? 'Locked' : (item.is_available === false ? 'Unavailable' : 'Add') }}</span>
           </span>
         </FlameButton>
         <button 
@@ -58,7 +72,9 @@ import FlameButton from '../../components/ui/FlameButton.vue'
 
 const props = defineProps({ 
   item: Object,
-  quantity: { type: Number, default: 0 }
+  quantity: { type: Number, default: 0 },
+  isLocked: { type: Boolean, default: false },
+  lockedReason: { type: String, default: 'Locked during refill mode' }
 })
 
 const emit = defineEmits(['add', 'view'])
@@ -66,6 +82,7 @@ const emit = defineEmits(['add', 'view'])
 const isAdding = ref(false)
 
 function handleAdd() {
+  if (props.isLocked) return
   if (isAdding.value) return
   isAdding.value = true
   emit('add', props.item)
