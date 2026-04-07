@@ -219,7 +219,7 @@ const heroImages = [
                   <h3 class="font-semibold text-sm text-black font-raleway mb-1 line-clamp-1">
                     {{ meal.name }}
                   </h3>
-                  <p class="text-xs text-gray-400 mb-2 text-secondary  line-clamp-1 font-kanit">
+                  <p class="text-xs text-secondary mb-2 line-clamp-1 font-kanit">
                     {{ meal.description }}
                   </p>
 
