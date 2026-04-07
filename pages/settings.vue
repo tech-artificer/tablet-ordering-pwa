@@ -88,8 +88,8 @@ watch(collapsed, (val) => {
 const getLocalIpAddress = async () => {
   try {
     // Try to get from device store if available (use last_ip_address per Device type)
-    if (deviceStore.device?.value?.last_ip_address) {
-      localIpAddress.value = deviceStore.device.value.last_ip_address
+    if (deviceStore.device?.last_ip_address) {
+      localIpAddress.value = deviceStore.device.last_ip_address
       return
     }
     
@@ -189,8 +189,8 @@ const fetchDeviceByIp = async (ip: string | null) => {
       try {
       const res = await api.post('/api/device/table', { ip })
       if (res && res.data && res.data.success) {
-        if (res.data.device) deviceStore.device.value = res.data.device
-        if (res.data.table) deviceStore.table.value = res.data.table
+        if (res.data.device) deviceStore.device = res.data.device
+        if (res.data.table) deviceStore.table = res.data.table
         return true
       }
     } catch (err: any) {
@@ -204,8 +204,8 @@ const fetchDeviceByIp = async (ip: string | null) => {
       try {
       const res2 = await api.get('/api/device/table', { params: { ip } })
       if (res2 && res2.data && res2.data.success) {
-        if (res2.data.device) deviceStore.device.value = res2.data.device
-        if (res2.data.table) deviceStore.table.value = res2.data.table
+        if (res2.data.device) deviceStore.device = res2.data.device
+        if (res2.data.table) deviceStore.table = res2.data.table
         return true
       }
     } catch (err2: any) {
@@ -398,16 +398,16 @@ const saveTableOverride = async () => {
 
   try {
     // If device is registered on backend, attempt to persist the table assignment
-    if (deviceStore.device?.value?.id) {
+    if (deviceStore.device?.id) {
       const { useApi } = await import('~/composables/useApi')
       const api = useApi()
       // Attempt to update device's table by PUT /api/devices/{id}
       // UpdateDeviceRequest requires: name (required), ip_address (required), table_id (nullable)
       const asNum = Number(tableOverride.value)
       const payload: any = {
-        name: deviceStore.device.value.name || '',
-        ip_address: deviceStore.device.value.ip_address || '',
-        port: deviceStore.device.value.port ?? null,
+        name: deviceStore.device.name || '',
+        ip_address: deviceStore.device.ip_address || '',
+        port: deviceStore.device.port ?? null,
       }
 
       if (!Number.isNaN(asNum) && asNum > 0) {
@@ -415,20 +415,20 @@ const saveTableOverride = async () => {
       }
 
       try {
-        const resp = await api.put(`/api/devices/${deviceStore.device.value.id}`, payload)
+        const resp = await api.put(`/api/devices/${deviceStore.device.id}`, payload)
         if (resp?.data) {
           // Update local store with returned device/table if provided
-          if (resp.data.device) deviceStore.device.value = resp.data.device
-          if (resp.data.table) deviceStore.table.value = resp.data.table
+          if (resp.data.device) deviceStore.device = resp.data.device
+          if (resp.data.table) deviceStore.table = resp.data.table
         }
       } catch (err) {
         logger.warn('Persisting table override failed:', err)
         // Even if persistence fails, update local UI so staff can continue
-        deviceStore.table.value = { id: asNum > 0 ? asNum : null, name: tableOverride.value } as any
+        deviceStore.table = { id: asNum > 0 ? asNum : null, name: tableOverride.value } as any
       }
     } else {
       // Not registered: just update local store for immediate effect
-      deviceStore.table.value = { id: null, name: tableOverride.value } as any
+      deviceStore.table = { id: null, name: tableOverride.value } as any
     }
 
     editingTable.value = false
