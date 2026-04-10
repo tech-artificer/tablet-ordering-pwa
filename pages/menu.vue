@@ -516,7 +516,7 @@ async function confirmOrder() {
 
 <template>
   <NuxtErrorBoundary @error="(e: Error) => { logger.error('[Menu] Uncaught page error:', e) }">
-    <div class="flex h-screen bg-gradient-to-br from-secondary via-accent to-secondary-dark text-white">
+    <div class="flex h-screen bg-app-grid text-white">
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden">

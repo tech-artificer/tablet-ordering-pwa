@@ -379,6 +379,28 @@ body {
 }
 
 /* ============================================
+   GRILL GRID BACKGROUND SYSTEM
+   Grid lines at 40px (5 × 8pt) — grill grate motif
+   ============================================ */
+
+/* Neutral dark base + grid (layouts, menu, settings) */
+.bg-app-grid {
+  background-color: #0D0D0D;
+  background-image:
+    repeating-linear-gradient(rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px);
+}
+
+/* Warm dark gradient + grid (welcome, order flows) */
+.bg-screen-base {
+  background-color: #0F0F0F;
+  background-image:
+    repeating-linear-gradient(rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
+    linear-gradient(to bottom right, #0F0F0F, #1A1A1A, #3D3530);
+}
+
+/* ============================================
    SAFE AREA PADDING (for notched devices)
    ============================================ */
 .safe-area-top {

@@ -35,15 +35,15 @@ if (import.meta.client) {
 </script>
 
 <template>
-  <div class="min-h-screen min-w-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-hidden">
+  <div class="min-h-screen min-w-screen flex items-center justify-center bg-app-grid overflow-hidden">
     <Transition name="slide-left" mode="out-in" appear>
       <div :key="route.path" class="h-screen w-screen z-10 safe-area-top safe-area-bottom">
         <slot />
       </div>
     </Transition>
     
-    <!-- Ambient flame effect -->
-    <div class="absolute inset-0 pointer-events-none z-5">
+    <!-- Ambient flame effect (z-20 = above page content; pointer-events-none = non-interactive) -->
+    <div class="absolute inset-0 pointer-events-none z-20">
       <img
         v-if="showFlame"
         :src="flameSrc"
@@ -53,7 +53,7 @@ if (import.meta.client) {
         height="900"
         loading="lazy"
         decoding="async"
-        class="absolute opacity-60 p-0 m-0 w-full h-full z-3 object-cover"
+        class="absolute opacity-30 p-0 m-0 w-full h-full object-cover mix-blend-screen"
         aria-hidden="true"
         @error="showFlame = false"
       />

@@ -212,7 +212,7 @@ function handleTouchEnd() {
 <template>
   <div class="relative h-screen w-screen flex flex-col overflow-hidden">
     <!-- Warm Background -->
-    <div class="absolute inset-0 bg-gradient-to-br from-secondary-dark via-secondary to-accent-warm opacity-90"></div>
+    <div class="absolute inset-0 bg-screen-base"></div>
 
     <!-- Content -->
     <div class="relative z-10 flex flex-col h-full p-6 gap-6">

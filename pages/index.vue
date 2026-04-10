@@ -1,7 +1,7 @@
 <template>
   <div class="relative h-screen w-screen flex flex-col overflow-hidden">
     <!-- Warm gradient background -->
-    <div class="absolute inset-0 bg-gradient-to-br from-secondary-dark via-secondary to-accent-warm opacity-90"></div>
+    <div class="absolute inset-0 bg-screen-base"></div>
 
     <!-- Radial glow at center -->
     <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(246,181,109,0.06) 0%, transparent 70%)"></div>

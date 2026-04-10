@@ -586,7 +586,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-screen overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-6">
+  <div class="h-screen overflow-y-auto bg-app-grid text-white p-6">
     <div class="max-w-4xl mx-auto pb-12">
       
       <!-- Header -->

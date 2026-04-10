@@ -32,7 +32,7 @@ const goBack = () => {
 <template>
   <div class="relative h-screen w-screen flex flex-col items-center justify-center overflow-hidden">
     <!-- Warm background -->
-    <div class="absolute inset-0 bg-gradient-to-br from-secondary-dark via-secondary to-accent-warm opacity-90"></div>
+    <div class="absolute inset-0 bg-screen-base"></div>
     
     <!-- Back Button -->
     <button 
