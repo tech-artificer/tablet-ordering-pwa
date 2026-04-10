@@ -36,6 +36,13 @@ export default defineNuxtConfig({
         '@vueuse/motion/nuxt'
     ],
     
+    components: [
+        {
+            path: '~/components',
+            pathPrefix: false, // Allow <cart-sidebar> instead of <OrderCartSidebar>
+        }
+    ],
+    
     typescript: {
         strict: false,
         typeCheck: false
@@ -129,13 +136,13 @@ export default defineNuxtConfig({
         
         client: {
             installPrompt: true,
-            periodicSyncForUpdates: 50,
+            periodicSyncForUpdates: 3600,
         },
     },
     
     vite: {
         build: {
-            chunkSizeWarningLimit: 1800,
+                chunkSizeWarningLimit: 1200,
         },
         // Ensure Vite dev server listens on network interfaces and allow
         // HMR to be configured via environment variables when testing on LAN.

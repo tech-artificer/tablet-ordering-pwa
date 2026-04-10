@@ -52,29 +52,22 @@ export default defineNuxtPlugin((nuxtApp: any) => {
             headers.Authorization = `Bearer ${token}`
         }
 
-        // Dynamically select protocol based on current page
-        // Always select protocol based on browser context, not .env
-        let wsProtocol = 'ws';
-        let forceTLS = false;
-        let wsPort = config.public.reverb.port;
-        let wssPort = config.public.reverb.port;
-        
-        if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-            wsProtocol = 'wss';
-            forceTLS = true;
-            // When HTTPS, connect via nginx proxy (port 8000) for TLS termination
-            wsPort = 8000;
-            wssPort = 8000;
-        }
+        // Use runtime-configured Reverb proxy settings.
+        // nginx terminates TLS on 8443 and proxies /app to the local Reverb server.
+        // Do not override to 8000 here; that stale port causes browser WebSocket failures.
+        const forceTLS = String(config.public.reverb.scheme || '').toLowerCase() === 'https'
+        const wsProtocol = forceTLS ? 'wss' : 'ws'
+        const wsPort = Number(config.public.reverb.port)
+        const wssPort = Number(config.public.reverb.port)
         
         logger.info(`[Echo] Connecting to Reverb: ${wsProtocol}://${reverbHost}:${wsPort}/reverb`)
 
         // Log Reverb configuration
-        console.log('[🔴 Echo Init] Config:', {
+        logger.info('[Echo Init] Config:', {
             key: config.public.reverb.appKey?.substring(0, 8) + '...',
             host: reverbHost,
             wsPort,
-            forceTLS: String(config.public.reverb.scheme || '').toLowerCase() === 'https',
+            forceTLS,
             authEndpoint,
             hasAuthToken: !!token,
             timestamp: new Date().toISOString()
@@ -84,10 +77,9 @@ export default defineNuxtPlugin((nuxtApp: any) => {
             broadcaster: 'reverb',
             key: config.public.reverb.appKey,
             wsHost: reverbHost,
-            wsPort: wsPort,
-            wssPort: wssPort,
-            // set forceTLS based on scheme if provided
-            forceTLS: String(config.public.reverb.scheme || '').toLowerCase() === 'https',
+            wsPort,
+            wssPort,
+            forceTLS,
             disableStats: true,
             enabledTransports: ['ws', 'wss'],
             authEndpoint,
@@ -105,22 +97,38 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         // Provide via Nuxt injection
         nuxtApp.provide('echo', echo)
 
+        // Clean up WebSocket connection when the app is unmounting to avoid
+        // dangling socket connections on page reload / navigation away.
+        nuxtApp.hook('app:beforeUnmount', () => {
+            try {
+                echo?.disconnect?.()
+                if (typeof window !== 'undefined') {
+                    delete (window as any).Echo
+                    delete (window as any).$echo
+                    delete (window as any).updateEchoAuth
+                }
+                logger.info('[Echo] Disconnected on app unmount')
+            } catch (e) {
+                logger.warn('[Echo] Disconnect on unmount failed', e)
+            }
+        })
+
         // Monitor connection state
         if (echo && (echo as any).connector) {
             const connector = (echo as any).connector
-            console.log('[✅ Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
+            logger.info('[Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
             
             // Hook into connection success/failure if available
             try {
                 if (typeof connector.socket?.on === 'function') {
                     connector.socket.on('connect', () => {
-                        console.log('[🟢 Echo Connected] WebSocket connected at', new Date().toISOString())
+                        logger.info('[Echo Connected] WebSocket connected at ' + new Date().toISOString())
                     })
                     connector.socket.on('disconnect', () => {
-                        console.log('[🔴 Echo Disconnected] WebSocket disconnected at', new Date().toISOString())
+                        logger.warn('[Echo Disconnected] WebSocket disconnected at ' + new Date().toISOString())
                     })
                     connector.socket.on('error', (err: any) => {
-                        console.error('[🔴 Echo Error]', err?.message || err, 'at', new Date().toISOString())
+                        logger.error('[Echo Error] ' + (err?.message || err) + ' at ' + new Date().toISOString())
                     })
                 }
             } catch (e) {
@@ -143,10 +151,10 @@ export default defineNuxtPlugin((nuxtApp: any) => {
                     if (bearer) (window as any).Echo.connector.options.auth.headers.Authorization = bearer
                     else delete (window as any).Echo.connector.options.auth.headers.Authorization
                 }
-                console.log('[📡 Echo Auth Updated] Bearer token', newToken ? 'SET' : 'CLEARED', 'at', new Date().toISOString())
+                logger.info('[Echo Auth Updated] Bearer token ' + (newToken ? 'SET' : 'CLEARED') + ' at ' + new Date().toISOString())
             } catch (e) {
                 logger.warn('[Echo] updateEchoAuth failed', e)
-                console.error('[❌ Echo Auth Update Failed]', e)
+                logger.error('[Echo Auth Update Failed]', e)
             }
         }
 

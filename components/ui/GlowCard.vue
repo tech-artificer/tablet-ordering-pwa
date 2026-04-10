@@ -6,7 +6,7 @@
       'bg-gradient-to-br from-primary/10 to-primary/5',
       'shadow-glow transition-all duration-300',
       'hover:shadow-lg hover:border-primary/60',
-      className
+      $attrs.class
     ]"
   >
     <slot />
@@ -14,11 +14,5 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps({ 
-  className: { type: String, default: '' } 
-})
+defineOptions({ inheritAttrs: false })
 </script>
-
-<style scoped>
-/* Warm glow effect for cards */
-</style>

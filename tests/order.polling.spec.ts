@@ -101,4 +101,23 @@ describe('order polling fallback', () => {
 
     await expect(order.submitOrder()).rejects.toThrow('An initial order has already been placed')
   })
+
+  it('does not crash when polling receives an empty response body', async () => {
+    const order = useOrderStore()
+
+    mockGet
+      .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing' } } })
+      .mockResolvedValueOnce(undefined as any)
+
+    await order.setOrderCreated({ order: { id: 19561, order_number: 'ORD-19561' } })
+
+    expect(order.getIsPolling()).toBe(true)
+
+    vi.advanceTimersByTime(6000)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(order.getIsPolling()).toBe(true)
+    expect(order.getCurrentOrder()?.order?.status).toBe('preparing')
+  })
 })

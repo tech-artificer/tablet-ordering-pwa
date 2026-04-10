@@ -2,7 +2,7 @@
 import { useOrderStore } from '../../stores/Order'
 import { ShoppingBasket } from 'lucide-vue-next'
 const orderStore = useOrderStore()
-const cartCount = computed(() => orderStore.cartItems.reduce((s,i)=>s+(i.quantity||1),0))
+const cartCount = computed(() => (((orderStore.cartItems as any)?.value ?? orderStore.cartItems ?? []) as any[]).reduce((sum, item) => sum + (item.quantity || 1), 0))
 const emit = defineEmits(['open-cart'])
 const openCart = () => emit('open-cart')
 </script>

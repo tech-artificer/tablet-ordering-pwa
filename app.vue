@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { useDeviceStore } from '~/stores/Device'
+import { useSessionStore } from '~/stores/Session'
 import { useBroadcasts } from '~/composables/useBroadcasts'
 import { useNetworkStatus } from '~/composables/useNetworkStatus'
+import { useOfflineOrderQueue } from '~/composables/useOfflineOrderQueue'
 import { logger } from '~/utils/logger'
 
 const router = useRouter()
+const route = useRoute()
 const nuxtApp = useNuxtApp()
 const deviceStore = useDeviceStore()
+const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
+const { registerOnlineListener } = useOfflineOrderQueue()
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
+
+// Sleep/wake tracking
+let hiddenSince: number | null = null
+const FORCE_REINIT_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
 
 // Initialize network status monitoring
 useNetworkStatus()
@@ -82,15 +91,15 @@ async function resolveAuthenticationState(): Promise<boolean> {
   }
 
   if (PUBLIC_ROUTES.includes(currentRoute)) {
-    return deviceStore.isAuthenticated
+    return deviceStore.isAuthenticated.value
   }
 
   await checkAuthentication()
-  return deviceStore.isAuthenticated
+  return deviceStore.isAuthenticated.value
 }
 
 function scheduleBroadcastInitialization(): void {
-  if (!deviceStore.isAuthenticated) {
+  if (!deviceStore.isAuthenticated.value) {
     return
   }
 
@@ -101,6 +110,35 @@ function scheduleBroadcastInitialization(): void {
   broadcastTimer = setTimeout(() => {
     initializeBroadcasts()
   }, 1000)
+}
+
+async function handleVisibilityChange(): Promise<void> {
+  if (typeof document === 'undefined') return
+
+  if (document.hidden) {
+    hiddenSince = Date.now()
+    return
+  }
+
+  // Device woke up
+  const hiddenDurationMs = hiddenSince !== null ? Date.now() - hiddenSince : 0
+  hiddenSince = null
+
+  logger.info(`[App] Wake detected after ${Math.round(hiddenDurationMs / 1000)}s`)
+
+  if (!deviceStore.isAuthenticated.value || !sessionStore.isActive) return
+
+  if (hiddenDurationMs >= FORCE_REINIT_THRESHOLD_MS) {
+    // After long sleep, force a full Echo teardown and re-init so channels
+    // re-subscribe and missed events are replayed. Short sleeps rely on
+    // useBroadcasts' auto-reconnect (Mission-7 Task 1.7).
+    logger.warn('[App] Wake after >5min — forcing full broadcast re-init')
+    cleanup()
+  }
+
+  initializeBroadcasts()
+  // Note: session sync + order polling restart on wake are handled by
+  // Session.ts _onVisibilityChange — no duplication needed here.
 }
 
 onMounted(async () => {
@@ -114,6 +152,13 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+  // Register global online event listener to drain the offline order queue
+  registerOnlineListener()
+
+  // Register sleep/wake handler
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
 })
 
 onUnmounted(() => {
@@ -122,6 +167,10 @@ onUnmounted(() => {
   }
 
   cleanup()
+
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
 })
 </script>
 
@@ -132,7 +181,7 @@ onUnmounted(() => {
     <NetworkStatus />
 
     <Transition name="page-fade" mode="out-in">
-      <NuxtPage :key="$route.path" />
+      <NuxtPage :key="route.path" />
     </Transition>
   </NuxtLayout>
 </template>

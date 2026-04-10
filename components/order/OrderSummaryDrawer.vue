@@ -4,6 +4,7 @@ import { formatCurrency } from '../../utils/formats'
 import type { PropType } from 'vue'
 import { useDeviceStore } from '../../stores/Device'
 import { useSessionStore } from '../../stores/Session'
+import { Flame, RefreshCw, X } from 'lucide-vue-next'
 
 const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()
@@ -59,41 +60,15 @@ function onRequestSupport() {
 <template>
   <el-drawer 
     v-model="visible" 
-    :title="isRefillMode ? '🔄 Confirm Refill Order' : '🔥 Confirm Order'" 
+    :title="isRefillMode ? 'Confirm Refill Order' : 'Confirm Order'" 
     size="28rem" 
     direction="rtl"
     :with-header="true"
   >
     <div class="h-full flex flex-col items-center justify-center text-white bg-gradient-to-b from-secondary via-secondary-dark to-black p-6">
-      
-      <!-- Countdown Mode -->
-      <div v-if="isCountingDown" class="text-center space-y-6">
-        <div class="relative">
-          <div class="text-9xl font-bold text-primary animate-pulse-scale">{{ countdown }}</div>
-          <div class="absolute inset-0 blur-3xl bg-primary/30 animate-pulse"></div>
-        </div>
-        <p class="text-xl text-white/90 font-medium">
-          Order will be placed in {{ countdown }}...
-        </p>
-        <p class="text-sm text-white/60">Cancel now to stop, or modify your order.</p>
-        <div class="flex gap-4 justify-center mt-8">
-          <button
-            @click="onCancel"
-            class="px-8 py-4 min-h-[44px] rounded-xl font-bold text-lg transition-all bg-red-500/20 text-red-400 border-2 border-red-500/30 hover:bg-red-500/30 active:scale-95 shadow-lg hover:shadow-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400"
-          >
-            ✕ Cancel
-          </button>
-          <button
-            @click="onModify"
-            class="px-8 py-4 min-h-[44px] rounded-xl font-bold text-lg transition-all bg-yellow-500/20 text-yellow-400 border-2 border-yellow-500/30 hover:bg-yellow-500/30 active:scale-95 shadow-lg hover:shadow-yellow-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
-          >
-            ✎ Review Order
-          </button>
-        </div>
-      </div>
 
-      <!-- Confirmation Mode (fallback if not counting down) -->
-      <div v-else class="w-full space-y-6">
+      <!-- Confirmation Mode -->
+      <div class="w-full space-y-6">
         
         <!-- Total Amount - Large Display -->
         <div class="text-center space-y-4 py-8">
@@ -141,14 +116,16 @@ function onRequestSupport() {
           <button
             @click="onConfirm"
             :disabled="isSubmitting"
-            class="flex-1 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-primary to-primary-dark text-white hover:shadow-2xl active:scale-95 hover:from-primary-dark hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="flex-1 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-primary to-primary-dark text-secondary hover:shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary flex items-center justify-center gap-2"
           >
-            {{ isRefillMode ? '🔄 Confirm Refill' : '🔥 Confirm Order' }}
+            <component :is="isRefillMode ? RefreshCw : Flame" :size="22" stroke-width="2" class="flex-shrink-0" />
+            {{ isRefillMode ? 'Confirm Refill' : 'Confirm Order' }}
           </button>
           <button
             @click="onCancel"
-            class="px-8 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 bg-white/10 text-white hover:bg-white/20 active:scale-95 border-2 border-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            class="px-8 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 bg-white/10 text-white hover:bg-white/20 active:scale-95 border-2 border-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white flex items-center justify-center gap-2"
           >
+            <X :size="20" stroke-width="2.5" />
             Cancel
           </button>
         </div>

@@ -81,4 +81,19 @@ describe('stores/order - submitOrder', () => {
     // ensure cartItems remain unchanged on failure
     expect(order.getCartItems().length).toBeGreaterThan(0)
   })
+
+  it('fails cleanly when order creation response body is empty', async () => {
+    const order = useOrderStore()
+
+    order.setPackage({ id: 1, name: 'Combo', price: 100, is_taxable: false } as Package)
+    order.setGuestCount(2)
+    order.setCartItems([
+      { id: 9, name: 'Wagyu Beef', price: 0, quantity: 1, category: 'meats', isUnlimited: false } as CartItem,
+    ])
+
+    mockPost.mockResolvedValueOnce(undefined as any)
+
+    await expect(order.submitOrder()).rejects.toThrow('Order creation response missing body')
+    expect(order.getCartItems().length).toBe(1)
+  })
 })

@@ -45,7 +45,8 @@ const goBack = () => {
 </script>
 
 <template>
-  <div class="relative h-screen w-screen flex flex-col overflow-hidden">
+  <NuxtErrorBoundary @error="(e: Error) => { console.error('[Review] Uncaught page error:', e) }">
+    <div class="relative h-screen w-screen flex flex-col overflow-hidden">
     <!-- Warm Background -->
     <div class="absolute inset-0 bg-gradient-to-br from-secondary-dark via-secondary to-accent-warm opacity-90"></div>
 
@@ -74,4 +75,15 @@ const goBack = () => {
       </div>
     </div>
   </div>
+    <template #error="{ error, clearError }">
+      <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
+        <p class="text-xl font-bold text-red-400">Something went wrong</p>
+        <p class="text-sm text-gray-400 text-center max-w-sm">{{ error?.message || 'An unexpected error occurred.' }}</p>
+        <button
+          class="px-6 py-3 bg-primary text-black font-semibold rounded-xl hover:opacity-90 transition"
+          @click="clearError()"
+        >Try Again</button>
+      </div>
+    </template>
+  </NuxtErrorBoundary>
 </template>

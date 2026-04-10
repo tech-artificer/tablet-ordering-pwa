@@ -3,6 +3,8 @@ import { logger } from '~/utils/logger'
 export default defineNuxtPlugin(async (nuxtApp) => {
   const menuStore = useMenuStore()
   const deviceStore = useDeviceStore()
+  let refreshInterval: ReturnType<typeof setInterval> | null = null
+  let inflightRefresh = false
 
   const loadMenus = async (forceRefresh = false) => {
     if (!deviceStore.isAuthenticated) {
@@ -26,19 +28,33 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   })
 
   if (import.meta.client) {
-    const refreshInterval = setInterval(async () => {
-      if (deviceStore.isAuthenticated && menuStore.isCacheStale && !document.hidden) {
+    const refreshTick = async () => {
+      if (inflightRefresh) return
+      if (!deviceStore.isAuthenticated || !menuStore.isCacheStale || document.hidden) return
+
+      inflightRefresh = true
+      try {
         await loadMenus()
         logger.debug('Menu data auto-refreshed')
+      } finally {
+        inflightRefresh = false
       }
-    }, 30 * 60 * 1000)
+    }
 
-    window.addEventListener('beforeunload', () => {
-      clearInterval(refreshInterval)
-    })
+    refreshInterval = setInterval(refreshTick, 30 * 60 * 1000)
 
-    nuxtApp.hook('app:beforeMount', () => {
-      // Hook runs before app remounts, good for cleanup
+    const onBeforeUnload = () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+        refreshInterval = null
+      }
+    }
+
+    window.addEventListener('beforeunload', onBeforeUnload)
+
+    nuxtApp.hook('app:beforeUnmount', () => {
+      onBeforeUnload()
+      window.removeEventListener('beforeunload', onBeforeUnload)
     })
   }
 })

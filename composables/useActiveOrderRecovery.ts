@@ -15,8 +15,14 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
   }
 
   const orderResp = orderStore.getCurrentOrder()
-  const orderObj = orderResp?.order || orderResp
+  const orderObj = ((orderResp?.order || orderResp) as any) || null
   const orderId = orderObj?.order_id || orderObj?.id || sessionStore.getOrderId()
+  const packageId = Number(
+    orderStore.getPackage?.value?.id
+      || orderObj?.package_id
+      || orderObj?.menu_id
+      || 0
+  ) || null
   const status = String(orderObj?.status || '').toLowerCase()
   const hasSessionFlag = sessionStore.getIsActive() || (typeof window !== 'undefined' && window.localStorage?.getItem('session_active') === '1')
 
@@ -25,6 +31,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
       hasActiveOrder: false,
       isTerminal: false,
       orderId: null,
+      packageId,
       status,
     }
   }
@@ -47,6 +54,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
       hasActiveOrder: false,
       isTerminal: false,
       orderId,
+      packageId,
       status,
     }
   }
@@ -66,6 +74,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
       hasActiveOrder: false,
       isTerminal: true,
       orderId,
+      packageId,
       status,
     }
   }
@@ -79,6 +88,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
     hasActiveOrder: true,
     isTerminal: false,
     orderId,
+    packageId,
     status,
   }
 }

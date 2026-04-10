@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "npx nuxi dev --host 0.0.0.0",
     "test": "vitest",
-    "build": "npx nuxi build",
-    "generate": "npx nuxi build && npx nuxi generate && node -e \"const fs=require('fs'), path=require('path'); const src='.output/public', dst='public'; fs.existsSync(src) && fs.cpSync(src, dst, {recursive: true, force: true})\"",
+    "build": "node scripts/clean-generated-public.mjs && npx nuxi build && npx nuxi generate && node scripts/verify-dist-assets.mjs",
+    "pregenerate": "node scripts/clean-generated-public.mjs",
+    "generate": "npx nuxi build && npx nuxi generate && node scripts/verify-dist-assets.mjs",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "npx nuxi typecheck",

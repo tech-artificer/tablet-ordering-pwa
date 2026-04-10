@@ -15,14 +15,16 @@ const formData = ref({
 })
 const localIp = ref<string | null>(null)
 
-const isLoading = computed(() => deviceStore.isLoading)
-const hasError = computed(() => !!deviceStore.errorMessage)
-const errorMessage = computed(() => deviceStore.errorMessage)
+const isLoading = computed(() => Boolean(deviceStore.isLoading))
+const errorMessage = computed(() => String(deviceStore.errorMessage || ''))
+const hasError = computed(() => Boolean(errorMessage.value))
 const registered = ref(false)
 const attempted = ref(false)
 
-const waitingForTable = computed(() => deviceStore.waitingForTable)
-const isPolling = computed(() => !!(deviceStore.isPollingForTable))
+const waitingForTable = computed(() => Boolean(deviceStore.waitingForTable))
+const isPolling = computed(() => Boolean(deviceStore.isPollingForTable))
+const hasToken = computed(() => Boolean(deviceStore.token))
+const suggestedDeviceName = computed(() => String(localIp.value || (typeof window !== 'undefined' ? window.location.hostname : 'kiosk') || 'kiosk').replace(/[^a-zA-Z0-9.\-]/g, '').replace(/\./g, '-'))
 
 const checkForTable = async () => {
   try {
@@ -33,7 +35,7 @@ const checkForTable = async () => {
       // stop polling if running and navigate away
       try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
       registered.value = true
-      deviceStore.waitingForTable = false
+      ;(deviceStore as any).waitingForTable = false
       try {
         const currentPath = router.currentRoute?.value?.path
         if (currentPath !== '/settings') await router.replace('/')
@@ -57,7 +59,7 @@ watch(
       try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
       // mark registered and navigate after short delay
       registered.value = true
-      deviceStore.waitingForTable = false
+      ;(deviceStore as any).waitingForTable = false
       setTimeout(async () => {
         try {
           const currentPath = router.currentRoute?.value?.path
@@ -70,7 +72,7 @@ watch(
 
 const resetRegistration = () => {
   registered.value = false
-  deviceStore.errorMessage = null
+  ;(deviceStore as any).errorMessage = null
   formData.value.deviceCode = ''
   formData.value.deviceName = ''
 }
@@ -121,7 +123,7 @@ const handleRegistration = async () => {
       const t = deviceStore.table as any
       if (t && (t.id || t.name)) {
         registered.value = true
-        deviceStore.waitingForTable = false
+        ;(deviceStore as any).waitingForTable = false
         try {
           const currentPath = router.currentRoute?.value?.path
           if (currentPath !== '/settings') await router.replace('/')
@@ -140,17 +142,17 @@ const handleRegistration = async () => {
   // If not inline, require a device name; inline mode keeps the UI compact and
   // only requires the code so registration can proceed from Settings quickly.
   if (!props.inline && !formData.value.deviceName) {
-    deviceStore.errorMessage = 'Device name is required.'
+    ;(deviceStore as any).errorMessage = 'Device name is required.'
     return
   }
 
   if (!formData.value.deviceCode) {
-    deviceStore.errorMessage = 'Device code is required.'
+    ;(deviceStore as any).errorMessage = 'Device code is required.'
     return
   }
 
   // Clear previous errors
-  deviceStore.errorMessage = null
+  ;(deviceStore as any).errorMessage = null
 
   try {
     const payload: any = { code: formData.value.deviceCode, name: formData.value.deviceName }
@@ -161,7 +163,7 @@ const handleRegistration = async () => {
     // If registration returned a device (with or without token), mark as registered; table may still be pending.
     if (deviceStore.device) {
       registered.value = true
-      deviceStore.errorMessage = null
+      ;(deviceStore as any).errorMessage = null
 
       // If table assigned already, navigate away
       const tableId = (deviceStore.table && (deviceStore.table as any).id) || (deviceStore.table && (deviceStore.table as any).value?.id)
@@ -177,7 +179,7 @@ const handleRegistration = async () => {
         // remain on page; show refresh button to check assignment
       }
     } else {
-      deviceStore.errorMessage = 'Registration succeeded but device details missing from server response. Please contact management.'
+      ;(deviceStore as any).errorMessage = 'Registration succeeded but device details missing from server response. Please contact management.'
     }
   } catch (error) {
     // Error is already set in deviceStore.errorMessage by the register action
@@ -204,23 +206,23 @@ const handleRegistration = async () => {
                 <div class="grid gap-3">
                   <el-form-item label="Device Name" required>
                     <el-input v-model="formData.deviceName" placeholder="e.g. Table 4 - Kiosk" size="large"
-                      class="w-full text-lg font-kanit" :class="{ 'border-red-500': hasError }" :disabled="registered || deviceStore.token" />
+                      class="w-full text-lg font-kanit" :class="{ 'border-red-500': hasError }" :disabled="registered || hasToken" />
                   </el-form-item>
 
                   <el-form-item label="Device Code" required>
                     <el-input v-model="formData.deviceCode" placeholder="e.g. 123456" size="large"
-                      class="w-full text-lg font-kanit" :class="{ 'border-red-500': hasError }" :disabled="registered || deviceStore.token" />
+                      class="w-full text-lg font-kanit" :class="{ 'border-red-500': hasError }" :disabled="registered || hasToken" />
                   </el-form-item>
                 </div>
 
                 <div class="space-y-2">
                   <button
                     class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
-                    @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !formData.deviceCode || registered || deviceStore.token">
-                    <span>{{ isLoading ? 'Registering...' : (registered || deviceStore.token ? 'Registered' : 'Register Device') }}</span>
+                    @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !formData.deviceCode || registered || hasToken">
+                    <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
                   </button>
 
-                  <div v-if="registered || deviceStore.token" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                  <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
                     <p class="text-sm text-white/70 mb-2">Device registered. Waiting for table assignment.</p>
                     <div class="flex gap-2">
                       <button v-if="!isPolling" @click="deviceStore.startTablePolling()" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20">Start Auto-Check</button>
@@ -264,7 +266,7 @@ const handleRegistration = async () => {
       <div class="grid gap-3">
           <div>
             <el-input v-model="formData.deviceCode" placeholder="Enter device code" size="default"
-              class="w-full text-sm" :class="{ 'border-red-500': hasError }" :disabled="registered || deviceStore.token" />
+              class="w-full text-sm" :class="{ 'border-red-500': hasError }" :disabled="registered || hasToken" />
             <p v-if="hasError && attempted" class="mt-2 text-sm text-red-400">{{ errorMessage }}</p>
           </div>
       </div>
@@ -272,10 +274,10 @@ const handleRegistration = async () => {
       <div class="mt-4 flex gap-3">
         <button
           class="flex-1 px-4 py-3 rounded-lg bg-primary text-white border border-primary/40 font-semibold min-h-[44px] hover:opacity-95 transition"
-          @click="handleRegistration()" :disabled="isLoading || !formData.deviceCode || registered || deviceStore.token">
-          <span>{{ isLoading ? 'Registering...' : (registered || deviceStore.token ? 'Registered' : 'Register Device') }}</span>
+          @click="handleRegistration()" :disabled="isLoading || !formData.deviceCode || registered || hasToken">
+          <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
         </button>
-        <button v-if="registered || deviceStore.token" @click="checkForTable" class="px-4 py-3 rounded bg-primary/20 min-h-[44px]">Check for Table</button>
+        <button v-if="registered || hasToken" @click="checkForTable" class="px-4 py-3 rounded bg-primary/20 min-h-[44px]">Check for Table</button>
       </div>
 
       <div v-if="hasError && attempted" class="mt-3">
@@ -285,7 +287,7 @@ const handleRegistration = async () => {
       <div class="mt-3 text-xs text-white/50">
         <div class="flex items-center justify-between">
           <div>Suggested name: <span class="font-mono">{{ formData.deviceName }}</span></div>
-          <button v-if="!formData.deviceName" @click="formData.deviceName = String(localIp || window.location.hostname || 'kiosk').replace(/[^a-zA-Z0-9\.\-]/g, '').replace(/\./g, '-')" class="text-sm text-blue-300">Use suggested</button>
+          <button v-if="!formData.deviceName" @click="formData.deviceName = suggestedDeviceName" class="text-sm text-blue-300">Use suggested</button>
         </div>
       </div>
     </el-form>

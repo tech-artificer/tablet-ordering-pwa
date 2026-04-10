@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import logoSrc from '~/assets/images/logo/woosoo-icon-color.png'
+const logoSrc = new URL('../assets/images/logo/woosoo-icon-color.png', import.meta.url).href
 
 const showLogoImage = ref(true)
 </script>

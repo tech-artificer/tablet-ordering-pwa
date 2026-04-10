@@ -3,6 +3,7 @@ import type { OrderApiResponse } from '../types'
 import { useDeviceStore } from '../stores/Device'
 import { useSessionStore } from '../stores/Session'
 import { useOrderStore } from '../stores/Order'
+import { logger } from '../utils/logger'
 
 /**
  * useRealtimeStatus
@@ -90,9 +91,16 @@ export const useRealtimeStatus = () => {
     latencyMs?: number
   } | null>(null)
 
+  let connectionMonitorInterval: ReturnType<typeof setInterval> | null = null
+
   // Monitor Echo connection state
   const monitorEchoConnection = () => {
     if (typeof window === 'undefined') return
+
+    if (connectionMonitorInterval) {
+      clearInterval(connectionMonitorInterval)
+      connectionMonitorInterval = null
+    }
 
     const checkConnectionState = () => {
       try {
@@ -126,13 +134,13 @@ export const useRealtimeStatus = () => {
           }
         }
       } catch (e) {
-        console.error('[useRealtimeStatus] Failed to check connection state:', e)
+        logger.warn('[useRealtimeStatus] Failed to check connection state:', e)
       }
     }
 
     // Check immediately and then every 2 seconds
     checkConnectionState()
-    setInterval(checkConnectionState, 2000)
+    connectionMonitorInterval = setInterval(checkConnectionState, 2000)
   }
 
   // Monitor subscription state (call this from useBroadcasts)
@@ -147,7 +155,7 @@ export const useRealtimeStatus = () => {
       timestamp: new Date().toISOString(),
       orderId
     }
-    console.log(`[📊 Status] Event received: ${eventType}`)
+    logger.debug(`[RealtimeStatus] Event received: ${eventType}`)
   }
 
   // Monitor polling (call this from Order.ts polling tick)
@@ -194,27 +202,29 @@ export const useRealtimeStatus = () => {
   // Log dashboard to console
   const logStatusDashboard = () => {
     const dashboard = getStatusDashboard()
-    console.log(
-      `%c🔍 REALTIME STATUS DASHBOARD`,
-      `background: #1a1a1a; color: #00ff00; font-weight: bold; font-size: 14px; padding: 5px 10px; border-radius: 3px;`
-    )
-    console.table({
-      'Echo Connected': dashboard.connection.echo ? '✅' : '❌',
-      'WebSocket State': dashboard.connection.state,
-      'Subscriptions Active': dashboard.subscriptions.isAnyActive ? '✅' : '❌',
-      'Device Active': dashboard.device.isActive ? '✅' : '❌',
-      'Has Order': dashboard.order.hasOrder ? '✅' : '❌',
-      'Has Polling': dashboard.order.isPolling ? '✅' : '❌',
-      'Last Event': dashboard.lastEvent?.type || 'none',
-      'Last Polling': dashboard.lastPolling?.timestamp || 'none'
+    logger.info('[RealtimeStatus] Dashboard snapshot', {
+      connection: dashboard.connection,
+      subscriptions: dashboard.subscriptions,
+      device: dashboard.device,
+      order: dashboard.order,
+      lastEvent: dashboard.lastEvent,
+      lastPolling: dashboard.lastPolling,
     })
-    console.log('📊 Full Dashboard:', dashboard)
     return dashboard
   }
 
   // Initialize monitoring
   const initializeMonitoring = () => {
     monitorEchoConnection()
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        if (connectionMonitorInterval) {
+          clearInterval(connectionMonitorInterval)
+          connectionMonitorInterval = null
+        }
+      }, { once: true })
+    }
   }
 
   // Expose status displays for templates

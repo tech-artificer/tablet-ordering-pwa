@@ -39,7 +39,7 @@ import { useSessionStore } from '../stores/Session'
 const PACKAGE = { id: 50, name: 'Yakiniku Combo', price: 250, is_taxable: false }
 const MEAT_ITEM = { id: 10, name: 'Wagyu Beef', price: 0, quantity: 1, category: 'meats' }
 const SIDE_ITEM = { id: 20, name: 'Caesar Salad', price: 30, quantity: 2, category: 'sides' }
-const REFILL_ITEM_1 = { id: 30, name: 'Sparkling Water', price: 0, quantity: 2, category: 'beverages' }
+const REFILL_ITEM_1 = { id: 30, name: 'Sliced Beef', price: 0, quantity: 2, category: 'meats' }
 const REFILL_ITEM_2 = { id: 31, name: 'Garlic Rice', price: 0, quantity: 1, category: 'sides' }
 
 const API_ORDER_RESP = {
@@ -237,7 +237,7 @@ describe('E2E Transaction: Tablet Ordering PWA', () => {
         `/api/order/${API_ORDER_RESP.order.order_id}/refill`,
         {
           items: [
-            { menu_id: 30, name: 'Sparkling Water', quantity: 2, note: 'Refill' },
+            { menu_id: 30, name: 'Sliced Beef', quantity: 2, note: 'Refill' },
             { menu_id: 31, name: 'Garlic Rice', quantity: 1, note: 'Refill' },
           ],
         },
@@ -256,14 +256,14 @@ describe('E2E Transaction: Tablet Ordering PWA', () => {
       order.setHasPlacedOrder(true)
       order.setCurrentOrder(API_ORDER_RESP as any)
       order.setIsRefillMode(true)
-      order.setRefillItems([{ id: 30, name: 'Water', price: 0, quantity: 1, category: 'beverages', note: 'No ice' }] as CartItem[])
+      order.setRefillItems([{ id: 30, name: 'Sliced Beef', price: 0, quantity: 1, category: 'meats', note: 'No sauce' }] as CartItem[])
 
       mockPost.mockResolvedValueOnce({ data: { success: true } })
 
       await order.submitRefill()
 
       const sentItems = mockPost.mock.calls[0][1].items
-      expect(sentItems[0].note).toBe('No ice')
+      expect(sentItems[0].note).toBe('No sauce')
     })
 
     it('throws if no existing order (guard against stale state)', async () => {
@@ -444,7 +444,7 @@ describe('E2E Transaction: Tablet Ordering PWA', () => {
       // Verify refill called correct URL with name field present
       const refillCall = mockPost.mock.calls[1]
       expect(refillCall[0]).toBe(`/api/order/19561/refill`)
-      expect(refillCall[1].items[0].name).toBe('Sparkling Water')
+      expect(refillCall[1].items[0].name).toBe('Sliced Beef')
 
       // Step 3: session teardown
       try { localStorage.setItem('session_active', '1') } catch (_) {}

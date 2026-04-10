@@ -116,16 +116,16 @@ export const useDeviceStore = defineStore('device', () => {
 
             if (state.device && state.token && state.table) {
                 const authMs = (performance.now() - authStart).toFixed(1)
-                console.log(`[✅ Device Authenticated] device_id=${state.device.id} table_id=${state.table?.id} table_name=${state.table?.name} latency=${authMs}ms at ${new Date().toISOString()}`)
+                logger.info(`[Device] Authenticated device_id=${state.device.id} table_id=${state.table?.id} table_name=${state.table?.name} latency=${authMs}ms at ${new Date().toISOString()}`)
                 logger.info(`[Device] Authenticated as device_id=${state.device.id}`)
                 state.waitingForTable = false
                 return true
             }
 
-            console.log(`[⚠️ Device Auth Failed] Incomplete response at ${new Date().toISOString()}`)
+            logger.warn(`[Device] Auth failed: incomplete response at ${new Date().toISOString()}`)
             return false
         } catch (error: any) {
-            console.error(`[❌ Device Auth Error] ${error?.message} at ${new Date().toISOString()}`)
+            logger.error(`[Device] Auth error ${error?.message} at ${new Date().toISOString()}`)
             logger.error('[DeviceStore] Authentication failed:', error)
             state.errorMessage = error?.response?.data?.message || 'Authentication failed'
             return false

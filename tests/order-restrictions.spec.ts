@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useOrderStore } from '../stores/order';
-import { useSessionStore } from '../stores/session';
+import { useOrderStore } from '../stores/Order';
+import { useSessionStore } from '../stores/Session';
 
 /**
  * Frontend unit tests for order restriction logic.
@@ -20,7 +20,7 @@ describe('Order Restrictions (Frontend)', () => {
 
   describe('hasPlacedOrder flag persistence', () => {
     it('should persist hasPlacedOrder flag across store resets', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Initial state
       expect(store.hasPlacedOrder).toBe(false);
@@ -34,7 +34,7 @@ describe('Order Restrictions (Frontend)', () => {
     });
 
     it('should prevent order placement when hasPlacedOrder is true', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Simulate order already placed
       store.hasPlacedOrder = true;
@@ -48,7 +48,7 @@ describe('Order Restrictions (Frontend)', () => {
 
   describe('Refill mode enforcement', () => {
     it('should toggle refill mode only when order is placed', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Should NOT be in refill mode initially
       expect(store.isRefillMode).toBe(false);
@@ -68,7 +68,7 @@ describe('Order Restrictions (Frontend)', () => {
     });
 
     it('should clear cart items when switching to refill mode', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Add some regular items
       store.addToCart({
@@ -77,7 +77,7 @@ describe('Order Restrictions (Frontend)', () => {
         price: 5,
         quantity: 2,
         img_url: '',
-      });
+      } as any);
       
       expect(store.cartItems.length).toBeGreaterThan(0);
       
@@ -91,7 +91,7 @@ describe('Order Restrictions (Frontend)', () => {
     });
 
     it('should keep refill items separate from regular cart', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Add regular item to cart
       store.addToCart({
@@ -100,7 +100,7 @@ describe('Order Restrictions (Frontend)', () => {
         price: 5,
         quantity: 1,
         img_url: '',
-      });
+      } as any);
       
       // Switch to refill mode
       store.hasPlacedOrder = true;
@@ -113,7 +113,7 @@ describe('Order Restrictions (Frontend)', () => {
         price: 0,
         quantity: 2,
         img_url: '',
-      });
+      } as any);
       
       // Verify items are isolated
       // (actual implementation may vary based on store design)
@@ -123,7 +123,7 @@ describe('Order Restrictions (Frontend)', () => {
 
   describe('Order history tracking', () => {
     it('should track submitted items after order placement', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Add items to cart
       store.addToCart({
@@ -132,7 +132,7 @@ describe('Order Restrictions (Frontend)', () => {
         price: 0,
         quantity: 1,
         img_url: '',
-      });
+      } as any);
       
       // Simulate order submission
       store.hasPlacedOrder = true;
@@ -145,7 +145,7 @@ describe('Order Restrictions (Frontend)', () => {
 
   describe('Cart clearing behavior', () => {
     it('should clear cart after successful order submission', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Add items
       store.addToCart({
@@ -154,7 +154,7 @@ describe('Order Restrictions (Frontend)', () => {
         price: 5,
         quantity: 2,
         img_url: '',
-      });
+      } as any);
       
       const itemCountBefore = store.cartItems.length;
       expect(itemCountBefore).toBeGreaterThan(0);
@@ -171,8 +171,8 @@ describe('Order Restrictions (Frontend)', () => {
 
   describe('Session ID population', () => {
     it('should populate orderId in session store after order placement', () => {
-      const sessionStore = useSessionStore();
-      const orderStore = useOrderStore();
+      const sessionStore: any = useSessionStore();
+      const orderStore: any = useOrderStore();
       
       // Initially no orderId
       expect(sessionStore.orderId).toBeFalsy();
@@ -187,8 +187,8 @@ describe('Order Restrictions (Frontend)', () => {
     });
 
     it('should wait for orderId before allowing refill toggle', async () => {
-      const sessionStore = useSessionStore();
-      const orderStore = useOrderStore();
+      const sessionStore: any = useSessionStore();
+      const orderStore: any = useOrderStore();
       
       // Mark order as placed but no orderId yet (simulating server delay)
       orderStore.hasPlacedOrder = true;
@@ -208,7 +208,7 @@ describe('Order Restrictions (Frontend)', () => {
 
   describe('State reset on guest change', () => {
     it('should reset order flags when guest count changes', () => {
-      const store = useOrderStore();
+      const store: any = useOrderStore();
       
       // Place order
       store.hasPlacedOrder = true;

@@ -151,6 +151,17 @@ export default defineNuxtPlugin(() => {
         }
       }
 
+      // Handle timeout / network-level errors before generic path
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        logger.error('⏱️ API Request timed out:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          timeout: error.config?.timeout,
+          message: error.message
+        })
+        return Promise.reject(error)
+      }
+
       logger.error('❌ API Error:', {
         url: error.config?.url,
         method: error.config?.method,

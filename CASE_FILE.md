@@ -1,10 +1,236 @@
+# CASE_FILE: Menu Screen — 5-Bug Forensic Audit
+**App:** `tablet-ordering-pwa`
+**Priority:** P1 / HIGH
+**Status:** 🔴 OPEN — Awaiting Execution
+**Date:** 2026-04-08
+
+---
+
+## The Mystery
+
+Five distinct defects found in the live menu screen — affecting usability, visual identity, and core ordering flow:
+
+1. **Duplicate item name** — Item names print twice (image overlay + card footer)
+2. **`[object Object]` on tab switch** — Broken skeleton component rendering corrupts the loading state
+3. **Submit button slow / unresponsive** — `el-tooltip` overhead + `el-drawer` 300ms animation creates perceived lag; user thinks the button isn't working
+4. **Countdown missing** — Auto-countdown appears inside the drawer (hidden behind RTL animation delay); users miss it and re-tap the button
+5. **Non-brand colors** — `gray-900/gray-800` background, `orange-400/emerald-400/pink-400/sky-400` category chips, and raw emoji icons (`🔥`, `🔄`, `✕`, `✎`) violate brand palette and UI guidelines
+
+---
+
+## The Blueprint
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CSB as CartSidebar
+    participant M as menu.vue
+    participant OSD as OrderSummaryDrawer
+
+    Note over CSB: CURRENT (broken) flow
+    U->>CSB: tap "🔥 Place Order"
+    Note over CSB: el-tooltip adds JS overhead
+    CSB->>M: emit('submitOrder')
+    M->>OSD: isOrderDrawerOpen = true
+    M->>M: startCountdown()
+    OSD-->>U: el-drawer slides in (300ms RTL anim)
+    Note over OSD: Countdown is hidden during animation
+    U-->>U: Sees nothing for 300ms — taps again
+
+    Note over CSB,M: PROPOSED (fixed) flow
+    U->>CSB: tap "Place Order" (no el-tooltip wrapper)
+    CSB->>M: emit('submitOrder') — instant
+    M->>M: startCountdown() — immediate
+    M->>CSB: isCountingDown=true, countdown=5 (props)
+    CSB-->>U: Footer transforms inline — INSTANT
+    Note over CSB: No drawer animation; countdown visible immediately
+    U->>CSB: tap "Review" (optional)
+    CSB->>M: emit('reviewOrder')
+    M->>OSD: isOrderDrawerOpen = true (review only)
+```
+
+---
+
+## The Evidence
+
+### BUG 1 — Duplicate item name `[VISUAL]`
+**File:** `components/menu/MenuItemGrid.vue` lines ~143–149
+
+```html
+<!-- Item name on image (decorative duplicate — footer is the source of truth) -->
+<div class="absolute inset-x-0 bottom-0 px-3 pb-3 pointer-events-none">
+  <h3 class="text-white font-bold text-[15px] leading-snug drop-shadow-lg">
+    {{ item.name || item.receipt_name || ... }}
+  </h3>
+</div>
+```
+
+The code's OWN comment admits it is a "decorative duplicate." The footer block at lines ~170–173 is the canonical source. Remove the overlay block entirely. Keep the footer.
+
+---
+
+### BUG 2 — `[object Object]` on loading [CRITICAL]
+**File:** `pages/menu.vue` lines ~597–602
+
+```html
+<component
+  v-for="i in 3"
+  :key="`skeleton-${i}`"
+  :is="() => import('~/components/ui/SkeletonCard.vue')"   <!-- ← BUG -->
+/>
+```
+
+`:is` receives a **function returning a Promise**. Vue 3 does not accept raw async functions as component definitions. It coerces the function to a string via `.toString()` → renders `[object Object]` in the DOM.
+
+**Fix:** `<SkeletonCard />` direct usage. With `pathPrefix: false`, `components/ui/SkeletonCard.vue` auto-registers as just `<SkeletonCard>`.
+
+---
+
+### BUG 3 — Submit button slow to respond [UX / P1]
+**File:** `components/order/CartSidebar.vue` lines ~405–415
+
+```html
+<el-tooltip v-if="!orderStore.hasPlacedOrder"
+  :content="!canSubmit ? 'Select package...' : ''"
+  :show-arrow="true" placement="top">
+  <button @click="submitOrder" ...>🔥 Place Order</button>
+</el-tooltip>
+```
+
+`el-tooltip` registers global pointer event listeners and wraps the slot in a trigger component. Even with an empty `:content`, it adds JS overhead on every tap. On a tablet with a mobile browser, this creates perceptible input latency.
+
+**Fix:** Remove `el-tooltip` wrapper. Use `title` attribute on the button for native browser tooltip. Zero JS overhead.
+
+---
+
+### BUG 4 — Countdown disappears [UX / P1]
+**Root cause:** `openOrderDrawer()` in `menu.vue` sets `isOrderDrawerOpen = true` then immediately calls `startCountdown()`. However, the `el-drawer` RTL slide-in animation takes ~300ms. During these 300ms, the drawer content IS rendered (`isCountingDown = true`) but the drawer is visually hidden behind the animation.
+
+Users do not see the countdown start — they see a blank or mid-animation drawer, think nothing happened, and re-tap the button.
+
+**Proposed fix (architectural):** Move the countdown OUT of the drawer. Show it inline in the CartSidebar footer, replacing the Place Order button. The drawer becomes a "Review Order" surface only (no auto-countdown in drawer).
+
+**Props to add to CartSidebar:** `isCountingDown: boolean`, `countdown: number`
+**New emit from CartSidebar:** `cancelCountdown` (fired by new Cancel button in the inline countdown)
+**menu.vue:** Pass the two new props; listen to `cancelCountdown`; the "Review" button in the inline countdown opens the drawer for summary only
+
+---
+
+### BUG 5 — Non-brand colors [VISUAL / DESIGN]
+Multiple files affected:
+
+| Location | Current (Wrong) | Correct |
+|---|---|---|
+| `pages/menu.vue` main bg | `from-gray-900 via-gray-800 to-black` (cool-gray tint) | `from-secondary via-accent to-secondary-dark` (warm brand darks) |
+| `MenuItemGrid.vue` chips | `orange-400/70`, `emerald-400/70`, `pink-400/70`, `sky-400/70` | `primary/70`, `success/70`, `primary-light/70`, `white/40` |
+| `CartSidebar.vue` prices | `text-gray-300` (2×) | `text-white/70` |
+| `CartSidebar.vue` buttons | `🔥 Place Order`, `🔄 Submit Refill`, `🔄 Order Refill` | SVG Lucide icons (`Flame`, `RefreshCw`) — no emoji |
+| `OrderSummaryDrawer.vue` | `🔥 Confirm Order`, `✕ Cancel`, `✎ Review Order` | SVG icons |
+| Success banner | `from-green-500 to-green-600` | `from-success to-success` (brand success token already `#10B981`) |
+
+Per **UI/UX Pro Max** rule `no-emoji-icons`: "Use SVG icons (Heroicons, Lucide), not emojis." Emojis render differently across platforms/OS versions and are not accessible.
+
+---
+
+## The Evidence — Color System Analysis
+
+**Brand identity:** KBBQ restaurant — warm golds (`primary`), deep warm charcoal (`secondary/accent`). Cool grays (`gray-900`, `gray-800`) introduce a bluish-gray tint foreign to the brand.
+
+**Contrast check:**
+- `primary` (#F6B56D) on `secondary` (#1A1A1A): passes WCAG AA ✅
+- `gray-300` on `#1e1e1e`: passes, but `gray-300` has cool undertones misaligned with brand ⚠️
+- Category chip colors (`orange-400`, `emerald-400`) are not wrong per se, but they are generic utility colors — not scoped to the brand system
+
+---
+
+## The Verdict — Execution Order
+
+> Gate: each task must be verified before the next begins.
+
+**Task 1 — Fix `[object Object]` skeleton bug** *(2 min)*
+- File: `pages/menu.vue`
+- Replace the broken `:is="() => import(...)"` with `<SkeletonCard />`
+- Verify: switch to Sides/Desserts/Beverages tab while items load → no `[object Object]` visible
+
+**Task 2 — Remove duplicate item name** *(5 min)*
+- File: `components/menu/MenuItemGrid.vue`
+- Delete lines ~143–149 (image overlay name block)
+- Verify: item card shows name only in footer; image area shows only gradient overlay + badges
+
+**Task 3 — Fix submit button + inline countdown** *(20 min)*
+- Files: `components/order/CartSidebar.vue`, `pages/menu.vue`
+- Part A (CartSidebar): Remove `el-tooltip` from all three action buttons (use `title` attr); add props `isCountingDown`, `countdown`; add emit `cancelCountdown`; add inline countdown widget in the footer that replaces the button when `isCountingDown` is true
+- Part B (menu.vue): Pass `:is-counting-down` and `:countdown` to `<cart-sidebar>`; listen `@cancel-countdown="cancelCountdown"`; remove `startCountdown()` call from `openOrderDrawer()` — instead call it independently; remove countdown view from `OrderSummaryDrawer`
+- Verify: tap Place Order → countdown appears IMMEDIATELY in sidebar (< 50ms perceived lag); Cancel works; countdown reaches 0 → order submitted
+
+**Task 4 — Replace emoji icons with SVG** *(10 min)*
+- Files: `CartSidebar.vue`, `OrderSummaryDrawer.vue`
+- Import `Flame`, `RefreshCw`, `X`, `Edit3`, `Check` from `lucide-vue-next`
+- Replace all emoji strings in button text with `<component :is="..." />` + text label
+- Verify: no emoji visible on screen
+
+**Task 5 — Brand color alignment** *(10 min)*
+- Files: `pages/menu.vue`, `components/menu/MenuItemGrid.vue`, `components/order/CartSidebar.vue`
+- Apply brand tokens per Evidence table above
+- Verify: warm charcoal background on menu page; gold-tinted category chips; no cool-gray text in price breakdown
+
+---
+
+## What NOT to Touch
+
+- `stores/Order.ts` — no changes needed for any of these fixes
+- `stores/Menu.ts` — no changes needed (data is correct)
+- `components/order/CartSidebar.vue` `canSubmit` computed — do not touch
+- `OrderSummaryDrawer.vue` overall structure — keep the drawer, only remove countdown mode and add SVG icons
+- Polling, WebSocket, session lifecycle — out of scope
+
+---
+
 # CASE_FILE: Order Transaction Audit — PWA → Backend → Database
-**Last Updated:** February 21, 2026 (PWA Static Output Aligned to public/)  
+**Last Updated:** April 8, 2026 (Mission-7 Phase 1 code verification — all 8 tasks confirmed)
 **Lead Detective:** Ranpo Edogawa  
 **Audit Date:** February 19-20, 2026  
+**Mission-7 Audit Date:** April 7, 2026  
+**Mission-7 Code Verification Date:** April 8, 2026  
 **Apps Audited:** tablet-ordering-pwa + woosoo-nexus (v1 Legacy Stack)  
 **Priority:** P0 / **CRITICAL**  
-**Status:** ✅ **P0 BLOCKER RESOLVED — V2 API FULLY IMPLEMENTED**
+**Status:** 🟡 **MISSION-7 PHASE 1 COMPLETE IN CODE — RUNTIME GATE PENDING**
+
+---
+
+## Addendum: Mission-7 Phase 1 Code Verification (April 8, 2026)
+
+**Verification By:** Ranpo Edogawa  
+**Scope:** Ground-truth source audit of all 8 Phase 1 tasks — no assumptions, no hallucinations.
+
+**All 8 Tasks Confirmed Implemented:**
+
+| Task | Fix | File(s) | Verdict |
+|------|-----|---------|---------|
+| 1.1 Broadcast Auth Bypass | Ownership checks on both channels | `routes/channels.php:17-23` | ✅ VERIFIED |
+| 1.2 ProcessOrderLogs Scheduler | Entry commented out + docblock | `routes/console.php`, `ProcessOrderLogs.php` | ✅ VERIFIED |
+| 1.3 Order UUID Race Condition | UUID in boot(), 2 migrations | `DeviceOrder.php`, migrations `2026_04_07_000001/000002` | ✅ VERIFIED |
+| 1.4 Rate Limiting | `throttle.device:10,1` + device-keyed middleware | `routes/api.php:139`, `ThrottleByDevice.php` | ✅ VERIFIED |
+| 1.5 Polling Timer Leak | Centralized start/stop, `onScopeDispose` | `stores/Order.ts:694-760` | ✅ VERIFIED |
+| 1.6 Session Ownership | POS session shared by design; PWA rejects foreign sessions | `stores/Session.ts:78-108`, `SessionApiController.php` | ✅ VERIFIED |
+| 1.7 WebSocket Reconnection | Exponential backoff + jitter, state-change handler | `composables/useBroadcasts.ts:510-580` | ✅ VERIFIED |
+| 1.8 Null Guards | `handleOrderError`, `extractResponseData`, optional chaining | `stores/Order.ts:55-70, 430-500, 750-770` | ✅ VERIFIED |
+
+**TypeScript Errors (all critical PWA files):** 0
+
+**New Issue Found (Non-blocking):**
+- `composables/useBroadcasts.ts` `replayMissedEvents()` calls `/api/events/missing` — backend route does NOT exist.  
+  Currently dead code (never called externally). Action before Phase 2: implement backend endpoint OR remove function.
+
+**Phase 1 Runtime Gate (must run on staging before Phase 2):**
+- [ ] `php artisan migrate` — verify UUID migrations apply cleanly
+- [ ] Confirm historical `device_orders` rows all have non-null `order_uuid`
+- [ ] 20 concurrent order submissions — zero `order_number` exceptions
+- [ ] 15-session memory simulation — 0 active intervals between sessions
+- [ ] Network drop + restore → WS reconnects within 30s
+- [ ] Mock `{ success: false, data: null }` → no PWA white screen
+
+**Gate Status:** Awaiting Ranpo sign-off after staging runtime verification.
 
 ---
 
@@ -35,6 +261,29 @@
 - Backend `OrderApiController@index` now scopes authenticated device requests to `device_id` (not only branch) to prevent sibling-tablet leakage and ensure deterministic recovery.
 
 **Gate:** Opening the app via direct URL on a tablet with an existing pending/confirmed order must immediately resume to in-session flow without placing a new order.
+
+---
+
+## Addendum: Menu Screen Bootstrap Regression (April 7, 2026)
+
+**Symptom:** Menu screen loaded with missing elements or empty content after session recovery and package-selection flows. In some paths, menu bootstrap failed before packages loaded.
+
+**Root Causes:**
+- `Menu.loadAllMenus()` called `fetchPackages()`, but the action was missing from the store, so bootstrap/plugin/session preload paths could fail before package data populated.
+- `fetchPackageDetails()` cached the full API envelope instead of the payload body, while `pages/menu.vue` expected `packageDetails[packageId].allowed_menus` at the top level.
+- Recovery redirects from `/` and `/order/packageSelection` resumed to bare `/menu` and dropped package identity, leaving meats empty when the package could not be inferred from recovered order payloads.
+
+**Fix Applied:**
+- Restored `fetchPackages()` in `stores/Menu.ts` and corrected the generic fetch helper to respect its endpoint/params.
+- Unwrapped `data.data` before caching package details so `allowed_menus` matches the frontend contract.
+- Extended active-order recovery to carry `packageId` when already known locally and preserved it on redirects to `/menu`.
+- Exposed `package_id` and per-item `ordered_menu_id` from backend `DeviceOrderResource` so cold resume flows can recover package identity from canonical order payloads.
+- Updated `pages/menu.vue` to seed `selectedPackageId` from route or store recovery state.
+
+**Gate:**
+- Entering `/order/packageSelection` must populate packages successfully.
+- Resuming an active order from `/` or `/order/packageSelection` must route to `/menu?packageId={id}` when package identity is known.
+- `pages/menu.vue` must read `menuStore.packageDetails[packageId].allowed_menus.meat` without requiring envelope unwrapping in the component.
 
 ---
 

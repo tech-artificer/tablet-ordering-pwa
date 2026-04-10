@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDeviceStore } from '~/stores/Device'
 import { useOrderStore } from '~/stores/Order'
@@ -9,61 +9,114 @@ import { useApi } from '~/composables/useApi'
 
 // Timeout tracking for proper cleanup on unmount (prevents memory leaks)
 let orderCompletionTimeoutId: ReturnType<typeof setTimeout> | null = null
-let reloadTimeoutId: ReturnType<typeof setTimeout> | null = null
+let reloadTimeoutId: number | null = null
+let deviceChannel: any = null
+let orderChannel: any = null
+let serviceRequestChannel: any = null
+let deviceControlChannel: any = null
+let reconnectAttempts = 0
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let boundPusherConnection: any = null
+let boundStateChangeHandler: ((states: any) => void) | null = null
+
+const channelStatus = ref({
+  device: false,
+  deviceControl: false,
+  order: false,
+  serviceRequest: false
+})
+
+// ─── WebSocket event interfaces ────────────────────────────────────────────
+// Shapes MUST stay in sync with woosoo-nexus broadcast events.
+// Reference: docs/websocket-events.md
+// Note: backend does NOT send `eventId` — removed from all interfaces.
 
 interface OrderCreatedEvent {
-  eventId: number
-  event: 'created'
   order: {
     id: number
     order_id: string
     order_number: string
     device_id: number
-    session_id: number
     table_id: number
+    branch_id: number
+    session_id: number
     status: string
-    items: any[]
-    subtotal: string
-    tax: string
-    service_charge: string
+    items: Array<{
+      id: number
+      name: string
+      quantity: number
+      price: string
+      is_refill: boolean
+    }>
     total: string
+    tax: string
+    discount: string | null
+    sub_total: string
     guest_count: number
     created_at: string
     updated_at: string
+    is_printed: boolean
+    device: { id: number; name: string }
+    table: { id: number; name: string }
+    serviceRequests: any[]
   }
 }
 
+/** Emitted by OrderStatusUpdated — channel Device.{deviceId} */
 interface OrderUpdatedEvent {
-  eventId: number
-  order_id: string
-  status: 'pending' | 'confirmed' | 'ready' | 'completed' | 'cancelled' | 'voided'
-}
-
-interface OrderCompletedEvent {
-  eventId: number
   order: {
     id: number
     order_id: string
     order_number: string
     device_id: number
+    table_id: number
+    branch_id: number
+    status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled' | 'voided'
+    is_printed: boolean
+    total: string
+    created_at: string
+    updated_at: string
+    device: { id: number; name: string }
+    table: { id: number; name: string }
+  }
+}
+
+interface OrderCompletedEvent {
+  order: {
+    id: number
+    order_id: string
+    order_number: string
+    device_id: number
+    table_id: number
+    branch_id: number
     session_id: number
     status: 'completed'
+    items: Array<{ id: number; name: string; quantity: number; price: string; is_refill: boolean }>
+    total: string
+    tax: string
+    discount: string | null
+    sub_total: string
+    guest_count: number
+    created_at: string
+    updated_at: string
+    is_printed: boolean
+    device: { id: number; name: string }
+    table: { id: number; name: string }
+    serviceRequests: any[]
   }
 }
 
 interface OrderCancelledEvent {
-  eventId: number
   order: {
     id: number
     order_id: string
     order_number: string
     device_id: number
-    status: 'cancelled'
+    status: 'cancelled' | 'voided'
   }
 }
 
 interface ServiceRequestEvent {
-  eventId: number
   service_request: {
     id: number
     order_id: string
@@ -78,7 +131,6 @@ interface ServiceRequestEvent {
 }
 
 interface DeviceControlEvent {
-  eventId: number
   action: 'restart' | 'lock' | 'unlock' | 'update' | 'reload' | 'message' | 'volume'
   payload: {
     message?: string
@@ -95,21 +147,6 @@ export const useBroadcasts = () => {
   const deviceStore = useDeviceStore()
   const orderStore = useOrderStore()
   const sessionStore = useSessionStore()
-
-  let deviceChannel: any = null
-  let orderChannel: any = null
-  let serviceRequestChannel: any = null
-  let deviceControlChannel: any = null
-  let orderCompletionTimeoutId: number | null = null
-  let reloadTimeoutId: number | null = null
-
-  // Channel connection status
-  const channelStatus = ref({
-    device: false,
-    deviceControl: false,
-    order: false,
-    serviceRequest: false
-  })
 
   // Track last event ID for reliability
   const getLastEventId = (): number => {
@@ -152,7 +189,7 @@ export const useBroadcasts = () => {
       setLastEventId(payload.eventId)
     }
 
-    console.log('Processing event:', eventType, payload)
+    logger.debug('Processing event:', eventType, payload)
     switch (eventType) {
       case 'order.created':
         handleOrderCreated(payload)
@@ -177,9 +214,7 @@ export const useBroadcasts = () => {
 
   // Event Handlers
   const handleOrderCreated = (event: OrderCreatedEvent) => {
-    const timestamp = new Date().toISOString()
-    console.log(`[📨 .order.created] Received at ${timestamp}`, { order_id: event.order.id, order_number: event.order.order_number })
-    logger.debug('Order created:', event.order)
+    logger.debug('[📨 .order.created]', { order_id: event.order.id, order_number: event.order.order_number })
     
     ElNotification({
       title: 'Order Confirmed',
@@ -195,10 +230,9 @@ export const useBroadcasts = () => {
   }
 
   const handleOrderUpdated = (event: OrderUpdatedEvent) => {
-    const timestamp = new Date().toISOString()
-    console.log(`[📨 .order.updated] Received at ${timestamp}`, { order_id: event.order_id, status: event.status })
-    logger.debug('Order status updated:', event)
-    
+    const { order } = event
+    logger.debug('[📨 .order.updated]', { order_id: order.order_id, status: order.status })
+
     const statusMessages: Record<string, { title: string; message: string; type: any }> = {
       preparing: {
         title: 'Order in Progress',
@@ -217,7 +251,7 @@ export const useBroadcasts = () => {
       }
     }
 
-    const notification = statusMessages[event.status]
+    const notification = statusMessages[order.status]
     if (notification) {
       ElNotification({
         title: notification.title,
@@ -228,21 +262,20 @@ export const useBroadcasts = () => {
     }
 
     // Update current order status in store
-    // Handle both { order: {...} } and direct order object structures
     const currentOrderResp = orderStore.getCurrentOrder()
     const currentOrderId = currentOrderResp?.order?.id || currentOrderResp?.order?.order_id || currentOrderResp?.id || currentOrderResp?.order_id
-    const eventOrderId = event.order_id
-    
-    logger.debug('🔄 Order update check:', { currentOrderId, eventOrderId, status: event.status })
-    
+    const eventOrderId = order.order_id
+
+    logger.debug('🔄 Order update check:', { currentOrderId, eventOrderId, status: order.status })
+
     if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
-      orderStore.updateOrderStatus(event.status)
+      orderStore.updateOrderStatus(order.status)
       // If this is a terminal status, stop the polling fallback
-      if (event.status === 'completed' || event.status === 'cancelled' || event.status === 'voided') {
+      if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'voided') {
         try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
-        
+
         // End session and navigate to home on completed
-        if (event.status === 'completed') {
+        if (order.status === 'completed') {
           logger.info('✅ Order completed via broadcast - ending session in 2s')
           if (orderCompletionTimeoutId) clearTimeout(orderCompletionTimeoutId)
           orderCompletionTimeoutId = setTimeout(async () => {
@@ -296,10 +329,10 @@ export const useBroadcasts = () => {
       duration: 8000
     })
 
-    // Clear order from store
+    // Clear order from store — order_id is a string (e.g. "ORD-2026-0001"), compare as strings
     const currentOrderResp = orderStore.getCurrentOrder()
-    if (currentOrderResp?.order_id === Number(event.order.order_id) ||
-        currentOrderResp?.order?.order_id === Number(event.order.order_id)) {
+    const currentId = currentOrderResp?.order_id ?? currentOrderResp?.order?.order_id
+    if (currentId && String(currentId) === String(event.order.order_id)) {
       orderStore.clearOrder()
       try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
     }
@@ -373,41 +406,66 @@ export const useBroadcasts = () => {
     }
   }
 
+  const clearReconnectTimer = () => {
+    if (reconnectTimer) {
+      try { clearTimeout(reconnectTimer) } catch (e) { logger.debug('[Broadcasts] clearReconnectTimer failed', e) }
+      reconnectTimer = null
+    }
+    reconnectAttempts = 0
+  }
+
+  const resetChannelStatus = () => {
+    channelStatus.value = {
+      device: false,
+      deviceControl: false,
+      order: false,
+      serviceRequest: false
+    }
+  }
+
+  const unsubscribeDeviceChannels = () => {
+    const canLeave = typeof (window as any).Echo?.leave === 'function'
+    if (deviceChannel) {
+      if (canLeave) {
+        ;(window as any).Echo.leave(deviceChannel.name)
+      }
+      deviceChannel = null
+      channelStatus.value.device = false
+    }
+    if (deviceControlChannel) {
+      if (canLeave) {
+        ;(window as any).Echo.leave(deviceControlChannel.name)
+      }
+      deviceControlChannel = null
+      channelStatus.value.deviceControl = false
+    }
+  }
+
   // Subscribe to device-specific channel
   const subscribeToDeviceChannel = () => {
     const deviceId = deviceStore.getDeviceId()
     if (!deviceId || !(window as any).Echo) return
 
+    unsubscribeDeviceChannels()
+
     // Subscribe to Device.{deviceId} for order updates
-    console.log('[Echo] Subscribing to channel: Device.' + deviceId)
+    logger.debug('[Echo] Subscribing to Device.' + deviceId)
     deviceChannel = (window as any).Echo.channel(`Device.${deviceId}`)
       .listen('.order.updated', (event: OrderUpdatedEvent) => {
-        console.log('[Echo] .order.updated', event)
         handleOrderUpdated(event)
       })
 
     channelStatus.value.device = true
-    console.log('[Echo] ✅ Subscribed to channel: Device.' + deviceId)
     logger.debug(`✅ Subscribed to Device.${deviceId}`)
-    
-    ElNotification({
-      title: '📡 Connected',
-      message: `Listening to Device.${deviceId}`,
-      type: 'success',
-      duration: 3000,
-      position: 'bottom-right'
-    })
 
     // Subscribe to device.{deviceId} for control events
-    console.log('[Echo] Subscribing to channel: device.' + deviceId)
+    logger.debug('[Echo] Subscribing to device.' + deviceId)
     deviceControlChannel = (window as any).Echo.channel(`device.${deviceId}`)
       .listen('.device.control', (event: DeviceControlEvent) => {
-        console.log('[Echo] .device.control', event)
         handleDeviceControl(event)
       })
 
     channelStatus.value.deviceControl = true
-    console.log('[Echo] ✅ Subscribed to channel: device.' + deviceId + ' (control)')
     logger.debug(`✅ Subscribed to device.${deviceId} (control)`)
   }
 
@@ -415,39 +473,34 @@ export const useBroadcasts = () => {
   const subscribeToOrderChannel = (orderId: string) => {
     if (!orderId || !(window as any).Echo) return
 
-    console.log('[Echo] Subscribing to channel: orders.' + orderId)
+    unsubscribeFromOrderChannel()
+
+    logger.debug('[Echo] Subscribing to orders.' + orderId)
     orderChannel = (window as any).Echo.channel(`orders.${orderId}`)
       .listen('.order.created', (event: OrderCreatedEvent) => {
-        console.log('[Echo] .order.created', event)
         handleOrderCreated(event)
       })
       .listen('.order.completed', (event: OrderCompletedEvent) => {
-        console.log('[Echo] .order.completed', event)
         handleOrderCompleted(event)
       })
       .listen('.order.cancelled', (event: OrderCancelledEvent) => {
-        console.log('[Echo] .order.cancelled', event)
         handleOrderCancelled(event)
       })
       .listen('.order.voided', (event: OrderCancelledEvent) => {
-        console.log('[Echo] .order.voided', event)
         handleOrderCancelled(event)
       })
 
     channelStatus.value.order = true
-    console.log('[Echo] ✅ Subscribed to channel: orders.' + orderId)
     logger.debug(`✅ Subscribed to orders.${orderId}`)
 
     // Subscribe to service requests for this order
-    console.log('[Echo] Subscribing to channel: service-requests.' + orderId)
+    logger.debug('[Echo] Subscribing to service-requests.' + orderId)
     serviceRequestChannel = (window as any).Echo.channel(`service-requests.${orderId}`)
       .listen('.service-request.notification', (event: ServiceRequestEvent) => {
-        console.log('[Echo] .service-request.notification', event)
         handleServiceRequest(event)
       })
 
     channelStatus.value.serviceRequest = true
-    console.log('[Echo] ✅ Subscribed to channel: service-requests.' + orderId)
     logger.debug(`✅ Subscribed to service-requests.${orderId}`)
   }
 
@@ -455,7 +508,7 @@ export const useBroadcasts = () => {
   const unsubscribeFromOrderChannel = () => {
     const canLeave = typeof (window as any).Echo?.leave === 'function'
     if (orderChannel) {
-      console.log(`[🔕 Unsubscribing] Channel: ${orderChannel.name} at ${new Date().toISOString()}`)
+      logger.debug(`[🔕 Unsubscribing] Channel: ${orderChannel.name}`)
       if (canLeave) {
         ;(window as any).Echo.leave(orderChannel.name)
       }
@@ -463,13 +516,100 @@ export const useBroadcasts = () => {
       channelStatus.value.order = false
     }
     if (serviceRequestChannel) {
-      console.log(`[🔕 Unsubscribing] Channel: ${serviceRequestChannel.name} at ${new Date().toISOString()}`)
+      logger.debug(`[🔕 Unsubscribing] Channel: ${serviceRequestChannel.name}`)
       if (canLeave) {
         ;(window as any).Echo.leave(serviceRequestChannel.name)
       }
       serviceRequestChannel = null
       channelStatus.value.serviceRequest = false
     }
+  }
+
+  const resubscribeChannels = () => {
+    subscribeToDeviceChannel()
+    const currentOrderId = sessionStore.getOrderId()
+    if (currentOrderId) {
+      subscribeToOrderChannel(String(currentOrderId))
+    }
+  }
+
+  const unbindConnectionStateHandler = () => {
+    if (boundPusherConnection && boundStateChangeHandler && typeof boundPusherConnection.unbind === 'function') {
+      try {
+        boundPusherConnection.unbind('state_change', boundStateChangeHandler)
+      } catch (e) {
+        logger.debug('[Broadcasts] unbind state_change failed', e)
+      }
+    }
+    boundPusherConnection = null
+    boundStateChangeHandler = null
+  }
+
+  const scheduleReconnect = () => {
+    if (reconnectTimer) {
+      return
+    }
+    const MAX_RECONNECT_ATTEMPTS = 10
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      logger.error('[Broadcasts] Max reconnect attempts reached — manual page reload required')
+      return
+    }
+    const jitterMs = Math.floor(Math.random() * 1000)
+    const backoffMs = Math.min(1000 * Math.pow(2, reconnectAttempts) + jitterMs, 30000)
+    reconnectAttempts++
+    logger.warn(`[Broadcasts] Scheduling reconnect attempt ${reconnectAttempts} in ${backoffMs}ms`)
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      logger.info('[Broadcasts] Attempting reconnect...')
+      try {
+        const echo = (window as any).Echo
+        if (typeof echo?.connect === 'function') {
+          echo.connect()
+          return
+        }
+        if (typeof echo?.connector?.pusher?.connect === 'function') {
+          echo.connector.pusher.connect()
+          return
+        }
+        throw new Error('Echo reconnect API unavailable')
+      } catch (e) {
+        logger.error('[Broadcasts] Reconnect call failed:', e)
+        scheduleReconnect()
+      }
+    }, backoffMs)
+  }
+
+  const bindConnectionStateHandler = () => {
+    const echo = (window as any).Echo
+    const connection = echo?.connector?.pusher?.connection
+    if (!connection || typeof connection.bind !== 'function') {
+      return
+    }
+    if (boundPusherConnection === connection && boundStateChangeHandler) {
+      return
+    }
+
+    unbindConnectionStateHandler()
+
+    boundStateChangeHandler = (states: any) => {
+      logger.debug('WebSocket state change:', states.current)
+
+      if (states.current === 'connected') {
+        logger.debug('✅ WebSocket connected')
+        clearReconnectTimer()
+        resubscribeChannels()
+        return
+      }
+
+      if (states.current === 'disconnected' || states.current === 'unavailable' || states.current === 'failed') {
+        logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
+        resetChannelStatus()
+        scheduleReconnect()
+      }
+    }
+
+    connection.bind('state_change', boundStateChangeHandler)
+    boundPusherConnection = connection
   }
 
   // Initialize broadcasts
@@ -479,49 +619,8 @@ export const useBroadcasts = () => {
       return
     }
 
-    // Subscribe to device channels
-    subscribeToDeviceChannel()
-
-    // Subscribe to current order if exists
-    const currentOrderId = sessionStore.getOrderId()
-    if (currentOrderId) {
-      subscribeToOrderChannel(currentOrderId.toString())
-    }
-
-    // Connection event handlers for Reverb/Pusher
-    const echo = (window as any).Echo
-    if (echo?.connector?.pusher) {
-      const pusher = echo.connector.pusher
-      
-      // Reverb uses state_change event instead of direct bind
-      pusher.connection.bind('state_change', (states: any) => {
-        const timestamp = new Date().toISOString()
-        console.log(`[🔗 WebSocket State Change] ${states.previous || '?'} → ${states.current} at ${timestamp}`)
-        logger.debug('WebSocket state change:', states.current)
-        
-        if (states.current === 'connected') {
-          console.log(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
-          logger.debug('✅ WebSocket connected')
-          ElNotification({
-            title: '✅ Connected',
-            message: 'Real-time connection established',
-            type: 'success',
-            duration: 2000,
-            position: 'bottom-right'
-          })
-          // TODO: Enable when backend implements GET /api/events/missing
-          // replayMissedEvents()
-        } else if (states.current === 'disconnected' || states.current === 'unavailable') {
-          logger.debug('⚠️ WebSocket disconnected')
-          channelStatus.value = {
-            device: false,
-            deviceControl: false,
-            order: false,
-            serviceRequest: false
-          }
-        }
-      })
-    }
+    resubscribeChannels()
+    bindConnectionStateHandler()
   }
 
   // Cleanup on unmount
@@ -535,27 +634,12 @@ export const useBroadcasts = () => {
       try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
       reloadTimeoutId = null
     }
+    clearReconnectTimer()
     unsubscribeFromOrderChannel()
-    const canLeave = typeof (window as any).Echo?.leave === 'function'
-    if (deviceChannel) {
-      if (canLeave) {
-        (window as any).Echo.leave(deviceChannel.name)
-      }
-      deviceChannel = null
-      channelStatus.value.device = false
-    }
-    if (deviceControlChannel) {
-      if (canLeave) {
-        (window as any).Echo.leave(deviceControlChannel.name)
-      }
-      deviceControlChannel = null
-      channelStatus.value.deviceControl = false
-    }
+    unsubscribeDeviceChannels()
+    unbindConnectionStateHandler()
+    resetChannelStatus()
   }
-
-  onUnmounted(() => {
-    cleanup()
-  })
 
   return {
     initializeBroadcasts,

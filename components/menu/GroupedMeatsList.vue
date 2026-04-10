@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { MenuItem, Modifier } from '../../types';
 import MenuItemGrid from './MenuItemGrid.vue';
 import { ElBadge, ElEmpty } from 'element-plus';
@@ -55,7 +56,12 @@ const groupsArray = computed(() => {
     <div v-for="group in groupsArray" :key="group.category" class="space-y-4">
       <!-- Section header -->
       <div class="flex items-center gap-3">
-        <h3 class="text-xl font-bold text-white uppercase tracking-wide">{{ group.category }} (<small class="text-primary font-semibold">{{ group.items.length }}</small>)</h3>
+        <span class="w-1 h-6 rounded-full bg-gradient-to-b from-primary to-primary/50 flex-shrink-0" aria-hidden="true"></span>
+        <h3 class="text-xs font-black text-white/90 uppercase tracking-[0.18em] font-kanit">{{ group.category }}</h3>
+        <span class="bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 rounded-full border border-primary/20">
+          {{ group.items.length }}
+        </span>
+        <span class="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" aria-hidden="true"></span>
       </div>
 
       <!-- Items grid -->

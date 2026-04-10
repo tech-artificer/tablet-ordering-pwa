@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ElMessage } from 'element-plus';
+import { computed, onMounted, ref, toRef, watch } from 'vue';
 import { formatCurrency } from '../utils/formats';
 import { useApi } from '../composables/useApi';
 import { useGuestReset } from '../composables/useGuestReset';
 import { recoverActiveOrderState } from '../composables/useActiveOrderRecovery';
 import { useSessionStore } from '../stores/Session';
 import { logger } from '../utils/logger';
-import { notifyWarning } from '../composables/useNotifier';
+import { notifyWarning, notifyInfo } from '../composables/useNotifier';
 import { useDeviceStore } from '../stores/Device';
 import { useMenuStore } from '../stores/Menu';
 import { useOrderStore } from '../stores/Order';
@@ -19,48 +19,39 @@ const route = useRoute();
 const router = useRouter();
 
 onMounted(async () => {
-  // Debug: Log initial state before initialization
-  const timestamp = new Date().toISOString()
-  console.log(`[🍽️ Menu Screen Loaded] at ${timestamp}`)
-  console.log('[Menu] onMounted - Initial state:', {
-    'sessionStore.orderId': sessionStore.orderId,
-    'sessionStore.sessionId': sessionStore.sessionId,
-    'sessionStore.isActive': sessionStore.isActive,
-    'orderStore.hasPlacedOrder': orderStore.hasPlacedOrder,
-    'orderStore.currentOrder': orderStore.currentOrder,
-    'orderStore.isRefillMode': orderStore.isRefillMode
-  })
-
+  if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
+    try {
+      await menuStore.loadAllMenus()
+    } catch (error) {
+      logger.warn('[Menu] Initial loadAllMenus failed:', error)
+    }
+  }
 
   const recovery = await recoverActiveOrderState('menu')
-  const hasPackageSelection = !!route.query.packageId
+  if (recovery.packageId && !route.query.packageId) {
+    selectedPackageId.value = String(recovery.packageId)
+  }
+
+  const hasPackageSelection = !!selectedPackageId.value
   const explicitMenuResume = route.query.resumeMenu === '1'
   const allowMenuAccess = hasPackageSelection || orderStore.isRefillMode || explicitMenuResume
 
   // If an active order is recovered and not allowed to access menu, stay on menu page and enable refill mode
   if (recovery.hasActiveOrder && !allowMenuAccess) {
-    console.log(`[↩️ Menu: Active order ${recovery.orderId} recovered, staying on menu and enabling refill mode at ${timestamp}`)
     orderStore.toggleRefillMode(true)
-    // Optionally, show a notification
-    ElMessage.info('Active order recovered. Refill mode enabled.')
-    // Do not redirect
-    // return
+    notifyInfo('Active order recovered. Refill mode enabled.')
   }
 
   // Log package details if an existing order is detected by middleware
   if (recovery.hasActiveOrder && selectedPackageId.value) {
-    const packageId = Number(selectedPackageId.value);
-    const packageDetails = menuStore.packageDetails[packageId];
-    console.log('[Menu] API packageDetails.allowed_menus:', {
-      meat: packageDetails?.allowed_menus?.meat,
-      modifiers: packageDetails?.allowed_menus?.modifiers
-    });
+    // package details pre-loaded for recovered order
   }
 
   // If we recovered an active order but no packageId in route, attempt to infer package from the recovered order
   if (recovery.hasActiveOrder && !selectedPackageId.value) {
     try {
-      const orderObj = orderStore.currentOrder?.order || orderStore.currentOrder;
+      const currentOrder = orderStore.getCurrentOrder();
+      const orderObj = ((currentOrder?.order || currentOrder) as any) || null;
       let inferredPackageId = null;
 
       // Check common fields first
@@ -75,42 +66,53 @@ onMounted(async () => {
 
       // If we found a package id, set it and fetch package details
       if (inferredPackageId) {
-        console.log('[Menu] Inferred packageId from recovered order:', inferredPackageId);
         selectedPackageId.value = String(inferredPackageId);
         try {
-          const pd = await menuStore.fetchPackageDetails(inferredPackageId as number);
-          console.log('[Menu] fetchPackageDetails result:', pd);
+          await menuStore.fetchPackageDetails(inferredPackageId as number);
         } catch (err) {
-          console.warn('[Menu] fetchPackageDetails failed for inferred package:', inferredPackageId, err);
+          logger.warn('[Menu] fetchPackageDetails failed for inferred package:', inferredPackageId, err);
         }
       } else {
-        console.warn('[Menu] Could not infer packageId from recovered order; no package details will be fetched');
+        logger.warn('[Menu] Could not infer packageId from recovered order');
       }
     } catch (err) {
-      console.warn('[Menu] Error while inferring package from recovered order:', err);
+      logger.warn('[Menu] Error while inferring package from recovered order:', err);
     }
   }
 
-  const orderStatus = orderStore.currentOrder?.order?.status || orderStore.currentOrder?.status
-  console.log(`[✅ Menu Ready] Order status=${orderStatus || 'none'}, ready for selections at ${timestamp}`)
+  const orderStatus = orderStore.getCurrentOrderStatus()
+
+  // Cart recovery notification: if session is active with a placed order but cart is empty
+  // AND nothing has been submitted yet — the in-progress cart was likely lost
+  // (localStorage cleared / page reload mid-order). Do NOT fire if the user navigated
+  // back after a successful submission (submittedItems would be non-empty in that case).
+  if (
+    sessionStore.isActive &&
+    orderStore.hasPlacedOrder &&
+    !orderStore.isRefillMode &&
+    orderStore.getCartItems().length === 0 &&
+    orderStore.getSubmittedItems().length === 0
+  ) {
+    notifyWarning('Your cart was cleared. Please re-add your items.')
+    logger.warn('[Menu] Cart items missing for active session — notified user of cart loss')
+  }
 
   // Load package details with allowed menus
   if (selectedPackageId.value) {
+    meatError.value = null;
     try {
-      console.log(`[📦 Loading Package Details] package_id=${selectedPackageId.value} at ${timestamp}`);
       logger.info('[Menu] Loading package details for package:', selectedPackageId.value);
       await menuStore.fetchPackageDetails(Number(selectedPackageId.value));
-      console.log(`[✅ Package Details Loaded] Allowed menus available for selection at ${timestamp}`)
       logger.info('[Menu] Package details loaded');
     } catch (error) {
-      console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`);
+      meatError.value = (error as Error).message || 'Failed to load meats — tap to retry';
       logger.error('[Menu] Failed to load package details:', error);
     }
   }
 })
 
 // Get selected package from route or store
-const selectedPackageId = ref(route.query.packageId || null);
+const selectedPackageId = ref(route.query.packageId || orderStore.getPackage?.value?.id || null);
 const selectedPackage = computed(() => {
   if (!selectedPackageId.value) return null;
   return menuStore.packages.find(pkg => pkg.id === Number(selectedPackageId.value));
@@ -128,7 +130,7 @@ watch(selectedPackage, (newPackage) => {
 
 // Watch for order completion status changes and redirect when completed
 watch(
-  () => orderStore.currentOrder?.order?.status || orderStore.currentOrder?.status,
+  () => orderStore.getCurrentOrderStatus(),
   (newStatus) => {
     if (newStatus === 'completed' || newStatus === 'cancelled' || newStatus === 'voided') {
       logger.info('📢 Order status changed to:', newStatus, '- ending session')
@@ -163,7 +165,6 @@ const supportRequests = [
 // Check if refills are available (order placed AND we have a valid order ID)
 const canRequestRefill = computed(() => {
   const hasOrder = orderStore.hasPlacedOrder && !!sessionStore.orderId
-  console.log('[Refill] canRequestRefill check:', { hasPlacedOrder: orderStore.hasPlacedOrder, orderId: sessionStore.orderId, result: hasOrder })
   return hasOrder
 })
 
@@ -197,8 +198,7 @@ const modifiers = computed(() => {
   if (!selectedPackageId.value) return [];
   const packageId = Number(selectedPackageId.value);
   const packageDetails = menuStore.packageDetails[packageId];
-  // Permanent: Only consume allowed_menus.modifiers from API contract
-  return Array.isArray(packageDetails?.allowed_menus?.modifiers) ? packageDetails.allowed_menus.modifiers : [];
+  return Array.isArray(packageDetails?.allowed_menus?.meat) ? packageDetails.allowed_menus.meat : [];
 });
 
 // Get items based on active category for MenuItemGrid
@@ -270,6 +270,33 @@ const setCategory = (category: MenuCategory) => {
   })()
 };
 
+// Retry loading the current category (used by the error state UI)
+const reloadCategory = async () => {
+  const category = activeCategory.value;
+  try {
+    switch (category) {
+      case 'meats':
+        if (selectedPackageId.value) {
+          meatError.value = null;
+          await menuStore.fetchPackageDetails(Number(selectedPackageId.value));
+        }
+        break;
+      case 'desserts':
+        await menuStore.fetchDesserts();
+        break;
+      case 'sides':
+        await menuStore.fetchSides();
+        break;
+      case 'beverages':
+        await menuStore.fetchBeverages();
+        break;
+    }
+  } catch (e) {
+    if (category === 'meats') meatError.value = (e as Error).message || 'Failed to load meats';
+    logger.warn('[Menu] reloadCategory failed for', category, e);
+  }
+};
+
 // Add item to order
 const addToOrder = (item: any) => {
   const isUnlimited = activeCategory.value === 'meats' || activeCategory.value === 'sides'
@@ -304,7 +331,7 @@ const handleSupportRequest = async (type: string) => {
   // Guard early to avoid a guaranteed 422 before any order is placed.
   if (!sessionStore.orderId) {
     logger.warn('[Support] Service request skipped: no active order yet')
-    ElMessage({ message: 'Please place your order first before calling for assistance.', type: 'warning', duration: 3000 })
+    notifyWarning('Please place your order first before calling for assistance.')
     return
   }
 
@@ -315,7 +342,7 @@ const handleSupportRequest = async (type: string) => {
     table_service_id: getServiceTypeId(type),
     order_id: sessionStore.orderId,
     session_id: sessionStore.sessionId ?? null,
-    table_id: deviceStore.table?.id ?? null
+    table_id: deviceStore.getTableId() ?? null
   }
 
   try {
@@ -344,28 +371,24 @@ const getServiceTypeId = (type: string): number => {
 const toggleRefillMode = () => {
   // Check if order has been placed AND confirmed by server
   if (!orderStore.hasPlacedOrder) {
-    console.log('[Refill] Blocked: hasPlacedOrder =', orderStore.hasPlacedOrder)
-    ElMessage.warning('Please place and confirm your order first before requesting refills')
+    notifyWarning('Please place and confirm your order first before requesting refills')
     return
   }
   
   // Verify we have an order ID from the server
   if (!sessionStore.orderId) {
-    console.log('[Refill] Blocked: sessionStore.orderId =', sessionStore.orderId)
-    ElMessage.warning('Waiting for order confirmation from server...')
+    notifyWarning('Waiting for order confirmation from server...')
     return
   }
   
-  console.log('[Refill] Toggling refill mode, current:', orderStore.isRefillMode)
   const newMode = !orderStore.isRefillMode
   orderStore.toggleRefillMode(newMode)
   
   if (newMode) {
-    // Switch to meats category when entering refill mode
     activeCategory.value = 'meats'
-    ElMessage.info('Refill mode: Only unlimited items available')
+    notifyInfo('Refill mode: Only unlimited items available')
   } else {
-    ElMessage.info('Back to regular menu')
+    notifyInfo('Back to regular menu')
   }
 }
 
@@ -379,9 +402,12 @@ const isLoading = computed((): boolean => {
     case 'beverages':
       return Boolean(menuStore.isLoadingBeverages);
     default:
-      return false;
+      return Boolean(menuStore.isLoadingPackageDetails);
   }
 });
+
+// Per-category error tracking — meats uses local ref, others use store
+const meatError = ref<string | null>(null);
 
 // Check for errors
 const categoryError = computed(() => {
@@ -393,7 +419,7 @@ const categoryError = computed(() => {
     case 'beverages':
       return menuStore.errors.beverages;
     default:
-      return null;
+      return meatError.value;
   }
 });
 
@@ -401,16 +427,12 @@ const categoryError = computed(() => {
 const isOrderDrawerOpen = ref(false)
 const openOrderDrawer = () => {
   logger.debug('openOrderDrawer called')
-  // If an initial order has already been placed and we're not in refill mode,
-  // prevent opening the order drawer for a new order.
   if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
-    // Inform the user they can only request refills
     notifyWarning('Order already placed — use Refill to add items')
     logger.warn('Order already placed; only refill allowed')
     return
   }
-  isOrderDrawerOpen.value = true
-  // Start countdown automatically when drawer opens
+  // Countdown is now inline in CartSidebar — start immediately, no drawer needed
   startCountdown()
 }
 
@@ -490,18 +512,57 @@ async function confirmOrder() {
     // ElMessage.error(placeOrderError.value || errorMsg)
   }
 }
-
-function modifyDuringCountdown() {
-  cancelCountdown()
-  isOrderDrawerOpen.value = true
-}
 </script>
 
 <template>
-  <div class="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+  <NuxtErrorBoundary @error="(e: Error) => { logger.error('[Menu] Uncaught page error:', e) }">
+    <div class="flex h-screen bg-gradient-to-br from-secondary via-accent to-secondary-dark text-white">
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- ─── Package Context Bar ─────────────────────────────────── -->
+      <div v-if="selectedPackage || sessionStore.orderId"
+        class="context-bar flex items-center justify-between gap-3 px-5 py-2.5 border-b border-white/[0.06]">
+        <!-- Left: Package name + icon -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="flex-shrink-0 w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
+            <Beef :size="15" class="text-primary" stroke-width="2" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-white font-bold text-sm truncate leading-tight">
+              {{ selectedPackage?.name || 'Menu' }}
+            </p>
+            <p v-if="selectedPackage?.price" class="text-primary/70 text-[11px] font-medium leading-tight">
+              ₱{{ selectedPackage.price }}/person
+            </p>
+          </div>
+        </div>
+
+        <!-- Centre: table pill only -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-1.5 bg-white/[0.06] rounded-full px-3 py-1">
+            <svg class="w-3 h-3 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+            <span class="text-white/70 text-xs font-medium">
+              {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'Table' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Right: Order status pill -->
+        <div class="flex-shrink-0">
+          <div v-if="orderStore.hasPlacedOrder"
+            class="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-3 py-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+            <span class="text-emerald-400 text-xs font-bold uppercase tracking-wide">Order Placed</span>
+          </div>
+          <div v-else
+            class="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full px-3 py-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
+            <span class="text-primary/80 text-xs font-semibold">Browsing Menu</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Category Filter Tabs -->
       <div class="sticky top-0 z-10">
@@ -539,11 +600,7 @@ function modifyDuringCountdown() {
 
           <!-- Loading State -->
           <div v-if="isLoading" class="space-y-6">
-            <component 
-              v-for="i in 3" 
-              :key="`skeleton-${i}`" 
-              :is="() => import('~/components/ui/SkeletonCard.vue')" 
-            />
+            <SkeletonCard v-for="i in 3" :key="`skeleton-${i}`" />
           </div>
 
           <!-- Error State -->
@@ -553,8 +610,7 @@ function modifyDuringCountdown() {
                 <span class="text-on font-semibold">Error Loading {{ activeCategory }}</span>
               </template>
               <p class="text-on mb-4">{{ categoryError }}</p>
-              <el-button type="danger"
-                @click="menuStore[`fetch${activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}`]()">
+              <el-button type="danger" @click="reloadCategory">
                 Try Again
               </el-button>
             </el-card>
@@ -579,7 +635,6 @@ function modifyDuringCountdown() {
     </div>
 
     <!-- Order Summary Sidebar -->
-    
     <cart-sidebar 
       :selected-package="selectedPackage" 
       :guest-count="guestCount" 
@@ -591,13 +646,15 @@ function modifyDuringCountdown() {
       :unlimited-item-cap="UNLIMITED_ITEM_CAP" 
       :is-refill-mode="orderStore.isRefillMode"
       :has-placed-order="orderStore.hasPlacedOrder"
+      :is-counting-down="isCountingDown"
+      :countdown="countdown"
       @update-quantity="updateQuantity" 
       @remove-item="removeFromOrder"
       @set-guest-count="(count) => orderStore.setGuestCount(count)"
       @submit-order="openOrderDrawer"
+      @cancel-countdown="cancelCountdown"
       @toggle-refill-mode="toggleRefillMode"
     />
-
   </div>
 
   <!-- Order Confirmation Drawer (component) -->
@@ -610,14 +667,11 @@ function modifyDuringCountdown() {
     :addOnsTotal="orderStore.isRefillMode ? orderStore.refillTotal : addOnsTotal" 
     :taxAmount="orderStore.isRefillMode ? 0 : taxAmount"
     :grandTotal="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal" 
-    :isCountingDown="isCountingDown" 
-    :countdown="countdown" 
     :placeOrderError="placeOrderError"
     :isSubmitting="orderStore.isSubmitting" 
     :is-refill-mode="orderStore.isRefillMode"
     @confirm="confirmOrder"
-    @cancel="() => { if (isCountingDown) cancelCountdown(); else isOrderDrawerOpen = false }"
-    @modify="modifyDuringCountdown" 
+    @cancel="() => { isOrderDrawerOpen = false }"
   />
 
   <!-- Support FAB -->
@@ -655,6 +709,18 @@ function modifyDuringCountdown() {
       </div>
     </div>
   </Transition>
+
+    <template #error="{ error, clearError }">
+      <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
+        <p class="text-xl font-bold text-red-400">Something went wrong</p>
+        <p class="text-sm text-gray-400 text-center max-w-sm">{{ error?.message || 'An unexpected error occurred.' }}</p>
+        <button
+          class="px-6 py-3 bg-primary text-black font-semibold rounded-xl hover:opacity-90 transition"
+          @click="clearError()"
+        >Try Again</button>
+      </div>
+    </template>
+  </NuxtErrorBoundary>
 
 </template>
 
@@ -705,6 +771,13 @@ function modifyDuringCountdown() {
 :deep(.el-badge__content) {
   border: none;
 }
+
+/* ─── Package context bar ───────────────────────────── */
+.context-bar {
+  background: linear-gradient(to right, rgba(26,26,26,0.95) 0%, rgba(17,17,17,0.98) 100%);
+  backdrop-filter: blur(12px);
+}
+
 
 /* Success banner transitions */
 .slide-down-enter-active {

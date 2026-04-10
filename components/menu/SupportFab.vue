@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { Component } from 'vue'
 import { Paintbrush, Droplets, CreditCard, Bell, Hand, X } from 'lucide-vue-next'
 

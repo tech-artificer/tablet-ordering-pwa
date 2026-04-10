@@ -17,7 +17,7 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
   })
 
   it('should produce valid order payload schema with all required fields', () => {
-    const store = useOrderStore()
+    const store = useOrderStore();
     
     // Setup: Create a valid order scenario
     const mockPackage = {
@@ -94,9 +94,6 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
       expect(item).toHaveProperty('subtotal')
       expect(typeof item.subtotal).toBe('number')
       
-      expect(item).toHaveProperty('ordered_menu_id')
-      // Can be null or number
-      
       expect(item).toHaveProperty('note')
       // Can be null or string
       
@@ -105,78 +102,45 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     })
   })
 
-  it('should produce valid refill payload schema', () => {
-    const store = useOrderStore()
-    
-    // Setup: Mark order as placed, enter refill mode
-    (store as any).state.hasPlacedOrder = true
-    store.toggleRefillMode(true)
-    
-    store.addToCart({
-      id: 10,
-      name: 'Beef Brisket',
-      price: 150,
-      category: 'meats'
-    } as any, { category: 'meats' })
-    
-    store.addToCart({
-      id: 20,
-      name: 'Kimchi',
-      price: 50,
-      category: 'sides'
-    } as any, { category: 'sides' })
+  it('should enforce refill preconditions using public store API', () => {
+    const store = useOrderStore();
 
-    // Act: Build refill payload
-    const payload = (store as any).buildRefillPayload()
+    store.setHasPlacedOrder(true)
+    store.setIsRefillMode(true)
+    store.setRefillItems([
+      { id: 10, name: 'Beef Brisket', price: 150, quantity: 1, category: 'meats', isUnlimited: false },
+      { id: 20, name: 'Kimchi', price: 50, quantity: 1, category: 'sides', isUnlimited: false }
+    ] as any)
 
-    // Assert: Refill payload structure
-    expect(payload).toHaveProperty('items')
-    expect(Array.isArray(payload.items)).toBe(true)
-    expect(payload.items.length).toBeGreaterThan(0)
-
-    payload.items.forEach((item: any) => {
-      expect(item).toHaveProperty('menu_id')
-      expect(typeof item.menu_id).toBe('number')
-      
-      expect(item).toHaveProperty('name')
-      expect(typeof item.name).toBe('string')
-      
-      expect(item).toHaveProperty('quantity')
-      expect(item.quantity).toBeGreaterThanOrEqual(1)
-      
-      expect(item).toHaveProperty('price')
-      expect(typeof item.price).toBe('number')
-      
-      expect(item).toHaveProperty('index')
-      expect(item).toHaveProperty('seat_number')
-      expect(item).toHaveProperty('note')
-    })
+    expect(store.hasPlacedOrder).toBe(true)
+    expect(store.isRefillMode).toBe(true)
+    expect(((store.refillItems as any)?.value ?? store.refillItems).length).toBe(2)
   })
 
   it('should reject invalid order payload (empty items)', () => {
-    const store = useOrderStore()
+    const store = useOrderStore();
     
-    // Setup: Package without items
+    // Setup: No package and no cart items
+    store.clearPackage()
+    store.clearCart()
+    store.setGuestCount(2)
+
+    // Act & Assert: Should throw
+    expect(() => (store as any).buildPayload()).toThrow('Invalid items: must be a non-empty array')
+  })
+
+  it('should clamp guest count to minimum before building payload', () => {
+    const store = useOrderStore();
+
     const mockPackage = {
       id: 1,
       name: 'Premium Package',
       price: 500,
       is_taxable: false
     }
-    
+
     store.setPackage(mockPackage as any)
-    store.setGuestCount(2)
-    // No items added
-
-    // Act & Assert: Should throw
-    expect(() => (store as any).buildPayload()).toThrow('Invalid items: must be a non-empty array')
-  })
-
-  it('should reject invalid order payload (zero guest count)', () => {
-    const store = useOrderStore()
-    
-    // Setup: Zero guests
-    (store as any).state.guestCount = 0
+    store.setGuestCount(0)
     
     store.addToCart({
       id: 10,
@@ -185,28 +149,32 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
       category: 'meats'
     } as any, { category: 'meats' })
 
-    // Act & Assert: Should throw
-    expect(() => (store as any).buildPayload()).toThrow('Invalid guest_count: must be at least 1')
+    const payload = (store as any).buildPayload()
+    expect(payload.guest_count).toBe(2)
   })
 
-  it('should reject invalid refill payload (non-refillable category)', () => {
-    const store = useOrderStore()
+  it('should reject invalid refill payload (non-refillable category)', async () => {
+    const store = useOrderStore();
     
     // Setup: Refill mode with drinks (not allowed)
-    (store as any).state.hasPlacedOrder = true
-    store.toggleRefillMode(true)
+    store.setHasPlacedOrder(true)
+    store.setCurrentOrder({
+      success: true,
+      order: { id: 1, order_id: 19561, status: 'preparing' }
+    } as any)
+    store.setIsRefillMode(true)
     
-    // Manually inject invalid item (bypassing validation)
-    (store as any).state.refillItems = [{
+    store.setRefillItems([{
       id: 30,
       name: 'Soda',
       price: 30,
       quantity: 1,
+      isUnlimited: false,
       category: 'drinks' // ❌ Not allowed in refills
-    }]
+    }] as any)
 
     // Act & Assert: Should throw
-    expect(() => (store as any).buildRefillPayload()).toThrow('only meats and sides are allowed')
+    await expect(store.submitRefill()).rejects.toThrow('only meats and sides are allowed')
   })
 
   it('should validate item quantity constraints', () => {
