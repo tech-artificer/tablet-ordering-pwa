@@ -201,6 +201,9 @@ export default defineNuxtConfig({
             mainApiUrl: process.env.MAIN_API_URL || 'https://192.168.100.7:8443',
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
 
+            // Settings PIN lock behavior
+            settingsPinBackgroundTimeoutMs: parseInt(process.env.NUXT_PUBLIC_SETTINGS_PIN_BACKGROUND_TIMEOUT_MS || '120000'),
+
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
 

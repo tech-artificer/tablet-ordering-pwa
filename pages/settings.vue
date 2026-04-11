@@ -11,6 +11,55 @@ definePageMeta({
 
 const deviceStore = useDeviceStore()
 const config = useRuntimeConfig()
+const router = useRouter()
+
+const SETTINGS_PIN_AUTH_KEY = 'settings.pin.auth_until'
+const SETTINGS_PIN_HIDDEN_AT_KEY = 'settings.pin.hidden_at'
+const SETTINGS_PIN_MAX_BACKGROUND_MS = computed(() => {
+  const raw = Number(config.public.settingsPinBackgroundTimeoutMs)
+  if (!Number.isFinite(raw) || raw <= 0) return 2 * 60 * 1000
+  return raw
+})
+
+const clearSettingsPinAuth = () => {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(SETTINGS_PIN_AUTH_KEY)
+  sessionStorage.removeItem(SETTINGS_PIN_HIDDEN_AT_KEY)
+}
+
+const hasValidSettingsPinAuth = () => {
+  if (typeof sessionStorage === 'undefined') return false
+  const raw = sessionStorage.getItem(SETTINGS_PIN_AUTH_KEY)
+  const authUntil = Number(raw || 0)
+  return Number.isFinite(authUntil) && authUntil > Date.now()
+}
+
+const enforceSettingsPinGate = async () => {
+  if (hasValidSettingsPinAuth()) return true
+  clearSettingsPinAuth()
+  await router.replace({ path: '/', query: { settingsLocked: '1' } })
+  return false
+}
+
+const handleSettingsVisibilityChange = () => {
+  if (typeof document === 'undefined' || typeof sessionStorage === 'undefined') return
+
+  if (document.hidden) {
+    sessionStorage.setItem(SETTINGS_PIN_HIDDEN_AT_KEY, String(Date.now()))
+    return
+  }
+
+  const hiddenAt = Number(sessionStorage.getItem(SETTINGS_PIN_HIDDEN_AT_KEY) || 0)
+  if (!hiddenAt) return
+
+  const elapsed = Date.now() - hiddenAt
+  sessionStorage.removeItem(SETTINGS_PIN_HIDDEN_AT_KEY)
+
+  if (elapsed >= SETTINGS_PIN_MAX_BACKGROUND_MS.value) {
+    clearSettingsPinAuth()
+    void router.replace({ path: '/', query: { settingsLocked: '1' } })
+  }
+}
 
 // Settings state
 const apiUrl = ref(config.public.mainApiUrl || '')
@@ -172,11 +221,15 @@ onMounted(() => {
   // listen to fullscreen changes
   if (typeof document !== 'undefined') {
     document.addEventListener('fullscreenchange', updateFullscreenState)
+    document.addEventListener('visibilitychange', handleSettingsVisibilityChange)
   }
 })
 
 onBeforeUnmount(() => {
-  if (typeof document !== 'undefined') document.removeEventListener('fullscreenchange', updateFullscreenState)
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('fullscreenchange', updateFullscreenState)
+    document.removeEventListener('visibilitychange', handleSettingsVisibilityChange)
+  }
 })
 
 // Try to resolve device & table by local IP. Server may accept POST or GET for this helper.
@@ -540,6 +593,8 @@ const testBackendOrder = async () => {
 }
 
 onMounted(async () => {
+  if (!(await enforceSettingsPinGate())) return
+
   await getLocalIpAddress()
   
   // After detecting local IP, attempt to resolve device/table

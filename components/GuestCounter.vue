@@ -1,20 +1,22 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { Users, Minus, Plus } from 'lucide-vue-next'
 import { useOrderStore } from '~/stores/Order'
 
 const orderStore = useOrderStore()
+const { guestCount } = storeToRefs(orderStore)
 
 const MIN = 2
 const MAX = 20
 
-const canDecrement = computed(() => orderStore.guestCount > MIN)
-const canIncrement = computed(() => orderStore.guestCount < MAX)
+const canDecrement = computed(() => guestCount.value > MIN)
+const canIncrement = computed(() => guestCount.value < MAX)
 
 function decrement() {
-  if (canDecrement.value) orderStore.setGuestCount(orderStore.guestCount - 1)
+  if (canDecrement.value) orderStore.setGuestCount(guestCount.value - 1)
 }
 function increment() {
-  if (canIncrement.value) orderStore.setGuestCount(orderStore.guestCount + 1)
+  if (canIncrement.value) orderStore.setGuestCount(guestCount.value + 1)
 }
 </script>
 
@@ -32,9 +34,9 @@ function increment() {
         <span
           class="text-6xl font-black font-raleway text-white leading-none tabular-nums transition-all duration-200"
           aria-live="polite"
-          :aria-label="`${orderStore.guestCount} guests`"
+          :aria-label="`${guestCount} guests`"
         >
-          {{ orderStore.guestCount }}
+          {{ guestCount }}
         </span>
         <span class="text-xs text-white/40 uppercase tracking-widest font-semibold">guests</span>
       </div>
@@ -47,12 +49,12 @@ function increment() {
         @click="decrement"
         :disabled="!canDecrement"
         class="touch-btn-circle w-14 h-14 rounded-full ring-1 transition-all duration-150
-               bg-white/8 ring-white/15 text-white/70
+               bg-white/10 ring-white/15 text-white/70
                hover:bg-white/15 hover:ring-primary/50 hover:text-white
                active:scale-90 active:bg-white/20
-               disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white/8 disabled:hover:ring-white/15 disabled:hover:text-white/70
+               disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white/10 disabled:hover:ring-white/15 disabled:hover:text-white/70
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-        :aria-label="`Decrease guest count, currently ${orderStore.guestCount}`"
+        :aria-label="`Decrease guest count, currently ${guestCount}`"
       >
         <Minus :size="22" stroke-width="2.5" />
       </button>
@@ -62,10 +64,8 @@ function increment() {
         <div
           v-for="n in MAX"
           :key="n"
-          class="rounded-full transition-all duration-150"
-          :class="n <= orderStore.guestCount
-            ? 'w-2 h-2 bg-primary'
-            : 'w-1.5 h-1.5 bg-white/15'"
+          class="w-1.5 h-1.5 rounded-full transition-colors duration-150"
+          :class="n <= guestCount ? 'bg-primary' : 'bg-white/15'"
         ></div>
       </div>
 
@@ -79,7 +79,7 @@ function increment() {
                active:scale-90 active:bg-primary/35
                disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-primary/15 disabled:hover:ring-primary/30
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-        :aria-label="`Increase guest count, currently ${orderStore.guestCount}`"
+        :aria-label="`Increase guest count, currently ${guestCount}`"
       >
         <Plus :size="22" stroke-width="2.5" />
       </button>

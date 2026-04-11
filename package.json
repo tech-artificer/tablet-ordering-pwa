@@ -46,13 +46,13 @@
     "@nuxt/image": "^1.10.0",
     "@nuxtjs/tailwindcss": "^6.14.0",
     "@types/node": "^24.10.1",
-    "@vite-pwa/nuxt": "^1.0.1",
+    "@vite-pwa/nuxt": "^0.6.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/test-utils": "^2.0.0-0",
-    "jsdom": "^21.1.0",
+    "jsdom": "^29.0.2",
     "playwright": "^1.40.1",
     "sharp": "^0.34.5",
     "typescript": "^5.4.0",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.4"
   }
 }

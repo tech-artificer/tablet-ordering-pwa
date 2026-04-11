@@ -70,13 +70,13 @@ const orderStatus = computed(() => {
 
 const statusConfig = computed(() => {
   const configs: Record<string, { label: string; color: string; bgColor: string; icon: any }> = {
-    'pending': { label: 'Order Received', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20 border-yellow-500/30', icon: Clock },
-    'confirmed': { label: 'Confirmed', color: 'text-blue-400', bgColor: 'bg-blue-500/20 border-blue-500/30', icon: CheckCircle },
-    'preparing': { label: 'Preparing', color: 'text-orange-400', bgColor: 'bg-orange-500/20 border-orange-500/30', icon: ChefHat },
-    'ready': { label: 'Ready to Serve', color: 'text-green-400', bgColor: 'bg-green-500/20 border-green-500/30', icon: CheckCircle },
-    'served': { label: 'Served', color: 'text-green-400', bgColor: 'bg-green-500/20 border-green-500/30', icon: CheckCircle },
-    'completed': { label: 'Completed', color: 'text-gray-400', bgColor: 'bg-gray-500/20 border-gray-500/30', icon: CheckCircle },
-    'cancelled': { label: 'Cancelled', color: 'text-red-400', bgColor: 'bg-red-500/20 border-red-500/30', icon: AlertCircle },
+    'pending':   { label: 'Order Received', color: 'text-warning',      bgColor: 'bg-warning/20 border-warning/30',      icon: Clock },
+    'confirmed': { label: 'Confirmed',      color: 'text-primary/80',   bgColor: 'bg-primary/10 border-primary/20',      icon: CheckCircle },
+    'preparing': { label: 'Preparing',      color: 'text-primary',      bgColor: 'bg-primary/20 border-primary/30',      icon: ChefHat },
+    'ready':     { label: 'Ready to Serve', color: 'text-success',      bgColor: 'bg-success/20 border-success/30',      icon: CheckCircle },
+    'served':    { label: 'Served',         color: 'text-success',      bgColor: 'bg-success/20 border-success/30',      icon: CheckCircle },
+    'completed': { label: 'Completed',      color: 'text-white/40',     bgColor: 'bg-white/5 border-white/10',           icon: CheckCircle },
+    'cancelled': { label: 'Cancelled',      color: 'text-error',        bgColor: 'bg-error/20 border-error/30',          icon: AlertCircle },
   }
   return configs[orderStatus.value] || configs['pending']
 })
@@ -180,65 +180,56 @@ const submitOrder = () => {
 
 <template>
   <div
-    class="w-80 flex-shrink-0 text-white bg-gradient-to-b from-[#1e1e1e] via-[#141414] to-black backdrop-blur-xl border-l-2 border-primary/40 flex flex-col shadow-[-4px_0_24px_rgba(0,0,0,0.6)] relative z-20">
+    class="w-80 flex-shrink-0 text-white bg-[#111111] border-l border-white/[0.07] flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.5)] relative z-20">
 
-    <!-- Summary Header with gradient -->
-    <div
-      class="sticky top-0 z-10 p-4 border-b border-primary/20 bg-gradient-to-r from-primary/20 to-primary-dark/20 backdrop-blur-lg">
+    <!-- ─── Summary Header ──────────────────────────────────── -->
+    <div class="px-5 pt-5 pb-3 border-b border-white/[0.07]">
+      <!-- Label -->
+      <p class="text-white/30 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Order Summary</p>
 
       <!-- Refill Mode Banner -->
-      <div v-if="isRefillMode" class="mb-3 bg-green-500/20 rounded-lg px-3 py-2 border border-green-500/30">
+      <div v-if="isRefillMode" class="mb-3 bg-success/15 rounded-xl px-3 py-2.5 border border-success/25">
         <div class="flex items-center gap-2">
-          <RefreshCw class="w-4 h-4 text-green-400" />
+          <RefreshCw class="w-4 h-4 text-success flex-shrink-0" />
           <div>
-            <p class="font-bold text-green-400 text-sm">Refill Order</p>
-            <p class="text-[10px] text-green-300/80">Unlimited items only</p>
+            <p class="font-bold text-success text-sm leading-none">Refill Order</p>
+            <p class="text-[10px] text-success/70 mt-0.5">Unlimited items only</p>
           </div>
         </div>
       </div>
 
-      <!-- Package header (hide in refill mode) -->
-      <template v-if="selectedPackage && !isRefillMode">
-        <!-- Package name + Order ID pill -->
-        <div class="flex items-start justify-between gap-2 mb-2.5">
-          <div class="flex-1 min-w-0">
-            <p class="text-primary font-bold text-base leading-tight truncate">{{ selectedPackage.name }}</p>
-            <p v-if="selectedPackage.price" class="text-primary/55 text-[11px] mt-0.5">₱{{ selectedPackage.price }}/person</p>
-          </div>
-          <!-- Order ID — only shown once an actual ID exists -->
-          <div v-if="orderStore.hasPlacedOrder && displayOrderId !== '-'"
-            class="flex-shrink-0 bg-white/[0.07] rounded-lg px-2 py-1.5 border border-white/10 text-right">
-            <p class="text-[9px] text-white/40 leading-none mb-0.5">Order</p>
-            <p class="text-white text-xs font-bold leading-none">#{{ displayOrderId }}</p>
-          </div>
+      <!-- Guests row -->
+      <div class="flex items-center justify-between py-2">
+        <span class="text-white/60 text-sm font-medium">Guests</span>
+        <div v-if="!orderStore.hasPlacedOrder" class="flex items-center gap-2">
+          <button
+            @click="emit('setGuestCount', Math.max(2, guestCount - 1))"
+            class="w-8 h-8 rounded-lg bg-white/[0.08] flex items-center justify-center text-white font-bold text-base transition-colors hover:bg-white/15 active:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
+            :disabled="guestCount <= 2"
+            aria-label="Decrease guests">−</button>
+          <span class="text-white font-bold text-base min-w-[2ch] text-center tabular-nums">{{ guestCount }}</span>
+          <button
+            @click="emit('setGuestCount', Math.min(20, guestCount + 1))"
+            class="w-8 h-8 rounded-lg bg-white/[0.08] flex items-center justify-center text-white font-bold text-base transition-colors hover:bg-white/15 active:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
+            :disabled="guestCount >= 20"
+            aria-label="Increase guests">+</button>
         </div>
+        <span v-else class="text-white font-bold text-base tabular-nums">{{ orderGuestCount }}</span>
+      </div>
 
-        <!-- Guest count control (pre-order) -->
-        <div v-if="!orderStore.hasPlacedOrder"
-          class="flex items-center justify-between bg-white/[0.06] rounded-xl px-3 py-2.5 border border-white/10">
-          <span class="text-white/50 text-xs font-medium">Guests</span>
-          <div class="flex items-center gap-3">
-            <button
-              @click="emit('setGuestCount', Math.max(2, guestCount - 1))"
-              class="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold transition-colors bg-white/10 active:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
-              :class="guestCount <= 2 ? 'text-white/20 cursor-not-allowed' : 'text-white'"
-              :disabled="guestCount <= 2"
-              aria-label="Decrease guests">−</button>
-            <span class="text-white font-bold text-lg min-w-[2ch] text-center tabular-nums">{{ guestCount }}</span>
-            <button
-              @click="emit('setGuestCount', Math.min(20, guestCount + 1))"
-              class="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold transition-colors bg-white/10 active:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
-              :class="guestCount >= 20 ? 'text-white/20 cursor-not-allowed' : 'text-white'"
-              :disabled="guestCount >= 20"
-              aria-label="Increase guests">+</button>
-          </div>
-        </div>
-        <!-- Post-order: show guest count as static info -->
-        <div v-else class="flex items-center gap-1.5 text-white/40 text-xs">
-          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2m6-6a3 3 0 100-6 3 3 0 000 6zm6 6v-2a3 3 0 00-3-3H9a3 3 0 00-3 3v2"/></svg>
-          <span>{{ orderGuestCount }} guests</span>
-        </div>
-      </template>
+      <!-- Package name (pre-order only) -->
+      <div v-if="selectedPackage && !isRefillMode && !orderStore.hasPlacedOrder"
+        class="flex items-center justify-between pt-1 pb-0.5">
+        <span class="text-white/40 text-xs">Package</span>
+        <span class="text-primary text-xs font-bold truncate max-w-[55%] text-right">{{ selectedPackage.name }}</span>
+      </div>
+
+      <!-- Order ID (post-order) -->
+      <div v-if="orderStore.hasPlacedOrder && displayOrderId !== '-'"
+        class="flex items-center justify-between pt-1">
+        <span class="text-white/40 text-xs">Order #</span>
+        <span class="text-white text-xs font-bold">#{{ displayOrderId }}</span>
+      </div>
     </div>
 
     <!-- Content Area -->
@@ -326,21 +317,67 @@ const submitOrder = () => {
       <!-- PRE-ORDER or REFILL: Show cart items (editable) -->
       <template v-else>
         <div v-if="cartItems.length > 0">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-white font-semibold text-sm flex items-center gap-2">
-              <span>{{ isRefillMode ? '🔄' : '➕' }}</span>
-              <span>{{ isRefillMode ? 'Refill Items' : 'Add-ons' }}</span>
-              <el-badge :value="cartItems.length" class="badge-primary" />
-            </h3>
-            <button @click="cartItems.forEach(item => $emit('removeItem', item.id))"
-              class="text-[10px] text-red-400 hover:text-red-300 active:scale-95 transition-all px-3 py-2 min-h-[44px] rounded bg-red-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400">
+          <!-- Clear all -->
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-white/30 text-[10px] font-bold uppercase tracking-widest">
+              {{ isRefillMode ? 'Refill Items' : 'Items' }}
+            </span>
+            <button
+              @click="cartItems.forEach(item => $emit('removeItem', item.id))"
+              class="text-[10px] text-error/70 hover:text-error transition-colors active:scale-95 px-2 py-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-error/60">
               Clear All
             </button>
           </div>
 
-          <div class="space-y-2">
-            <cart-item-card v-for="item in cartItems" :key="item.id" :item="item" :unlimited-cap="unlimitedItemCap"
-              @update-quantity="(qty) => updateQuantity(item.id, qty)" @remove="removeItem(item.id)" />
+          <!-- Reference-style item rows -->
+          <div class="divide-y divide-white/[0.05]">
+            <div
+              v-for="item in cartItems"
+              :key="item.id"
+              class="py-3 first:pt-0 last:pb-0">
+              <!-- Name + price/badge row -->
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="flex-1 min-w-0">
+                  <p class="text-white font-semibold text-[13px] leading-snug truncate">{{ item.name }}</p>
+                  <p class="text-white/35 text-[10px] uppercase tracking-wide mt-0.5">
+                    {{ (item as any).category || (item as any).group || 'ITEM' }}
+                    <template v-if="item.isUnlimited"> · Unlimited</template>
+                  </p>
+                </div>
+                <span
+                  class="flex-shrink-0 text-[10px] font-bold mt-0.5"
+                  :class="item.price > 0 ? 'text-primary' : 'text-white/40'">
+                  {{ item.price > 0 ? formatCurrency(item.price) : 'Included' }}
+                </span>
+              </div>
+              <!-- Stepper row -->
+              <div class="flex items-center gap-2">
+                <button
+                  class="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-base transition-all
+                         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                  :class="item.quantity <= 1
+                    ? 'bg-error/15 text-error border border-error/30 hover:bg-error/25 focus-visible:outline-error/50'
+                    : 'bg-white/[0.08] text-white/70 border border-white/10 hover:bg-white/15 focus-visible:outline-white/40'"
+                  @click="item.quantity <= 1 ? removeItem(item.id) : updateQuantity(item.id, item.quantity - 1)"
+                  :aria-label="item.quantity <= 1 ? 'Remove item' : 'Decrease quantity'">
+                  <span v-if="item.quantity <= 1" class="text-xs">×</span>
+                  <span v-else>−</span>
+                </button>
+                <span class="text-white font-bold text-sm min-w-[2ch] text-center tabular-nums select-none">
+                  {{ item.quantity }}
+                </span>
+                <button
+                  class="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-base transition-all
+                         bg-white/[0.08] text-white/70 border border-white/10 hover:bg-white/15
+                         disabled:opacity-30 disabled:cursor-not-allowed
+                         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
+                  @click="updateQuantity(item.id, item.quantity + 1)"
+                  :disabled="item.isUnlimited && item.quantity >= (unlimitedItemCap || 5)"
+                  aria-label="Increase quantity">
+                  +
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

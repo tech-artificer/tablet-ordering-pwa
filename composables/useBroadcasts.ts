@@ -157,32 +157,6 @@ export const useBroadcasts = () => {
     localStorage.setItem('lastEventId', eventId.toString())
   }
 
-  // Replay missed events after reconnection
-  const replayMissedEvents = async () => {
-    const lastEventId = getLastEventId()
-    const deviceId = deviceStore.getDeviceId()
-
-    if (!deviceId) return
-
-    try {
-      const api = useApi()
-      const response = await api.get(`/api/events/missing?after=${lastEventId}&device_id=${deviceId}&limit=100`)
-      
-      const { events, hasMore } = response.data
-
-      for (const event of events) {
-        processEvent(event.event_type, event.payload)
-        setLastEventId(event.id)
-      }
-
-      if (hasMore) {
-        await replayMissedEvents()
-      }
-    } catch (error) {
-      logger.error('Failed to replay missed events:', error)
-    }
-  }
-
   // Process events based on type
   const processEvent = (eventType: string, payload: any) => {
     if (payload.eventId) {
@@ -645,7 +619,6 @@ export const useBroadcasts = () => {
     initializeBroadcasts,
     subscribeToOrderChannel,
     unsubscribeFromOrderChannel,
-    replayMissedEvents,
     cleanup,
     channelStatus
   }

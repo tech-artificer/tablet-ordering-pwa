@@ -39,6 +39,7 @@
           <div class="text-center">
             <h3 class="text-2xl font-bold text-primary">Settings</h3>
             <p class="text-sm text-white/60 mt-2">Enter your PIN</p>
+            <p v-if="pinNotice" class="text-xs text-primary/80 mt-2">{{ pinNotice }}</p>
           </div>
 
           <input
@@ -184,11 +185,11 @@ import { useBroadcasts } from '~/composables/useBroadcasts';
 import { useMenuStore } from '~/stores/Menu';
 import { Settings, UtensilsCrossed } from 'lucide-vue-next';
 import { recoverActiveOrderState } from '~/composables/useActiveOrderRecovery'
-import { logger } from '../utils/logger'
 const session = useSessionStore();
 const deviceStore = useDeviceStore();
 const menuStore = useMenuStore();
 const router = useRouter();
+const route = useRoute();
 const { channelStatus } = useBroadcasts();
 
 const isWebSocketConnected = computed(() => channelStatus.value.device || channelStatus.value.deviceControl || channelStatus.value.order || channelStatus.value.serviceRequest);
@@ -197,7 +198,10 @@ const isWebSocketConnected = computed(() => channelStatus.value.device || channe
 const showPinModal = ref(false)
 const pinInput = ref('')
 const pinError = ref('')
+const pinNotice = ref('')
 const PIN_STORAGE_KEY = 'settings.pin'
+const SETTINGS_PIN_AUTH_KEY = 'settings.pin.auth_until'
+const SETTINGS_PIN_AUTH_WINDOW_MS = 5 * 60 * 1000
 const storedPin = ref<string | null>(null)
 const DEFAULT_PIN = '0711'
 
@@ -214,6 +218,11 @@ onMounted(async () => {
   // Silently warm the package cache while kiosk is idle on the welcome screen.
   // loadAllMenus respects the 30-min cache — no duplicate requests if already fresh.
   menuStore.loadAllMenus().catch(() => { /* non-fatal — packageSelection will retry */ })
+
+  if (route.query.settingsLocked === '1') {
+    openSettings('Settings access expired. Please re-enter PIN.')
+    await router.replace('/')
+  }
 });
 
 const start = () => {
@@ -221,8 +230,8 @@ const start = () => {
   console.log(`[🎬 Session START] Welcome screen → Start button clicked at ${timestamp}`)
   
   if (!deviceStore.isAuthenticated) {
-    console.log(`[⚠️ Device Auth Failed] Redirecting to Settings at ${timestamp}`)
-    router.replace({ path: '/settings', query: { requirePin: '1' } })
+    console.log(`[⚠️ Device Auth Failed] Prompting PIN for Settings at ${timestamp}`)
+    openSettings()
     return
   }
   
@@ -231,7 +240,9 @@ const start = () => {
   router.replace('/order/start')
 }
 
-const openSettings = () => {
+const openSettings = (notice = '') => {
+  pinNotice.value = notice
+  pinError.value = ''
   storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
   showPinModal.value = true
 }
@@ -240,6 +251,7 @@ const closePinModal = () => {
   showPinModal.value = false
   pinInput.value = ''
   pinError.value = ''
+  pinNotice.value = ''
 }
 
 const verifyPin = () => {
@@ -247,6 +259,9 @@ const verifyPin = () => {
   storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
 
   if (pinInput.value === storedPin.value) {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(SETTINGS_PIN_AUTH_KEY, String(Date.now() + SETTINGS_PIN_AUTH_WINDOW_MS))
+    }
     closePinModal()
     router.push('/settings')
     return
@@ -264,20 +279,6 @@ const backspace = () => {
   pinInput.value = pinInput.value.slice(0, -1)
   pinError.value = ''
 }
-
-// Ambient food strip images (static paths, served from public/)
-const foodImages = [
-  '/images/food/samgyupsal.png',
-  '/images/food/beef-bulgogi.png',
-  '/images/food/golden-mushroom-beef-roll.png',
-  '/images/food/gyeran-jjim-egg-souffle.png',
-  '/images/food/korean-chili-pepper-samgyupsal.png',
-  '/images/food/yangyeom-samgyupsal.png',
-  '/images/food/woosamgyup.png',
-  '/images/food/plain-samgyupsal.png',
-  '/images/food/dak-galbi-plain-or-spicy.png',
-  '/images/food/sweet-and-crunchy-tofu-dubu-ganjeong.png',
-]
 </script>
 
 <style scoped>
@@ -287,33 +288,6 @@ const foodImages = [
 
 .fade-in-enter-from, .fade-in-leave-to {
   opacity: 0;
-}
-
-/* ─── Ambient food strip ────────────────────────────── */
-.food-strip {
-  height: 160px;
-  overflow: hidden;
-}
-
-.food-track {
-  overflow-x: auto;
-  scrollbar-width: none;
-  animation: auto-scroll 20s linear infinite;
-  pause: auto;
-}
-
-.food-track::-webkit-scrollbar {
-  display: none;
-}
-
-.food-track:hover {
-  animation-play-state: paused;
-}
-
-@keyframes auto-scroll {
-  0% {
-    scroll-behavior: smooth;
-  }
 }
 
 /* ─── Entrance & Decorative Animations ────────────── */
@@ -426,15 +400,5 @@ const foodImages = [
 
 .animate-shake {
   animation: shake 0.4s ease-in-out;
-}
-
-/* Enhance food thumbnails styling */
-.food-thumb {
-  transition: transform 0.3s ease, filter 0.3s ease;
-}
-
-.food-thumb:hover {
-  transform: scale(1.05);
-  filter: brightness(1.1);
 }
 </style>

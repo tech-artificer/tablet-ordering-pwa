@@ -134,6 +134,21 @@ const isAvailable = (item: any) => {
 
       <!-- Card footer: price + description chip + add button -->
       <div class="px-3 pt-2 pb-3 bg-gradient-to-b from-[#1e1e1e] to-[#141414]">
+        <!-- Item code + category row -->
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-white/25 text-[10px] font-bold tracking-wider uppercase">
+            M{{ (item as any).id }}
+          </span>
+          <span
+            class="text-[10px] font-bold uppercase tracking-wider"
+            :class="{
+              'text-primary/60': categoryType === 'meats',
+              'text-success/70': categoryType === 'sides',
+              'text-primary-light/60': categoryType === 'desserts',
+              'text-white/35': categoryType === 'beverages',
+            }"
+          >{{ isUnlimitedCategory ? 'UNLIMITED' : categoryType }}</span>
+        </div>
         <!-- Item name — always visible, primary source of truth -->
         <p class="text-white font-semibold text-sm leading-snug mb-1 truncate">
           {{ (item as any).name || (item as any).receipt_name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
@@ -144,24 +159,13 @@ const isAvailable = (item: any) => {
           {{ (item as any).description }}
         </p>
 
-        <div class="flex items-center justify-between gap-2">
-          <!-- Price + category chip -->
-          <div class="flex flex-col gap-1">
+        <div class="flex items-center justify-between gap-2 mt-2">
+          <!-- Price only -->
+          <div>
             <span v-if="item.price > 0" class="text-primary font-black text-base tabular-nums leading-none">
               {{ formatCurrency(item.price) }}
             </span>
-            <span v-else class="text-[#4ade80] text-xs font-bold uppercase tracking-wide leading-none">Free</span>
-            <!-- Flavor/category chip -->
-            <span
-              v-if="categoryType"
-              class="text-[10px] font-bold uppercase tracking-wider leading-none"
-              :class="{
-                'text-primary/70': categoryType === 'meats',
-                'text-success/80': categoryType === 'sides',
-                'text-primary-light/70': categoryType === 'desserts',
-                'text-white/40': categoryType === 'beverages',
-              }"
-            >{{ categoryType }}</span>
+            <span v-else class="text-success text-xs font-bold uppercase tracking-wide leading-none">Free</span>
           </div>
 
           <!-- Add button -->
@@ -170,7 +174,7 @@ const isAvailable = (item: any) => {
             @click.stop="addItem(item)"
             :aria-disabled="isAddDisabled(item) || !isAvailable(item)"
             :class="[
-              'add-btn flex items-center justify-center gap-1 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all duration-150 shadow-md min-h-[44px] min-w-[80px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              'add-btn flex items-center justify-center gap-1 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all duration-150 shadow-md min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
               isAddDisabled(item) || !isAvailable(item) || isLocked()
                 ? 'bg-white/10 text-white/30 cursor-not-allowed'
                 : 'bg-primary text-secondary active:scale-95 hover:bg-primary-light'
@@ -180,6 +184,7 @@ const isAvailable = (item: any) => {
               <span v-if="isLocked()">Locked</span>
               <span v-else-if="!isAvailable(item)">N/A</span>
               <span v-else-if="isAddDisabled(item)">Max</span>
+              <span v-else-if="isUnlimitedCategory">ADD TO GRILL</span>
               <span v-else>Add</span>
             </span>
           </button>
@@ -229,9 +234,9 @@ const isAvailable = (item: any) => {
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.07em;
-  color: #052e16;
-  background: linear-gradient(135deg, #22c55e, #4ade80);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+  color: #1A1A1A;
+  background: linear-gradient(135deg, #F6B56D, #C78B45);
+  box-shadow: 0 4px 12px rgba(246, 181, 109, 0.35);
   text-transform: uppercase;
 }
 
@@ -239,7 +244,7 @@ const isAvailable = (item: any) => {
   width: 5px;
   height: 5px;
   border-radius: 9999px;
-  background: #052e16;
+  background: #1A1A1A;
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 

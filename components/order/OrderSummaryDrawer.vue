@@ -111,8 +111,44 @@ function onRequestSupport() {
           </div>
         </div>
 
+        <!-- Countdown ring — visible while auto-confirming -->
+        <div v-if="isCountingDown && !isSubmitting" class="flex flex-col items-center gap-3 py-4">
+          <!-- SVG countdown ring -->
+          <div class="relative w-24 h-24 flex-shrink-0">
+            <svg class="w-24 h-24 -rotate-90" viewBox="0 0 96 96" aria-hidden="true">
+              <!-- Track -->
+              <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(246,181,109,0.12)" stroke-width="6" />
+              <!-- Progress — 5s countdown, circumference = 2π×40 ≈ 251.3 -->
+              <circle
+                cx="48" cy="48" r="40" fill="none"
+                stroke="#F6B56D" stroke-width="6"
+                stroke-linecap="round"
+                stroke-dasharray="251.3"
+                :stroke-dashoffset="251.3 * (1 - countdown / 5)"
+                style="transition: stroke-dashoffset 0.9s linear;"
+              />
+            </svg>
+            <!-- Number in the centre of the ring -->
+            <span
+              class="absolute inset-0 flex items-center justify-center text-4xl font-black text-primary tabular-nums"
+              aria-live="polite"
+              :aria-label="`Order confirms in ${countdown} seconds`"
+            >{{ countdown }}</span>
+          </div>
+          <p class="text-white/60 text-sm text-center leading-snug">
+            Confirming in <span class="text-primary font-bold">{{ countdown }}s</span>
+            &thinsp;—&thinsp; or tap below to confirm now
+          </p>
+        </div>
+
+        <!-- Submitting spinner -->
+        <div v-else-if="isSubmitting" class="flex flex-col items-center gap-3 py-4">
+          <div class="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+          <p class="text-white/50 text-sm">Sending your order…</p>
+        </div>
+
         <!-- Action Buttons -->
-        <div class="flex gap-4 mt-8">
+        <div class="flex gap-4 mt-4">
           <button
             @click="onConfirm"
             :disabled="isSubmitting"

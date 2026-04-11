@@ -432,9 +432,14 @@ const openOrderDrawer = () => {
     logger.warn('Order already placed; only refill allowed')
     return
   }
-  // Countdown is now inline in CartSidebar — start immediately, no drawer needed
+  isOrderDrawerOpen.value = true
   startCountdown()
 }
+
+// Cancel countdown whenever the confirmation drawer closes
+watch(isOrderDrawerOpen, (open) => {
+  if (!open) cancelCountdown()
+})
 
 // Page-managed submission UI state (countdown, submit, undo)
 const isCountingDown = ref(false)
@@ -521,45 +526,51 @@ async function confirmOrder() {
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden">
 
-      <!-- ─── Package Context Bar ─────────────────────────────────── -->
-      <div v-if="selectedPackage || sessionStore.orderId"
-        class="context-bar flex items-center justify-between gap-3 px-5 py-2.5 border-b border-white/[0.06]">
-        <!-- Left: Package name + icon -->
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="flex-shrink-0 w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
-            <Beef :size="15" class="text-primary" stroke-width="2" />
-          </div>
+      <!-- ─── Header Bar ──────────────────────────────────────────── -->
+      <div class="flex items-center justify-between gap-4 px-4 py-3 border-b border-white/[0.07]"
+        style="background: rgba(15,15,15,0.95); backdrop-filter: blur(12px);">
+
+        <!-- Left: Back + title -->
+        <div class="flex items-center gap-3 min-w-0">
+          <button
+            @click="router.back()"
+            class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
+            aria-label="Go back">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
           <div class="min-w-0">
-            <p class="text-white font-bold text-sm truncate leading-tight">
-              {{ selectedPackage?.name || 'Menu' }}
+            <p class="text-white font-bold text-base leading-tight truncate">
+              {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill' }}
             </p>
-            <p v-if="selectedPackage?.price" class="text-primary/70 text-[11px] font-medium leading-tight">
-              ₱{{ selectedPackage.price }}/person
+            <p class="text-white/35 text-[10px] uppercase tracking-[0.15em] font-semibold leading-tight">
+              {{ selectedPackage ? (selectedPackage as any).description || 'Korean BBQ Selection' : 'Korean BBQ' }}
             </p>
           </div>
         </div>
 
-        <!-- Centre: table pill only -->
+        <!-- Right: Package pill + status -->
         <div class="flex items-center gap-2 flex-shrink-0">
-          <div class="flex items-center gap-1.5 bg-white/[0.06] rounded-full px-3 py-1">
-            <svg class="w-3 h-3 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
-            <span class="text-white/70 text-xs font-medium">
+          <!-- Table pill -->
+          <div class="hidden sm:flex items-center gap-1.5 bg-white/[0.05] rounded-full px-3 py-1 border border-white/[0.07]">
+            <svg class="w-3 h-3 text-white/35" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+            <span class="text-white/55 text-[11px] font-medium">
               {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'Table' }}
             </span>
           </div>
-        </div>
 
-        <!-- Right: Order status pill -->
-        <div class="flex-shrink-0">
-          <div v-if="orderStore.hasPlacedOrder"
-            class="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-3 py-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
-            <span class="text-emerald-400 text-xs font-bold uppercase tracking-wide">Order Placed</span>
+          <!-- Package name pill -->
+          <div v-if="selectedPackage" class="flex flex-col items-end">
+            <span class="text-white/30 text-[9px] uppercase tracking-[0.18em] font-bold leading-none mb-0.5">Package</span>
+            <span class="text-primary font-bold text-sm leading-tight truncate max-w-[130px]">{{ selectedPackage.name }}</span>
           </div>
-          <div v-else
-            class="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full px-3 py-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"></span>
-            <span class="text-primary/80 text-xs font-semibold">Browsing Menu</span>
+
+          <!-- Order placed pill -->
+          <div v-if="orderStore.hasPlacedOrder"
+            class="flex items-center gap-1.5 bg-success/15 border border-success/25 rounded-full px-2.5 py-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse flex-shrink-0"></span>
+            <span class="text-success text-[10px] font-bold uppercase tracking-wide">Live</span>
           </div>
         </div>
       </div>
@@ -568,13 +579,13 @@ async function confirmOrder() {
       <div class="sticky top-0 z-10">
         <div class="max-w-7xl mx-auto">
           <!-- Refill Mode Indicator -->
-          <div v-if="orderStore.isRefillMode" class="bg-green-500/20 border-b border-green-500/30 px-6 py-3">
+          <div v-if="orderStore.isRefillMode" class="bg-success/20 border-b border-success/30 px-6 py-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <RefreshCw :size="24" :stroke-width="2" class="text-green-400" />
+                <RefreshCw :size="24" :stroke-width="2" class="text-success" />
                 <div>
-                  <p class="font-bold text-green-400">Refill Mode Active</p>
-                  <p class="text-sm text-green-300/80">Only unlimited items available (Meats & Sides)</p>
+                  <p class="font-bold text-success">Refill Mode Active</p>
+                  <p class="text-sm text-success/80">Only unlimited items available (Meats &amp; Sides)</p>
                 </div>
               </div>
               <refill-button 
@@ -605,7 +616,7 @@ async function confirmOrder() {
 
           <!-- Error State -->
           <div v-else-if="categoryError" class="flex justify-center">
-            <el-card class="max-w-md bg-red-500/20">
+            <el-card class="max-w-md bg-error/20">
               <template #header>
                 <span class="text-on font-semibold">Error Loading {{ activeCategory }}</span>
               </template>
@@ -670,8 +681,11 @@ async function confirmOrder() {
     :placeOrderError="placeOrderError"
     :isSubmitting="orderStore.isSubmitting" 
     :is-refill-mode="orderStore.isRefillMode"
+    :is-counting-down="isCountingDown"
+    :countdown="countdown"
     @confirm="confirmOrder"
-    @cancel="() => { isOrderDrawerOpen = false }"
+    @cancel="() => { isOrderDrawerOpen = false; cancelCountdown() }"
+    @retry="confirmOrder"
   />
 
   <!-- Support FAB -->
