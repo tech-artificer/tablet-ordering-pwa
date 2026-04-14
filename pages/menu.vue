@@ -244,9 +244,6 @@ const displayItems = computed(() => {
   return baseItems.filter((item: any) => item?.group || item?.category || item?.name || item?.img_url);
 });
 
-  return baseItems;
-});
-
 const isUnlimitedCategory = computed(() => activeCategory.value === 'meats' || activeCategory.value === 'sides')
 
 // Totals are derived from the order store
