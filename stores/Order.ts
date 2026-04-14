@@ -742,7 +742,7 @@ export const useOrderStore = defineStore('order', () => {
           stopOrderPolling()
           return
         }
-        const url = `api/device-order/by-order-id/${orderId}`
+        const url = `/api/device-order/by-order-id/${orderId}`
         const resp = await api.get(url)
         const tickMs = (performance.now() - tickStart).toFixed(1)
         
@@ -919,7 +919,7 @@ export const useOrderStore = defineStore('order', () => {
       const api = useApi()
       const orderIdStr = String(sessionStore.orderId)
       if (orderIdStr && orderIdStr !== 'null' && orderIdStr !== 'undefined') {
-        const resp = await api.get(`api/device-order/by-order-id/${orderIdStr}`)
+        const resp = await api.get(`/api/device-order/by-order-id/${orderIdStr}`)
         const orderObj = resp.data?.order || resp.data
         if (orderObj) {
           state.currentOrder = { order: orderObj }

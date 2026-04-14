@@ -229,12 +229,12 @@ export const useBroadcasts = () => {
 
     // Update current order status in store
     // Handle both { order: {...} } and direct order object structures
-    const currentOrderId = orderStore.currentOrder?.order?.id || orderStore.currentOrder?.order?.order_id || orderStore.currentOrder?.id || orderStore.currentOrder?.order_id
+    const currentOrderId = orderStore.currentOrder?.order?.id ?? orderStore.currentOrder?.order?.order_id ?? orderStore.currentOrder?.id ?? orderStore.currentOrder?.order_id
     const eventOrderId = event.order_id
     
     logger.debug('🔄 Order update check:', { currentOrderId, eventOrderId, status: event.status })
     
-    if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
+    if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
       orderStore.updateOrderStatus(event.status)
       // If this is a terminal status, stop the polling fallback
       if (event.status === 'completed' || event.status === 'cancelled' || event.status === 'voided') {
@@ -265,12 +265,12 @@ export const useBroadcasts = () => {
 
     // Mark order as completed in store
     // Handle both { order: {...} } and direct order object structures
-    const currentOrderId = orderStore.currentOrder?.order?.id || orderStore.currentOrder?.order?.order_id || orderStore.currentOrder?.id || orderStore.currentOrder?.order_id
+    const currentOrderId = orderStore.currentOrder?.order?.id ?? orderStore.currentOrder?.order?.order_id ?? orderStore.currentOrder?.id ?? orderStore.currentOrder?.order_id
     const eventOrderId = event.order.order_id || event.order.id
     
     logger.debug('✅ Order completed check:', { currentOrderId, eventOrderId })
     
-    if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
+    if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
       orderStore.completeOrder()
       try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
       
@@ -374,21 +374,21 @@ export const useBroadcasts = () => {
     const deviceId = deviceStore.device.value?.id
     if (!deviceId || !(window as any).Echo) return
 
-    // Subscribe to Device.{deviceId} for order updates
-    console.log('[Echo] Subscribing to channel: Device.' + deviceId)
-    deviceChannel = (window as any).Echo.channel(`Device.${deviceId}`)
+    // Subscribe to device.{deviceId} for order updates
+    console.log('[Echo] Subscribing to channel: device.' + deviceId)
+    deviceChannel = (window as any).Echo.channel(`device.${deviceId}`)
       .listen('.order.updated', (event: OrderUpdatedEvent) => {
         console.log('[Echo] .order.updated', event)
         handleOrderUpdated(event)
       })
 
     channelStatus.value.device = true
-    console.log('[Echo] ✅ Subscribed to channel: Device.' + deviceId)
-    logger.debug(`✅ Subscribed to Device.${deviceId}`)
+    console.log('[Echo] ✅ Subscribed to channel: device.' + deviceId)
+    logger.debug(`✅ Subscribed to device.${deviceId}`)
     
     ElNotification({
       title: '📡 Connected',
-      message: `Listening to Device.${deviceId}`,
+      message: `Listening to device.${deviceId}`,
       type: 'success',
       duration: 3000,
       position: 'bottom-right'
