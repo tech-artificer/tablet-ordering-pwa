@@ -1,11 +1,22 @@
 // import { defineNuxtConfig } from 'nuxt/config';
+import 'dotenv/config';
 import path from 'path';
+
+// Fail explicitly at build/start time rather than shipping hardcoded dev IPs.
+// Set these variables in the .env file for every environment.
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(
+      `[nuxt.config] Required environment variable "${name}" is not set. ` +
+      'Add it to your .env file or deployment environment before starting the app.'
+    )
+  }
+  return value
+}
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    serverMiddleware: [
-        '~/server/middleware/security.ts',
-    ],
     devtools: { enabled: process.env.NODE_ENV !== 'production' },
     
     debug: false,
@@ -97,38 +108,17 @@ export default defineNuxtConfig({
             ],
         },
         
-        workbox: {
+        // Custom service worker via injectManifest strategy.
+        // BackgroundSyncPlugin and precaching are handled in public/sw.ts.
+        strategies: 'injectManifest' as const,
+        srcDir: 'public',
+        filename: 'sw.ts',
+
+        // Keep existing runtime caching config for menus and images in the injectManifest
+        // by referencing it from the custom SW. The workbox key is unused in injectManifest mode.
+        injectManifest: {
             maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
             globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-            navigateFallback: "/",
-            navigateFallbackDenylist: [/^\/api/],
-            cleanupOutdatedCaches: true,
-            
-            runtimeCaching: [
-                {
-                    urlPattern: /^https:\/\/.*\/api\/menus/i,
-                    handler: "NetworkFirst",
-                    options: {
-                        cacheName: "menus-cache",
-                        expiration: {
-                            maxEntries: 50,
-                            maxAgeSeconds: 86400 // 1 day
-                        },
-                        networkTimeoutSeconds: 3,
-                    },
-                },
-                {
-                    urlPattern: /\.(png|jpg|jpeg|webp|svg)$/i,
-                    handler: "CacheFirst",
-                    options: {
-                        cacheName: "images-cache",
-                        expiration: {
-                            maxEntries: 200,
-                            maxAgeSeconds: 604800 // 7 days
-                        },
-                    },
-                },
-            ],
         },
         
         client: {
@@ -159,12 +149,6 @@ export default defineNuxtConfig({
                 '@': path.resolve(__dirname, './')
             }
         },
-        test: {
-            globals: true,
-            environment: 'jsdom',
-            include: ['tests/**/*.spec.ts'],
-            setupFiles: ['./tests/setup.ts']
-        }
     },
     
     app: {
@@ -172,7 +156,7 @@ export default defineNuxtConfig({
             meta: [
                 {
                     name: "viewport",
-                    content: "width=device-width, height=device-height, user-scalable=no, initial-scale=1.0, maximum-scale=1.0"
+                    content: "width=device-width, height=device-height, initial-scale=1.0"
                 },
                 { name: 'theme-color', content: '#F6B56D' },
                 { name: 'apple-mobile-web-app-capable', content: 'yes' },
@@ -193,8 +177,11 @@ export default defineNuxtConfig({
             appVersion: process.env.APP_VERSION || '1.0.0',
             appEnv: process.env.APP_ENV || 'production',
 
+            // Feature Flags
+            offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === 'true',
+
             // API Configuration
-            mainApiUrl: process.env.MAIN_API_URL || 'https://192.168.100.7:8443',
+            mainApiUrl: requireEnv('MAIN_API_URL'),
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
 
             // Broadcasting Configuration
@@ -205,17 +192,17 @@ export default defineNuxtConfig({
             reverb: {
                 appId:      process.env.NUXT_PUBLIC_REVERB_APP_ID     || '',
                 appKey:     process.env.NUXT_PUBLIC_REVERB_APP_KEY    || '',
-                host:       process.env.NUXT_PUBLIC_REVERB_HOST       || '192.168.100.7',
+                host:       requireEnv('NUXT_PUBLIC_REVERB_HOST'),
                 port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '8443'),
                 scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'https',
-                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || '192.168.100.7',
+                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || requireEnv('NUXT_PUBLIC_REVERB_HOST'),
                 serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6002'),
                 serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || '',
             },
 
             // Laravel Echo (mirrors reverb config — kept for backwards compat)
             echo: {
-                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || '192.168.100.7',
+                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || requireEnv('NUXT_PUBLIC_REVERB_HOST'),
                 port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '8443'),
                 encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true',
             },
