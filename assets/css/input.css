@@ -53,7 +53,8 @@
   --popover: #FFFFFF;
   --popover-foreground: #111827;
 
-  /* Brand colors (from tailwind.config.js) */
+  /* Brand colors — single source of truth.
+     tailwind.config.js colors must match these values. */
   --primary: #F6B56D;       /* primary */
   --primary-dark: #C78B45;  /* primary-dark */
   --primary-light: #F9D0A1; /* primary-light */
@@ -103,9 +104,11 @@
   --el-color-danger: #EF4444;
 }
 
+/* Dark theme class — unused in dark-only kiosk app.
+   Retained for future light/dark toggle support.
+
 .dark {
-  /* Dark theme */
-  --background: #121212; /* very dark */
+  --background: #121212;
   --foreground: #FFFFFF;
   --card: #1F1F1F;
   --card-foreground: #FFFFFF;
@@ -151,7 +154,6 @@
   --sidebar-border: var(--secondary-dark);
   --sidebar-ring: var(--primary-light);
 
-  /* Element Plus color tokens (dark) */
   --el-color-primary: var(--primary);
   --el-color-primary-dark-2: var(--primary-dark);
   --el-color-primary-light-3: var(--primary-light);
@@ -159,6 +161,7 @@
   --el-color-success: #10B981;
   --el-color-danger: #EF4444;
 }
+*/
 
 @layer base {
   /* Use explicit CSS here instead of tailwind-only utilities to avoid

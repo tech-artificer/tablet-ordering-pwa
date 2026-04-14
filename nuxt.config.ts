@@ -17,6 +17,9 @@ function requireEnv(name: string): string {
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+    // server/middleware/ is auto-scanned by Nuxt 3 — no manual registration needed.
+    // Global route middleware uses .global.ts suffix (middleware/auth.global.ts).
+
     devtools: { enabled: process.env.NODE_ENV !== 'production' },
     
     debug: false,
@@ -28,10 +31,6 @@ export default defineNuxtConfig({
     },
     
     ssr: false,
-    
-    router: {
-        middleware: ['auth']
-    },
     
     css: [
         "./assets/css/input.css",
@@ -49,6 +48,13 @@ export default defineNuxtConfig({
         "@nuxt/fonts",
         '@vite-pwa/nuxt',
         '@vueuse/motion/nuxt'
+    ],
+    
+    components: [
+        {
+            path: '~/components',
+            pathPrefix: false, // Allow <cart-sidebar> instead of <OrderCartSidebar>
+        }
     ],
     
     typescript: {
@@ -123,13 +129,13 @@ export default defineNuxtConfig({
         
         client: {
             installPrompt: true,
-            periodicSyncForUpdates: 50,
+            periodicSyncForUpdates: 3600,
         },
     },
     
     vite: {
         build: {
-            chunkSizeWarningLimit: 1800,
+                chunkSizeWarningLimit: 1200,
         },
         // Ensure Vite dev server listens on network interfaces and allow
         // HMR to be configured via environment variables when testing on LAN.
@@ -159,6 +165,7 @@ export default defineNuxtConfig({
                     content: "width=device-width, height=device-height, initial-scale=1.0"
                 },
                 { name: 'theme-color', content: '#F6B56D' },
+                { name: 'mobile-web-app-capable', content: 'yes' },
                 { name: 'apple-mobile-web-app-capable', content: 'yes' },
                 { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
                 { name: 'apple-mobile-web-app-title', content: 'Wooserve' },
@@ -183,6 +190,9 @@ export default defineNuxtConfig({
             // API Configuration
             mainApiUrl: requireEnv('MAIN_API_URL'),
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
+
+            // Settings PIN lock behavior
+            settingsPinBackgroundTimeoutMs: parseInt(process.env.NUXT_PUBLIC_SETTINGS_PIN_BACKGROUND_TIMEOUT_MS || '120000'),
 
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',

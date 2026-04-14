@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { ElDrawer, ElBadge, ElButton, ElDivider } from 'element-plus'
 import { formatCurrency } from '../../utils/formats'
 import type { PropType } from 'vue'
 import { useDeviceStore } from '../../stores/Device'
 import { useSessionStore } from '../../stores/Session'
+import { Flame, RefreshCw, X } from 'lucide-vue-next'
 
 const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()
@@ -25,7 +25,7 @@ const props = defineProps({
   isRefillMode: { type: Boolean as PropType<boolean>, default: false }
 })
 
-const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'modify'])
+const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'modify', 'retry', 'request-support'])
 
 const visible = computed({
   get: () => props.modelValue,
@@ -47,43 +47,28 @@ function onCancel() {
 function onModify() {
   emit('modify')
 }
+
+function onRetry() {
+  emit('retry')
+}
+
+function onRequestSupport() {
+  emit('request-support')
+}
 </script>
 
 <template>
   <el-drawer 
     v-model="visible" 
-    :title="isRefillMode ? '🔄 Confirm Refill Order' : '🔥 Confirm Order'" 
+    :title="isRefillMode ? 'Confirm Refill Order' : 'Confirm Order'" 
     size="28rem" 
     direction="rtl"
     :with-header="true"
   >
     <div class="h-full flex flex-col items-center justify-center text-white bg-gradient-to-b from-secondary via-secondary-dark to-black p-6">
-      
-      <!-- Countdown Mode -->
-      <div v-if="isCountingDown" class="text-center space-y-6">
-        <div class="relative">
-          <div class="text-9xl font-bold text-primary animate-pulse-scale">{{ countdown }}</div>
-          <div class="absolute inset-0 blur-3xl bg-primary/30 animate-pulse"></div>
-        </div>
-        <p class="text-xl text-white/90 font-medium">Placing your order...</p>
-        <div class="flex gap-4 justify-center mt-8">
-          <button
-            @click="onCancel"
-            class="px-8 py-4 rounded-xl font-bold text-lg transition-all bg-red-500/20 text-red-400 border-2 border-red-500/30 hover:bg-red-500/30 active:scale-95 shadow-lg hover:shadow-red-500/20"
-          >
-            ✕ Cancel
-          </button>
-          <button
-            @click="onModify"
-            class="px-8 py-4 rounded-xl font-bold text-lg transition-all bg-yellow-500/20 text-yellow-400 border-2 border-yellow-500/30 hover:bg-yellow-500/30 active:scale-95 shadow-lg hover:shadow-yellow-500/20"
-          >
-            ✎ Modify Order
-          </button>
-        </div>
-      </div>
 
-      <!-- Confirmation Mode (fallback if not counting down) -->
-      <div v-else class="w-full space-y-6">
+      <!-- Confirmation Mode -->
+      <div class="w-full space-y-6">
         
         <!-- Total Amount - Large Display -->
         <div class="text-center space-y-4 py-8">
@@ -108,23 +93,75 @@ function onModify() {
         </div>
 
         <!-- Error Message -->
-        <div v-if="placeOrderError" class="bg-red-500/20 border border-red-500/30 rounded-lg px-4 py-3">
+        <div v-if="placeOrderError" class="bg-red-500/20 border border-red-500/30 rounded-lg px-4 py-3 space-y-3">
           <p class="text-red-400 text-sm">{{ placeOrderError }}</p>
+          <div class="flex flex-wrap gap-3">
+            <button
+              @click="onRetry"
+                class="px-4 py-2 min-h-[44px] rounded-lg font-semibold bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Retry Order
+            </button>
+            <button
+              @click="onRequestSupport"
+                class="px-4 py-2 min-h-[44px] rounded-lg font-semibold bg-white/10 text-white border border-white/20 hover:bg-white/20 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              Request Staff
+            </button>
+          </div>
+        </div>
+
+        <!-- Countdown ring — visible while auto-confirming -->
+        <div v-if="isCountingDown && !isSubmitting" class="flex flex-col items-center gap-3 py-4">
+          <!-- SVG countdown ring -->
+          <div class="relative w-24 h-24 flex-shrink-0">
+            <svg class="w-24 h-24 -rotate-90" viewBox="0 0 96 96" aria-hidden="true">
+              <!-- Track -->
+              <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(246,181,109,0.12)" stroke-width="6" />
+              <!-- Progress — 5s countdown, circumference = 2π×40 ≈ 251.3 -->
+              <circle
+                cx="48" cy="48" r="40" fill="none"
+                stroke="#F6B56D" stroke-width="6"
+                stroke-linecap="round"
+                stroke-dasharray="251.3"
+                :stroke-dashoffset="251.3 * (1 - countdown / 5)"
+                style="transition: stroke-dashoffset 0.9s linear;"
+              />
+            </svg>
+            <!-- Number in the centre of the ring -->
+            <span
+              class="absolute inset-0 flex items-center justify-center text-4xl font-black text-primary tabular-nums"
+              aria-live="polite"
+              :aria-label="`Order confirms in ${countdown} seconds`"
+            >{{ countdown }}</span>
+          </div>
+          <p class="text-white/60 text-sm text-center leading-snug">
+            Confirming in <span class="text-primary font-bold">{{ countdown }}s</span>
+            &thinsp;—&thinsp; or tap below to confirm now
+          </p>
+        </div>
+
+        <!-- Submitting spinner -->
+        <div v-else-if="isSubmitting" class="flex flex-col items-center gap-3 py-4">
+          <div class="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+          <p class="text-white/50 text-sm">Sending your order…</p>
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex gap-4 mt-8">
+        <div class="flex gap-4 mt-4">
           <button
             @click="onConfirm"
             :disabled="isSubmitting"
-            class="flex-1 py-5 rounded-xl font-bold text-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-primary to-primary-dark text-white hover:shadow-2xl active:scale-95 hover:from-primary-dark hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex-1 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 shadow-lg bg-gradient-to-r from-primary to-primary-dark text-secondary hover:shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary flex items-center justify-center gap-2"
           >
-            {{ isRefillMode ? '🔄 Confirm Refill' : '🔥 Confirm Order' }}
+            <component :is="isRefillMode ? RefreshCw : Flame" :size="22" stroke-width="2" class="flex-shrink-0" />
+            {{ isRefillMode ? 'Confirm Refill' : 'Confirm Order' }}
           </button>
           <button
             @click="onCancel"
-            class="px-8 py-5 rounded-xl font-bold text-xl transition-all duration-300 bg-white/10 text-white hover:bg-white/20 active:scale-95 border-2 border-white/20"
+            class="px-8 py-5 min-h-[56px] rounded-xl font-bold text-xl transition-all duration-300 bg-white/10 text-white hover:bg-white/20 active:scale-95 border-2 border-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white flex items-center justify-center gap-2"
           >
+            <X :size="20" stroke-width="2.5" />
             Cancel
           </button>
         </div>

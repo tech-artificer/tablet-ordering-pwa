@@ -14,16 +14,24 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
     logger.warn(`[ActiveOrderRecovery:${source}] initializeFromSession failed`, error)
   }
 
-  const orderObj = orderStore.currentOrder?.order || orderStore.currentOrder
-  const orderId = orderObj?.order_id || orderObj?.id || sessionStore.orderId
+  const orderResp = orderStore.getCurrentOrder()
+  const orderObj = ((orderResp?.order || orderResp) as any) || null
+  const orderId = orderObj?.order_id || orderObj?.id || sessionStore.getOrderId()
+  const packageId = Number(
+    orderStore.getPackage?.value?.id
+      || orderObj?.package_id
+      || orderObj?.menu_id
+      || 0
+  ) || null
   const status = String(orderObj?.status || '').toLowerCase()
-  const hasSessionFlag = sessionStore.isActive || (typeof window !== 'undefined' && window.localStorage?.getItem('session_active') === '1')
+  const hasSessionFlag = sessionStore.getIsActive() || (typeof window !== 'undefined' && window.localStorage?.getItem('session_active') === '1')
 
   if (!orderId) {
     return {
       hasActiveOrder: false,
       isTerminal: false,
       orderId: null,
+      packageId,
       status,
     }
   }
@@ -46,6 +54,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
       hasActiveOrder: false,
       isTerminal: false,
       orderId,
+      packageId,
       status,
     }
   }
@@ -65,6 +74,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
       hasActiveOrder: false,
       isTerminal: true,
       orderId,
+      packageId,
       status,
     }
   }
@@ -78,6 +88,7 @@ export async function recoverActiveOrderState(source: string = 'unknown') {
     hasActiveOrder: true,
     isTerminal: false,
     orderId,
+    packageId,
     status,
   }
 }

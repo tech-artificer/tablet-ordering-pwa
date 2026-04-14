@@ -15,6 +15,16 @@ const normalizePrice = <T extends { price?: unknown }>(item: T): T => ({
     price: toNumber(item.price),
 });
 
+const extractPayload = <T = any>(responseData: any): T | null => {
+    if (responseData == null) return null;
+    return (responseData?.data ?? responseData) as T;
+};
+
+const extractArrayPayload = <T = any>(responseData: any): T[] => {
+    const payload = extractPayload<any>(responseData);
+    return Array.isArray(payload) ? payload : [];
+};
+
 const normalizePackage = (pkg: Package): Package => ({
     ...(pkg as Package),
     price: toNumber((pkg as Package).price),
@@ -50,6 +60,7 @@ export const useMenuStore = defineStore("menu", {
             beverages: false,
             meatCategories: false,
             tabletCategories: false,
+            packageDetails: false,
         },
         errors: {
             packages: null as string | null,
@@ -73,6 +84,7 @@ export const useMenuStore = defineStore("menu", {
         isLoadingDesserts: (state: any) => state.loading.desserts,
         isLoadingSides: (state: any) => state.loading.sides,
         isLoadingBeverages: (state: any) => state.loading.beverages,
+        isLoadingPackageDetails: (state: any) => state.loading.packageDetails,
         hasErrors: (state: any) => Object.values(state.errors).some(error => error !== null),
         isCacheStale: (state: any) => {
             if (!state.lastFetched) return true;
@@ -82,12 +94,14 @@ export const useMenuStore = defineStore("menu", {
 
     actions: {
         async fetchPackages(this: any) {
-            this.loading.packages = true;       
+            this.loading.packages = true;
             this.errors.packages = null;
             const api = useApi();
+
             try {
-                const { data } = await api.get('/api/v2/tablet/packages');
-                this.packages = Array.isArray(data.data) ? data.data.map(normalizePackage) : [];
+                const response = await api.get('/api/v2/tablet/packages');
+                const packages = extractArrayPayload<Package>(response?.data);
+                this.packages = packages.map(normalizePackage);
                 logger.debug('✅ Packages loaded:', this.packages.length);
                 return { success: true };
             } catch (error) {
@@ -100,13 +114,44 @@ export const useMenuStore = defineStore("menu", {
             }
         },
 
+        /**
+         * Generic fetch function for all menu item types
+         * Eliminates code duplication across 6 fetch methods
+         */
+        async _fetchMenuItem(
+            this: any,
+            key: 'packages' | 'modifiers' | 'desserts' | 'sides' | 'alacartes' | 'beverages',
+            endpoint: string,
+            params: Record<string, string> = {},
+            normalizer: (item: any) => any = normalizePrice
+        ) {
+            this.loading[key] = true
+            this.errors[key] = null
+            const api = useApi()
+            
+            try {
+                const response = await api.get(endpoint, { params });
+                const items = extractArrayPayload<any>(response?.data).map(normalizer);
+                this[key] = items;
+                logger.debug(`✅ ${key.charAt(0).toUpperCase() + key.slice(1)} loaded:`, items.length);
+                return { success: true };
+            } catch (error) {
+                const errorMessage = (error as Error).message || `Failed to fetch ${key}`
+                this.errors[key] = errorMessage
+                logger.error(`❌ ${key.charAt(0).toUpperCase() + key.slice(1)} error:`, error)
+                throw new Error(errorMessage)
+            } finally {
+                this.loading[key] = false
+            }
+        },
+
         async fetchMeatCategories(this: any) {
             this.loading.meatCategories = true;
             this.errors.meatCategories = null;
             const api = useApi();
             try {
-                const { data } = await api.get('/api/v2/tablet/meat-categories');
-                this.meatCategories = Array.isArray(data.data) ? data.data : [];
+                const response = await api.get('/api/v2/tablet/meat-categories');
+                this.meatCategories = extractArrayPayload<MeatCategory>(response?.data);
                 logger.debug('✅ Meat categories loaded:', this.meatCategories.length);
                 return { success: true };
             } catch (error) {
@@ -124,8 +169,8 @@ export const useMenuStore = defineStore("menu", {
             this.errors.tabletCategories = null;
             const api = useApi();
             try {
-                const { data } = await api.get('/api/v2/tablet/categories');
-                this.tabletCategories = Array.isArray(data.data) ? data.data : [];
+                const response = await api.get('/api/v2/tablet/categories');
+                this.tabletCategories = extractArrayPayload<TabletCategory>(response?.data);
                 logger.debug('✅ Tablet categories loaded:', this.tabletCategories.length);
                 return { success: true };
             } catch (error) {
@@ -140,18 +185,25 @@ export const useMenuStore = defineStore("menu", {
 
         async fetchPackageDetails(this: any, packageId: number, meatCategory?: string) {
             const api = useApi();
+            this.loading.packageDetails = true;
             try {
                 const params = meatCategory ? { meat_category: meatCategory } : {};
-                const { data } = await api.get(`/api/v2/tablet/packages/${packageId}`, { params });
+                const response = await api.get(`/api/v2/tablet/packages/${packageId}`, { params });
+                const payload = extractPayload<PackageDetails>(response?.data);
+                if (!payload) {
+                    throw new Error(`Package ${packageId} details response missing body`);
+                }
                 
                 // Cache the package details
-                this.packageDetails[packageId] = data;
+                this.packageDetails[packageId] = payload;
                 logger.debug(`✅ Package ${packageId} details loaded`);
-                return data;
+                return payload;
             } catch (error) {
                 const errorMessage = (error as Error).message || `Failed to fetch package ${packageId} details`;
                 logger.error(`❌ Package ${packageId} details error:`, error);
                 throw new Error(errorMessage);
+            } finally {
+                this.loading.packageDetails = false;
             }
         },
 
@@ -180,17 +232,18 @@ export const useMenuStore = defineStore("menu", {
                 );
                 
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const payload = extractPayload<any>(response?.data);
 
                     // Defensive: Ensure data.data is a proper array of non-promise items
-                    if (!Array.isArray(data?.data)) {
-                        logger.warn('⚠️ Desserts API returned non-array data:', data?.data);
+                    if (!Array.isArray(payload)) {
+                        logger.warn('⚠️ Desserts API returned non-array data:', payload);
                         this.desserts = [];
                         return { success: true };
                     }
 
                     // Filter out any promise-like objects (if any somehow exist)
-                    const filteredArr = data.data.filter((item: any) => {
+                    const filteredArr = payload.filter((item: any) => {
                         if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
                             logger.warn('⚠️ Skipping promise-like object in desserts:', item);
                             return false;
@@ -228,8 +281,8 @@ export const useMenuStore = defineStore("menu", {
                 );
                 
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    this.sides = Array.isArray(data.data) ? data.data.map(normalizePrice) : [];
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    this.sides = extractArrayPayload<MenuItem>(response?.data).map(normalizePrice);
                 } else {
                     logger.warn('⚠️ Sides category not found in tablet categories');
                     this.sides = [];
@@ -257,17 +310,18 @@ export const useMenuStore = defineStore("menu", {
                 );
                 
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const payload = extractPayload<any>(response?.data);
                     
                     // Defensive: Ensure data.data is a proper array of non-promise items
-                    if (!Array.isArray(data?.data)) {
-                        logger.warn('⚠️ Alacartes API returned non-array data:', data?.data);
+                    if (!Array.isArray(payload)) {
+                        logger.warn('⚠️ Alacartes API returned non-array data:', payload);
                         this.alacartes = [];
                         return { success: true };
                     }
 
                     // Filter out any promise-like objects
-                    const filteredArr = data.data.filter((item: any) => {
+                    const filteredArr = payload.filter((item: any) => {
                         if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
                             logger.warn('⚠️ Skipping promise-like object in alacartes:', item);
                             return false;
@@ -304,17 +358,18 @@ export const useMenuStore = defineStore("menu", {
                 );
                 
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const payload = extractPayload<any>(response?.data);
                     
                     // Defensive: Ensure data.data is a proper array of non-promise items
-                    if (!Array.isArray(data?.data)) {
-                        logger.warn('⚠️ Beverages API returned non-array data:', data?.data);
+                    if (!Array.isArray(payload)) {
+                        logger.warn('⚠️ Beverages API returned non-array data:', payload);
                         this.beverages = [];
                         return { success: true };
                     }
 
                     // Filter out any promise-like objects
-                    const filteredArr = data.data.filter((item: any) => {
+                    const filteredArr = payload.filter((item: any) => {
                         if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
                             logger.warn('⚠️ Skipping promise-like object in beverages:', item);
                             return false;

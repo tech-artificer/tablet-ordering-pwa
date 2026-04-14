@@ -1,3 +1,4 @@
+
 import { ref } from 'vue'
 import { useDeviceStore } from '~/stores/Device'
 import { useApi } from './useApi'
@@ -13,8 +14,8 @@ export const useDeviceAuth = () => {
       const res = await api.post('/api/devices/register', payload)
       // assume backend returns token + device
       // Update nested refs on the device store
-      try { device.device.value = res.data.device || device.device.value } catch (e) { /* ignore */ }
-      try { device.token.value = res.data.token ?? device.token.value } catch (e) { /* ignore */ }
+      try { device.device = res.data.device || device.device } catch (e) { /* ignore */ }
+      try { device.token = res.data.token ?? device.token } catch (e) { /* ignore */ }
       return res.data
     } finally {
       loading.value = false

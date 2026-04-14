@@ -23,6 +23,8 @@ export const API_ENDPOINTS = {
   DEVICE_LOGIN: '/api/device/login',
   DEVICE_SESSION: '/api/device/session',
   DEVICE_STATUS: '/api/device/status',
+  DEVICE_CREATE_ORDER: '/api/devices/create-order',
+  DEVICE_ORDERS: '/api/device-orders',
 
   // Table endpoints
   TABLES: '/api/tables',
@@ -31,6 +33,10 @@ export const API_ENDPOINTS = {
   // Payment endpoints
   PAYMENTS: '/api/payments',
   PAYMENT_METHODS: '/api/payment-methods',
+
+  // Dynamic order endpoints
+  ORDER_REFILL: (orderId: number | string) => `/api/order/${orderId}/refill`,
+  DEVICE_ORDER_BY_EXTERNAL_ID: (orderId: number | string) => `/api/device-order/by-order-id/${orderId}`,
 } as const;
 
 // HTTP Headers configuration

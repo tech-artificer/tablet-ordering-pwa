@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { Component } from 'vue';
 import { ElDrawer, ElButton } from 'element-plus';
 
 interface SupportRequest {
   id: string;
   label: string;
-  icon: string;
+  icon: Component;
   type: string;
 }
 
@@ -46,7 +47,7 @@ const sendRequest = (requestLabel: string) => {
           :disabled="isSending">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
-              <span class="text-2xl">{{ request.icon }}</span>
+              <component :is="request.icon" :size="24" :stroke-width="2" />
               <span>{{ request.label }}</span>
             </div>
             <span class="text-sm text-white/70">Tap to notify</span>

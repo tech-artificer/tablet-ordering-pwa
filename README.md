@@ -12,11 +12,14 @@ Quick start (development)
 
 Build & preview
 - `npm run build` — build the production output
+- `npm run generate` — static generate to `dist/` with post-build integrity verification
 - `npm run preview` — preview the production build (server binds to 0.0.0.0)
 
 Scripts of interest
 - `dev`: development server (`npx nuxi dev --host 0.0.0.0`)
 - `build`: `npx nuxi build`
+- `pregenerate`: removes stale generated artifacts from `public/` before static build
+- `generate`: static build + integrity check that all chunk hashes in HTML exist in `dist/`
 - `preview`: `npx nuxi preview --host 0.0.0.0`
 - `test`: `vitest`
 - `rebuild:esbuild`: refreshes esbuild native binary (run automatically during `postinstall`)
@@ -28,3 +31,4 @@ Environment variables
 Notes
 - `public/manifest.json` is configured for fullscreen and landscape orientation.
 - Pinia is used for state management with persisted state plugin enabled.
+- For production nginx static hosting, configure HTML (`/index.html`, `/200.html`, `/404.html`) as no-cache and keep hashed assets under `/_nuxt/` immutable.

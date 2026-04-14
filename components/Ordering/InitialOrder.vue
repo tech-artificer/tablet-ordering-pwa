@@ -9,7 +9,14 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div v-for="meat in availableMeats" :key="meat.id" class="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
             <div class="flex items-center">
-              <img :src="meat.image" :alt="meat.name" class="w-16 h-16 rounded-md object-cover mr-4">
+              <NuxtImg
+                :src="meat.image"
+                :alt="meat.name || 'Menu item'"
+                class="w-16 h-16 rounded-md object-cover mr-4"
+                loading="lazy"
+                sizes="64px"
+                format="webp"
+              />
               <div>
                 <p class="font-bold text-white">{{ meat.name }}</p>
                 <p class="text-sm text-gray-400">{{ meat.description }}</p>
@@ -34,7 +41,14 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div v-for="item in alaCarteItems" :key="item.id" class="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
             <div class="flex items-center">
-              <img :src="item.image" :alt="item.name" class="w-16 h-16 rounded-md object-cover mr-4">
+              <NuxtImg
+                :src="item.image"
+                :alt="item.name || 'Menu item'"
+                class="w-16 h-16 rounded-md object-cover mr-4"
+                loading="lazy"
+                sizes="64px"
+                format="webp"
+              />
               <div>
                 <p class="font-bold text-white">{{ item.name }}</p>
                 <p class="text-sm text-gray-400">₱{{ item.price }}</p>
@@ -61,7 +75,6 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
 
 const emit = defineEmits(['selectionsComplete']);
 

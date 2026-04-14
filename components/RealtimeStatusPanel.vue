@@ -152,7 +152,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
 import { useRealtimeStatus } from '../composables/useRealtimeStatus'
 
 const realtimeStatus = useRealtimeStatus()

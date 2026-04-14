@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { WifiOff, Wifi } from 'lucide-vue-next'
 import { useNetworkStatus } from '../../composables/useNetworkStatus'
 

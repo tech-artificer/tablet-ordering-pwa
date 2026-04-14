@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessageBox, ElNotification } from 'element-plus'
 import { useDeviceStore } from '../stores/Device'
-import { useRuntimeConfig } from '#app'
 import { logger } from '../utils/logger'
 
 // @ts-ignore - Nuxt auto-imports
@@ -10,10 +9,57 @@ definePageMeta({
   layout: 'default'
 })
 
-import { reactive } from 'vue'
-
 const deviceStore = useDeviceStore()
 const config = useRuntimeConfig()
+const router = useRouter()
+
+const SETTINGS_PIN_AUTH_KEY = 'settings.pin.auth_until'
+const SETTINGS_PIN_HIDDEN_AT_KEY = 'settings.pin.hidden_at'
+const SETTINGS_PIN_MAX_BACKGROUND_MS = computed(() => {
+  const raw = Number(config.public.settingsPinBackgroundTimeoutMs)
+  if (!Number.isFinite(raw) || raw <= 0) return 2 * 60 * 1000
+  return raw
+})
+
+const clearSettingsPinAuth = () => {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(SETTINGS_PIN_AUTH_KEY)
+  sessionStorage.removeItem(SETTINGS_PIN_HIDDEN_AT_KEY)
+}
+
+const hasValidSettingsPinAuth = () => {
+  if (typeof sessionStorage === 'undefined') return false
+  const raw = sessionStorage.getItem(SETTINGS_PIN_AUTH_KEY)
+  const authUntil = Number(raw || 0)
+  return Number.isFinite(authUntil) && authUntil > Date.now()
+}
+
+const enforceSettingsPinGate = async () => {
+  if (hasValidSettingsPinAuth()) return true
+  clearSettingsPinAuth()
+  await router.replace({ path: '/', query: { settingsLocked: '1' } })
+  return false
+}
+
+const handleSettingsVisibilityChange = () => {
+  if (typeof document === 'undefined' || typeof sessionStorage === 'undefined') return
+
+  if (document.hidden) {
+    sessionStorage.setItem(SETTINGS_PIN_HIDDEN_AT_KEY, String(Date.now()))
+    return
+  }
+
+  const hiddenAt = Number(sessionStorage.getItem(SETTINGS_PIN_HIDDEN_AT_KEY) || 0)
+  if (!hiddenAt) return
+
+  const elapsed = Date.now() - hiddenAt
+  sessionStorage.removeItem(SETTINGS_PIN_HIDDEN_AT_KEY)
+
+  if (elapsed >= SETTINGS_PIN_MAX_BACKGROUND_MS.value) {
+    clearSettingsPinAuth()
+    void router.replace({ path: '/', query: { settingsLocked: '1' } })
+  }
+}
 
 // Settings state
 const apiUrl = ref(config.public.mainApiUrl || '')
@@ -92,8 +138,8 @@ watch(collapsed, (val) => {
 const getLocalIpAddress = async () => {
   try {
     // Try to get from device store if available (use last_ip_address per Device type)
-    if (deviceStore.device?.value?.last_ip_address) {
-      localIpAddress.value = deviceStore.device.value.last_ip_address
+    if (displayDevice.value?.last_ip_address) {
+      localIpAddress.value = displayDevice.value.last_ip_address
       return
     }
     
@@ -175,11 +221,15 @@ onMounted(() => {
   // listen to fullscreen changes
   if (typeof document !== 'undefined') {
     document.addEventListener('fullscreenchange', updateFullscreenState)
+    document.addEventListener('visibilitychange', handleSettingsVisibilityChange)
   }
 })
 
 onBeforeUnmount(() => {
-  if (typeof document !== 'undefined') document.removeEventListener('fullscreenchange', updateFullscreenState)
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('fullscreenchange', updateFullscreenState)
+    document.removeEventListener('visibilitychange', handleSettingsVisibilityChange)
+  }
 })
 
 // Try to resolve device & table by local IP. Server may accept POST or GET for this helper.
@@ -193,8 +243,8 @@ const fetchDeviceByIp = async (ip: string | null) => {
       try {
       const res = await api.post('/api/device/table', { ip })
       if (res && res.data && res.data.success) {
-        if (res.data.device) deviceStore.device.value = res.data.device
-        if (res.data.table) deviceStore.table.value = res.data.table
+        if (res.data.device) deviceStore.device = res.data.device
+        if (res.data.table) deviceStore.table = res.data.table
         return true
       }
     } catch (err: any) {
@@ -208,8 +258,8 @@ const fetchDeviceByIp = async (ip: string | null) => {
       try {
       const res2 = await api.get('/api/device/table', { params: { ip } })
       if (res2 && res2.data && res2.data.success) {
-        if (res2.data.device) deviceStore.device.value = res2.data.device
-        if (res2.data.table) deviceStore.table.value = res2.data.table
+        if (res2.data.device) deviceStore.device = res2.data.device
+        if (res2.data.table) deviceStore.table = res2.data.table
         return true
       }
     } catch (err2: any) {
@@ -244,8 +294,8 @@ const saveApiUrl = async () => {
     setTimeout(() => {
       window.location.reload()
     }, 2000)
-  } catch {
-    // User cancelled
+  } catch (e) {
+    logger.debug('[Settings] saveApiUrl canceled or failed', e)
   }
 }
 
@@ -386,8 +436,8 @@ const logout = async () => {
     tokenStatus.value = 'invalid'
     tokenMessage.value = 'Device logged out'
     logger.debug('✅ Device logged out')
-  } catch {
-    // User cancelled
+  } catch (e) {
+    logger.debug('[Settings] logout canceled or failed', e)
   }
 }
 
@@ -402,36 +452,37 @@ const saveTableOverride = async () => {
 
   try {
     // If device is registered on backend, attempt to persist the table assignment
-    if (deviceStore.device?.value?.id) {
+    if (displayDevice.value?.id) {
       const { useApi } = await import('~/composables/useApi')
       const api = useApi()
       // Attempt to update device's table by PUT /api/devices/{id}
-      const payload: any = {}
-
-      // If value is numeric, treat as table id
+      // UpdateDeviceRequest requires: name (required), ip_address (required), table_id (nullable)
       const asNum = Number(tableOverride.value)
+      const payload: any = {
+        name: displayDevice.value?.name || '',
+        ip_address: displayDevice.value?.ip_address || '',
+        port: (displayDevice.value as any)?.port ?? null,
+      }
+
       if (!Number.isNaN(asNum) && asNum > 0) {
         payload.table_id = asNum
-      } else {
-        // otherwise send as table name (backend may need to resolve)
-        payload.table_name = tableOverride.value
       }
 
       try {
-        const resp = await api.put(`/api/devices/${deviceStore.device.value.id}`, payload)
+        const resp = await api.put(`/api/devices/${displayDevice.value.id}`, payload)
         if (resp?.data) {
           // Update local store with returned device/table if provided
-          if (resp.data.device) deviceStore.device.value = resp.data.device
-          if (resp.data.table) deviceStore.table.value = resp.data.table
+          if (resp.data.device) deviceStore.device = resp.data.device
+          if (resp.data.table) deviceStore.table = resp.data.table
         }
       } catch (err) {
         logger.warn('Persisting table override failed:', err)
         // Even if persistence fails, update local UI so staff can continue
-        deviceStore.table.value = { id: asNum > 0 ? asNum : null, name: tableOverride.value } as any
+        deviceStore.table = { id: asNum > 0 ? asNum : null, name: tableOverride.value } as any
       }
     } else {
       // Not registered: just update local store for immediate effect
-      deviceStore.table.value = { id: null, name: tableOverride.value } as any
+      deviceStore.table = { id: null, name: tableOverride.value } as any
     }
 
     editingTable.value = false
@@ -542,6 +593,8 @@ const testBackendOrder = async () => {
 }
 
 onMounted(async () => {
+  if (!(await enforceSettingsPinGate())) return
+
   await getLocalIpAddress()
   
   // After detecting local IP, attempt to resolve device/table
@@ -588,7 +641,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-screen overflow-y-auto bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-6">
+  <div class="h-screen overflow-y-auto bg-app-grid text-white p-6">
     <div class="max-w-4xl mx-auto pb-12">
       
       <!-- Header -->

@@ -1,3 +1,4 @@
+
 import { watch } from 'vue'
 import { useSessionStore } from '../stores/Session'
 import { useOrderStore } from '../stores/Order'
@@ -11,7 +12,7 @@ export function useGuestReset() {
     () => sessionStore.sessionId,
     (newVal, oldVal) => {
       if (oldVal && !newVal) {
-        orderStore.guestCount = 2
+        orderStore.setGuestCount(2)
       }
     },
     { flush: 'sync' }

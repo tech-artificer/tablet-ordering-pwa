@@ -1,7 +1,5 @@
-import { defineNuxtPlugin } from '#app'
 import axios from 'axios'
 import { useDeviceStore } from '../stores/Device'
-import { useRuntimeConfig } from '#imports'
 import { logger } from '../utils/logger'
 import type { InternalAxiosRequestConfig } from 'axios'
 
@@ -151,6 +149,17 @@ export default defineNuxtPlugin(() => {
         } catch (reauthError) {
           logger.error('❌ Re-authentication failed after 401', reauthError)
         }
+      }
+
+      // Handle timeout / network-level errors before generic path
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        logger.error('⏱️ API Request timed out:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          timeout: error.config?.timeout,
+          message: error.message
+        })
+        return Promise.reject(error)
       }
 
       logger.error('❌ API Error:', {

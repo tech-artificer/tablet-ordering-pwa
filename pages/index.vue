@@ -1,94 +1,248 @@
+<template>
+  <div class="relative h-screen w-screen flex flex-col overflow-hidden">
+    <!-- Warm gradient background -->
+    <div class="absolute inset-0 bg-screen-base"></div>
+
+    <!-- Radial glow at center -->
+    <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(246,181,109,0.06) 0%, transparent 70%)"></div>
+
+    <!-- CSS atmospheric glow (replaces flame.gif - no image bleed, no 9.8MB load) -->
+    <div class="absolute inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+      <!-- Warm amber pulse at bottom-center -->
+      <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60vw] h-[40vh] rounded-full bg-primary/10 blur-3xl animate-pulse-glow"></div>
+      <!-- Subtle cool-dark vignette at corners -->
+      <div class="absolute inset-0" style="background: radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, rgba(0,0,0,0.45) 100%)"></div>
+    </div>
+
+    <!-- Subtle Branded Accent (bottom, decorative) -->
+    <div class="absolute bottom-0 left-0 right-0 z-0 pointer-events-none flex justify-center" aria-hidden="true">
+      <svg width="320" height="64" viewBox="0 0 320 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-[80vw] max-w-xl h-16 opacity-20">
+        <ellipse cx="160" cy="32" rx="150" ry="20" fill="url(#accentGradient)" />
+        <defs>
+          <linearGradient id="accentGradient" x1="0" y1="32" x2="320" y2="32" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F6B56D" stop-opacity="0.5" />
+            <stop offset="0.5" stop-color="#F6B56D" stop-opacity="0.2" />
+            <stop offset="1" stop-color="#F6B56D" stop-opacity="0.5" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+
+    <!-- Content Layer -->
+    <div class="relative z-10 flex flex-col h-full items-center justify-center px-6">
+      <!-- PIN modal -->
+      <div
+        v-if="showPinModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity"
+      >
+        <div class="bg-gradient-to-br from-secondary to-secondary-dark text-white shadow-2xl ring-1 ring-primary/30 rounded-2xl p-8 w-full max-w-xs space-y-6 border-t-2 border-primary animate-modal-enter">
+          <div class="text-center">
+            <h3 class="text-2xl font-bold text-primary">Settings</h3>
+            <p class="text-sm text-white/60 mt-2">Enter your PIN</p>
+            <p v-if="pinNotice" class="text-xs text-primary/80 mt-2">{{ pinNotice }}</p>
+          </div>
+
+          <input
+            readonly
+            aria-live="polite"
+            :value="maskedPin"
+            placeholder="••••"
+            class="w-full px-4 py-4 rounded-xl bg-white/5 ring-1 ring-white/20 text-3xl tracking-[0.5em] text-center text-white placeholder-white/30 font-mono font-semibold"
+          />
+
+          <div class="grid grid-cols-3 gap-2">
+            <button 
+              v-for="n in 9" 
+              :key="n" 
+              @click.prevent="appendDigit(String(n))" 
+              class="h-12 text-lg font-semibold rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 active:scale-95 transition-all duration-150"
+              type="button"
+            >
+              {{ n }}
+            </button>
+            <button 
+              @click.prevent="appendDigit('0')" 
+              class="h-12 text-lg font-semibold rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 active:scale-95 transition-all duration-150 col-start-2"
+              type="button"
+            >
+              0
+            </button>
+            <button 
+              @click.prevent="backspace()" 
+              class="h-12 text-lg font-semibold rounded-lg bg-error/20 hover:bg-error/30 active:bg-error/40 active:scale-95 transition-all duration-150 col-start-3"
+              type="button"
+              aria-label="Backspace"
+            >
+              ⌫
+            </button>
+          </div>
+
+          <p v-if="pinError" class="text-sm text-error bg-error/20 ring-1 ring-error/40 rounded-lg px-4 py-3 text-center font-medium animate-shake">{{ pinError }}</p>
+          
+          <div class="flex gap-3 pt-4">
+            <FlameButton variant="secondary" size="md" class="flex-1" @click="closePinModal">Cancel</FlameButton>
+            <FlameButton variant="primary" size="md" class="flex-1" @click="verifyPin">Verify</FlameButton>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Bar - Top -->
+      <div class="absolute top-6 left-6 right-6 flex items-center justify-between z-20">
+        <!-- Connection Status -->
+        <div class="flex items-center gap-3 bg-surface-20 backdrop-blur-md ring-1 ring-white/10 rounded-full px-4 py-2 transition-all">
+          <div 
+            :class="[
+              'w-2.5 h-2.5 rounded-full transition-all',
+              isWebSocketConnected ? 'bg-success animate-pulse' : 'bg-error'
+            ]"
+          ></div>
+          <span class="text-xs font-medium transition-colors" :class="isWebSocketConnected ? 'text-success' : 'text-error'">
+            {{ isWebSocketConnected ? 'Online' : 'Offline' }}
+          </span>
+        </div>
+
+        <!-- Settings Button -->
+        <button
+          @click="openSettings"
+          class="flex items-center justify-center w-12 h-12 rounded-full bg-surface-20 hover:bg-surface-10 ring-1 ring-white/10 hover:ring-primary/60 text-white/70 hover:text-primary transition-all focus:outline-none focus:ring-2 focus:ring-primary hover:shadow-lg"
+          title="Settings"
+          aria-label="Open settings"
+          :class="{ 'animate-spin-slow': showPinModal }"
+        >
+          <Settings :size="22" stroke-width="1.5" />
+        </button>
+      </div>
+
+      <!-- Main Content -->
+      <div class="flex flex-col items-center gap-10 text-center">
+        <!-- Logo & Welcome -->
+        <div class="space-y-6 animate-fade-in">
+          <div class="flex justify-center">
+            <div class="relative animate-float-slow">
+              <div class="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/5 rounded-full blur-2xl"></div>
+              <WoosooLogo />
+            </div>
+          </div>
+          
+          <div class="space-y-2 animate-fade-in-delayed">
+            <p class="text-xs tracking-[0.3em] uppercase font-semibold text-primary/80">Authentic Korean BBQ</p>
+            <h1 class="text-5xl font-bold font-raleway text-white leading-tight">
+              <span class="block">Your Table,</span>
+              <span class="block">Your Grill.</span>
+            </h1>
+            <p class="text-white/60 font-kanit text-lg tracking-wide mt-4">
+              gather • grill • savor
+            </p>
+          </div>
+        </div>
+
+        <!-- CTA Button -->
+        <div class="space-y-4 animate-fade-in-delayed-2">
+          <div class="relative inline-block group">
+            <!-- Glow layer — contained, no bleed -->
+            <div class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl opacity-80 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+
+            <button
+              @click="start"
+              class="relative flex items-center justify-center gap-2.5 rounded-2xl font-bold tracking-wide transition-all duration-200
+                     bg-gradient-to-br from-primary via-primary to-primary-dark text-secondary
+                     shadow-[0_4px_24px_rgba(246,181,109,0.30)]
+                     hover:shadow-[0_6px_32px_rgba(246,181,109,0.50)] hover:brightness-110
+                     active:scale-[0.97] active:shadow-none
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
+                     min-h-[56px] px-10 text-base"
+              aria-label="Begin your order"
+            >
+              <UtensilsCrossed :size="20" stroke-width="2.5" class="flex-shrink-0" />
+              <span>Begin the Feast</span>
+            </button>
+          </div>
+
+          <!-- Auth Status Message -->
+          <transition name="fade-in">
+            <div v-if="!deviceStore.isAuthenticated" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+              <p class="text-sm text-warning font-medium mb-3">This tablet isn't registered yet</p>
+              <button
+                type="button"
+                @click="openSettings"
+                class="w-full px-4 py-3 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label="Register device in Settings"
+              >
+                Set up in Settings →
+              </button>
+            </div>
+          </transition>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useDeviceStore } from '~/stores/Device';
 import { useSessionStore } from '~/stores/Session'
-import WoosooLogo from '~/components/WoosooLogo.vue';
-import PrimaryButton from '~/components/common/PrimaryButton.vue';
-import { ElMessageBox } from 'element-plus';
 import { useBroadcasts } from '~/composables/useBroadcasts';
+import { useMenuStore } from '~/stores/Menu';
+import { Settings, UtensilsCrossed } from 'lucide-vue-next';
 import { recoverActiveOrderState } from '~/composables/useActiveOrderRecovery'
-import { logger } from '../utils/logger'
-
 const session = useSessionStore();
 const deviceStore = useDeviceStore();
+const menuStore = useMenuStore();
 const router = useRouter();
+const route = useRoute();
 const { channelStatus } = useBroadcasts();
 
-const isWebSocketConnected = ref(false);
+const isWebSocketConnected = computed(() => channelStatus.value.device || channelStatus.value.deviceControl || channelStatus.value.order || channelStatus.value.serviceRequest);
 
-// PIN modal state for settings access
+// PIN modal state
 const showPinModal = ref(false)
 const pinInput = ref('')
 const pinError = ref('')
+const pinNotice = ref('')
 const PIN_STORAGE_KEY = 'settings.pin'
+const SETTINGS_PIN_AUTH_KEY = 'settings.pin.auth_until'
+const SETTINGS_PIN_AUTH_WINDOW_MS = 5 * 60 * 1000
 const storedPin = ref<string | null>(null)
 const DEFAULT_PIN = '0711'
-
-// Check WebSocket connection status for Reverb/Pusher
-const checkWebSocketStatus = () => {
-  if (typeof window !== 'undefined' && (window as any).Echo) {
-    const echo = (window as any).Echo;
-    if (echo.connector?.pusher?.connection) {
-      const state = echo.connector.pusher.connection.state;
-      isWebSocketConnected.value = state === 'connected';
-    }
-  }
-};
 
 onMounted(async () => {
   const recovery = await recoverActiveOrderState('index')
   if (recovery.hasActiveOrder) {
-    await router.replace('/menu')
+    await router.replace({
+      path: '/menu',
+      query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: '1' } : { resumeMenu: '1' }
+    })
     return
   }
 
-  checkWebSocketStatus();
-  // Check every 3 seconds
-  const interval = setInterval(checkWebSocketStatus, 3000);
-  
-  // Also listen to Echo connection state changes
-  if ((window as any).Echo?.connector?.pusher) {
-    (window as any).Echo.connector.pusher.connection.bind('state_change', (states: any) => {
-      isWebSocketConnected.value = states.current === 'connected';
-    });
+  // Silently warm the package cache while kiosk is idle on the welcome screen.
+  // loadAllMenus respects the 30-min cache — no duplicate requests if already fresh.
+  menuStore.loadAllMenus().catch(() => { /* non-fatal — packageSelection will retry */ })
+
+  if (route.query.settingsLocked === '1') {
+    openSettings('Settings access expired. Please re-enter PIN.')
+    await router.replace('/')
   }
-  
-  // Cleanup on unmount
-  onUnmounted(() => clearInterval(interval));
 });
 
 const start = () => {
   const timestamp = new Date().toISOString()
   console.log(`[🎬 Session START] Welcome screen → Start button clicked at ${timestamp}`)
-  console.log(`[📋 Device Status] authenticated=${deviceStore.isAuthenticated} device_id=${deviceStore.device?.id} table_id=${(deviceStore.table as any)?.id}`)
   
-  logger.debug('Start clicked - Device Store:', {
-    token: deviceStore.token,
-    table: deviceStore.table,
-    'table.value': deviceStore.table.value,
-    'table?.id': (deviceStore.table as any)?.id,
-    'table.value?.id': deviceStore.table.value?.id,
-    isAuthenticated: deviceStore.isAuthenticated
-  })
-  
-  // Use isAuthenticated computed property instead of manual checks
   if (!deviceStore.isAuthenticated) {
-    console.log(`[⚠️ Device Auth Failed] Not authenticated, redirecting to Settings at ${timestamp}`)
-    logger.debug('Not authenticated, redirecting to Settings (PIN)')
-    // Redirect to Settings and require staff PIN before revealing registration
-    router.replace({ path: '/settings', query: { requirePin: '1' } })
+    console.log(`[⚠️ Device Auth Failed] Prompting PIN for Settings at ${timestamp}`)
+    openSettings()
     return
   }
   
   console.log(`[✅ Device Ready] Starting session at ${timestamp}`)
-  logger.debug('Starting session...')
   session.start()
   router.replace('/order/start')
 }
 
-const openSettings = () => {
-  // Load stored PIN or use default
+const openSettings = (notice = '') => {
+  pinNotice.value = notice
+  pinError.value = ''
   storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
   showPinModal.value = true
 }
@@ -97,7 +251,7 @@ const closePinModal = () => {
   showPinModal.value = false
   pinInput.value = ''
   pinError.value = ''
-  storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+  pinNotice.value = ''
 }
 
 const verifyPin = () => {
@@ -105,6 +259,9 @@ const verifyPin = () => {
   storedPin.value = (typeof localStorage !== 'undefined' && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
 
   if (pinInput.value === storedPin.value) {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(SETTINGS_PIN_AUTH_KEY, String(Date.now() + SETTINGS_PIN_AUTH_WINDOW_MS))
+    }
     closePinModal()
     router.push('/settings')
     return
@@ -112,170 +269,136 @@ const verifyPin = () => {
   pinError.value = 'Incorrect PIN'
 }
 
-// Calculator-style keypad helpers
 const maskedPin = computed(() => '•'.repeat(pinInput.value.length))
-const MAX_PIN_LENGTH = 6
 const appendDigit = (d: string) => {
-  if (pinInput.value.length >= MAX_PIN_LENGTH) return
-  pinInput.value = (pinInput.value || '') + d
+  if (pinInput.value.length >= 6) return
+  pinInput.value += d
   pinError.value = ''
 }
 const backspace = () => {
-  pinInput.value = (pinInput.value || '').slice(0, -1)
+  pinInput.value = pinInput.value.slice(0, -1)
   pinError.value = ''
-}
-const clearPin = () => {
-  pinInput.value = ''
-  pinError.value = ''
-}
-
-const clearDeviceAuth = () => {
-  try {
-    // Clear Pinia persisted device store and in-memory state
-    if (typeof localStorage !== 'undefined') localStorage.removeItem('device-store')
-    try { deviceStore.clearAuth() } catch (e) { /* ignore */ }
-    // reload to ensure UI reflects cleared state
-    window.location.reload()
-  } catch (e) {
-    logger.error('Failed to clear device auth', e)
-  }
 }
 </script>
 
-<template>
-  <div class="flex h-screen w-screen p-4 relative overflow-hidden">
-    
-    <!-- PIN modal overlay -->
-    <div
-      v-if="showPinModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xl backdrop-brightness-75 transition-opacity"
-    >
-      <div class="bg-slate-900/90 text-white shadow-2xl shadow-black/40 ring-1 ring-white/10 rounded-2xl p-8 w-full max-w-md space-y-4 border-t-2 border-primary/60">
-        <h3 class="text-xl font-semibold">Enter Settings PIN</h3>
-        <p class="text-sm text-white/60">Enter staff PIN to access Settings.</p>
+<style scoped>
+.fade-in-enter-active, .fade-in-leave-active {
+  transition: opacity 0.3s ease;
+}
 
-        <!-- Readonly masked display prevents virtual keyboard from opening -->
-        <div>
-          <input
-            readonly
-            aria-live="polite"
-            :value="maskedPin"
-            placeholder="Enter PIN"
-            class="w-full px-4 py-3 rounded-xl bg-white/10 ring-1 ring-white/15 text-2xl tracking-[0.35em] text-center"
-          />
-        </div>
+.fade-in-enter-from, .fade-in-leave-to {
+  opacity: 0;
+}
 
-        <div class="grid grid-cols-3 gap-3">
-          <button @click.prevent="appendDigit('1')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">1</button>
-          <button @click.prevent="appendDigit('2')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">2</button>
-          <button @click.prevent="appendDigit('3')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">3</button>
-          <button @click.prevent="appendDigit('4')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">4</button>
-          <button @click.prevent="appendDigit('5')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">5</button>
-          <button @click.prevent="appendDigit('6')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">6</button>
-          <button @click.prevent="appendDigit('7')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">7</button>
-          <button @click.prevent="appendDigit('8')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">8</button>
-          <button @click.prevent="appendDigit('9')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">9</button>
-          <button @click.prevent="backspace()" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">⌫</button>
-          <button @click.prevent="appendDigit('0')" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">0</button>
-          <button @click.prevent="clearPin()" class="h-14 text-2xl font-semibold rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Clear</button>
-        </div>
+/* ─── Entrance & Decorative Animations ────────────── */
 
-        <p v-if="pinError" class="text-sm text-red-300 bg-red-500/10 rounded-lg px-3 py-2">{{ pinError }}</p>
-        <div class="flex items-center justify-end gap-3">
-          <button @click="closePinModal()" class="px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25">Cancel</button>
-          <button @click.prevent="verifyPin()" class="px-4 py-3 rounded-xl bg-primary text-slate-950 hover:bg-primary/90">Enter</button>
-        </div>
-      </div>
-    </div>
+/* Logo float animation */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
 
-    <!-- Connection Status Indicator -->
-    <div class="absolute top-4 left-4 z-50 flex items-center gap-3 glass-card px-4 py-2.5">
-      <div class="flex items-center gap-2">
-        <div 
-          :class="[
-            'w-3 h-3 rounded-full transition-all',
-            isWebSocketConnected ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-red-500'
-          ]"
-        ></div>
-        <span class="text-sm font-medium" :class="isWebSocketConnected ? 'text-green-400' : 'text-red-400'">
-          {{ isWebSocketConnected ? 'Connected' : 'Offline' }}
-        </span>
-      </div>
-      <div v-if="channelStatus.device || channelStatus.deviceControl" class="text-white/30 text-sm">|</div>
-      <div v-if="channelStatus.device || channelStatus.deviceControl" class="flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-        </svg>
-        <span class="text-sm text-primary font-medium">
-          {{ (channelStatus.device ? 1 : 0) + (channelStatus.deviceControl ? 1 : 0) + (channelStatus.order ? 1 : 0) + (channelStatus.serviceRequest ? 1 : 0) }} channels
-        </span>
-      </div>
-    </div>
+.animate-float-slow {
+  animation: float-slow 4s ease-in-out infinite;
+}
 
-    <!-- Exit/Settings Button - Enhanced touch target -->
-    <button
-      @click="openSettings"
-      class="icon-btn absolute top-4 right-4 z-50 !w-12 !h-12 text-white/60 hover:text-white"
-      title="Settings"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    </button>
+/* Fade in animations with stagger */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
-    <div class="flex-1 flex justify-center gap-6 flex-col items-center">
-      <div class="z-10 flex flex-col justify-center items-center gap-4 text-center">
-        <WoosooLogo />
-        <div class="space-y-3">
-          <h2 class="text-4xl lg:text-5xl font-extrabold font-raleway tracking-tight text-white flex flex-col leading-tight">
-            <span>The grill is hot,</span>
-            <span>the meat is marinated,</span>
-            <span class="font-bold text-primary"> and the feast awaits.</span>
-          </h2>
-        </div>
-      </div>
-      
-      <div class="flex flex-col items-center gap-3">
-        <button
-          :disabled="!deviceStore.isAuthenticated"
-          :class="[
-            'px-14 py-5 text-lg font-semibold rounded-full transition-all duration-200 flex items-center gap-2',
-            deviceStore.isAuthenticated 
-              ? 'bg-gradient-to-r from-primary to-primary/85 text-white shadow-lg shadow-primary/40 hover:from-primary/95 hover:to-primary/80 active:scale-98' 
-              : 'bg-transparent border-2 border-primary/40 text-primary/50 cursor-not-allowed'
-          ]"
-          @click="start()"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12.378 1.602a.75.75 0 00-.756 0L3 6.632l9 5.25 9-5.25-8.622-5.03zM21.75 7.93l-9 5.25v9l8.628-5.032a.75.75 0 00.372-.648V7.93zM11.25 22.18v-9l-9-5.25v8.57a.75.75 0 00.372.648l8.628 5.033z" />
-          </svg>
-          Start Order
-        </button>
-        <p v-if="!deviceStore.isAuthenticated" class="text-sm text-white/60 mt-3 text-center">
-          Device is not registered. You must register the device in Settings before starting an order.
-          <button
-            type="button"
-            class="underline ml-2 text-primary hover:text-primary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60"
-            @click.prevent="openSettings"
-          >
-            Open Settings
-          </button>
-        </p>
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
 
-        <div v-if="!deviceStore.isAuthenticated" class="mt-4 text-sm text-white/60 text-center">
-          <div>Registered: <span class="text-red-400">No</span></div>
-          <div v-if="deviceStore.device && deviceStore.device.value" class="mt-1 font-mono text-xs">
-            ID: {{ deviceStore.device.value.id || '—' }} &nbsp; Code: {{ deviceStore.device.value.code || '—' }}
-          </div>
-          <div class="mt-3">
-            <button @click.prevent="clearDeviceAuth" class="px-3 py-2 rounded bg-white/10">Reset Device Auth</button>
-          </div>
-        </div>
-        <p class="text-white/80 text-sm font-kanit text-center mt-4">
-          Tap to begin your <span class="font-bold text-primary">Ultimate K-BBQ experience</span>
-        </p>
-      </div>
-    </div>
-  </div>
-</template>
+.animate-fade-in-delayed {
+  animation: fade-in 0.8s ease-out 0.2s both;
+}
+
+.animate-fade-in-delayed-2 {
+  animation: fade-in 0.8s ease-out 0.4s both;
+}
+
+/* Slide up animation */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out;
+}
+
+/* Pulse glow for CTA button container */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Settings button spin animation */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
+
+/* Modal enter animation */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-enter {
+  animation: modal-enter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Shake animation for error messages */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+</style>

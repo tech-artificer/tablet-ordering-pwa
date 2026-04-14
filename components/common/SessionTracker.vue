@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
 import { Check } from '@element-plus/icons-vue';
 import { ElIcon } from 'element-plus';
 

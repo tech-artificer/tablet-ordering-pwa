@@ -20,6 +20,7 @@ vi.mock('../composables/useApi', () => ({ useApi: () => ({ get: mockGet, post: m
 
 import { useOrderStore } from '../stores/Order'
 import { useSessionStore } from '../stores/Session'
+import type { CartItem, Package } from '../types'
 
 describe('order polling fallback', () => {
   beforeEach(() => {
@@ -49,33 +50,32 @@ describe('order polling fallback', () => {
   it('starts polling after setOrderCreated and stops when order becomes completed', async () => {
     const order = useOrderStore()
 
-    // Arrange: return completed immediately so the immediate tick stops polling
-    mockGet.mockResolvedValueOnce({ data: { order: { id: 19561, status: 'completed' } } })
+    // First tick returns 'preparing' so polling stays active past the isPolling assertion.
+    // The immediate tick's microtask resolves BEFORE the test's await resumes, so the mock
+    // must NOT return a terminal status on the first call.
+    mockGet
+      .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing' } } })
+      .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'completed' } } })
 
     // Act: simulate order creation response
     await order.setOrderCreated({ order: { id: 19561, order_number: 'ORD-19561' } })
 
-    // Immediately after creation, polling should have started
-    expect(order.isPolling).toBe(true)
+    // After the await, the immediate tick has already run (preparing) — polling still active
+    expect(order.getIsPolling()).toBe(true)
+    expect(order.getCurrentOrder()?.order?.status).toBe('preparing')
 
-    // Let the immediate tick resolve and advance timers enough to run two ticks
+    // Advance past the 5 s interval to fire the second tick (completed)
+    vi.advanceTimersByTime(6000)
+    // Allow the async tick chain to resolve
     await Promise.resolve()
-    vi.advanceTimersByTime(10000)
-    // allow pending microtasks to complete
     await Promise.resolve()
-    await Promise.resolve()
-
-    // Wait for the polling ticks to run and update the order
     await Promise.resolve()
     await Promise.resolve()
 
-    // The canonical order should be updated to completed
-    expect(order.currentOrder?.order?.status).toBe('completed')
-
-    // Ensure we can stop the poll and clear timers (defensive cleanup)
-    order.stopOrderPolling()
-    expect(order.isPolling).toBe(false)
-    expect(order.pollTimerId).toBeNull()
+    // The canonical order should be updated to completed and polling stopped
+    expect(order.getCurrentOrder()?.order?.status).toBe('completed')
+    expect(order.getIsPolling()).toBe(false)
+    expect(order.getPollTimerId()).toBeNull()
   })
 
   it('initializeFromSession fetches canonical order and prevents new order submission', async () => {
@@ -86,19 +86,38 @@ describe('order polling fallback', () => {
     mockGet.mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing', total_amount: 200 } } })
 
     // Simulate persisted session order id
-    session.orderId = 19561
+    session.setOrderId(19561)
 
     await order.initializeFromSession()
 
     expect(order.hasPlacedOrder).toBe(true)
-    expect(order.currentOrder).toBeTruthy()
-    expect(order.currentOrder.order.id).toBe(19561)
+    expect(order.getCurrentOrder()).toBeTruthy()
+    expect(order.getCurrentOrder()?.order?.id).toBe(19561)
 
     // Attempt to submit a new order should throw due to hasPlacedOrder guard
-    order.package = { id: 1, price: 100 } as any
-    order.cartItems = [{ id: 10, name: 'Extra', price: 5, quantity: 1 } as any]
-    order.guestCount = 1
+    order.setPackage({ id: 1, price: 100 } as Package)
+    order.setCartItems([{ id: 10, name: 'Extra', price: 5, quantity: 1 } as CartItem])
+    order.setGuestCount(1)
 
     await expect(order.submitOrder()).rejects.toThrow('An initial order has already been placed')
+  })
+
+  it('does not crash when polling receives an empty response body', async () => {
+    const order = useOrderStore()
+
+    mockGet
+      .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing' } } })
+      .mockResolvedValueOnce(undefined as any)
+
+    await order.setOrderCreated({ order: { id: 19561, order_number: 'ORD-19561' } })
+
+    expect(order.getIsPolling()).toBe(true)
+
+    vi.advanceTimersByTime(6000)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(order.getIsPolling()).toBe(true)
+    expect(order.getCurrentOrder()?.order?.status).toBe('preparing')
   })
 })

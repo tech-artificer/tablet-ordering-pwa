@@ -6,19 +6,23 @@ import { useDeviceStore } from './Device'
 import { useMenuStore } from './Menu'
 import { logger } from '../utils/logger'
 
+// Module-scope: track last-hidden timestamp for sleep/wake duration check
+let _hiddenAt: number | null = null
+
 export const useSessionStore = defineStore('session', () => {
   const state = reactive({
     sessionId: null as number | null,
     orderId: null as number | null,
-    isActive: false as boolean,
+    isActive: false,
     sessionStartedAt: null as number | null,
     sessionEndsAt: null as number | null,
-    remainingMs: 0 as number,
-    timerExpired: false as boolean
+    remainingMs: 0,
+    timerExpired: false,
   })
 
-  const SESSION_DURATION_MS = 60 * 60 * 1000
+  const SESSION_DURATION_MS = 4 * 60 * 60 * 1000 // 4 hours — matches server session_duration_seconds: 14400
   let sessionTimerId: number | null = null
+  let syncResyncTimerId: number | null = null
 
   const stopTimerInterval = () => {
     if (sessionTimerId) {
@@ -71,13 +75,130 @@ export const useSessionStore = defineStore('session', () => {
     startTimerInterval()
   }
 
-  async function fetchLatestSession() {
-    const $api = useApi();
+  const stopSyncResyncTimer = () => {
+    if (syncResyncTimerId) {
+      try { clearInterval(syncResyncTimerId) } catch (e) { logger.debug('[SessionStore] clearInterval (sync) failed', e) }
+      syncResyncTimerId = null
+    }
+  }
+
+  const startSyncResyncTimer = () => {
+    if (syncResyncTimerId || typeof window === 'undefined') return
+    syncResyncTimerId = window.setInterval(syncFromServer, 60_000)
+  }
+
+  const _onVisibilityChange = () => {
+    if (typeof document === 'undefined') return
+
+    if (document.hidden) {
+      // Page going to background — record the time
+      _hiddenAt = Date.now()
+      return
+    }
+
+    // Page became visible (wake from sleep or tab focus)
+    if (!state.isActive) return
+
+    const hiddenMs = _hiddenAt !== null ? Date.now() - _hiddenAt : 0
+    _hiddenAt = null
+
+    // Always re-sync session timer from server
+    syncFromServer()
+
+    // Restart order polling if an order is active and we have a known order ID
+    const orderStore = useOrderStore()
+    if (orderStore.hasPlacedOrder) {
+      const orderId = orderStore.getPollingOrderId()
+      if (orderId) {
+        orderStore.startOrderPolling(orderId)
+      }
+    }
+
+    // Note: WebSocket reconnection is handled automatically by useBroadcasts
+    // exponential-backoff state-change handler (Mission-7 Task 1.7).
+    // Log the wake duration so operators can monitor sleep recovery.
+    if (hiddenMs > 5 * 60 * 1000) {
+      logger.warn('[Session] visibilitychange: wake after extended sleep', { hiddenMs: Math.round(hiddenMs / 1000) + 's' })
+    }
+  }
+
+  const _unregisterVisibilitySync = () => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('visibilitychange', _onVisibilityChange)
+    }
+  }
+
+  const _registerVisibilitySync = () => {
+    if (typeof window !== 'undefined') {
+      // Remove first to prevent duplicate listeners on hot-reload
+      window.removeEventListener('visibilitychange', _onVisibilityChange)
+      window.addEventListener('visibilitychange', _onVisibilityChange)
+    }
+  }
+
+  async function syncFromServer(): Promise<void> {
+    if (!state.isActive) return
+    const api = useApi()
     try {
-      const { data } = await $api('/api/session/latest', { method: 'GET' })
-      state.sessionId = Number(data.id) || data.id
+      const response = await api.get('/api/session/latest')
+      const responseData = response?.data ?? null
+      if (!responseData) return
+      const serverTime: string | undefined = responseData.server_time
+      const sessionStartedAt: string | undefined = responseData.session_started_at
+      const durationSeconds: number = responseData.session_duration_seconds ?? 14400
+      if (serverTime && sessionStartedAt) {
+        const serverNow = new Date(serverTime).getTime()
+        const sessionStart = new Date(sessionStartedAt).getTime()
+        const durationMs = durationSeconds * 1000
+        const serverEndAt = sessionStart + durationMs
+        // Correct for client/server clock skew
+        const localOffset = Date.now() - serverNow
+        state.sessionEndsAt = serverEndAt + localOffset
+        logger.debug('[Session] syncFromServer: sessionEndsAt recalibrated', {
+          serverNow: new Date(serverNow).toISOString(),
+          sessionStart: new Date(sessionStart).toISOString(),
+          sessionEndsAt: new Date(state.sessionEndsAt).toISOString(),
+        })
+      }
+    } catch (err: any) {
+      logger.debug('[Session] syncFromServer failed (non-fatal):', err?.message)
+    }
+  }
+
+  async function fetchLatestSession() {
+    const api = useApi()
+    const deviceStore = useDeviceStore()
+    try {
+      const response = await api.get('/api/session/latest')
+      const responseData = response?.data ?? null
+      const sessionPayload = responseData?.data ?? responseData
+
+      if (!sessionPayload || !sessionPayload.id) {
+        logger.debug('[Session] fetchLatestSession: no active session returned')
+        return
+      }
+
+      const currentDeviceId = deviceStore.getDeviceId()
+      const sessionDeviceId = Number(sessionPayload.device_id || 0) || null
+
+      if (currentDeviceId && sessionDeviceId && currentDeviceId !== sessionDeviceId) {
+        logger.warn('[Session] fetchLatestSession: rejected foreign session', {
+          sessionId: sessionPayload.id,
+          currentDeviceId,
+          sessionDeviceId,
+        })
+        return
+      }
+
+      const sessionId = Number(sessionPayload.id) || null
+      if (!sessionId) {
+        logger.warn('[Session] fetchLatestSession: session id is not a valid number', sessionPayload.id)
+        return
+      }
+      state.sessionId = sessionId
+      logger.debug('[Session] fetchLatestSession: assigned sessionId', sessionId)
     } catch (error: any) {
-      // ignore
+      logger.debug('[Session] fetchLatestSession error (non-fatal):', error?.message)
     }
   }
 
@@ -91,7 +212,7 @@ export const useSessionStore = defineStore('session', () => {
       const ok = await deviceStore.authenticate()
       if (!ok) {
         // Authentication failed; caller should handle registration UI
-        console.log(`[❌ Device Auth Failed] Cannot start session without token at ${timestamp}`)
+        logger.warn(`[Session] Device auth failed: cannot start session without token at ${timestamp}`)
         return false
       }
     }
@@ -117,14 +238,14 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
       // Token is missing/expired/near expiry — try refreshing
-      console.log(`[🔄 Token Refresh] Token expired or missing, refreshing at ${timestamp}`)
+      logger.info(`[Session] Token refresh requested at ${timestamp}`)
       const refreshed = await deviceStore.refresh()
       if (!refreshed) {
         // Refresh failed — require re-registration
-        console.log(`[❌ Token Refresh Failed] Cannot refresh token at ${timestamp}`)
+        logger.warn(`[Session] Token refresh failed at ${timestamp}`)
         return false
       }
-      console.log(`[✅ Token Refreshed] Valid token obtained at ${timestamp}`)
+      logger.info(`[Session] Token refreshed at ${timestamp}`)
     }
 
     // Fetch latest session id from server to keep local state in-sync
@@ -138,9 +259,9 @@ export const useSessionStore = defineStore('session', () => {
     // Preload menu data so customers don't wait when ordering
     const menuStore = useMenuStore()
     try {
-      console.log(`[📦 Menu Preload] Loading menus for quick response at ${timestamp}`)
+      logger.info(`[Session] Menu preload started at ${timestamp}`)
       await menuStore.loadAllMenus()
-      console.log(`[✅ Menu Preloaded] Ready for ordering at ${timestamp}`)
+      logger.info(`[Session] Menu preload finished at ${timestamp}`)
     } catch (e) {
       logger.warn('[SessionStore] preload menus failed:', e)
     }
@@ -148,13 +269,18 @@ export const useSessionStore = defineStore('session', () => {
     // Reset order store to fresh state for new dining session
     const orderStore = useOrderStore()
     orderStore.setGuestCount(2)       // Default guest count
-    orderStore.cartItems = []          // Clear active cart
-    orderStore.package = {} as any     // Clear package selection
-    orderStore.currentOrder = null     // Clear current order reference
+    orderStore.clearCart()             // Clear active cart
+    orderStore.clearPackage()          // Clear package selection
+    orderStore.clearCurrentOrder()     // Clear current order reference
 
     state.isActive = true
     state.timerExpired = false
     startTimer()
+
+    // Sync timer from server to correct for client/server clock skew
+    await syncFromServer()
+    startSyncResyncTimer()
+    _registerVisibilitySync()
 
     // Centralized lightweight flag to signal session is active for simple pages
     // Avoid direct localStorage writes from pages/components — use this store instead
@@ -162,7 +288,7 @@ export const useSessionStore = defineStore('session', () => {
       try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
     }
 
-    console.log(`[✅ Session Started] Ready for guest ordering flow at ${timestamp}`)
+    logger.info(`[Session] Started at ${timestamp}`)
     logger.info('[SessionStore] Session started')
 
     return true
@@ -172,13 +298,13 @@ export const useSessionStore = defineStore('session', () => {
     const timestamp = new Date().toISOString()
     const orderStore = useOrderStore()
     const currentOrderId = state.orderId
-    const finalStatus = orderStore.currentOrder?.order?.status || 'unknown'
+    const finalStatus = orderStore.getCurrentOrderStatus() || 'unknown'
     
-    console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
+    logger.info(`[Session] Ending order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
     logger.info('🔚 Session ending - clearing all session and order state')
     state.timerExpired = false
     clear()
-    console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
+    logger.info(`[Session] Cleared at ${timestamp}`)
   }
 
   // Compatibility alias used by some callers
@@ -196,24 +322,26 @@ export const useSessionStore = defineStore('session', () => {
     state.sessionEndsAt = null
     state.remainingMs = 0
     stopTimerInterval()
+    stopSyncResyncTimer()
+    _unregisterVisibilitySync()
     
     // Reset order state when session ends
     const orderStore = useOrderStore()
     
     // Stop any active polling first
-    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
     
     orderStore.setGuestCount(2)
-    orderStore.cartItems = []
-    orderStore.refillItems = []
-    orderStore.submittedItems = []
-    orderStore.package = {} as any
-    orderStore.currentOrder = null
-    orderStore.hasPlacedOrder = false
-    orderStore.isRefillMode = false
+    orderStore.clearCart()
+    orderStore.clearRefillItems()
+    orderStore.clearSubmittedItems()
+    orderStore.clearPackage()
+    orderStore.clearCurrentOrder()
+    orderStore.setHasPlacedOrder(false)
+    orderStore.setIsRefillMode(false)
     // Note: orderStore.history is KEPT for historical tracking
     
-    console.log(`[📊 State Cleared] All order/cart/package data cleared at ${timestamp}`)
+    logger.info(`[Session] State cleared at ${timestamp}`)
     
     // Force persist to localStorage immediately to avoid hydration issues
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -236,7 +364,7 @@ export const useSessionStore = defineStore('session', () => {
           history: orderStore.history || [] // Keep history
         }))
         
-        console.log(`[💾 Persisted] Session state saved at ${timestamp}`)
+        logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
         logger.debug('✅ Session and order stores cleared and persisted')
       } catch (e) {
         logger.warn('Failed to persist cleared stores:', e)
@@ -244,7 +372,15 @@ export const useSessionStore = defineStore('session', () => {
     }
     // Remove lightweight active flag from localStorage (SSR-safe)
     if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+      try { window.localStorage.removeItem('session_active') } catch (e) { logger.debug('[SessionStore] failed to remove session_active', e) }
+    }
+    // Clear persisted idempotency key — prevents previous-session key leaking into next order attempt
+    if (typeof sessionStorage !== 'undefined') {
+      try { sessionStorage.removeItem('woosoo_order_idem_key') } catch (e) { logger.debug('[SessionStore] failed to clear idempotency key', e) }
+    }
+    // Clear offline order queue — queued orders must not survive session end (session boundary safety)
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem('woosoo_order_queue') } catch (e) { logger.debug('[SessionStore] failed to clear offline order queue', e) }
     }
   }
 
@@ -258,21 +394,23 @@ export const useSessionStore = defineStore('session', () => {
     state.remainingMs = 0
     state.timerExpired = false
     stopTimerInterval()
+    stopSyncResyncTimer()
+    _unregisterVisibilitySync()
     
     const orderStore = useOrderStore()
     
     // Stop any active polling first
-    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { /* ignore */ }
+    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
     
     orderStore.setGuestCount(2)
-    orderStore.cartItems = []
-    orderStore.refillItems = []
-    orderStore.submittedItems = []
-    orderStore.package = {} as any
-    orderStore.currentOrder = null
-    orderStore.hasPlacedOrder = false
-    orderStore.isRefillMode = false
-    orderStore.history = []  // Only cleared on full reset
+    orderStore.clearCart()
+    orderStore.clearRefillItems()
+    orderStore.clearSubmittedItems()
+    orderStore.clearPackage()
+    orderStore.clearCurrentOrder()
+    orderStore.setHasPlacedOrder(false)
+    orderStore.setIsRefillMode(false)
+    orderStore.clearHistory()          // Only cleared on full reset
     
     // Force persist to localStorage immediately
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -300,20 +438,36 @@ export const useSessionStore = defineStore('session', () => {
       }
     }
     if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.removeItem('session_active') } catch (e) { /* ignore */ }
+      try { window.localStorage.removeItem('session_active') } catch (e) { logger.debug('[SessionStore] failed to remove session_active', e) }
     }
   }
+
+  // Typed cross-store mutation helpers — avoids TypeScript Ref<T> false-positives
+  // when Pinia 3 + Vue 3.5 fails to unwrap setup store return types.
+  function setOrderId(id: number | null) { state.orderId = id }
+  function setIsActive(val: boolean) { state.isActive = val }
+  function setSessionId(id: number | null) { state.sessionId = id }
+  function getOrderId(): number | null { return state.orderId }
+  function getIsActive(): boolean { return state.isActive }
+  function getSessionId(): number | null { return state.sessionId }
 
   return {
     ...toRefs(state),
     fetchLatestSession,
+    syncFromServer,
     start,
     end,
     endSession,
     clear,
     reset,
     startTimer,
-    ensureTimer
+    ensureTimer,
+    setOrderId,
+    setIsActive,
+    setSessionId,
+    getOrderId,
+    getIsActive,
+    getSessionId,
   }
 }, {
   persist: {
@@ -322,238 +476,3 @@ export const useSessionStore = defineStore('session', () => {
     pick: ['sessionId', 'isActive', 'orderId', 'sessionStartedAt', 'sessionEndsAt']
   }
 })
-
-
-
-// // stores/session.ts
-// import { defineStore } from 'pinia'
-// import type { Session, Table, Device, Branch, ApiResponse } from '~/types'
-
-// export const useSessionStore = defineStore('session', {
-//   state: () => ({
-//     currentSession: null as Session | null,
-//     device: null as Device | null,
-//     branch: null as Branch | null,
-//     isLoading: false,
-//     error: null as string | null
-//   }),
-
-//   getters: {
-//     hasActiveSession: (state) => state.currentSession !== null,
-    
-//     currentTable: (state) => state.currentSession?.table || null,
-    
-//     sessionId: (state) => state.currentSession?.session_id || null,
-    
-//     isTableLocked: (state) => state.currentSession?.table?.is_locked || false,
-    
-//     deviceInfo: (state) => {
-//       if (!state.device) return null
-//       return {
-//         id: state.device.id,
-//         name: state.device.name,
-//         code: state.device.code
-//       }
-//     },
-
-//     branchInfo: (state) => {
-//       if (!state.branch) return null
-//       return {
-//         id: state.branch.id,
-//         name: state.branch.name
-//       }
-//     }
-//   },
-
-//   actions: {
-//     // Initialize device and branch
-//     async initializeDevice(deviceCode: string) {
-//       this.isLoading = true
-//       this.error = null
-
-//       try {
-//         const response = await $fetch<ApiResponse<{ device: Device; branch: Branch }>>(
-//           '/api/device/authenticate',
-//           {
-//             method: 'POST',
-//             body: { code: deviceCode }
-//           }
-//         )
-
-//         if (response.success) {
-//           this.device = response.data.device
-//           this.branch = response.data.branch
-          
-//           // Store device token for subsequent requests
-//           if (response.data.device.token) {
-//             localStorage.setItem('device_token', response.data.device.token)
-//           }
-
-//           return true
-//         }
-
-//         throw new Error(response.message || 'Failed to authenticate device')
-//       } catch (error: any) {
-//         this.error = error.message
-//         console.error('Device initialization error:', error)
-//         return false
-//       } finally {
-//         this.isLoading = false
-//       }
-//     },
-
-//     // Start a new session with a table
-//     async startSession(tableId: number, guestCount: number = 1) {
-//       if (!this.device || !this.branch) {
-//         throw new Error('Device not initialized')
-//       }
-
-//       this.isLoading = true
-//       this.error = null
-
-//       try {
-//         const response = await $fetch<ApiResponse<Session>>(
-//           '/api/sessions',
-//           {
-//             method: 'POST',
-//             body: {
-//               table_id: tableId,
-//               guest_count: guestCount,
-//               device_id: this.device.id,
-//               branch_id: this.branch.id
-//             }
-//           }
-//         )
-
-//         if (response.success) {
-//           this.currentSession = response.data
-//           return response.data
-//         }
-
-//         throw new Error(response.message || 'Failed to start session')
-//       } catch (error: any) {
-//         this.error = error.message
-//         console.error('Start session error:', error)
-//         throw error
-//       } finally {
-//         this.isLoading = false
-//       }
-//     },
-
-//     // Load existing session
-//     async loadSession(sessionId: number) {
-//       this.isLoading = true
-//       this.error = null
-
-//       try {
-//         const response = await $fetch<ApiResponse<Session>>(
-//           `/api/sessions/${sessionId}`
-//         )
-
-//         if (response.success) {
-//           this.currentSession = response.data
-//           return response.data
-//         }
-
-//         throw new Error(response.message || 'Failed to load session')
-//       } catch (error: any) {
-//         this.error = error.message
-//         console.error('Load session error:', error)
-//         throw error
-//       } finally {
-//         this.isLoading = false
-//       }
-//     },
-
-//     // Update session
-//     updateSession(session: Partial<Session>) {
-//       if (this.currentSession) {
-//         this.currentSession = {
-//           ...this.currentSession,
-//           ...session
-//         }
-//       }
-//     },
-
-//     // End session
-//     async endSession() {
-//       if (!this.currentSession) {
-//         throw new Error('No active session')
-//       }
-
-//       this.isLoading = true
-//       this.error = null
-
-//       try {
-//         const response = await $fetch<ApiResponse<void>>(
-//           `/api/sessions/${this.currentSession.session_id}/end`,
-//           {
-//             method: 'POST'
-//           }
-//         )
-
-//         if (response.success) {
-//           this.currentSession = null
-//           return true
-//         }
-
-//         throw new Error(response.message || 'Failed to end session')
-//       } catch (error: any) {
-//         this.error = error.message
-//         console.error('End session error:', error)
-//         return false
-//       } finally {
-//         this.isLoading = false
-//       }
-//     },
-
-//     // Lock/unlock table
-//     async toggleTableLock(locked: boolean) {
-//       if (!this.currentSession?.table) {
-//         throw new Error('No active table')
-//       }
-
-//       try {
-//         const response = await $fetch<ApiResponse<Table>>(
-//           `/api/tables/${this.currentSession.table.id}/lock`,
-//           {
-//             method: 'POST',
-//             body: { is_locked: locked }
-//           }
-//         )
-
-//         if (response.success && this.currentSession) {
-//           this.currentSession.table = response.data
-//           return true
-//         }
-
-//         return false
-//       } catch (error: any) {
-//         this.error = error.message
-//         console.error('Toggle table lock error:', error)
-//         return false
-//       }
-//     },
-
-//     // Clear session (logout)
-//     clearSession() {
-//       this.currentSession = null
-//       this.error = null
-//     },
-
-//     // Clear all data
-//     reset() {
-//       this.currentSession = null
-//       this.device = null
-//       this.branch = null
-//       this.error = null
-//       localStorage.removeItem('device_token')
-//     }
-//   },
-
-//   persist: {
-//     key: 'session-store',
-//     storage: localStorage,
-//     pick: ['currentSession', 'device', 'branch']
-//   }
-// })
