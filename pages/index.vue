@@ -183,6 +183,7 @@ import { useDeviceStore } from '~/stores/Device';
 import { useSessionStore } from '~/stores/Session'
 import { useBroadcasts } from '~/composables/useBroadcasts';
 import { useMenuStore } from '~/stores/Menu';
+import { useNetworkStatus } from '~/composables/useNetworkStatus';
 import { Settings, UtensilsCrossed } from 'lucide-vue-next';
 import { recoverActiveOrderState } from '~/composables/useActiveOrderRecovery'
 const session = useSessionStore();
@@ -191,8 +192,12 @@ const menuStore = useMenuStore();
 const router = useRouter();
 const route = useRoute();
 const { channelStatus } = useBroadcasts();
+const { isOnline } = useNetworkStatus();
 
-const isWebSocketConnected = computed(() => channelStatus.value.device || channelStatus.value.deviceControl || channelStatus.value.order || channelStatus.value.serviceRequest);
+// On the welcome screen, show real network connectivity — not WebSocket subscription
+// state, which is always false here because no channels are subscribed until the
+// device is authenticated and an order session starts.
+const isWebSocketConnected = computed(() => isOnline.value);
 
 // PIN modal state
 const showPinModal = ref(false)
