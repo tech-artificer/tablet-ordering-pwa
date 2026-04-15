@@ -49,8 +49,10 @@ describe('order polling fallback', () => {
   it('starts polling after setOrderCreated and stops when order becomes completed', async () => {
     const order = useOrderStore()
 
-    // Arrange: return completed immediately so the immediate tick stops polling
-    mockGet.mockResolvedValueOnce({ data: { order: { id: 19561, status: 'completed' } } })
+    // Arrange: first tick remains non-terminal, second tick transitions terminal
+    mockGet
+      .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing' } } })
+      .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'completed' } } })
 
     // Act: simulate order creation response
     await order.setOrderCreated({ order: { id: 19561, order_number: 'ORD-19561' } })
