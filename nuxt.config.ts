@@ -3,9 +3,6 @@ import path from 'path';
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    serverMiddleware: [
-        '~/server/middleware/security.ts',
-    ],
     devtools: { enabled: process.env.NODE_ENV !== 'production' },
     
     debug: false,
@@ -15,18 +12,9 @@ export default defineNuxtConfig({
     experimental: {
         payloadExtraction: false,
     },
-    
+
     ssr: false,
-    
-    // Nitro static preset for nginx deployment (generates index.html + 200.html fallback)
-    nitro: {
-        preset: 'static',
-        prerender: {
-            crawlLinks: false,
-            routes: ['/']
-        }
-    },
-    
+
     router: {
         middleware: ['auth']
     },
@@ -59,6 +47,11 @@ export default defineNuxtConfig({
     // This prevents nuxt generate from wiping static files (icons, favicon) during builds.
     // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/dist).
     nitro: {
+        preset: 'static',
+        prerender: {
+            crawlLinks: false,
+            routes: ['/'],
+        },
         output: {
             publicDir: 'dist',
         },
