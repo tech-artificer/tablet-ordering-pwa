@@ -196,29 +196,28 @@ export default defineNuxtConfig({
             appEnv: process.env.APP_ENV || 'production',
 
             // API Configuration
-            mainApiUrl: process.env.MAIN_API_URL || 'https://192.168.100.7:8443',
+            mainApiUrl: process.env.MAIN_API_URL || 'http://localhost:8000',
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
 
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
 
             // Reverb WebSocket Configuration
-            // Client connects via nginx TLS termination on port 8443 — NOT directly to Reverb (6002).
             reverb: {
                 appId:      process.env.NUXT_PUBLIC_REVERB_APP_ID     || '',
                 appKey:     process.env.NUXT_PUBLIC_REVERB_APP_KEY    || '',
-                host:       process.env.NUXT_PUBLIC_REVERB_HOST       || '192.168.100.7',
-                port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '8443'),
-                scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'https',
-                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || '192.168.100.7',
-                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6002'),
+                host:       process.env.NUXT_PUBLIC_REVERB_HOST       || 'localhost',
+                port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '6001'),
+                scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'http',
+                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || 'localhost',
+                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6001'),
                 serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || '',
             },
 
             // Laravel Echo (mirrors reverb config — kept for backwards compat)
             echo: {
-                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || '192.168.100.7',
-                port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '8443'),
+                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || 'localhost',
+                port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '6001'),
                 encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true',
             },
         },
