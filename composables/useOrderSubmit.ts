@@ -62,6 +62,11 @@ export function useOrderSubmit() {
       : deviceStore.token?.value ?? null
 
     const idempotencyKey = generateIdempotencyKey()
+    const submitOptions = {
+      headers: {
+        'X-Idempotency-Key': idempotencyKey,
+      },
+    }
 
     // -----------------------------------------------------------------------
     // Submit via existing orderStore (handles validation + API call).
@@ -69,7 +74,7 @@ export function useOrderSubmit() {
     // queues it, and the network-error catch path mirrors it in Dexie.
     // -----------------------------------------------------------------------
     try {
-      const result = await orderStore.submitOrder(payload)
+      const result = await (orderStore.submitOrder as any)(payload, submitOptions)
       return { queued: false, data: result }
     } catch (err: any) {
       const status: number | undefined = err?.response?.status
