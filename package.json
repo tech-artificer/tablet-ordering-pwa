@@ -23,7 +23,7 @@
     "@element-plus/icons-vue": "^2.3.2",
     "@pinia/nuxt": "^0.11.2",
     "@vueuse/motion": "^3.0.3",
-    "axios": "^1.5.0",
+    "axios": "^1.15.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "dexie": "^4.4.2",
