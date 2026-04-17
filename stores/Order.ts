@@ -2,6 +2,7 @@
 import { reactive, computed, toRefs, onScopeDispose } from 'vue'
 import { useApi } from '../composables/useApi'
 import { logger } from '../utils/logger'
+import { extractOrderId, extractOrderNumber } from '../utils/orderHelpers'
 import { notifyBlockedAction } from '../composables/useNotifier'
 import { useDeviceStore } from './Device'
 import { useSessionStore } from './Session'
@@ -635,7 +636,9 @@ export const useOrderStore = defineStore('order', () => {
     const orderId = extractOrderId(respData)
 
     // Store the numeric order_id in session for API lookups
-    if (orderId) sessionStore.orderId = Number(orderId)
+    if (orderId && sessionStore.orderId) {
+      sessionStore.orderId.value = Number(orderId)
+    }
     state.hasPlacedOrder = true
     state.currentOrder = respData
     
@@ -763,7 +766,9 @@ export const useOrderStore = defineStore('order', () => {
           try {
             const sessionStore = useSessionStore()
             const polledOrderId = extractOrderId(orderObj)
-            if (polledOrderId) sessionStore.orderId = Number(polledOrderId)
+            if (polledOrderId && sessionStore.orderId) {
+              sessionStore.orderId.value = Number(polledOrderId)
+            }
           } catch (e) {
             logger.debug('startOrderPolling: failed to sync session orderId', e)
           }
@@ -791,8 +796,10 @@ export const useOrderStore = defineStore('order', () => {
 
                     // If end returns a promise, await it
                     try {
-                      const res = sessionStore.end && sessionStore.end()
-                      if (res && typeof (res as any).then === 'function') await res
+                      if (sessionStore.end) {
+                        const res = sessionStore.end()
+                        if (res && typeof (res as any).then === 'function') await res
+                      }
                     } catch (e) {
                       logger.warn('sessionStore.end() threw:', e)
                     }
@@ -873,8 +880,8 @@ export const useOrderStore = defineStore('order', () => {
         const activeStatus = String(activeOrder?.status || '').toLowerCase()
 
         if (activeOrderId && !['completed', 'cancelled', 'voided'].includes(activeStatus)) {
-          sessionStore.orderId = activeOrderId
-          sessionStore.isActive = true
+          if (sessionStore.orderId) sessionStore.orderId.value = activeOrderId
+          if (sessionStore.isActive) sessionStore.isActive.value = true
           if (typeof window !== 'undefined' && window.localStorage) {
             try { window.localStorage.setItem('session_active', '1') } catch (e) { /* ignore */ }
           }
@@ -992,6 +999,7 @@ export const useOrderStore = defineStore('order', () => {
     clearRefillCart,
     toggleRefillMode,
     buildPayload,
+    buildRefillPayload,
     submitOrder,
     submitRefill,
     setOrderCreated,

@@ -54,7 +54,7 @@ const goBack = () => {
       <div class="flex flex-col items-center gap-3">
         <button
           type="button"
-          class="px-14 py-5 text-lg font-semibold rounded-full transition-all duration-200 bg-gradient-to-r from-primary to-primary/85 text-white shadow-lg shadow-primary/40 hover:from-primary/95 hover:to-primary/80 active:scale-98"
+          class="btn-primary px-14 py-5 text-lg font-semibold rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 active:scale-[0.98] transition-all duration-200"
           @click="handleGuestConfirmation"
         >
           Ready To Grill

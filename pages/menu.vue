@@ -593,16 +593,14 @@ function modifyDuringCountdown() {
 
           <!-- Error State -->
           <div v-if="categoryError" class="flex justify-center">
-            <el-card class="max-w-md bg-red-500/20">
-              <template #header>
-                <span class="text-on font-semibold">Error Loading {{ activeCategory }}</span>
-              </template>
-              <p class="text-on mb-4">{{ categoryError }}</p>
+            <div class="max-w-md rounded-2xl bg-red-500/15 border border-red-500/30 p-6">
+              <p class="font-semibold text-red-300 mb-2">Error Loading {{ activeCategory }}</p>
+              <p class="text-sm text-red-200/80 mb-4">{{ categoryError }}</p>
               <el-button type="danger"
                 @click="menuStore[`fetch${activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}`]()">
                 Try Again
               </el-button>
-            </el-card>
+            </div>
           </div>
 
           <!-- Meats View (Grouped by Category) -->

@@ -13,6 +13,8 @@ export const useDeviceStore = defineStore('device', () => {
     const expiration = ref<number | string | null>(null)
     const isLoading = ref(false)
     const errorMessage = ref<string | null>(null)
+    // Broadcasting config received from server (persisted to localStorage)
+    const broadcastConfig = ref<{ key: string; host: string; port: number; scheme: string; authEndpoint: string } | null>(null)
         // Debug / diagnostics: last raw auth/register response and server-chosen IP
         const lastAuthResponse = ref<any | null>(null)
         const lastServerIpUsed = ref<string | null>(null)
@@ -114,6 +116,24 @@ export const useDeviceStore = defineStore('device', () => {
             }, intervalMs) as unknown as number
         }
 
+    /** Extract broadcasting config from a server response and (re-)init Echo if available. */
+    function applyBroadcastConfig(responseData: any) {
+        const bc = responseData?.broadcasting
+        if (bc && bc.key) {
+            broadcastConfig.value = {
+                key: bc.key,
+                host: bc.host ?? '',
+                port: bc.port ?? 6001,
+                scheme: bc.scheme ?? 'http',
+                authEndpoint: bc.auth_endpoint ?? '/broadcasting/auth',
+            }
+            // Re-initialize Echo with server-provided config
+            if (typeof window !== 'undefined' && (window as any).initEcho) {
+                (window as any).initEcho(broadcastConfig.value, token.value)
+            }
+        }
+    }
+
     // Getters
     const isAuthenticated = computed((): boolean => {
         return !!(token.value && table.value?.id)
@@ -163,9 +183,12 @@ export const useDeviceStore = defineStore('device', () => {
                 table.value = normalizeTable(authTable)
                 expiration.value = expires_at
                 
+                // Apply broadcasting config from server response
+                applyBroadcastConfig(response.data)
+
                 console.log(`[✅ Device Authenticated] device_id=${authDevice.id} table_id=${authTable?.id} table_name=${authTable?.name} latency=${authMs}ms at ${new Date().toISOString()}`)
                 logger.info(`[Device] Authenticated as device_id=${authDevice.id}`)
-                
+
                 return true
             }
             
@@ -236,7 +259,8 @@ export const useDeviceStore = defineStore('device', () => {
                 ;(device.value as any).ip_address = ipUsedFromServer
             }
 
-            
+            // Apply broadcasting config from server response
+            applyBroadcastConfig(response.data)
 
         } catch (error: any) {
             logger.error('[DeviceStore] Registration failed:', error)
@@ -257,6 +281,8 @@ export const useDeviceStore = defineStore('device', () => {
                         waitingForTable.value = true
                     }
 
+                // Apply broadcasting config even from error responses (409 includes it)
+                applyBroadcastConfig(resp)
                 // Friendly message informing that device exists but assignment pending
                 errorMessage.value = 'Device was registered on the server; waiting for table assignment. Use "Check for Table" in Settings.'
                 // Do not re-throw — caller should treat this as handled
@@ -344,12 +370,14 @@ export const useDeviceStore = defineStore('device', () => {
             // Diagnostics
             lastAuthResponse,
             lastServerIpUsed,
+            // Broadcasting config (server-provided)
+            broadcastConfig,
         clearAuth,
     }
 }, {
     persist: {
         key: 'device-store',
         storage: typeof window !== 'undefined' ? localStorage : undefined,
-        paths: ['device', 'token', 'expiration', 'table'],
+        paths: ['device', 'token', 'expiration', 'table', 'broadcastConfig'],
     }
 })

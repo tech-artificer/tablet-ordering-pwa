@@ -7,7 +7,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useOrderStore } from '~/stores/order'
+import { useOrderStore } from '~/stores/Order'
 
 const orderStore = useOrderStore()
 

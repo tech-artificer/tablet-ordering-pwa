@@ -103,6 +103,54 @@ export const useBroadcasts = () => {
   let orderCompletionTimeoutId: number | null = null
   let reloadTimeoutId: number | null = null
 
+  // BUG-7 Fix: Exponential backoff for WebSocket reconnection
+  let reconnectionAttempts = 0
+  let reconnectionTimerId: ReturnType<typeof setTimeout> | null = null
+  const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30] // seconds, max 30s
+  const MAX_RECONNECTION_ATTEMPTS = 10
+
+  const scheduleReconnection = () => {
+    if (reconnectionTimerId) return // Already scheduled
+    if (reconnectionAttempts >= MAX_RECONNECTION_ATTEMPTS) {
+      console.log(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
+      logger.warn('WebSocket max reconnection attempts reached')
+      ElNotification({
+        title: '⚠️ Connection Lost',
+        message: 'Please reload the page to reconnect',
+        type: 'warning',
+        duration: 0, // Persistent until dismissed
+        position: 'bottom-right'
+      })
+      return
+    }
+
+    reconnectionAttempts++
+    const backoffIndex = Math.min(reconnectionAttempts - 1, RECONNECTION_BACKOFF.length - 1)
+    const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
+    
+    console.log(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectionAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
+    
+    reconnectionTimerId = setTimeout(() => {
+      reconnectionTimerId = null
+      console.log(`[🔄 WebSocket] Attempting reconnection (attempt ${reconnectionAttempts})`)
+      
+      // Re-subscribe to channels (Echo handles socket reconnection internally)
+      subscribeToDeviceChannel()
+      const currentOrderId = sessionStore.orderId
+      if (currentOrderId) {
+        subscribeToOrderChannel(currentOrderId.toString())
+      }
+    }, delaySeconds * 1000)
+  }
+
+  const cancelReconnection = () => {
+    if (reconnectionTimerId) {
+      clearTimeout(reconnectionTimerId)
+      reconnectionTimerId = null
+    }
+    reconnectionAttempts = 0 // Reset on successful connection
+  }
+
   // Channel connection status
   const channelStatus = ref({
     device: false,
@@ -110,6 +158,30 @@ export const useBroadcasts = () => {
     order: false,
     serviceRequest: false
   })
+
+  // Event deduplication: Track last 100 processed event IDs (BUG-9 fix)
+  const processedEventIds = new Set<number>()
+  const MAX_PROCESSED_EVENT_CACHE = 100
+  const eventIdQueue: number[] = []
+
+  const isEventProcessed = (eventId: number): boolean => {
+    return processedEventIds.has(eventId)
+  }
+
+  const markEventProcessed = (eventId: number) => {
+    if (processedEventIds.has(eventId)) return
+    
+    processedEventIds.add(eventId)
+    eventIdQueue.push(eventId)
+    
+    // LRU eviction: Remove oldest event ID when cache exceeds limit
+    if (eventIdQueue.length > MAX_PROCESSED_EVENT_CACHE) {
+      const oldestId = eventIdQueue.shift()
+      if (oldestId !== undefined) {
+        processedEventIds.delete(oldestId)
+      }
+    }
+  }
 
   // Track last event ID for reliability
   const getLastEventId = (): number => {
@@ -148,7 +220,15 @@ export const useBroadcasts = () => {
 
   // Process events based on type
   const processEvent = (eventType: string, payload: any) => {
+    // BUG-9 Fix: Event deduplication to prevent duplicate processing
     if (payload.eventId) {
+      if (isEventProcessed(payload.eventId)) {
+        console.log(`[🔄 Duplicate Event] eventId=${payload.eventId} type=${eventType} already processed, skipping`)
+        logger.debug('Duplicate event skipped:', { eventId: payload.eventId, type: eventType })
+        return // Silently drop duplicate event
+      }
+      
+      markEventProcessed(payload.eventId)
       setLastEventId(payload.eventId)
     }
 
@@ -498,6 +578,10 @@ export const useBroadcasts = () => {
         if (states.current === 'connected') {
           console.log(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
           logger.debug('✅ WebSocket connected')
+          
+          // BUG-7 Fix: Reset reconnection backoff on successful connection
+          cancelReconnection()
+          
           ElNotification({
             title: '✅ Connected',
             message: 'Real-time connection established',
@@ -509,12 +593,17 @@ export const useBroadcasts = () => {
           // replayMissedEvents()
         } else if (states.current === 'disconnected' || states.current === 'unavailable') {
           logger.debug('⚠️ WebSocket disconnected')
+          
+          // Clear channel status
           channelStatus.value = {
             device: false,
             deviceControl: false,
             order: false,
             serviceRequest: false
           }
+          
+          // BUG-7 Fix: Schedule reconnection with exponential backoff
+          scheduleReconnection()
         }
       })
     }
@@ -531,6 +620,13 @@ export const useBroadcasts = () => {
       try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
       reloadTimeoutId = null
     }
+    // BUG-7 Fix: Clear reconnection timer on cleanup
+    if (reconnectionTimerId) {
+      try { clearTimeout(reconnectionTimerId) } catch (e) { logger.debug('[Broadcasts] cleanup reconnection timer failed', e) }
+      reconnectionTimerId = null
+    }
+    reconnectionAttempts = 0
+    
     unsubscribeFromOrderChannel()
     const canLeave = typeof (window as any).Echo?.leave === 'function'
     if (deviceChannel) {

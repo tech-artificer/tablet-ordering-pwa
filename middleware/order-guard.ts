@@ -6,8 +6,8 @@
  * first placing an order through the proper flow.
  */
 
-import { useOrderStore } from '~/stores/order'
-import { useSessionStore } from '~/stores/session'
+import { useOrderStore } from '~/stores/Order'
+import { useSessionStore } from '~/stores/Session'
 import { logger } from '~/utils/logger'
 
 export default defineNuxtRouteMiddleware((to, from) => {

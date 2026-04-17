@@ -221,12 +221,12 @@ function handleTouchEnd() {
           
           <!-- Title block -->
           <div class="text-center px-2">
-            <p class="text-[11px] tracking-[0.35em] uppercase text-white/45 font-semibold mb-1">Package Selection</p>
+            <p class="text-xs tracking-[0.3em] uppercase text-white/45 font-semibold mb-1">Package Selection</p>
             <h1 class="text-4xl font-bold text-white font-raleway leading-none">
               Choose Your <span class="text-primary">Package</span>
             </h1>
-            <p class="text-xs tracking-[0.22em] uppercase text-white/55 mt-2">
-              {{ orderStore.guestCount }} Guests · View Included Meats
+            <p class="text-xs tracking-widest uppercase text-white/55 mt-2">
+              {{ orderStore.guestCount }} Guests &middot; View Included Meats
             </p>
           </div>
           

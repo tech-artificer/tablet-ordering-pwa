@@ -53,9 +53,17 @@ const handleOrderSubmitted = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-900 text-white p-4 md:p-8">
-    <h1 class="text-3xl font-bold mb-6 text-orange-400">3. Review and Confirm Order</h1>
+  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex items-center gap-3 mb-8">
+        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">3</div>
+        <div>
+          <h1 class="text-2xl font-bold font-raleway text-white">Review & Confirm</h1>
+          <p class="text-sm text-white/50">Double-check your order before submitting</p>
+        </div>
+      </div>
     
-    <OrderingStep3ReviewSubmit @orderSubmitted="handleOrderSubmitted" />
+      <OrderingStep3ReviewSubmit @orderSubmitted="handleOrderSubmitted" />
+    </div>
   </div>
 </template>

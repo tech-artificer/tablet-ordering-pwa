@@ -29,12 +29,12 @@ describe('useGuestReset composable', () => {
     order.guestCount = 5
 
     // set a session id, then activate the watcher
-    session.sessionId = 123
+    session.$state.sessionId = 123
 
     useGuestReset()
 
     // simulate session end
-    session.sessionId = null as any
+    session.$state.sessionId = null as any
 
     expect(order.guestCount).toBe(2)
   })

@@ -1,10 +1,27 @@
 # CASE_FILE: Order Transaction Audit — PWA → Backend → Database
-**Last Updated:** February 21, 2026 (PWA Static Output Aligned to public/)  
+**Last Updated:** April 16, 2026 (Pinia Ref Regression Fixed)  
 **Lead Detective:** Ranpo Edogawa  
 **Audit Date:** February 19-20, 2026  
 **Apps Audited:** tablet-ordering-pwa + woosoo-nexus (v1 Legacy Stack)  
 **Priority:** P0 / **CRITICAL**  
 **Status:** ✅ **P0 BLOCKER RESOLVED — V2 API FULLY IMPLEMENTED**
+
+---
+
+## Addendum: Pinia Ref Access Pattern Regression (April 16, 2026)
+
+**Symptom:** 18 TypeScript errors and 8 failing tests in tablet PWA blocking Mission-7 Phase 3 testing.
+
+**Root Cause:** Session store uses `toRefs(state)` returning Vue Refs, but production code was directly assigning `sessionStore.orderId = value` instead of `sessionStore.orderId.value = value`.
+
+**Fix Applied:**
+- Added `.value` accessor + defensive null checks to Order.ts (3 locations: setOrderCreated, startOrderPolling, recoverActiveOrder)
+- Migrated 4 test files to `$state` pattern for state mutation
+- Added Session store initialization in 2 test files (`order.submit.spec.ts`, `order.polling.spec.ts`)
+
+**Gate:** 23/23 Vitest tests passing, Order.ts TypeScript errors resolved (0 errors)
+
+**Vault Entry:** `vault/Mission-7-Phase-3-Pinia-Ref-Regression-Fix.md`
 
 ---
 

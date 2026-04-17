@@ -115,6 +115,7 @@ const verifyPin = () => {
 // Calculator-style keypad helpers
 const maskedPin = computed(() => '•'.repeat(pinInput.value.length))
 const MAX_PIN_LENGTH = 6
+const KEYPAD_DIGITS = ['1','2','3','4','5','6','7','8','9'] as const
 const appendDigit = (d: string) => {
   if (pinInput.value.length >= MAX_PIN_LENGTH) return
   pinInput.value = (pinInput.value || '') + d
@@ -153,95 +154,75 @@ const clearDeviceAuth = () => {
         <h3 class="text-lg font-semibold">Enter Settings PIN</h3>
         <p class="text-xs text-white/60">Enter staff PIN to access Settings.</p>
 
-        <!-- Readonly masked display prevents virtual keyboard from opening -->
-        <div>
-          <input
-            readonly
-            aria-live="polite"
-            aria-label="Settings PIN input"
-            :value="maskedPin"
-            placeholder="Enter PIN"
-            class="w-full px-4 py-3 rounded-lg bg-white/10 ring-2 ring-primary/30 text-2xl tracking-[0.4em] text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-            style="min-width:160px; min-height:48px;"
+        <!-- PIN dot indicators -->
+        <div class="flex items-center justify-center gap-3 py-3" role="status" aria-live="polite" :aria-label="`${pinInput.length} of ${MAX_PIN_LENGTH} digits entered`">
+          <div
+            v-for="i in MAX_PIN_LENGTH"
+            :key="i"
+            :class="[
+              'w-3.5 h-3.5 rounded-full transition-all duration-200',
+              i <= pinInput.length
+                ? 'bg-primary scale-110 shadow-md shadow-primary/40'
+                : 'bg-white/15 border border-white/20'
+            ]"
           />
         </div>
 
+        <!-- Keypad grid -->
         <div class="grid grid-cols-3 gap-2.5 mt-2">
-          <button @click.prevent="appendDigit('1')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">1</button>
-          <button @click.prevent="appendDigit('2')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">2</button>
-          <button @click.prevent="appendDigit('3')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">3</button>
-          <button @click.prevent="appendDigit('4')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">4</button>
-          <button @click.prevent="appendDigit('5')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">5</button>
-          <button @click.prevent="appendDigit('6')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">6</button>
-          <button @click.prevent="appendDigit('7')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">7</button>
-          <button @click.prevent="appendDigit('8')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">8</button>
-          <button @click.prevent="appendDigit('9')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">9</button>
-          <button @click.prevent="backspace()"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">⌫</button>
-          <button @click.prevent="appendDigit('0')"
-            class="h-12 w-full text-xl font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">0</button>
-          <button @click.prevent="clearPin()"
-            class="h-12 w-full text-base font-semibold rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            style="min-width:48px; min-height:48px;">Clear</button>
+          <button
+            v-for="digit in KEYPAD_DIGITS"
+            :key="digit"
+            @click.prevent="appendDigit(digit)"
+            :aria-label="`Digit ${digit}`"
+            class="keypad-btn text-xl"
+          >{{ digit }}</button>
+          <button @click.prevent="backspace()" aria-label="Delete last digit" class="keypad-btn text-xl">⌫</button>
+          <button @click.prevent="appendDigit('0')" aria-label="Digit 0" class="keypad-btn text-xl">0</button>
+          <button @click.prevent="clearPin()" aria-label="Clear all digits" class="keypad-btn text-base">Clear</button>
         </div>
 
-        <p v-if="pinError" class="text-xs text-red-300 bg-red-500/10 rounded-lg px-3 py-1.5">{{ pinError }}</p>
+        <p v-if="pinError" role="alert" class="text-xs text-red-300 bg-red-500/10 rounded-lg px-3 py-1.5">{{ pinError }}</p>
         <div class="flex items-center justify-end gap-2">
-          <button @click="closePinModal()" class="px-3 py-2 text-sm rounded-lg bg-white/15 hover:bg-white/25">Cancel</button>
+          <button @click="closePinModal()" class="px-4 py-2.5 text-sm rounded-lg bg-white/15 hover:bg-white/25 min-h-[44px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Cancel</button>
           <button @click.prevent="verifyPin()"
-            class="px-3 py-2 text-sm rounded-lg bg-primary text-slate-950 hover:bg-primary/90">Enter</button>
+            class="px-4 py-2.5 text-sm font-semibold rounded-lg bg-primary text-slate-950 hover:bg-primary/90 min-h-[44px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Enter</button>
         </div>
       </div>
     </div>
 
     <!-- Connection Status Indicator -->
-    <div class="absolute top-4 left-4 z-50 flex items-center gap-3 glass-card px-4 py-2.5">
+    <div class="absolute top-4 left-4 z-50 flex items-center gap-2.5 glass-card px-3.5 py-2" role="status" aria-live="polite">
       <div class="flex items-center gap-2">
         <div :class="[
-          'w-3 h-3 rounded-full transition-all',
-          isWebSocketConnected ? 'bg-green-500 animate-pulse shadow-lg shadow-green-500/50' : 'bg-red-500'
-        ]"></div>
-        <span class="text-sm font-medium" :class="isWebSocketConnected ? 'text-green-400' : 'text-red-400'">
+          'w-2.5 h-2.5 rounded-full transition-all duration-300',
+          isWebSocketConnected ? 'bg-green-500 shadow-md shadow-green-500/50' : 'bg-red-500 shadow-md shadow-red-500/40'
+        ]" :aria-hidden="true"></div>
+        <span class="text-xs font-medium" :class="isWebSocketConnected ? 'text-green-400' : 'text-red-400'">
           {{ isWebSocketConnected ? 'Connected' : 'Offline' }}
         </span>
       </div>
-      <div v-if="channelStatus.device || channelStatus.deviceControl" class="text-white/30 text-sm">|</div>
-      <div v-if="channelStatus.device || channelStatus.deviceControl" class="flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-        </svg>
-        <span class="text-sm text-primary font-medium">
-          {{ (channelStatus.device ? 1 : 0) + (channelStatus.deviceControl ? 1 : 0) + (channelStatus.order ? 1 : 0) +
-            (channelStatus.serviceRequest ? 1 : 0) }} channels
-        </span>
-      </div>
+      <template v-if="channelStatus.device || channelStatus.deviceControl">
+        <div class="w-px h-4 bg-white/15"></div>
+        <div class="flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-primary/80" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+          </svg>
+          <span class="text-xs text-primary/80 font-medium">
+            {{ (channelStatus.device ? 1 : 0) + (channelStatus.deviceControl ? 1 : 0) + (channelStatus.order ? 1 : 0) +
+              (channelStatus.serviceRequest ? 1 : 0) }}ch
+          </span>
+        </div>
+      </template>
     </div>
 
-    <!-- Exit/Settings Button - Enhanced touch target -->
+    <!-- Exit/Settings Button -->
     <button @click="openSettings"
-      class="icon-btn absolute top-4 right-4 z-50 !w-12 !h-12 text-white/60 hover:text-white" title="Settings">
+      class="icon-btn absolute top-4 right-4 z-50 w-12 h-12 text-white/60 hover:text-white"
+      aria-label="Open settings"
+      title="Settings">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

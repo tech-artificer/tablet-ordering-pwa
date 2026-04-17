@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, watch, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSessionStore } from '~/stores/session'
+import { useSessionStore } from '~/stores/Session'
 
 const sessionStore = useSessionStore()
 const router = useRouter()

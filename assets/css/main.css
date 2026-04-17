@@ -1,8 +1,7 @@
 @import "./btn-primary.css";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* NOTE: @tailwind directives are in input.css (the primary entrypoint).
+   This file contains utility classes and animations. */
 
 /* ============================================
    SHIMMER ANIMATION
@@ -23,11 +22,10 @@
 }
 
 :root { 
-  --primary: #F6B56D; 
-  --primary-dark: #C78B45;
+  /* Additional custom properties (brand colors defined in input.css) */
   --kbbq-flame: #FF5C00; 
   --panel: #252525;
-  --touch-min: 48px; /* Minimum touch target size */
+  --touch-min: 48px; /* WCAG 2.5.8 minimum touch target size */
 }
 
 .bg-panel {
@@ -232,6 +230,38 @@ body {
   .scale-pop-leave-active {
     transition: none;
   }
+}
+
+/* ============================================
+   KEYPAD BUTTON (PIN dialogs, numeric inputs)
+   ============================================ */
+.keypad-btn {
+  min-width: 48px;
+  min-height: 48px;
+  height: 3rem;
+  width: 100%;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.keypad-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.keypad-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.30);
+}
+
+.keypad-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ============================================

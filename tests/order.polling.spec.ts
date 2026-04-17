@@ -28,6 +28,9 @@ describe('order polling fallback', () => {
     vi.useFakeTimers()
     mockGet.mockReset()
     mockPost.mockReset()
+    // Initialize session store to prevent null ref errors
+    const session = useSessionStore()
+    session.$state.isActive = true
     // Ensure test environment reports online so polling starts
     // Ensure navigator.onLine exists and is writable in test env
     if (typeof global.navigator === 'undefined') {
@@ -88,7 +91,7 @@ describe('order polling fallback', () => {
     mockGet.mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing', total_amount: 200 } } })
 
     // Simulate persisted session order id
-    session.orderId = 19561
+    session.$state.orderId = 19561
 
     await order.initializeFromSession()
 

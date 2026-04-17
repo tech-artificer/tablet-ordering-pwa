@@ -18,6 +18,7 @@ vi.mock('../composables/useApi', () => ({ useApi: () => ({ post: mockPost }) }))
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useDeviceStore } from '../stores/Device'
+import { useSessionStore } from '../stores/Session'
 import { useOrderStore } from '../stores/Order'
 
 describe('stores/order - submitOrder', () => {
@@ -29,6 +30,9 @@ describe('stores/order - submitOrder', () => {
     const dsInstance = useDeviceStore()
     ;(dsInstance as any).token = 'test-token'
     ;(dsInstance as any).table = { id: 1, name: 'Test Table' }
+    // Initialize session store to prevent null ref errors
+    const session = useSessionStore()
+    session.$state.isActive = true
   })
 
   it('submits order, sets currentOrder and clears cartItems (success path)', async () => {
@@ -37,7 +41,10 @@ describe('stores/order - submitOrder', () => {
     // Prepare store state
     order.package = { id: 1, price: 100, is_taxable: false } as any
     order.guestCount = 2
-    order.cartItems = [{ id: 10, name: 'Extra', price: 5, quantity: 2 } as any]
+    order.cartItems = [
+      { id: 10, name: 'Beef Brisket', price: 5, quantity: 2, category: 'meats' } as any,
+      { id: 11, name: 'Extra Side', price: 3, quantity: 1 } as any
+    ]
 
     const apiOrder = { id: 999, total_amount: 110, order_number: 'ORD-999' }
     const apiResp = { success: true, order: apiOrder }
@@ -66,7 +73,9 @@ describe('stores/order - submitOrder', () => {
 
     order.package = { id: 2, price: 50 } as any
     order.guestCount = 1
-    order.cartItems = [{ id: 11, name: 'Side', price: 3, quantity: 1 } as any]
+    order.cartItems = [
+      { id: 12, name: 'Pork Belly', price: 4, quantity: 1, category: 'meats' } as any
+    ]
 
     mockPost.mockRejectedValueOnce(new Error('Network error'))
 

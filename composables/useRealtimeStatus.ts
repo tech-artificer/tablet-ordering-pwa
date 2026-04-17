@@ -17,6 +17,9 @@ export const useRealtimeStatus = () => {
   const sessionStore = useSessionStore()
   const orderStore = useOrderStore() as any
 
+  // Interval tracking for cleanup
+  let connectionMonitorIntervalId: ReturnType<typeof setInterval> | null = null
+
   // Connection state
   const echoConnected = ref<boolean>(false)
   const websocketState = ref<string>('unknown')
@@ -91,6 +94,12 @@ export const useRealtimeStatus = () => {
   const monitorEchoConnection = () => {
     if (typeof window === 'undefined') return
 
+    // Clear any existing interval first
+    if (connectionMonitorIntervalId) {
+      clearInterval(connectionMonitorIntervalId)
+      connectionMonitorIntervalId = null
+    }
+
     const checkConnectionState = () => {
       try {
         const echo = (window as any).Echo
@@ -129,7 +138,15 @@ export const useRealtimeStatus = () => {
 
     // Check immediately and then every 2 seconds
     checkConnectionState()
-    setInterval(checkConnectionState, 2000)
+    connectionMonitorIntervalId = setInterval(checkConnectionState, 2000)
+  }
+
+  // Cleanup function to stop monitoring
+  const stopMonitoring = () => {
+    if (connectionMonitorIntervalId) {
+      clearInterval(connectionMonitorIntervalId)
+      connectionMonitorIntervalId = null
+    }
   }
 
   // Monitor subscription state (call this from useBroadcasts)
@@ -243,6 +260,7 @@ export const useRealtimeStatus = () => {
     // Monitoring
     initializeMonitoring,
     monitorEchoConnection,
+    stopMonitoring,
     updateSubscriptionStatus,
     trackEventReceived,
     trackPollingTick,

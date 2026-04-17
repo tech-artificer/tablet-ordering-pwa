@@ -202,7 +202,9 @@ export default defineNuxtConfig({
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
 
-            // Reverb WebSocket Configuration
+            // Reverb WebSocket Configuration (fallback for first boot / dev / CI).
+            // In production, broadcasting config is fetched from the server
+            // at auth time and persisted in the Device store.
             reverb: {
                 appId:      process.env.NUXT_PUBLIC_REVERB_APP_ID     || '',
                 appKey:     process.env.NUXT_PUBLIC_REVERB_APP_KEY    || '',

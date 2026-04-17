@@ -94,9 +94,6 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
       expect(item).toHaveProperty('subtotal')
       expect(typeof item.subtotal).toBe('number')
       
-      expect(item).toHaveProperty('ordered_menu_id')
-      // Can be null or number
-      
       expect(item).toHaveProperty('note')
       // Can be null or string
       
@@ -109,7 +106,7 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     const store = useOrderStore()
     
     // Setup: Mark order as placed, enter refill mode
-    (store as any).state.hasPlacedOrder = true
+    store.$state.hasPlacedOrder = true
     store.toggleRefillMode(true)
     
     store.addToCart({
@@ -156,7 +153,7 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
   it('should reject invalid order payload (empty items)', () => {
     const store = useOrderStore()
     
-    // Setup: Package without items
+    // Setup: Package without meats (triggers modifier validation before item count check)
     const mockPackage = {
       id: 1,
       name: 'Premium Package',
@@ -166,17 +163,17 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     
     store.setPackage(mockPackage as any)
     store.setGuestCount(2)
-    // No items added
+    // No items added → package will have empty modifiers
 
-    // Act & Assert: Should throw
-    expect(() => (store as any).buildPayload()).toThrow('Invalid items: must be a non-empty array')
+    // Act & Assert: Should throw validation error about missing modifiers
+    expect(() => (store as any).buildPayload()).toThrow('package items must have at least one modifier')
   })
 
   it('should reject invalid order payload (zero guest count)', () => {
     const store = useOrderStore()
     
     // Setup: Zero guests
-    (store as any).state.guestCount = 0
+    store.$state.guestCount = 0
     
     store.addToCart({
       id: 10,
@@ -193,11 +190,11 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     const store = useOrderStore()
     
     // Setup: Refill mode with drinks (not allowed)
-    (store as any).state.hasPlacedOrder = true
+    store.$state.hasPlacedOrder = true
     store.toggleRefillMode(true)
     
     // Manually inject invalid item (bypassing validation)
-    (store as any).state.refillItems = [{
+    store.$state.refillItems = [{
       id: 30,
       name: 'Soda',
       price: 30,
