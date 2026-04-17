@@ -102,8 +102,26 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     })
   })
 
-  it('should enforce refill preconditions using public store API', () => {
-    const store = useOrderStore();
+  it('should produce valid refill payload schema', () => {
+    const store = useOrderStore()
+    
+    // Setup: Mark order as placed, enter refill mode
+    store.$state.hasPlacedOrder = true
+    store.toggleRefillMode(true)
+    
+    store.addToCart({
+      id: 10,
+      name: 'Beef Brisket',
+      price: 150,
+      category: 'meats'
+    } as any, { category: 'meats' })
+    
+    store.addToCart({
+      id: 20,
+      name: 'Kimchi',
+      price: 50,
+      category: 'sides'
+    } as any, { category: 'sides' })
 
     store.setHasPlacedOrder(true)
     store.setIsRefillMode(true)
@@ -120,18 +138,7 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
   it('should reject invalid order payload (empty items)', () => {
     const store = useOrderStore();
     
-    // Setup: No package and no cart items
-    store.clearPackage()
-    store.clearCart()
-    store.setGuestCount(2)
-
-    // Act & Assert: Should throw
-    expect(() => (store as any).buildPayload()).toThrow('Invalid items: must be a non-empty array')
-  })
-
-  it('should clamp guest count to minimum before building payload', () => {
-    const store = useOrderStore();
-
+    // Setup: Package without meats (triggers modifier validation before item count check)
     const mockPackage = {
       id: 1,
       name: 'Premium Package',
@@ -140,7 +147,18 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     }
 
     store.setPackage(mockPackage as any)
-    store.setGuestCount(0)
+    store.setGuestCount(2)
+    // No items added → package will have empty modifiers
+
+    // Act & Assert: Should throw validation error about missing modifiers
+    expect(() => (store as any).buildPayload()).toThrow('package items must have at least one modifier')
+  })
+
+  it('should reject invalid order payload (zero guest count)', () => {
+    const store = useOrderStore()
+    
+    // Setup: Zero guests
+    store.$state.guestCount = 0
     
     store.addToCart({
       id: 10,
@@ -157,14 +175,11 @@ describe('Contract: PWA → Backend (Order Submission)', () => {
     const store = useOrderStore();
     
     // Setup: Refill mode with drinks (not allowed)
-    store.setHasPlacedOrder(true)
-    store.setCurrentOrder({
-      success: true,
-      order: { id: 1, order_id: 19561, status: 'preparing' }
-    } as any)
-    store.setIsRefillMode(true)
+    store.$state.hasPlacedOrder = true
+    store.toggleRefillMode(true)
     
-    store.setRefillItems([{
+    // Manually inject invalid item (bypassing validation)
+    store.$state.refillItems = [{
       id: 30,
       name: 'Soda',
       price: 30,

@@ -17,9 +17,6 @@ function requireEnv(name: string): string {
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    // server/middleware/ is auto-scanned by Nuxt 3 — no manual registration needed.
-    // Global route middleware uses .global.ts suffix (middleware/auth.global.ts).
-
     devtools: { enabled: process.env.NODE_ENV !== 'production' },
     
     debug: false,
@@ -29,8 +26,12 @@ export default defineNuxtConfig({
     experimental: {
         payloadExtraction: false,
     },
-    
+
     ssr: false,
+
+    router: {
+        middleware: ['auth']
+    },
     
     css: [
         "./assets/css/input.css",
@@ -67,6 +68,11 @@ export default defineNuxtConfig({
     // This prevents nuxt generate from wiping static files (icons, favicon) during builds.
     // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/dist).
     nitro: {
+        preset: 'static',
+        prerender: {
+            crawlLinks: false,
+            routes: ['/'],
+        },
         output: {
             publicDir: 'dist',
         },
@@ -188,7 +194,7 @@ export default defineNuxtConfig({
             offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === 'true',
 
             // API Configuration
-            mainApiUrl: requireEnv('MAIN_API_URL'),
+            mainApiUrl: process.env.MAIN_API_URL || 'http://localhost:8000',
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
 
             // Settings PIN lock behavior
@@ -197,23 +203,24 @@ export default defineNuxtConfig({
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
 
-            // Reverb WebSocket Configuration
-            // Client connects via nginx TLS termination on port 8443 — NOT directly to Reverb (6002).
+            // Reverb WebSocket Configuration (fallback for first boot / dev / CI).
+            // In production, broadcasting config is fetched from the server
+            // at auth time and persisted in the Device store.
             reverb: {
                 appId:      process.env.NUXT_PUBLIC_REVERB_APP_ID     || '',
                 appKey:     process.env.NUXT_PUBLIC_REVERB_APP_KEY    || '',
-                host:       requireEnv('NUXT_PUBLIC_REVERB_HOST'),
-                port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '8443'),
-                scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'https',
-                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || requireEnv('NUXT_PUBLIC_REVERB_HOST'),
-                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6002'),
+                host:       process.env.NUXT_PUBLIC_REVERB_HOST       || 'localhost',
+                port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '6001'),
+                scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'http',
+                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || 'localhost',
+                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6001'),
                 serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || '',
             },
 
             // Laravel Echo (mirrors reverb config — kept for backwards compat)
             echo: {
-                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || requireEnv('NUXT_PUBLIC_REVERB_HOST'),
-                port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '8443'),
+                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || 'localhost',
+                port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '6001'),
                 encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true',
             },
         },

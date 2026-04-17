@@ -6,10 +6,44 @@ import { useDeviceStore } from './Device'
 import { useMenuStore } from './Menu'
 import { logger } from '../utils/logger'
 
-// Module-scope: track last-hidden timestamp for sleep/wake duration check
-let _hiddenAt: number | null = null
+// BUG-13 Fix: Simple async mutex to prevent concurrent session operations
+class AsyncMutex {
+  private locked = false
+  private queue: Array<() => void> = []
+
+  async lock(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true
+      return
+    }
+    // Wait in queue until lock is released
+    return new Promise((resolve) => {
+      this.queue.push(resolve)
+    })
+  }
+
+  unlock(): void {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift()
+      if (next) next() // Release next waiting operation
+    } else {
+      this.locked = false
+    }
+  }
+
+  async runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    await this.lock()
+    try {
+      return await fn()
+    } finally {
+      this.unlock()
+    }
+  }
+}
 
 export const useSessionStore = defineStore('session', () => {
+  const sessionMutex = new AsyncMutex()
+  
   const state = reactive({
     sessionId: null as number | null,
     orderId: null as number | null,
@@ -203,116 +237,114 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function start(): Promise<boolean> {
-    const timestamp = new Date().toISOString()
-    // Ensure device token is present and valid before starting session
-    const deviceStore = useDeviceStore()
+    // BUG-13 Fix: Serialize session operations to prevent race conditions
+    return sessionMutex.runExclusive(async () => {
+      const timestamp = new Date().toISOString()
+      // Ensure device token is present and valid before starting session
+      const deviceStore = useDeviceStore()
 
-    // If no token present, try authenticate (login) the device
-    if (!deviceStore.token) {
-      const ok = await deviceStore.authenticate()
-      if (!ok) {
-        // Authentication failed; caller should handle registration UI
-        logger.warn(`[Session] Device auth failed: cannot start session without token at ${timestamp}`)
-        return false
+      // If no token present, try authenticate (login) the device
+      if (!deviceStore.token) {
+        const ok = await deviceStore.authenticate()
+        if (!ok) {
+          // Authentication failed; caller should handle registration UI
+          console.log(`[❌ Device Auth Failed] Cannot start session without token at ${timestamp}`)
+          return false
+        }
       }
-    }
 
-    // Parse expiration value robustly (supports ISO string, ms, or seconds)
-    const parseExpiration = (val: any): number | null => {
-      if (!val && val !== 0) return null
-      if (typeof val === 'number') {
-        // if timestamp appears to be in seconds, convert to ms
-        return val < 1e12 ? val * 1000 : val
+      // Parse expiration value robustly (supports ISO string, ms, or seconds)
+      const parseExpiration = (val: any): number | null => {
+        if (!val && val !== 0) return null
+        if (typeof val === 'number') {
+          // if timestamp appears to be in seconds, convert to ms
+          return val < 1e12 ? val * 1000 : val
+        }
+        const asNumber = Number(val)
+        if (!isNaN(asNumber) && asNumber !== 0) {
+          return asNumber < 1e12 ? asNumber * 1000 : asNumber
+        }
+        const parsed = Date.parse(String(val))
+        return isNaN(parsed) ? null : parsed
       }
-      const asNumber = Number(val)
-      if (!isNaN(asNumber) && asNumber !== 0) {
-        return asNumber < 1e12 ? asNumber * 1000 : asNumber
+
+      const expiresAt = parseExpiration(deviceStore.expiration)
+      const now = Date.now()
+      const refreshBuffer = 60 * 1000 // 1 minute buffer to avoid mid-session expiry
+
+      if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
+        // Token is missing/expired/near expiry — try refreshing
+        console.log(`[🔄 Token Refresh] Token expired or missing, refreshing at ${timestamp}`)
+        const refreshed = await deviceStore.refresh()
+        if (!refreshed) {
+          // Refresh failed — require re-registration
+          console.log(`[❌ Token Refresh Failed] Cannot refresh token at ${timestamp}`)
+          return false
+        }
+        console.log(`[✅ Token Refreshed] Valid token obtained at ${timestamp}`)
       }
-      const parsed = Date.parse(String(val))
-      return isNaN(parsed) ? null : parsed
-    }
 
-    const expiresAt = parseExpiration(deviceStore.expiration)
-    const now = Date.now()
-    const refreshBuffer = 60 * 1000 // 1 minute buffer to avoid mid-session expiry
-
-    if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
-      // Token is missing/expired/near expiry — try refreshing
-      logger.info(`[Session] Token refresh requested at ${timestamp}`)
-      const refreshed = await deviceStore.refresh()
-      if (!refreshed) {
-        // Refresh failed — require re-registration
-        logger.warn(`[Session] Token refresh failed at ${timestamp}`)
-        return false
+      // Fetch latest session id from server to keep local state in-sync
+      try {
+        await fetchLatestSession()
+      } catch (e) {
+        // non-fatal; proceed but log
+        logger.warn('[SessionStore] fetchLatestSession failed before start:', e)
       }
-      logger.info(`[Session] Token refreshed at ${timestamp}`)
-    }
 
-    // Fetch latest session id from server to keep local state in-sync
-    try {
-      await fetchLatestSession()
-    } catch (e) {
-      // non-fatal; proceed but log
-      logger.warn('[SessionStore] fetchLatestSession failed before start:', e)
-    }
+      // Preload menu data so customers don't wait when ordering
+      const menuStore = useMenuStore()
+      try {
+        console.log(`[📦 Menu Preload] Loading menus for quick response at ${timestamp}`)
+        await menuStore.loadAllMenus()
+        console.log(`[✅ Menu Preloaded] Ready for ordering at ${timestamp}`)
+      } catch (e) {
+        logger.warn('[SessionStore] preload menus failed:', e)
+      }
 
-    // Preload menu data so customers don't wait when ordering
-    const menuStore = useMenuStore()
-    try {
-      logger.info(`[Session] Menu preload started at ${timestamp}`)
-      await menuStore.loadAllMenus()
-      logger.info(`[Session] Menu preload finished at ${timestamp}`)
-    } catch (e) {
-      logger.warn('[SessionStore] preload menus failed:', e)
-    }
+      // Reset order store to fresh state for new dining session
+      const orderStore = useOrderStore()
+      orderStore.setGuestCount(2)       // Default guest count
+      orderStore.cartItems = []          // Clear active cart
+      orderStore.package = {} as any     // Clear package selection
+      orderStore.currentOrder = null     // Clear current order reference
 
-    // Reset order store to fresh state for new dining session
-    const orderStore = useOrderStore()
-    orderStore.setGuestCount(2)       // Default guest count
-    orderStore.clearCart()             // Clear active cart
-    orderStore.clearPackage()          // Clear package selection
-    orderStore.clearCurrentOrder()     // Clear current order reference
+      state.isActive = true
+      state.timerExpired = false
+      startTimer()
 
-    state.isActive = true
-    state.timerExpired = false
-    startTimer()
+      // Centralized lightweight flag to signal session is active for simple pages
+      // Avoid direct localStorage writes from pages/components — use this store instead
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
+      }
 
-    // Sync timer from server to correct for client/server clock skew
-    await syncFromServer()
-    startSyncResyncTimer()
-    _registerVisibilitySync()
+      console.log(`[✅ Session Started] Ready for guest ordering flow at ${timestamp}`)
+      logger.info('[SessionStore] Session started')
 
-    // Centralized lightweight flag to signal session is active for simple pages
-    // Avoid direct localStorage writes from pages/components — use this store instead
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.setItem('session_active', '1') } catch (e) { logger.warn('[SessionStore] failed to set session_active', e) }
-    }
-
-    logger.info(`[Session] Started at ${timestamp}`)
-    logger.info('[SessionStore] Session started')
-
-    return true
+      return true
+    }) // End mutex.runExclusive
   }
 
   function end() {
-    const timestamp = new Date().toISOString()
-    const orderStore = useOrderStore()
-    const currentOrderId = state.orderId
-    const finalStatus = orderStore.getCurrentOrderStatus() || 'unknown'
-    
-    logger.info(`[Session] Ending order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
-    logger.info('🔚 Session ending - clearing all session and order state')
-    state.timerExpired = false
-    clear()
-    logger.info(`[Session] Cleared at ${timestamp}`)
+    // BUG-13 Fix: Synchronous wrapper calls async mutex (safe because end() is top-level)
+    // Must return promise to maintain async contract
+    return sessionMutex.runExclusive(async () => {
+      const timestamp = new Date().toISOString()
+      const orderStore = useOrderStore()
+      const currentOrderId = state.orderId
+      const finalStatus = orderStore.currentOrder?.order?.status || 'unknown'
+      
+      console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
+      logger.info('🔚 Session ending - clearing all session and order state')
+      state.timerExpired = false
+      await clearInternal() // Call internal version to avoid double-locking
+      console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
+    })
   }
 
-  // Compatibility alias used by some callers
-  function endSession() {
-    try { return end() } catch (e) { logger.warn('[SessionStore] endSession failed', e) }
-  }
-
-  function clear() {
+  // Internal clear function (not mutex-protected, called by end() which is already locked)
+  async function clearInternal() {
     const timestamp = new Date().toISOString()
     logger.debug('🧹 Clearing session state...')
     state.sessionId = null
@@ -384,62 +416,75 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  // Public clear function with mutex protection
+  function clear() {
+    return sessionMutex.runExclusive(async () => {
+      await clearInternal()
+    })
+  }
+
+  // Compatibility alias used by some callers
+  function endSession() {
+    try { return end() } catch (e) { logger.warn('[SessionStore] endSession failed', e) }
+  }
+
   function reset() {
-    // Full reset including history (for end of day or device reset)
-    state.sessionId = null
-    state.orderId = null
-    state.isActive = false
-    state.sessionStartedAt = null
-    state.sessionEndsAt = null
-    state.remainingMs = 0
-    state.timerExpired = false
-    stopTimerInterval()
-    stopSyncResyncTimer()
-    _unregisterVisibilitySync()
+    // BUG-13 Fix: Protect reset with mutex
+    return sessionMutex.runExclusive(async () => {
+      // Full reset including history (for end of day or device reset)
+      state.sessionId = null
+      state.orderId = null
+      state.isActive = false
+      state.sessionStartedAt = null
+      state.sessionEndsAt = null
+      state.remainingMs = 0
+      state.timerExpired = false
+      stopTimerInterval()
     
-    const orderStore = useOrderStore()
-    
-    // Stop any active polling first
-    try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
-    
-    orderStore.setGuestCount(2)
-    orderStore.clearCart()
-    orderStore.clearRefillItems()
-    orderStore.clearSubmittedItems()
-    orderStore.clearPackage()
-    orderStore.clearCurrentOrder()
-    orderStore.setHasPlacedOrder(false)
-    orderStore.setIsRefillMode(false)
-    orderStore.clearHistory()          // Only cleared on full reset
-    
-    // Force persist to localStorage immediately
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        window.localStorage.setItem('session-store', JSON.stringify({
-          sessionId: null,
-          orderId: null,
-          isActive: false
-        }))
-        
-        // Also persist cleared order store (full reset clears history too)
-        window.localStorage.setItem('order-store', JSON.stringify({
-          guestCount: 2,
-          package: {},
-          hasPlacedOrder: false,
-          currentOrder: null,
-          submittedItems: [],
-          isRefillMode: false,
-          history: []
-        }))
-        
-        logger.debug('✅ Session and order stores fully reset and persisted')
-      } catch (e) {
-        logger.warn('Failed to persist reset stores:', e)
+      const orderStore = useOrderStore()
+      
+      // Stop any active polling first
+      try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[SessionStore] stopOrderPolling failed', e) }
+      
+      orderStore.setGuestCount(2)
+      orderStore.cartItems = []
+      orderStore.refillItems = []
+      orderStore.submittedItems = []
+      orderStore.package = {} as any
+      orderStore.currentOrder = null
+      orderStore.hasPlacedOrder = false
+      orderStore.isRefillMode = false
+      orderStore.history = []  // Only cleared on full reset
+      
+      // Force persist to localStorage immediately
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem('session-store', JSON.stringify({
+            sessionId: null,
+            orderId: null,
+            isActive: false
+          }))
+          
+          // Also persist cleared order store (full reset clears history too)
+          window.localStorage.setItem('order-store', JSON.stringify({
+            guestCount: 2,
+            package: {},
+            hasPlacedOrder: false,
+            currentOrder: null,
+            submittedItems: [],
+            isRefillMode: false,
+            history: []
+          }))
+          
+          logger.debug('✅ Session and order stores fully reset and persisted')
+        } catch (e) {
+          logger.warn('Failed to persist reset stores:', e)
+        }
       }
-    }
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try { window.localStorage.removeItem('session_active') } catch (e) { logger.debug('[SessionStore] failed to remove session_active', e) }
-    }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try { window.localStorage.removeItem('session_active') } catch (e) { logger.debug('[SessionStore] failed to remove session_active', e) }
+      }
+    }) // End mutex.runExclusive
   }
 
   // Typed cross-store mutation helpers — avoids TypeScript Ref<T> false-positives

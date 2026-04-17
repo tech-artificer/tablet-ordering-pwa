@@ -148,6 +148,93 @@ export const useBroadcasts = () => {
   const orderStore = useOrderStore()
   const sessionStore = useSessionStore()
 
+  let deviceChannel: any = null
+  let orderChannel: any = null
+  let serviceRequestChannel: any = null
+  let deviceControlChannel: any = null
+  let orderCompletionTimeoutId: number | null = null
+  let reloadTimeoutId: number | null = null
+
+  // BUG-7 Fix: Exponential backoff for WebSocket reconnection
+  let reconnectionAttempts = 0
+  let reconnectionTimerId: ReturnType<typeof setTimeout> | null = null
+  const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30] // seconds, max 30s
+  const MAX_RECONNECTION_ATTEMPTS = 10
+
+  const scheduleReconnection = () => {
+    if (reconnectionTimerId) return // Already scheduled
+    if (reconnectionAttempts >= MAX_RECONNECTION_ATTEMPTS) {
+      console.log(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
+      logger.warn('WebSocket max reconnection attempts reached')
+      ElNotification({
+        title: '⚠️ Connection Lost',
+        message: 'Please reload the page to reconnect',
+        type: 'warning',
+        duration: 0, // Persistent until dismissed
+        position: 'bottom-right'
+      })
+      return
+    }
+
+    reconnectionAttempts++
+    const backoffIndex = Math.min(reconnectionAttempts - 1, RECONNECTION_BACKOFF.length - 1)
+    const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
+    
+    console.log(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectionAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
+    
+    reconnectionTimerId = setTimeout(() => {
+      reconnectionTimerId = null
+      console.log(`[🔄 WebSocket] Attempting reconnection (attempt ${reconnectionAttempts})`)
+      
+      // Re-subscribe to channels (Echo handles socket reconnection internally)
+      subscribeToDeviceChannel()
+      const currentOrderId = sessionStore.orderId
+      if (currentOrderId) {
+        subscribeToOrderChannel(currentOrderId.toString())
+      }
+    }, delaySeconds * 1000)
+  }
+
+  const cancelReconnection = () => {
+    if (reconnectionTimerId) {
+      clearTimeout(reconnectionTimerId)
+      reconnectionTimerId = null
+    }
+    reconnectionAttempts = 0 // Reset on successful connection
+  }
+
+  // Channel connection status
+  const channelStatus = ref({
+    device: false,
+    deviceControl: false,
+    order: false,
+    serviceRequest: false
+  })
+
+  // Event deduplication: Track last 100 processed event IDs (BUG-9 fix)
+  const processedEventIds = new Set<number>()
+  const MAX_PROCESSED_EVENT_CACHE = 100
+  const eventIdQueue: number[] = []
+
+  const isEventProcessed = (eventId: number): boolean => {
+    return processedEventIds.has(eventId)
+  }
+
+  const markEventProcessed = (eventId: number) => {
+    if (processedEventIds.has(eventId)) return
+    
+    processedEventIds.add(eventId)
+    eventIdQueue.push(eventId)
+    
+    // LRU eviction: Remove oldest event ID when cache exceeds limit
+    if (eventIdQueue.length > MAX_PROCESSED_EVENT_CACHE) {
+      const oldestId = eventIdQueue.shift()
+      if (oldestId !== undefined) {
+        processedEventIds.delete(oldestId)
+      }
+    }
+  }
+
   // Track last event ID for reliability
   const getLastEventId = (): number => {
     return parseInt(localStorage.getItem('lastEventId') || '0')
@@ -159,7 +246,15 @@ export const useBroadcasts = () => {
 
   // Process events based on type
   const processEvent = (eventType: string, payload: any) => {
+    // BUG-9 Fix: Event deduplication to prevent duplicate processing
     if (payload.eventId) {
+      if (isEventProcessed(payload.eventId)) {
+        console.log(`[🔄 Duplicate Event] eventId=${payload.eventId} type=${eventType} already processed, skipping`)
+        logger.debug('Duplicate event skipped:', { eventId: payload.eventId, type: eventType })
+        return // Silently drop duplicate event
+      }
+      
+      markEventProcessed(payload.eventId)
       setLastEventId(payload.eventId)
     }
 
@@ -236,14 +331,14 @@ export const useBroadcasts = () => {
     }
 
     // Update current order status in store
-    const currentOrderResp = orderStore.getCurrentOrder()
-    const currentOrderId = currentOrderResp?.order?.id || currentOrderResp?.order?.order_id || currentOrderResp?.id || currentOrderResp?.order_id
-    const eventOrderId = order.order_id
-
-    logger.debug('🔄 Order update check:', { currentOrderId, eventOrderId, status: order.status })
-
-    if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
-      orderStore.updateOrderStatus(order.status)
+    // Handle both { order: {...} } and direct order object structures
+    const currentOrderId = orderStore.currentOrder?.order?.id ?? orderStore.currentOrder?.order?.order_id ?? orderStore.currentOrder?.id ?? orderStore.currentOrder?.order_id
+    const eventOrderId = event.order_id
+    
+    logger.debug('🔄 Order update check:', { currentOrderId, eventOrderId, status: event.status })
+    
+    if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
+      orderStore.updateOrderStatus(event.status)
       // If this is a terminal status, stop the polling fallback
       if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'voided') {
         try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
@@ -273,13 +368,12 @@ export const useBroadcasts = () => {
 
     // Mark order as completed in store
     // Handle both { order: {...} } and direct order object structures
-    const currentOrderResp = orderStore.getCurrentOrder()
-    const currentOrderId = currentOrderResp?.order?.id || currentOrderResp?.order?.order_id || currentOrderResp?.id || currentOrderResp?.order_id
+    const currentOrderId = orderStore.currentOrder?.order?.id ?? orderStore.currentOrder?.order?.order_id ?? orderStore.currentOrder?.id ?? orderStore.currentOrder?.order_id
     const eventOrderId = event.order.order_id || event.order.id
     
     logger.debug('✅ Order completed check:', { currentOrderId, eventOrderId })
     
-    if (currentOrderId && (String(currentOrderId) === String(eventOrderId))) {
+    if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
       orderStore.completeOrder()
       try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug('[Broadcasts] stopOrderPolling failed', e) }
       
@@ -420,17 +514,24 @@ export const useBroadcasts = () => {
     const deviceId = deviceStore.getDeviceId()
     if (!deviceId || !(window as any).Echo) return
 
-    unsubscribeDeviceChannels()
-
-    // Subscribe to Device.{deviceId} for order updates
-    logger.debug('[Echo] Subscribing to Device.' + deviceId)
-    deviceChannel = (window as any).Echo.channel(`Device.${deviceId}`)
+    // Subscribe to device.{deviceId} for order updates
+    console.log('[Echo] Subscribing to channel: device.' + deviceId)
+    deviceChannel = (window as any).Echo.channel(`device.${deviceId}`)
       .listen('.order.updated', (event: OrderUpdatedEvent) => {
         handleOrderUpdated(event)
       })
 
     channelStatus.value.device = true
-    logger.debug(`✅ Subscribed to Device.${deviceId}`)
+    console.log('[Echo] ✅ Subscribed to channel: device.' + deviceId)
+    logger.debug(`✅ Subscribed to device.${deviceId}`)
+    
+    ElNotification({
+      title: '📡 Connected',
+      message: `Listening to device.${deviceId}`,
+      type: 'success',
+      duration: 3000,
+      position: 'bottom-right'
+    })
 
     // Subscribe to device.{deviceId} for control events
     logger.debug('[Echo] Subscribing to device.' + deviceId)
@@ -593,8 +694,58 @@ export const useBroadcasts = () => {
       return
     }
 
-    resubscribeChannels()
-    bindConnectionStateHandler()
+    // Subscribe to device channels
+    subscribeToDeviceChannel()
+
+    // Subscribe to current order if exists
+    const currentOrderId = sessionStore.orderId
+    if (currentOrderId) {
+      subscribeToOrderChannel(currentOrderId.toString())
+    }
+
+    // Connection event handlers for Reverb/Pusher
+    const echo = (window as any).Echo
+    if (echo?.connector?.pusher) {
+      const pusher = echo.connector.pusher
+      
+      // Reverb uses state_change event instead of direct bind
+      pusher.connection.bind('state_change', (states: any) => {
+        const timestamp = new Date().toISOString()
+        console.log(`[🔗 WebSocket State Change] ${states.previous || '?'} → ${states.current} at ${timestamp}`)
+        logger.debug('WebSocket state change:', states.current)
+        
+        if (states.current === 'connected') {
+          console.log(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
+          logger.debug('✅ WebSocket connected')
+          
+          // BUG-7 Fix: Reset reconnection backoff on successful connection
+          cancelReconnection()
+          
+          ElNotification({
+            title: '✅ Connected',
+            message: 'Real-time connection established',
+            type: 'success',
+            duration: 2000,
+            position: 'bottom-right'
+          })
+          // TODO: Enable when backend implements GET /api/events/missing
+          // replayMissedEvents()
+        } else if (states.current === 'disconnected' || states.current === 'unavailable') {
+          logger.debug('⚠️ WebSocket disconnected')
+          
+          // Clear channel status
+          channelStatus.value = {
+            device: false,
+            deviceControl: false,
+            order: false,
+            serviceRequest: false
+          }
+          
+          // BUG-7 Fix: Schedule reconnection with exponential backoff
+          scheduleReconnection()
+        }
+      })
+    }
   }
 
   // Cleanup on unmount
@@ -608,7 +759,13 @@ export const useBroadcasts = () => {
       try { clearTimeout(reloadTimeoutId) } catch (e) { logger.debug('[Broadcasts] cleanup clearTimeout failed', e) }
       reloadTimeoutId = null
     }
-    clearReconnectTimer()
+    // BUG-7 Fix: Clear reconnection timer on cleanup
+    if (reconnectionTimerId) {
+      try { clearTimeout(reconnectionTimerId) } catch (e) { logger.debug('[Broadcasts] cleanup reconnection timer failed', e) }
+      reconnectionTimerId = null
+    }
+    reconnectionAttempts = 0
+    
     unsubscribeFromOrderChannel()
     unsubscribeDeviceChannels()
     unbindConnectionStateHandler()

@@ -42,8 +42,8 @@
     <div class="flex-1 min-w-0">
       <div class="flex justify-between items-start gap-2 mb-1">
         <h3 class="text-base font-bold truncate">{{ item.name }}</h3>
-        <div class="bg-white text-secondary text-xs font-bold px-2.5 py-1 rounded-full shadow-md whitespace-nowrap flex-shrink-0">
-          {{ formatCurrency(item.price) }}
+        <div class="bg-primary text-secondary text-xs font-bold px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap flex-shrink-0">
+          {{ item.price }}
         </div>
       </div>
       <p class="text-xs text-gray-300 line-clamp-2 mb-2">{{ item.description }}</p>

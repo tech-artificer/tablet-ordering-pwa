@@ -217,18 +217,23 @@ const submitOrder = () => {
         <span v-else class="text-white font-bold text-base tabular-nums">{{ orderGuestCount }}</span>
       </div>
 
-      <!-- Package name (pre-order only) -->
-      <div v-if="selectedPackage && !isRefillMode && !orderStore.hasPlacedOrder"
-        class="flex items-center justify-between pt-1 pb-0.5">
-        <span class="text-white/40 text-xs">Package</span>
-        <span class="text-primary text-xs font-bold truncate max-w-[55%] text-right">{{ selectedPackage.name }}</span>
-      </div>
-
-      <!-- Order ID (post-order) -->
-      <div v-if="orderStore.hasPlacedOrder && displayOrderId !== '-'"
-        class="flex items-center justify-between pt-1">
-        <span class="text-white/40 text-xs">Order #</span>
-        <span class="text-white text-xs font-bold">#{{ displayOrderId }}</span>
+      <!-- Package info (hide in refill mode) -->
+      <div v-if="selectedPackage && !isRefillMode"
+        class="flex items-center justify-between bg-white/5 rounded-lg px-3 py-1.5 border border-white/10">
+        <span class="text-primary font-semibold text-sm">{{ selectedPackage.name }}</span>
+        <div v-if="!orderStore.hasPlacedOrder" class="flex items-center gap-1.5 bg-white/10 rounded-lg px-2 py-1">
+          <button @click="emit('setGuestCount', Math.max(2, guestCount - 1))"
+            class="touch-btn-circle min-w-[44px] min-h-[44px] w-11 h-11 text-white font-bold bg-white/10 active:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            :disabled="guestCount <= 2"
+            aria-label="Decrease guest count">−</button>
+          <span class="text-white font-semibold min-w-[2ch] text-center text-sm">{{ guestCount }}</span>
+          <button @click="emit('setGuestCount', Math.min(20, guestCount + 1))"
+            class="touch-btn-circle min-w-[44px] min-h-[44px] w-11 h-11 text-white font-bold bg-white/10 active:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            :disabled="guestCount >= 20"
+            aria-label="Increase guest count">+</button>
+          <span class="text-white/70 text-[10px] ml-0.5">Guests</span>
+        </div>
+        <div v-else class="text-white/60 text-sm">{{ orderGuestCount }} guests</div>
       </div>
     </div>
 

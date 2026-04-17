@@ -16,8 +16,8 @@ describe('session end behavior', () => {
     const session = useSessionStore()
 
     // Simulate active session + order state
-    session.setIsActive(true)
-    session.setOrderId(123)
+    session.$state.isActive = true
+    session.$state.orderId = 123
     try { localStorage.setItem('session_active', '1') } catch (e) {}
 
     order.setCartItems([{ id: 1, name: 'Taco', price: 10, quantity: 1 } as any])
@@ -28,8 +28,8 @@ describe('session end behavior', () => {
     await session.end()
 
     // Assert: session cleared
-    expect(session.isActive).toBe(false)
-    expect(session.orderId).toBeNull()
+    expect(session.$state.isActive).toBe(false)
+    expect(session.$state.orderId).toBeNull()
     // localStorage flag removed
     expect(localStorage.getItem('session_active')).toBeNull()
 
