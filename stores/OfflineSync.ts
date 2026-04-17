@@ -69,7 +69,7 @@ export const useOfflineSyncStore = defineStore('offline-sync', () => {
             const { useOrderStore } = await import('~/stores/Order')
             const orderStore = useOrderStore()
             if (order) {
-              await orderStore.setOrderCreated(type === 'orders-sync-409' ? order : event.data)
+              await orderStore.setOrderCreated(order)
               orderStore.startOrderPolling(
                 order?.order_id ?? order?.id ?? order?.order?.order_id,
               )
