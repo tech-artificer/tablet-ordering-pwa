@@ -58,6 +58,8 @@
 </template>
 
 <script setup lang="ts">
+import type { PropType } from 'vue'
+
 const props = defineProps({
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
@@ -68,7 +70,7 @@ const props = defineProps({
   premium: { type: Boolean, default: false },
   interactive: { type: Boolean, default: true },
   isEmpty: { type: Boolean, default: false },
-  items: { type: Array as PropType<string[]>, default: null },
+  items: { type: Array as PropType<string[]>, default: () => [] },
   className: { type: String, default: '' }
 })
 
