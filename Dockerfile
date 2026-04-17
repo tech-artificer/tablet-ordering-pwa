@@ -28,12 +28,9 @@ RUN npm run build
 # ============================================================================
 FROM nginx:alpine AS app
 
-# Create non-root user for nginx (already exists in alpine, but explicit for clarity)
-RUN addgroup -g 1001 -S nginx-app && \
-    adduser -u 1001 -S nginx-app -G nginx-app || true
-
-# Create app directory with proper permissions
-RUN mkdir -p /app/public && chown -R nginx:nginx /app
+# Prepare application and nginx runtime directories for the existing non-root nginx user
+RUN mkdir -p /app/public /var/cache/nginx /var/run && \
+    chown -R nginx:nginx /app /var/cache/nginx /var/run
 
 WORKDIR /app
 
@@ -96,6 +93,8 @@ EOF
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+
+USER nginx
 
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
