@@ -1,4 +1,4 @@
-import { logger } from './logger'
+import { logger } from '~/utils/logger'
 
 export async function getLocalIp(timeout = 1500): Promise<string | null> {
   // Try to extract local LAN IP using WebRTC ICE candidates.
