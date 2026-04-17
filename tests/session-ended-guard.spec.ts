@@ -15,7 +15,7 @@ describe('session-ended route — middleware guard', () => {
     // This is a structural test — the middleware file must contain the route string
     const fs = require('fs')
     const path = require('path')
-    const middlewarePath = path.resolve(__dirname, '../middleware/auth.ts')
+    const middlewarePath = path.resolve(__dirname, '../middleware/auth.global.ts')
     const src = fs.readFileSync(middlewarePath, 'utf8')
     expect(src).toContain('/order/session-ended')
   })
