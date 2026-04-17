@@ -187,7 +187,7 @@ Per **UI/UX Pro Max** rule `no-emoji-icons`: "Use SVG icons (Heroicons, Lucide),
 ---
 
 # CASE_FILE: Order Transaction Audit — PWA → Backend → Database
-**Last Updated:** April 8, 2026 (Mission-7 Phase 1 code verification — all 8 tasks confirmed)
+**Last Updated:** April 16, 2026 (Pinia Ref Regression Fixed)  
 **Lead Detective:** Ranpo Edogawa  
 **Audit Date:** February 19-20, 2026  
 **Mission-7 Audit Date:** April 7, 2026  
@@ -231,6 +231,23 @@ Per **UI/UX Pro Max** rule `no-emoji-icons`: "Use SVG icons (Heroicons, Lucide),
 - [ ] Mock `{ success: false, data: null }` → no PWA white screen
 
 **Gate Status:** Awaiting Ranpo sign-off after staging runtime verification.
+
+---
+
+## Addendum: Pinia Ref Access Pattern Regression (April 16, 2026)
+
+**Symptom:** 18 TypeScript errors and 8 failing tests in tablet PWA blocking Mission-7 Phase 3 testing.
+
+**Root Cause:** Session store uses `toRefs(state)` returning Vue Refs, but production code was directly assigning `sessionStore.orderId = value` instead of `sessionStore.orderId.value = value`.
+
+**Fix Applied:**
+- Added `.value` accessor + defensive null checks to Order.ts (3 locations: setOrderCreated, startOrderPolling, recoverActiveOrder)
+- Migrated 4 test files to `$state` pattern for state mutation
+- Added Session store initialization in 2 test files (`order.submit.spec.ts`, `order.polling.spec.ts`)
+
+**Gate:** 23/23 Vitest tests passing, Order.ts TypeScript errors resolved (0 errors)
+
+**Vault Entry:** `vault/Mission-7-Phase-3-Pinia-Ref-Regression-Fix.md`
 
 ---
 

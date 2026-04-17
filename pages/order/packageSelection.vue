@@ -210,38 +210,41 @@ function handleTouchEnd() {
 </script>
 
 <template>
-  <div class="relative h-screen w-screen flex flex-col overflow-hidden">
-    <!-- Warm Background -->
-    <div class="absolute inset-0 bg-screen-base"></div>
-
-    <!-- Content -->
-    <div class="relative z-10 flex flex-col h-full p-6 gap-6">
-      <!-- Header: Back Button + Title + Navigation -->
-      <div class="flex items-center justify-between gap-4">
-        <button 
-          @click="goBack" 
-          class="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-surface-20 hover:bg-surface-15 ring-1 ring-white/10 text-white/70 hover:text-primary transition-colors"
-          aria-label="Go back"
-        >
-          <ArrowLeft :size="20" stroke-width="2" />
-        </button>
-        
-        <div class="flex-1 text-center">
-          <!-- Step Indicator -->
-          <div class="flex items-center justify-center gap-3 mb-4" aria-label="Order steps">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-full bg-white/15 border border-white/20 text-white/50 text-xs font-bold flex items-center justify-center">1</div>
-              <span class="text-white/40 text-xs font-semibold uppercase tracking-wide">Guests</span>
-            </div>
-            <div class="w-8 h-px bg-primary/40"></div>
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-full bg-primary/30 border border-primary/60 text-primary text-xs font-black flex items-center justify-center shadow-lg shadow-primary/40">2</div>
-              <span class="text-primary text-xs font-bold uppercase tracking-wide">Package</span>
-            </div>
-            <div class="w-8 h-px bg-primary/20"></div>
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-full bg-white/10 border border-white/15 text-white/40 text-xs font-bold flex items-center justify-center">3</div>
-              <span class="text-white/30 text-xs font-semibold uppercase tracking-wide">Menu</span>
+  <div class="h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
+    <div class="relative z-10 flex flex-col h-screen p-4">
+      <div class="w-full max-w-7xl mx-auto flex flex-col h-full">
+        <!-- Header row -->
+        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-4">
+          <!-- Back button -->
+          <button 
+            @click="goBack" 
+            class="flex items-center justify-center w-12 h-12 bg-white/10 hover:bg-white/15 backdrop-blur-sm rounded-xl border border-white/10 transition-all duration-200 active:scale-95"
+          >
+            <ArrowLeft :size="22" class="text-white" />
+          </button>
+          
+          <!-- Title block -->
+          <div class="text-center px-2">
+            <p class="text-xs tracking-[0.3em] uppercase text-white/45 font-semibold mb-1">Package Selection</p>
+            <h1 class="text-4xl font-bold text-white font-raleway leading-none">
+              Choose Your <span class="text-primary">Package</span>
+            </h1>
+            <p class="text-xs tracking-widest uppercase text-white/55 mt-2">
+              {{ orderStore.guestCount }} Guests &middot; View Included Meats
+            </p>
+          </div>
+          
+          <!-- Package navigation -->
+          <div class="flex items-center gap-2">
+            <button
+              @click="prevPackage"
+              :disabled="packages.length <= 1 || currentIndex === 0"
+              class="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-primary/20 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 border border-white/10 active:scale-95"
+            >
+              <ChevronLeft :size="22" class="text-white" />
+            </button>
+            <div class="px-3 py-2 bg-white/10 rounded-lg min-w-[60px] text-center">
+              <span class="text-white font-bold text-sm">{{ currentIndex + 1 }}/{{ packages.length }}</span>
             </div>
           </div>
           <h1 class="text-4xl font-bold font-raleway text-white">

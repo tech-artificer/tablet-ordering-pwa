@@ -29,6 +29,9 @@ describe('order polling fallback', () => {
     vi.useFakeTimers()
     mockGet.mockReset()
     mockPost.mockReset()
+    // Initialize session store to prevent null ref errors
+    const session = useSessionStore()
+    session.$state.isActive = true
     // Ensure test environment reports online so polling starts
     // Ensure navigator.onLine exists and is writable in test env
     if (typeof global.navigator === 'undefined') {
@@ -50,9 +53,7 @@ describe('order polling fallback', () => {
   it('starts polling after setOrderCreated and stops when order becomes completed', async () => {
     const order = useOrderStore()
 
-    // First tick returns 'preparing' so polling stays active past the isPolling assertion.
-    // The immediate tick's microtask resolves BEFORE the test's await resumes, so the mock
-    // must NOT return a terminal status on the first call.
+    // Arrange: first tick remains non-terminal, second tick transitions terminal
     mockGet
       .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing' } } })
       .mockResolvedValueOnce({ data: { order: { id: 19561, status: 'completed' } } })
@@ -86,7 +87,7 @@ describe('order polling fallback', () => {
     mockGet.mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing', total_amount: 200 } } })
 
     // Simulate persisted session order id
-    session.setOrderId(19561)
+    session.$state.orderId = 19561
 
     await order.initializeFromSession()
 

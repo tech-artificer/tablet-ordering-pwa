@@ -3,6 +3,7 @@ import { reactive, computed, toRefs, onScopeDispose } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useOfflineOrderQueue } from '../composables/useOfflineOrderQueue'
 import { logger } from '../utils/logger'
+import { extractOrderId, extractOrderNumber } from '../utils/orderHelpers'
 import { notifyBlockedAction } from '../composables/useNotifier'
 import { useDeviceStore } from './Device'
 import { useSessionStore } from './Session'
@@ -693,7 +694,9 @@ export const useOrderStore = defineStore('order', () => {
     const orderId = respData?.order?.order_id || respData?.order_id || respData?.order?.id || respData?.id
 
     // Store the numeric order_id in session for API lookups
-    sessionStore.setOrderId(orderId ?? null)
+    if (orderId && sessionStore.orderId) {
+      sessionStore.orderId.value = Number(orderId)
+    }
     state.hasPlacedOrder = true
     state.currentOrder = respData
     
@@ -793,7 +796,7 @@ export const useOrderStore = defineStore('order', () => {
           stopPolling()
           return
         }
-        const url = API_ENDPOINTS.DEVICE_ORDER_BY_EXTERNAL_ID(orderId)
+        const url = `/api/device-order/by-order-id/${orderId}`
         const resp = await api.get(url)
         const responseData = resp?.data ?? null
         const tickMs = (performance.now() - tickStart).toFixed(1)
@@ -820,7 +823,10 @@ export const useOrderStore = defineStore('order', () => {
           // Persist session order id if missing
           try {
             const sessionStore = useSessionStore()
-            sessionStore.setOrderId(orderObj?.order_id ?? orderObj?.id ?? sessionStore.orderId ?? null)
+            const polledOrderId = extractOrderId(orderObj)
+            if (polledOrderId && sessionStore.orderId) {
+              sessionStore.orderId.value = Number(polledOrderId)
+            }
           } catch (e) {
             // ignore
           }
@@ -844,7 +850,10 @@ export const useOrderStore = defineStore('order', () => {
                     const sessionStore = useSessionStore()
 
                     try {
-                      sessionStore.end()
+                      if (sessionStore.end) {
+                        const res = sessionStore.end()
+                        if (res && typeof (res as any).then === 'function') await res
+                      }
                     } catch (e) {
                       logger.warn('sessionStore.end() threw:', e)
                     }
@@ -933,8 +942,8 @@ export const useOrderStore = defineStore('order', () => {
         const activeStatus = String(activeOrder?.status || '').toLowerCase()
 
         if (activeOrderId && !['completed', 'cancelled', 'voided'].includes(activeStatus)) {
-          sessionStore.setOrderId(activeOrderId)
-          sessionStore.setIsActive(true)
+          if (sessionStore.orderId) sessionStore.orderId.value = activeOrderId
+          if (sessionStore.isActive) sessionStore.isActive.value = true
           if (typeof window !== 'undefined' && window.localStorage) {
             try { window.localStorage.setItem('session_active', '1') } catch (e) { /* ignore */ }
           }
@@ -978,9 +987,8 @@ export const useOrderStore = defineStore('order', () => {
       const api = useApi()
       const orderIdStr = String(sessionStore.orderId)
       if (orderIdStr && orderIdStr !== 'null' && orderIdStr !== 'undefined') {
-        const resp = await api.get(API_ENDPOINTS.DEVICE_ORDER_BY_EXTERNAL_ID(orderIdStr))
-        const responseData = extractResponseData(resp)
-        const orderObj = responseData?.order || responseData
+        const resp = await api.get(`/api/device-order/by-order-id/${orderIdStr}`)
+        const orderObj = resp.data?.order || resp.data
         if (orderObj) {
           state.currentOrder = { order: orderObj }
           logger.debug('🔁 Fetched order from server for session.orderId:', orderIdStr)
@@ -1076,6 +1084,7 @@ export const useOrderStore = defineStore('order', () => {
     clearRefillCart,
     toggleRefillMode,
     buildPayload,
+    buildRefillPayload,
     submitOrder,
     submitRefill,
     setOrderCreated,

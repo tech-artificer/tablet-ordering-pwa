@@ -72,25 +72,16 @@ const goBack = () => {
 
       <GuestCounter />
       
-      <div class="flex flex-col items-center gap-4">
-        <div class="relative group">
-          <div class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl opacity-80 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-          <button
-            @click="handleGuestConfirmation"
-            class="relative flex items-center justify-center gap-2.5 rounded-xl font-bold text-[15px] tracking-wide transition-all duration-200
-                   bg-gradient-to-br from-primary via-primary to-primary-dark text-secondary
-                   shadow-[0_2px_20px_rgba(246,181,109,0.30)]
-                   hover:shadow-[0_4px_28px_rgba(246,181,109,0.50)] hover:brightness-110
-                   active:scale-[0.97] active:shadow-none
-                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
-                   min-h-[52px] px-8"
-            aria-label="Confirm guest count and select package"
-          >
-            Choose a Package
-          </button>
-        </div>
-        <p class="text-white/60 text-sm font-kanit text-center max-w-xs">
-          Select your party size so we can prep the perfect feast for your group.
+      <div class="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          class="btn-primary px-14 py-5 text-lg font-semibold rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 active:scale-[0.98] transition-all duration-200"
+          @click="handleGuestConfirmation"
+        >
+          Ready To Grill
+        </button>
+        <p class="text-white/60 text-sm font-kanit mt-1">
+          Choose your guest count so we can keep the <span class="text-primary">sizzle going</span>.
         </p>
       </div>
     </div>

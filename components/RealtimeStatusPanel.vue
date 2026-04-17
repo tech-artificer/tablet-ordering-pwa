@@ -152,6 +152,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRealtimeStatus } from '../composables/useRealtimeStatus'
 
 const realtimeStatus = useRealtimeStatus()
@@ -164,13 +165,19 @@ const refreshStatus = () => {
 }
 
 // Auto-refresh every 2 seconds
-setInterval(() => {
+const refreshIntervalId = setInterval(() => {
   refreshStatus()
 }, 2000)
 
 // Initialize monitoring on component mount
 onMounted(() => {
   realtimeStatus.initializeMonitoring()
+})
+
+// Cleanup on component unmount
+onUnmounted(() => {
+  clearInterval(refreshIntervalId)
+  realtimeStatus.stopMonitoring()
 })
 </script>
 

@@ -175,14 +175,14 @@ describe('Order Restrictions (Frontend)', () => {
       const orderStore: any = useOrderStore();
       
       // Initially no orderId
-      expect(sessionStore.orderId).toBeFalsy();
+      expect(sessionStore.$state.orderId).toBeFalsy();
       
       // Simulate successful order creation response
-      sessionStore.orderId = 1001;
+      sessionStore.$state.orderId = 1001;
       orderStore.hasPlacedOrder = true;
       
       // Now orderId should be set
-      expect(sessionStore.orderId).toBe(1001);
+      expect(sessionStore.$state.orderId).toBe(1001);
       expect(orderStore.hasPlacedOrder).toBe(true);
     });
 
@@ -192,17 +192,17 @@ describe('Order Restrictions (Frontend)', () => {
       
       // Mark order as placed but no orderId yet (simulating server delay)
       orderStore.hasPlacedOrder = true;
-      sessionStore.orderId = null;
+      sessionStore.$state.orderId = null;
       
       // In menu.vue toggleRefillMode(), there's a wait loop
       // that checks for orderId population with timeout
       // This test documents that behavior
-      expect(sessionStore.orderId).toBeFalsy();
+      expect(sessionStore.$state.orderId).toBeFalsy();
       expect(orderStore.hasPlacedOrder).toBe(true);
       
       // Simulate orderId arriving
-      sessionStore.orderId = 1001;
-      expect(sessionStore.orderId).toBe(1001);
+      sessionStore.$state.orderId = 1001;
+      expect(sessionStore.$state.orderId).toBe(1001);
     });
   });
 

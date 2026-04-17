@@ -18,6 +18,7 @@ vi.mock('../composables/useApi', () => ({ useApi: () => ({ post: mockPost }) }))
 
 import { setActivePinia, createPinia } from 'pinia'
 import { useDeviceStore } from '../stores/Device'
+import { useSessionStore } from '../stores/Session'
 import { useOrderStore } from '../stores/Order'
 import type { CartItem, Package } from '../types'
 
@@ -28,20 +29,23 @@ describe('stores/order - submitOrder', () => {
     mockPost.mockReset()
     // Provide a fake authenticated device to satisfy store validation
     const dsInstance = useDeviceStore()
-    dsInstance.setToken('test-token')
-    dsInstance.setTable({ id: 1, name: 'Test Table', status: 'unknown', is_available: false, is_locked: false })
+    ;(dsInstance as any).token = 'test-token'
+    ;(dsInstance as any).table = { id: 1, name: 'Test Table' }
+    // Initialize session store to prevent null ref errors
+    const session = useSessionStore()
+    session.$state.isActive = true
   })
 
   it('submits order, sets currentOrder and clears cartItems (success path)', async () => {
     const order = useOrderStore()
 
-    // Prepare store state — meat item is required so buildPayload produces modifiers for the package
-    order.setPackage({ id: 1, name: 'Combo', price: 100, is_taxable: false } as Package)
-    order.setGuestCount(2)
-    order.setCartItems([
-      { id: 9, name: 'Wagyu Beef', price: 0, quantity: 1, category: 'meats', isUnlimited: false } as CartItem,
-      { id: 10, name: 'Extra Side', price: 5, quantity: 2, category: 'sides', isUnlimited: false } as CartItem,
-    ])
+    // Prepare store state
+    order.package = { id: 1, price: 100, is_taxable: false } as any
+    order.guestCount = 2
+    order.cartItems = [
+      { id: 10, name: 'Beef Brisket', price: 5, quantity: 2, category: 'meats' } as any,
+      { id: 11, name: 'Extra Side', price: 3, quantity: 1 } as any
+    ]
 
     const apiOrder = { id: 999, total_amount: 110, order_number: 'ORD-999' }
     const apiResp = { success: true, order: apiOrder }
@@ -68,11 +72,11 @@ describe('stores/order - submitOrder', () => {
   it('propagates API errors and does not clear cartItems on failure', async () => {
     const order = useOrderStore()
 
-    order.setPackage({ id: 2, name: 'BBQ Pack', price: 50 } as Package)
-    order.setGuestCount(1)
-    order.setCartItems([
-      { id: 11, name: 'Beef Ribs', price: 0, quantity: 1, category: 'meats', isUnlimited: false } as CartItem,
-    ])
+    order.package = { id: 2, price: 50 } as any
+    order.guestCount = 1
+    order.cartItems = [
+      { id: 12, name: 'Pork Belly', price: 4, quantity: 1, category: 'meats' } as any
+    ]
 
     mockPost.mockRejectedValueOnce(new Error('Network error'))
 

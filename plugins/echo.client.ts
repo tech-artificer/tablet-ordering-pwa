@@ -3,158 +3,177 @@ import Pusher from 'pusher-js'
 import { useDeviceStore } from '../stores/Device'
 import { logger } from '../utils/logger'
 
+/**
+ * Create (or recreate) an Echo instance with the given config.
+ * Disconnects any existing instance first.
+ */
+function createEcho(
+    nuxtApp: any,
+    cfg: { key: string; host: string; port: number; scheme: string; authEndpoint?: string },
+    mainApiUrl: string,
+    token: string | null
+) {
+    // Disconnect previous instance if any
+    if (typeof window !== 'undefined' && (window as any).Echo) {
+        try { (window as any).Echo.disconnect() } catch (_) {}
+    }
+
+    // expose Pusher to window for libraries that expect it
+    // @ts-ignore - augmenting window
+    window.Pusher = Pusher
+
+    // Build a normalized auth endpoint
+    const authEndpoint = cfg.authEndpoint
+        ? `${String(mainApiUrl).replace(/\/$/, '')}${cfg.authEndpoint}`
+        : `${String(mainApiUrl).replace(/\/$/, '')}/broadcasting/auth`
+
+    const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    if (token) {
+        headers.Authorization = `Bearer ${token}`
+    }
+
+    // Dynamically select protocol based on current page
+    let wsPort = cfg.port
+    let wssPort = cfg.port
+    let forceTLS = false
+
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        forceTLS = true
+        // When HTTPS, connect via nginx proxy (port 8000) for TLS termination
+        wsPort = 8000
+        wssPort = 8000
+    }
+
+    logger.info(`[Echo] Connecting to Reverb: ${forceTLS ? 'wss' : 'ws'}://${cfg.host}:${wsPort}/reverb`)
+
+    console.log('[Echo Init] Config:', {
+        key: cfg.key?.substring(0, 8) + '...',
+        host: cfg.host,
+        wsPort,
+        forceTLS: String(cfg.scheme || '').toLowerCase() === 'https',
+        authEndpoint,
+        hasAuthToken: !!token,
+        timestamp: new Date().toISOString()
+    })
+
+    const echo = new Echo({
+        broadcaster: 'reverb',
+        key: cfg.key,
+        wsHost: cfg.host,
+        wsPort: wsPort,
+        wssPort: wssPort,
+        forceTLS: String(cfg.scheme || '').toLowerCase() === 'https',
+        disableStats: true,
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint,
+        auth: {
+            headers
+        }
+    })
+
+    // @ts-ignore - attach for global access
+    window.Echo = echo
+    // @ts-ignore
+    window.$echo = echo
+
+    // Provide via Nuxt injection
+    nuxtApp.provide('echo', echo)
+
+    // Monitor connection state
+    if (echo && (echo as any).connector) {
+        const connector = (echo as any).connector
+        console.log('[Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
+
+        try {
+            if (typeof connector.socket?.on === 'function') {
+                connector.socket.on('connect', () => {
+                    console.log('[Echo Connected] WebSocket connected at', new Date().toISOString())
+                })
+                connector.socket.on('disconnect', () => {
+                    console.log('[Echo Disconnected] WebSocket disconnected at', new Date().toISOString())
+                })
+                connector.socket.on('error', (err: any) => {
+                    console.error('[Echo Error]', err?.message || err, 'at', new Date().toISOString())
+                })
+            }
+        } catch (e) {
+            logger.debug('[Echo] Connection hooks unavailable', e)
+        }
+    }
+
+    return echo
+}
+
 export default defineNuxtPlugin((nuxtApp: any) => {
     const config = useRuntimeConfig()
- 
-   const reverbKey = config.public.reverb.appKey
-    const reverbHost = config.public.reverb.host
     const mainApi = config.public.mainApiUrl
-    // console.log(reverbKey, reverbHost, mainApi)
-    if (!reverbKey || !reverbHost || !mainApi) {
-        // Missing runtime config — do nothing but warn
-        // This keeps the app running in environments without websockets configured
-        // (e.g., CI, static preview)
-        // eslint-disable-next-line no-console
-        // console.log('Reverb server not running; skipping initialization')
-        // errorDialog.show('Reverb configuration error. Retrying...')
-        return
-    }
+
+    if (!mainApi) return
 
     try {
         const deviceStore = useDeviceStore()
 
-        // If Echo is already initialized elsewhere, reuse it and avoid double init
+        // If Echo is already initialized elsewhere, reuse it
         if (typeof window !== 'undefined' && (window as any).Echo) {
-            // ensure it's provided to Nuxt and available as $echo
             // @ts-ignore
             (window as any).$echo = (window as any).Echo
             nuxtApp.provide('echo', (window as any).Echo)
+            // Still register initEcho for future config changes
+            ;(window as any).initEcho = (cfg: any, tok: string | null) => {
+                createEcho(nuxtApp, cfg, String(mainApi), tok)
+            }
             return
         }
 
-        // expose Pusher to window for libraries that expect it
-        // (only in client runtime)
-        // @ts-ignore - augmenting window
-        window.Pusher = Pusher
+        // Expose initEcho globally — called by Device store after auth when
+        // server provides broadcasting config
+        ;(window as any).initEcho = (cfg: any, tok: string | null) => {
+            createEcho(nuxtApp, cfg, String(mainApi), tok)
+        }
 
-        // Build a normalized auth endpoint
-        const authEndpoint = `${String(mainApi).replace(/\/$/, '')}/broadcasting/auth`
-
-        // Prepare headers only if we have a token
+        // Determine initial config source:
+        // 1. Persisted broadcastConfig from Device store (server-provided, preferred)
+        // 2. runtimeConfig from nuxt.config.ts (fallback for first boot / dev / CI)
+        const persisted = deviceStore.broadcastConfig
         const token = deviceStore?.token
-        
-        const headers: Record<string, string> = {
-            Accept: 'application/json',
-            'Content-Type': 'application/json'
-        }
 
-        if (token) {
-            headers.Authorization = `Bearer ${token}`
-        }
-
-        // Use runtime-configured Reverb proxy settings.
-        // nginx terminates TLS on 8443 and proxies /app to the local Reverb server.
-        // Do not override to 8000 here; that stale port causes browser WebSocket failures.
-        const forceTLS = String(config.public.reverb.scheme || '').toLowerCase() === 'https'
-        const wsProtocol = forceTLS ? 'wss' : 'ws'
-        const wsPort = Number(config.public.reverb.port)
-        const wssPort = Number(config.public.reverb.port)
-        
-        logger.info(`[Echo] Connecting to Reverb: ${wsProtocol}://${reverbHost}:${wsPort}/reverb`)
-
-        // Log Reverb configuration
-        logger.info('[Echo Init] Config:', {
-            key: config.public.reverb.appKey?.substring(0, 8) + '...',
-            host: reverbHost,
-            wsPort,
-            forceTLS,
-            authEndpoint,
-            hasAuthToken: !!token,
-            timestamp: new Date().toISOString()
-        })
-
-        const echo = new Echo({
-            broadcaster: 'reverb',
-            key: config.public.reverb.appKey,
-            wsHost: reverbHost,
-            wsPort,
-            wssPort,
-            forceTLS,
-            disableStats: true,
-            enabledTransports: ['ws', 'wss'],
-            authEndpoint,
-            auth: {
-                headers
-            }
-        })
-
-        // @ts-ignore - attach for global access (used across the app)
-        window.Echo = echo
-        // also expose as $echo for older code paths
-        // @ts-ignore
-        window.$echo = echo
-
-        // Provide via Nuxt injection
-        nuxtApp.provide('echo', echo)
-
-        // Clean up WebSocket connection when the app is unmounting to avoid
-        // dangling socket connections on page reload / navigation away.
-        nuxtApp.hook('app:beforeUnmount', () => {
-            try {
-                echo?.disconnect?.()
-                if (typeof window !== 'undefined') {
-                    delete (window as any).Echo
-                    delete (window as any).$echo
-                    delete (window as any).updateEchoAuth
-                }
-                logger.info('[Echo] Disconnected on app unmount')
-            } catch (e) {
-                logger.warn('[Echo] Disconnect on unmount failed', e)
-            }
-        })
-
-        // Monitor connection state
-        if (echo && (echo as any).connector) {
-            const connector = (echo as any).connector
-            logger.info('[Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
-            
-            // Hook into connection success/failure if available
-            try {
-                if (typeof connector.socket?.on === 'function') {
-                    connector.socket.on('connect', () => {
-                        logger.info('[Echo Connected] WebSocket connected at ' + new Date().toISOString())
-                    })
-                    connector.socket.on('disconnect', () => {
-                        logger.warn('[Echo Disconnected] WebSocket disconnected at ' + new Date().toISOString())
-                    })
-                    connector.socket.on('error', (err: any) => {
-                        logger.error('[Echo Error] ' + (err?.message || err) + ' at ' + new Date().toISOString())
-                    })
-                }
-            } catch (e) {
-                logger.debug('[Echo] Connection hooks unavailable', e)
-            }
+        if (persisted && persisted.key) {
+            logger.info('[Echo] Using persisted server-provided broadcast config')
+            createEcho(nuxtApp, persisted, String(mainApi), token)
+        } else if (config.public.reverb?.appKey && config.public.reverb?.host) {
+            // Fallback to runtimeConfig (env vars)
+            logger.info('[Echo] Using runtimeConfig fallback (no server config cached yet)')
+            createEcho(nuxtApp, {
+                key: config.public.reverb.appKey,
+                host: config.public.reverb.host,
+                port: config.public.reverb.port || 6001,
+                scheme: config.public.reverb.scheme || 'http',
+            }, String(mainApi), token)
+        } else {
+            // No config available — Echo will init after first successful auth
+            logger.info('[Echo] No broadcast config available yet, waiting for auth')
         }
 
         // Expose a helper to update Echo auth header when token changes
-        // Usage: window.updateEchoAuth(tokenString | null)
-        // This avoids re-initializing Echo and allows the device store
-        // to call this after refreshing/setting a new token.
+        // (fast path — no full reinit, just updates the bearer token)
         // @ts-ignore
         window.updateEchoAuth = (newToken: string | null) => {
             try {
                 const bearer = newToken ? `Bearer ${newToken}` : undefined
-                // Some Echo connectors expose `connector.options.auth.headers`
                 if ((window as any).Echo && (window as any).Echo.connector && (window as any).Echo.connector.options) {
                     ;(window as any).Echo.connector.options.auth = (window as any).Echo.connector.options.auth || {}
                     ;(window as any).Echo.connector.options.auth.headers = (window as any).Echo.connector.options.auth.headers || {}
                     if (bearer) (window as any).Echo.connector.options.auth.headers.Authorization = bearer
                     else delete (window as any).Echo.connector.options.auth.headers.Authorization
                 }
-                logger.info('[Echo Auth Updated] Bearer token ' + (newToken ? 'SET' : 'CLEARED') + ' at ' + new Date().toISOString())
+                console.log('[Echo Auth Updated] Bearer token', newToken ? 'SET' : 'CLEARED', 'at', new Date().toISOString())
             } catch (e) {
                 logger.warn('[Echo] updateEchoAuth failed', e)
-                logger.error('[Echo Auth Update Failed]', e)
+                console.error('[Echo Auth Update Failed]', e)
             }
         }
 
