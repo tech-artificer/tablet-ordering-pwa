@@ -15,7 +15,7 @@
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "npx nuxi typecheck",
-    "rebuild:esbuild": "npm rebuild esbuild --update-binary || true",
+    "rebuild:esbuild": "npm rebuild esbuild || true",
     "postinstall": "nuxi prepare && npm run rebuild:esbuild",
     "clean": "rm -rf .nuxt .output node_modules package-lock.json"
   },
