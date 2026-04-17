@@ -229,7 +229,7 @@ export interface ModifierSelection {
 }
 
 export interface Table {
-  id: number;
+  id: number | null;
   name: string;
   status: string;
   is_available: boolean;
@@ -303,6 +303,8 @@ export interface Device {
   code?: string;
   app_version?: string;
   last_ip_address?: string;
+  /** Ephemeral field populated from server `ip_used` response — diagnostics only. */
+  ip_address?: string;
 }
 
 export interface Branch {
@@ -345,10 +347,91 @@ export interface RefillableItem {
   max_refills?: number; // Optional limit
 }
 
-export interface CartItem extends MenuItem {
-  ordered_menu_id: number ;
+/**
+ * A line item in the active shopping cart. Deliberately standalone —
+ * does not extend MenuItem so partial data from user selections is valid.
+ */
+export interface CartItem {
+  id: number;
+  name: string;
+  price: number;
   quantity: number;
   isUnlimited: boolean;
+  ordered_menu_id?: number;
+  category?: string | null;
+  img_url?: string | null;
+  note?: string | null;
+  group?: string | null;
+  course?: string | null;
+  receipt_name?: string;
+  kitchen_name?: string;
+  description?: string;
+  is_taxable?: boolean;
+  is_discountable?: boolean;
+  is_available?: boolean;
+  tax?: Tax;
+  tax_amount?: number;
+}
+
+/** A snapshot of a submitted cart item kept for UI display after cart is cleared. */
+export interface SubmittedItem {
+  id: number;
+  menu_id: number;
+  name: string;
+  quantity: number;
+  price: number;
+  img_url?: string | null;
+  category?: string | null;
+  isUnlimited: boolean;
+}
+
+/** The shape of the `POST /api/devices/create-order` and `409` recovery response. */
+export interface OrderApiResponse {
+  success?: boolean;
+  resumed?: boolean;
+  message?: string;
+  /** Nested order object (primary structure). */
+  order?: {
+    id?: number;
+    order_id?: number | null;
+    order_number?: string;
+    status?: string;
+    total_amount?: number;
+  };
+  /** Flat fields — some API variants return these at top level as a fallback. */
+  id?: number;
+  order_id?: number | null;
+  order_number?: string;
+  status?: string;
+  total_amount?: number;
+}
+
+export interface OrderModifier {
+  menu_id: number;
+  quantity: number;
+}
+
+export interface OrderPayloadItem {
+  menu_id: number;
+  name: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  note: string | null;
+  is_package: boolean;
+  modifiers: OrderModifier[];
+}
+
+export interface OrderPayload {
+  table_id: number | null;
+  guest_count: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total_amount: number;
+  items: OrderPayloadItem[];
 }
 
 // API Response types
@@ -369,37 +452,40 @@ export interface PaginatedResponse<T> {
 
 // New types for Tablet API integration
 export interface MeatCategory {
-  code: string;  // PORK, BEEF, CHICKEN
-  name: string;  // Display name
-  icon: string;  // Icon (emoji or URL)
-  color: string; // Hex color code
-  sort_order: number;
+  id: number;
+  name: string;     // PORK, BEEF, CHICKEN
+  slug: string;
+  prefix: string;   // P, B, C — receipt_name prefix
 }
 
 export interface TabletCategory {
   id: number;
   name: string;
   slug: string;
+  pos_category?: string;
   description?: string;
   icon_url?: string;
   color?: string;
-  menu_count: number;
 }
 
 export interface AllowedMenu {
   id: number;
-  description: string;
+  name: string;
+  kitchen_name: string;
   receipt_name: string;
   price: number;
-  extra_price: number;
-  total_price: number;
-  is_default: boolean;
-  is_free: boolean;
-  meat_category?: MeatCategory;
-  image?: {
-    url: string;
-    alt_text?: string;
-  };
+  description?: string;
+  group?: string | null;
+  groupName?: string | null;
+  category?: string | null;
+  is_taxable: boolean;
+  is_available?: boolean;
+  is_discountable?: boolean;
+  is_modifier?: boolean;
+  is_modifier_only?: boolean;
+  isMod?: boolean;
+  isModOnly?: boolean;
+  img_url?: string | null;
 }
 
 export interface PackageDetails {
@@ -436,4 +522,11 @@ export interface PackageValidationResult {
     extra_charges: number;
     total_price: number;
   };
+}
+
+declare global {
+  interface Window {
+    /** Echo plugin auth refresh hook — set by plugins/echo.client.ts if present. */
+    updateEchoAuth?: (token: string) => void;
+  }
 }

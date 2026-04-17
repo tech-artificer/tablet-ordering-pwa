@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, onScopeDispose } from 'vue'
+import { reactive, computed, toRefs, onScopeDispose } from 'vue'
 import { useApi } from "../composables/useApi";
 import { logger } from "../utils/logger";
 import type { Device, Table } from '../types/index'
@@ -30,88 +30,156 @@ export const useDeviceStore = defineStore('device', () => {
         const defaultMaxPollAttempts = 24
         const defaultMaxPollRuntimeMs = 2 * 60 * 1000
 
-        function stopTablePolling() {
-            if (pollTimerId) {
-                try {
-                    clearInterval(pollTimerId)
-                } catch (e) {
-                    logger.debug('[DeviceStore] stopTablePolling: clearInterval failed', e)
-                }
-                pollTimerId = null
-            }
-            pollStartedAt = null
-            isPollingForTable.value = false
-            pollAttempts.value = 0
+    let pollTimerId: number | null = null
+    let pollStartedAt: number | null = null
+    const defaultPollIntervalMs = 5000
+    const defaultMaxPollAttempts = 24
+    const defaultMaxPollRuntimeMs = 2 * 60 * 1000
+
+    function normalizeTable(tbl: any): Table | null {
+        if (!tbl) return null
+        if (typeof tbl === 'string') {
+            return { id: null as any, name: tbl, status: 'unknown', is_available: false, is_locked: false }
+        }
+        return tbl as Table
+    }
+
+    function applyAuthPayload(payload: any) {
+        const authToken = payload?.token
+        const authDevice = payload?.device
+        const authTable = payload?.table
+        const expiresAt = payload?.expires_at
+        const ipUsedFromServer: string | undefined = payload?.ip_used
+
+        state.lastAuthResponse = payload ?? null
+        if (ipUsedFromServer) state.lastServerIpUsed = ipUsedFromServer
+
+        if (authDevice) {
+            if (ipUsedFromServer) authDevice.ip_address = ipUsedFromServer
+            state.device = authDevice
         }
 
-        function startTablePolling(intervalMs = defaultPollIntervalMs, maxAttempts = defaultMaxPollAttempts) {
-            // don't start if already polling
-            if (isPollingForTable.value) return
-            if (typeof window === 'undefined') {
-                logger.warn('[DeviceStore] startTablePolling: window unavailable (SSR)')
+        if (authToken) {
+            state.token = authToken
+            try {
+                if (typeof window !== 'undefined' && window.updateEchoAuth) {
+                    window.updateEchoAuth(state.token)
+                }
+            } catch (e) {
+                logger.debug('[DeviceStore] updateEchoAuth not available', e)
+            }
+        }
+
+        if (expiresAt) state.expiration = expiresAt
+        if (authTable) state.table = normalizeTable(authTable)
+    }
+
+    function stopTablePolling() {
+        if (pollTimerId) {
+            try {
+                clearInterval(pollTimerId)
+            } catch (e) {
+                logger.debug('[DeviceStore] stopTablePolling: clearInterval failed', e)
+            }
+            pollTimerId = null
+        }
+        pollStartedAt = null
+        state.isPollingForTable = false
+        state.pollAttempts = 0
+    }
+
+    async function refresh(): Promise<boolean> {
+        state.isLoading = true
+        state.errorMessage = null
+
+        try {
+            const api = useApi()
+            const response = await api.post('/api/devices/refresh')
+            applyAuthPayload(response.data)
+
+            if (state.table) {
+                state.waitingForTable = !(state.table.id || state.table.name)
+            } else {
+                state.waitingForTable = true
+            }
+
+            return !!state.token
+        } catch (error: any) {
+            logger.error('[DeviceStore] Token refresh failed:', error)
+            state.errorMessage = error?.response?.data?.message || 'Token refresh failed'
+            return false
+        } finally {
+            state.isLoading = false
+        }
+    }
+
+    async function authenticate(): Promise<boolean> {
+        state.isLoading = true
+        state.errorMessage = null
+
+        try {
+            const api = useApi()
+            const authStart = performance.now()
+            const response = await api.get('/api/devices/login')
+            applyAuthPayload(response.data)
+
+            if (state.device && state.token && state.table) {
+                const authMs = (performance.now() - authStart).toFixed(1)
+                logger.info(`[Device] Authenticated device_id=${state.device.id} table_id=${state.table?.id} table_name=${state.table?.name} latency=${authMs}ms at ${new Date().toISOString()}`)
+                logger.info(`[Device] Authenticated as device_id=${state.device.id}`)
+                state.waitingForTable = false
+                return true
+            }
+
+            logger.warn(`[Device] Auth failed: incomplete response at ${new Date().toISOString()}`)
+            return false
+        } catch (error: any) {
+            logger.error(`[Device] Auth error ${error?.message} at ${new Date().toISOString()}`)
+            logger.error('[DeviceStore] Authentication failed:', error)
+            state.errorMessage = error?.response?.data?.message || 'Authentication failed'
+            return false
+        } finally {
+            state.isLoading = false
+        }
+    }
+
+    function startTablePolling(intervalMs = defaultPollIntervalMs, maxAttempts = defaultMaxPollAttempts) {
+        if (state.isPollingForTable) return
+        if (typeof window === 'undefined') {
+            logger.warn('[DeviceStore] startTablePolling: window unavailable (SSR)')
+            return
+        }
+
+        logger.debug('[DeviceStore] startTablePolling')
+        state.isPollingForTable = true
+        state.waitingForTable = true
+        state.pollAttempts = 0
+        state.maxPollAttempts = maxAttempts
+        pollStartedAt = Date.now()
+
+        pollTimerId = window.setInterval(async () => {
+            state.pollAttempts += 1
+
+            if (pollStartedAt && (Date.now() - pollStartedAt) > defaultMaxPollRuntimeMs) {
+                logger.warn('[DeviceStore] table polling max runtime exceeded')
+                stopTablePolling()
                 return
             }
-            logger.debug('[DeviceStore] startTablePolling')
-            isPollingForTable.value = true
-            // ensure UI shows we're awaiting assignment
-            waitingForTable.value = true
-            pollAttempts.value = 0
-            maxPollAttempts.value = maxAttempts
-            pollStartedAt = Date.now()
-            pollTimerId = window.setInterval(async () => {
-                pollAttempts.value++
 
-                if (pollStartedAt && (Date.now() - pollStartedAt) > defaultMaxPollRuntimeMs) {
-                    logger.warn('[DeviceStore] table polling max runtime exceeded')
+            try {
+                const ok = state.token ? await refresh() : await authenticate()
+                const t = state.table
+
+                if (ok && t && (t.id || t.name)) {
+                    state.waitingForTable = false
+                    logger.debug('[DeviceStore] table assigned during polling', t)
                     stopTablePolling()
                     return
                 }
 
-                try {
-                        const api = useApi()
-                        if (!api || typeof (api as any).get !== 'function') {
-                            logger.warn('[DeviceStore] startTablePolling: api client unavailable — stopping table polling')
-                            stopTablePolling()
-                            return
-                        }
-                        const response = await api.get('/api/devices/login')
-                    const resp = response.data || {}
-                    // store raw response for diagnostics
-                    lastAuthResponse.value = resp
-                    const ipUsedFromServer: string | undefined = resp?.ip_used
-                    if (ipUsedFromServer) lastServerIpUsed.value = ipUsedFromServer
-
-                    const authToken = resp.token
-                    const authDevice = resp.device
-                    const authTable = resp.table
-                    const expires_at = resp.expires_at
-
-                    if (authDevice) {
-                        if (ipUsedFromServer) (authDevice as any).ip_address = ipUsedFromServer
-                        device.value = authDevice
-                    }
-                    if (authToken) token.value = authToken
-                    if (expires_at) expiration.value = expires_at
-
-                    if (authTable) {
-                        table.value = normalizeTable(authTable)
-                    }
-
-                    const t = table.value as any
-                    if (t && (t.id || t.name)) {
-                        // assigned — stop polling and clear waiting flag
-                        waitingForTable.value = false
-                        logger.debug('[DeviceStore] table assigned during polling', t)
-                        stopTablePolling()
-                    } else if (pollAttempts.value >= maxAttempts) {
-                        // give up after max attempts
-                        logger.debug('[DeviceStore] table polling max attempts reached')
-                        stopTablePolling()
-                    }
-                } catch (e) {
-                    // network errors: keep trying until attempts exhausted
-                    logger.warn('[DeviceStore] polling error', e)
-                    if (pollAttempts.value >= maxAttempts) stopTablePolling()
+                if (state.pollAttempts >= maxAttempts) {
+                    logger.debug('[DeviceStore] table polling max attempts reached')
+                    stopTablePolling()
                 }
             }, intervalMs) as unknown as number
         }
@@ -191,66 +259,30 @@ export const useDeviceStore = defineStore('device', () => {
 
                 return true
             }
-            
-            // Device not found or incomplete response
-            console.log(`[⚠️ Device Auth Failed] Incomplete response at ${new Date().toISOString()}`)
-            return false
-
-        } catch (error: any) {
-            console.error(`[❌ Device Auth Error] ${error?.message} at ${new Date().toISOString()}`)
-            logger.error('[DeviceStore] Authentication failed:', error)
-            errorMessage.value = error?.response?.data?.message || 'Authentication failed'
-            return false
-        } finally {
-            isLoading.value = false
-        }
+        }, intervalMs) as unknown as number
     }
 
+    const isAuthenticated = computed((): boolean => !!(state.token && state.table?.id))
+    const hasDevice = computed((): boolean => !!state.token)
+    const tableName = computed((): string | undefined => state.table?.name)
+
     async function register(formData: { code: string; name?: string }): Promise<void> {
-        isLoading.value = true
-        errorMessage.value = null
-        
+        state.isLoading = true
+        state.errorMessage = null
+
         try {
             const api = useApi()
-            // Let the backend detect the client IP from the incoming request.
-            // include name if provided; backend expects device name in some deployments
             const payload: any = { ...formData }
-
             const response = await api.post('/api/devices/register', payload)
-            const { token: authToken, device: authDevice, table: authTable, expires_at } = response.data
-            const ipUsedFromServer: string | undefined = response.data?.ip_used
-            // store raw response for diagnostics
-            lastAuthResponse.value = response.data
-            if (ipUsedFromServer) lastServerIpUsed.value = ipUsedFromServer
+            applyAuthPayload(response.data)
 
-            // Require at least the device object; token/table may be provided later by backend.
-                    if (authDevice) {
-                        if (ipUsedFromServer) (authDevice as any).ip_address = ipUsedFromServer
-                        device.value = authDevice
-                    }
-                    if (authToken) {
-                        token.value = authToken
-                        try { if (typeof window !== 'undefined' && (window as any).updateEchoAuth) (window as any).updateEchoAuth(token.value) } catch (e) { logger.debug('[DeviceStore] updateEchoAuth not available') }
-                    }
-            device.value = authDevice
-            expiration.value = expires_at
-
-            if (authToken) {
-                token.value = authToken
+            if (state.table) {
+                state.waitingForTable = !(state.table.id || state.table.name)
             } else {
-                // no token returned yet; remain unauthenticated but remember device
-                token.value = token.value || null
+                state.waitingForTable = true
             }
 
-            if (authTable) {
-                table.value = normalizeTable(authTable)
-                // If the server included a table name or id, we're no longer waiting
-                waitingForTable.value = !( (table.value as any).id || (table.value as any).name )
-            } else {
-                table.value = null
-                // mark that we're awaiting table assignment from the server
-                waitingForTable.value = true
-                // start background polling to detect table assignment
+            if (state.waitingForTable) {
                 startTablePolling()
             }
 
@@ -265,7 +297,6 @@ export const useDeviceStore = defineStore('device', () => {
         } catch (error: any) {
             logger.error('[DeviceStore] Registration failed:', error)
 
-            // If the server returned a body that includes device details, treat as registered
             const resp = error?.response?.data
             if (resp && (resp.device || resp.token || resp.success)) {
                 // store raw response for diagnostics if present
@@ -289,81 +320,74 @@ export const useDeviceStore = defineStore('device', () => {
                 return
             }
 
-            // Extract error message for genuine failures
             if (error?.response?.data?.errors) {
-                errorMessage.value = error.response.data.errors
+                state.errorMessage = error.response.data.errors
             } else if (error?.response?.data?.message) {
-                errorMessage.value = error.response.data.message
+                state.errorMessage = error.response.data.message
             } else {
-                errorMessage.value = error?.message || 'Registration failed'
+                state.errorMessage = error?.message || 'Registration failed'
             }
 
-            throw error // Re-throw to allow caller to handle
+            throw error
         } finally {
-            isLoading.value = false
+            state.isLoading = false
         }
     }
 
-        // Checks if the server has assigned a table after registration.
-        // Calls `authenticate()` to fetch latest device info and returns true when a table is present.
-        async function checkTableAssignment(): Promise<boolean> {
-            // If we don't have any device or token at all, nothing to check
-                if (!device.value && !token.value) return false
-                logger.debug('[DeviceStore] checkTableAssignment running — device present?', !!device.value, 'token?', !!token.value)
+    async function checkTableAssignment(): Promise<boolean> {
+        if (!state.device && !state.token) return false
+        logger.debug('[DeviceStore] checkTableAssignment running — device present?', !!state.device, 'token?', !!state.token)
 
-            try {
-                const ok = await authenticate()
-                const t = table.value as any
-                if (t && (t.id || t.name)) {
-                    waitingForTable.value = false
-                    return true
-                }
-                // still no table
-                waitingForTable.value = true
-                return false
-            } catch (e) {
-                logger.warn('[DeviceStore] checkTableAssignment failed', e)
-                return false
+        try {
+            const ok = state.token ? await refresh() : await authenticate()
+            const t = state.table
+            if (ok && t && (t.id || t.name)) {
+                state.waitingForTable = false
+                return true
             }
+            state.waitingForTable = true
+            return false
+        } catch (e) {
+            logger.warn('[DeviceStore] checkTableAssignment failed', e)
+            return false
         }
-
-    
-    function clearAuth(): void {
-        device.value = null
-        token.value = null
-        table.value = null
-        expiration.value = null
-        errorMessage.value = null
-            lastAuthResponse.value = null
-            lastServerIpUsed.value = null
-                waitingForTable.value = false
     }
+
+    function clearAuth(): void {
+        stopTablePolling()
+        state.device = null
+        state.token = null
+        state.table = null
+        state.expiration = null
+        state.errorMessage = null
+        state.lastAuthResponse = null
+        state.lastServerIpUsed = null
+        state.waitingForTable = false
+    }
+
+    function getDeviceId(): number | null { return state.device?.id ?? null }
+    function getDeviceLastIpAddress(): string | undefined { return state.device?.last_ip_address }
+    function getLastServerIpUsed(): string | null { return state.lastServerIpUsed }
+    function getTableId(): number | null { return state.table?.id ?? null }
+    function getTableName(): string | undefined { return state.table?.name }
+    function getToken(): string | null { return state.token }
+    function getTable(): Table | null { return state.table }
+
+    function setToken(val: string | null) { state.token = val }
+    function setTable(val: Table | null) { state.table = val }
 
     onScopeDispose(() => {
         stopTablePolling()
     })
 
     return {
-        // State
-        device,
-        code,
-        table,
-        token,
-        expiration,
-        isLoading,
-        errorMessage,
-            waitingForTable,
-            isPollingForTable,
-            pollAttempts,
-            maxPollAttempts,
-        
-        // Getters
+        ...toRefs(state),
         isAuthenticated,
         hasDevice,
         tableName,
-        // Actions
         authenticate,
         register,
+        refresh,
         checkTableAssignment,
         startTablePolling,
         stopTablePolling,
@@ -373,6 +397,15 @@ export const useDeviceStore = defineStore('device', () => {
             // Broadcasting config (server-provided)
             broadcastConfig,
         clearAuth,
+        getDeviceId,
+        getDeviceLastIpAddress,
+        getLastServerIpUsed,
+        getTableId,
+        getTableName,
+        getToken,
+        getTable,
+        setToken,
+        setTable,
     }
 }, {
     persist: {

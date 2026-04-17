@@ -26,14 +26,14 @@ describe('CartSidebar UI', () => {
     setActivePinia(pinia)
     // Ensure session store minimally populated
     const ss = useSessionStore()
-    ss.orderId = null
+    ss.setOrderId(null)
   })    
 
   it('hides Place Order button after initial order is placed', async () => {
     const order = useOrderStore()
     // Set up order state to simulate an already-placed order
-    order.hasPlacedOrder = true
-    order.isRefillMode = false
+    order.setHasPlacedOrder(true)
+    order.setIsRefillMode(false)
 
     const wrapper = mount(CartSidebar, {
       global: {

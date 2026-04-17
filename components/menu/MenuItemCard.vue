@@ -34,7 +34,7 @@
         format="webp"
       />
       <div v-else class="w-full h-full flex items-center justify-center text-sm text-gray-400">
-        <span class="text-2xl">🍽️</span>
+        <UtensilsCrossed :size="24" :stroke-width="1.5" />
       </div>
     </div>
     
@@ -67,8 +67,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import FlameButton from '../../components/ui/FlameButton.vue'
+import { UtensilsCrossed } from 'lucide-vue-next'
+import { formatCurrency } from '../../utils/formats'
 
 const props = defineProps({ 
   item: Object,

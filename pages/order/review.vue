@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
+import { ArrowLeft } from 'lucide-vue-next';
 import { logger } from '~/utils/logger';
 import { useSessionStore } from '../../stores/Session';
 import confetti from 'canvas-confetti';
-// import { ElNotification } from 'element-plus';
 
 const router = useRouter();
 
 const triggerCelebration = () => {
   const colors = ['#F6B56D', '#10B981', '#FFFFFF'];
   confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 },
+    particleCount: 120,
+    spread: 80,
+    origin: { y: 0.5 },
     colors: colors,
     duration: 2000
   });
@@ -22,18 +21,8 @@ const handleOrderSubmitted = async () => {
   const timestamp = new Date().toISOString()
   logger.info('[Order Review] Order confirmation received', { timestamp })
   
-  // Trigger celebration confetti
   triggerCelebration();
-  
-  // Logic after the API call succeeds in the child component
-  // ElNotification({
-  //   title: 'Order Confirmed! 🥳',
-  //   message: 'Your food is on its way. Estimated wait time: 7 minutes.',
-  //   type: 'success',
-  //   duration: 3500,
-  // });
 
-  // Mark session active via Session store (centralized localStorage writes)
   try {
     const sessionStore = useSessionStore()
     logger.info('[Order Review] Marking session active', { timestamp })
@@ -46,9 +35,12 @@ const handleOrderSubmitted = async () => {
     })
   }
 
-  // 1. Navigate to the In-Session (Refill/Support) screen, replacing the history entry
   logger.info('[Order Review] Navigating to in-session screen', { timestamp })
   router.replace('/order/in-session');
+};
+
+const goBack = () => {
+  router.push('/menu');
 };
 </script>
 
@@ -66,4 +58,15 @@ const handleOrderSubmitted = async () => {
       <OrderingStep3ReviewSubmit @orderSubmitted="handleOrderSubmitted" />
     </div>
   </div>
+    <template #error="{ error, clearError }">
+      <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
+        <p class="text-xl font-bold text-red-400">Something went wrong</p>
+        <p class="text-sm text-gray-400 text-center max-w-sm">{{ error?.message || 'An unexpected error occurred.' }}</p>
+        <button
+          class="px-6 py-3 bg-primary text-black font-semibold rounded-xl hover:opacity-90 transition"
+          @click="clearError()"
+        >Try Again</button>
+      </div>
+    </template>
+  </NuxtErrorBoundary>
 </template>

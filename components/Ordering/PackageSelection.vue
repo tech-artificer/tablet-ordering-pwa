@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { useMenuStore } from '../../stores/Menu';
 import { 
   User, 
   House,
   ShoppingCart,
 } from '@element-plus/icons-vue'
-import PackageCard from './PackageCard.vue';
 
 const menuStore = useMenuStore();
 import { logger } from '../../utils/logger'

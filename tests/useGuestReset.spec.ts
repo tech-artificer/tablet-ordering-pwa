@@ -26,7 +26,7 @@ describe('useGuestReset composable', () => {
     const order = useOrderStore()
 
     // start with a non-default guest count
-    order.guestCount = 5
+    order.setGuestCount(5)
 
     // set a session id, then activate the watcher
     session.$state.sessionId = 123

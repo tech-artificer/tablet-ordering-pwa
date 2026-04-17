@@ -1,5 +1,19 @@
 // import { defineNuxtConfig } from 'nuxt/config';
+import 'dotenv/config';
 import path from 'path';
+
+// Fail explicitly at build/start time rather than shipping hardcoded dev IPs.
+// Set these variables in the .env file for every environment.
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(
+      `[nuxt.config] Required environment variable "${name}" is not set. ` +
+      'Add it to your .env file or deployment environment before starting the app.'
+    )
+  }
+  return value
+}
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -21,7 +35,7 @@ export default defineNuxtConfig({
     
     css: [
         "./assets/css/input.css",
-        "./assets/css/main.css" 
+        "./assets/css/main.css"
     ],
     
     modules: [
@@ -35,6 +49,13 @@ export default defineNuxtConfig({
         "@nuxt/fonts",
         '@vite-pwa/nuxt',
         '@vueuse/motion/nuxt'
+    ],
+    
+    components: [
+        {
+            path: '~/components',
+            pathPrefix: false, // Allow <cart-sidebar> instead of <OrderCartSidebar>
+        }
     ],
     
     typescript: {
@@ -99,49 +120,28 @@ export default defineNuxtConfig({
             ],
         },
         
-        workbox: {
+        // Custom service worker via injectManifest strategy.
+        // BackgroundSyncPlugin and precaching are handled in public/sw.ts.
+        strategies: 'injectManifest' as const,
+        srcDir: 'public',
+        filename: 'sw.ts',
+
+        // Keep existing runtime caching config for menus and images in the injectManifest
+        // by referencing it from the custom SW. The workbox key is unused in injectManifest mode.
+        injectManifest: {
             maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
             globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-            navigateFallback: "/",
-            navigateFallbackDenylist: [/^\/api/],
-            cleanupOutdatedCaches: true,
-            
-            runtimeCaching: [
-                {
-                    urlPattern: /^https:\/\/.*\/api\/menus/i,
-                    handler: "NetworkFirst",
-                    options: {
-                        cacheName: "menus-cache",
-                        expiration: {
-                            maxEntries: 50,
-                            maxAgeSeconds: 86400 // 1 day
-                        },
-                        networkTimeoutSeconds: 3,
-                    },
-                },
-                {
-                    urlPattern: /\.(png|jpg|jpeg|webp|svg)$/i,
-                    handler: "CacheFirst",
-                    options: {
-                        cacheName: "images-cache",
-                        expiration: {
-                            maxEntries: 200,
-                            maxAgeSeconds: 604800 // 7 days
-                        },
-                    },
-                },
-            ],
         },
         
         client: {
             installPrompt: true,
-            periodicSyncForUpdates: 50,
+            periodicSyncForUpdates: 3600,
         },
     },
     
     vite: {
         build: {
-            chunkSizeWarningLimit: 1800,
+                chunkSizeWarningLimit: 1200,
         },
         // Ensure Vite dev server listens on network interfaces and allow
         // HMR to be configured via environment variables when testing on LAN.
@@ -161,12 +161,6 @@ export default defineNuxtConfig({
                 '@': path.resolve(__dirname, './')
             }
         },
-        test: {
-            globals: true,
-            environment: 'jsdom',
-            include: ['tests/**/*.spec.ts'],
-            setupFiles: ['./tests/setup.ts']
-        }
     },
     
     app: {
@@ -174,9 +168,10 @@ export default defineNuxtConfig({
             meta: [
                 {
                     name: "viewport",
-                    content: "width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"
+                    content: "width=device-width, height=device-height, initial-scale=1.0"
                 },
                 { name: 'theme-color', content: '#F6B56D' },
+                { name: 'mobile-web-app-capable', content: 'yes' },
                 { name: 'apple-mobile-web-app-capable', content: 'yes' },
                 { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
                 { name: 'apple-mobile-web-app-title', content: 'Wooserve' },
@@ -195,9 +190,15 @@ export default defineNuxtConfig({
             appVersion: process.env.APP_VERSION || '1.0.0',
             appEnv: process.env.APP_ENV || 'production',
 
+            // Feature Flags
+            offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === 'true',
+
             // API Configuration
             mainApiUrl: process.env.MAIN_API_URL || 'http://localhost:8000',
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
+
+            // Settings PIN lock behavior
+            settingsPinBackgroundTimeoutMs: parseInt(process.env.NUXT_PUBLIC_SETTINGS_PIN_BACKGROUND_TIMEOUT_MS || '120000'),
 
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',

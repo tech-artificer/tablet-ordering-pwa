@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatCurrency } from '../../utils/formats';
 import type { MenuItem, Modifier } from '../../types';
-import { ElButton, ElEmpty } from 'element-plus';
+import { ElEmpty } from 'element-plus';
 
 type CategoryType = 'meats' | 'sides' | 'desserts' | 'beverages';
 
@@ -66,137 +66,200 @@ const isAvailable = (item: any) => {
     <div
       v-for="item in items"
       :key="item.id"
-      v-bind:class="[
-        'relative bg-white/5 backdrop-blur-sm rounded-xl overflow-hidden transition-all duration-200 border border-white/10 shadow-lg',
-        (isAvailable(item) ? 'cursor-pointer active:scale-95 hover:bg-white/10' : 'cursor-not-allowed opacity-60'),
-        (isLocked() ? 'cursor-not-allowed opacity-60 grayscale' : '')
+      :class="[
+        'menu-card group relative rounded-2xl overflow-hidden transition-all duration-200 shadow-xl border',
+        isAvailable(item) && !isLocked()
+          ? 'border-white/10 cursor-pointer hover:border-primary/40 hover:shadow-primary/20 hover:shadow-2xl active:scale-[0.97]'
+          : 'border-white/5 cursor-not-allowed opacity-55'
       ]"
       :title="isLocked() ? (props.lockedReason || 'Locked during refill mode') : ''"
-      @click="isAvailable(item) && addItem(item)">
-      
+      @click="isAvailable(item) && !isLocked() && addItem(item)">
+
       <!-- Quantity Badge -->
-      <div v-if="getItemQuantity(item.id) > 0" class="absolute -top-2 -right-2 bg-primary text-secondary text-sm font-bold w-8 h-8 rounded-full shadow-lg flex items-center justify-center z-20 animate-bounce-in">
+      <div
+        v-if="getItemQuantity(item.id) > 0"
+        class="qty-badge absolute top-2.5 right-2.5 z-30 bg-primary text-secondary text-sm font-black w-8 h-8 rounded-full shadow-xl flex items-center justify-center animate-bounce-in tabular-nums">
         {{ getItemQuantity(item.id) }}
       </div>
 
-      <!-- Unlimited Badge (for meats and sides) -->
-      <div v-if="isUnlimitedCategory" class="absolute top-2 left-2 z-20">
-        <div class="unlimited-badge">
+      <!-- Unlimited / Locked badge -->
+      <div class="absolute top-2.5 left-2.5 z-30 flex gap-1.5">
+        <div v-if="isUnlimitedCategory && !isLocked()" class="unlimited-badge">
           <span class="unlimited-dot" aria-hidden="true"></span>
           UNLIMITED
         </div>
+        <div v-if="isLocked()" class="locked-badge">
+          <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+          LOCKED
+        </div>
       </div>
 
-      <div class="relative h-40 overflow-hidden">
+      <!-- Image area — taller, with name overlay -->
+      <div class="relative h-44 overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900">
         <NuxtImg
           v-if="item.img_url"
           :src="item.img_url"
           :alt="item.name || 'Menu item'"
-          class="w-full h-full object-cover"
+          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
           sizes="(max-width: 768px) 100vw, 33vw"
           format="webp"
-          @error="(e) => ((e.target as HTMLImageElement).src = '/images/placeholder.jpg')"
+          @error="(e: Event) => { const el = e.target as HTMLImageElement; el.style.display = 'none'; el.closest('.img-wrap')?.classList.add('img-error') }"
         />
-        
-        <div v-else class="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-          <span class="text-2xl">🍽️</span>
+        <div v-if="!item.img_url" class="w-full h-full flex flex-col items-center justify-center gap-2"
+          style="background: linear-gradient(135deg, #2a2218 0%, #1a1510 100%)">
+          <svg class="w-12 h-12 text-primary/25" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 20 C8 20 12 14 24 14 C36 14 40 20 40 20"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 24 H42"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 24 L14 36 M24 24 L24 36 M34 24 L34 36"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 36 H38"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 10 C18 8 20 6 20 6 C20 6 19 9 21 10"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M24 8 C24 6 26 4 26 4 C26 4 25 7 27 8"/>
+          </svg>
         </div>
 
-        <div v-if="!isAvailable(item)" class="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-          <span class="text-white font-semibold text-lg">Unavailable</span>
+        <!-- Gradient overlay at bottom -->  
+        <div class="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+
+        <!-- Unavailable overlay -->
+        <div v-if="!isAvailable(item)" class="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
+          <span class="text-white/80 font-semibold text-sm tracking-wide uppercase">Unavailable</span>
         </div>
 
-        <div v-if="isLocked()" class="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-          <div class="text-center text-white/90">
-            <div class="text-2xl">🔒</div>
-            <div class="text-sm font-semibold">Locked in Refill</div>
-          </div>
-        </div>
-
-        <!-- Price badge with gradient -->
-        <div v-if="item.price > 0" class="absolute bottom-2 right-2 bg-white text-secondary px-3 py-1.5 rounded-full text-sm font-bold shadow-lg">
-          {{ formatCurrency(item.price) }}
+        <!-- Locked overlay -->
+        <div v-if="isLocked()" class="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
+          <span class="text-white/70 font-semibold text-sm tracking-wide uppercase">Locked</span>
         </div>
       </div>
 
-      <div class="p-4">
-        <h3 class="text-white font-semibold text-lg mb-1 truncate">{{ item.name || (item as any).receipt_name || (item as any).kitchen_name }}</h3>
-        <p v-if="item.description" class="text-gray-300 text-sm line-clamp-2">{{ item.description }}</p>
-        
-        <!-- Add to order button -->
-        <button
-          :disabled="isAddDisabled(item) || !isAvailable(item)"
-          @click.stop="addItem(item)"
-          :aria-disabled="isAddDisabled(item) || !isAvailable(item)"
-          class="mt-3 w-full bg-primary text-secondary font-semibold py-2 px-4 rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[44px]">
-          <span v-if="isLocked()">Locked in Refill</span>
-          <span v-else-if="!isAvailable(item)">Unavailable</span>
-          <span v-else-if="!isAddDisabled(item)" class="flex items-center justify-center gap-1">
-            <span>+</span>
-            <span>Add to Order</span>
+      <!-- Card footer: price + description chip + add button -->
+      <div class="px-3 pt-2 pb-3 bg-gradient-to-b from-[#1e1e1e] to-[#141414]">
+        <!-- Item code + category row -->
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-white/25 text-[10px] font-bold tracking-wider uppercase">
+            M{{ (item as any).id }}
           </span>
-          <span v-else>Limit Reached</span>
-        </button>
+          <span
+            class="text-[10px] font-bold uppercase tracking-wider"
+            :class="{
+              'text-primary/60': categoryType === 'meats',
+              'text-success/70': categoryType === 'sides',
+              'text-primary-light/60': categoryType === 'desserts',
+              'text-white/35': categoryType === 'beverages',
+            }"
+          >{{ isUnlimitedCategory ? 'UNLIMITED' : categoryType }}</span>
+        </div>
+        <!-- Item name — always visible, primary source of truth -->
+        <p class="text-white font-semibold text-sm leading-snug mb-1 truncate">
+          {{ (item as any).name || (item as any).receipt_name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
+        </p>
+        <!-- Description (if available) -->
+        <p v-if="(item as any).description"
+          class="text-white/45 text-[11px] leading-snug line-clamp-2 mb-2">
+          {{ (item as any).description }}
+        </p>
+
+        <div class="flex items-center justify-between gap-2 mt-2">
+          <!-- Price only -->
+          <div>
+            <span v-if="item.price > 0" class="text-primary font-black text-base tabular-nums leading-none">
+              {{ formatCurrency(item.price) }}
+            </span>
+            <span v-else class="text-success text-xs font-bold uppercase tracking-wide leading-none">Free</span>
+          </div>
+
+          <!-- Add button -->
+          <button
+            :disabled="isAddDisabled(item) || !isAvailable(item) || isLocked()"
+            @click.stop="addItem(item)"
+            :aria-disabled="isAddDisabled(item) || !isAvailable(item)"
+            :class="[
+              'add-btn flex items-center justify-center gap-1 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all duration-150 shadow-md min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              isAddDisabled(item) || !isAvailable(item) || isLocked()
+                ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                : 'bg-primary text-secondary active:scale-95 hover:bg-primary-light'
+            ]">
+            <svg v-if="!isAddDisabled(item) && isAvailable(item) && !isLocked()" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            <span>
+              <span v-if="isLocked()">Locked</span>
+              <span v-else-if="!isAvailable(item)">N/A</span>
+              <span v-else-if="isAddDisabled(item)">Max</span>
+              <span v-else-if="isUnlimitedCategory">ADD TO GRILL</span>
+              <span v-else>Add</span>
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.menu-card {
+  background: linear-gradient(160deg, #1f1f1f 0%, #141414 100%);
+  transform: translateZ(0);
+  -webkit-tap-highlight-color: transparent;
 }
 
-@keyframes bounce-in {
-  0% {
-    transform: scale(0);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
+.menu-card:hover .add-btn:not(:disabled) {
+  box-shadow: 0 0 16px rgba(246, 181, 109, 0.4);
 }
 
-.animate-bounce-in {
-  animation: bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+.qty-badge {
+  box-shadow: 0 4px 12px rgba(246, 181, 109, 0.5);
 }
 
-.active\:scale-95:active {
-  transform: scale(0.95);
+.locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.15);
+  backdrop-filter: blur(4px);
+  text-transform: uppercase;
 }
 
 .unlimited-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 3px 9px;
   border-radius: 9999px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #052e16;
-  background: linear-gradient(135deg, #22c55e, #4ade80);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.45);
+  letter-spacing: 0.07em;
+  color: #1A1A1A;
+  background: linear-gradient(135deg, #F6B56D, #C78B45);
+  box-shadow: 0 4px 12px rgba(246, 181, 109, 0.35);
   text-transform: uppercase;
 }
 
 .unlimited-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 9999px;
-  background: #052e16;
+  background: #1A1A1A;
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 0.85; }
-  50% { transform: scale(1.4); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0); }
+  55% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 </style>

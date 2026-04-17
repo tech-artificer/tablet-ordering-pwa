@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import type { Component } from 'vue';
+
 type MenuCategory = 'meats' | 'sides' | 'alacartes' | 'desserts' | 'beverages';
 
 interface Category {
   id: MenuCategory;
   label: string;
-  icon: string;
+  icon: Component;
 }
 
 const props = defineProps<{
@@ -32,30 +34,49 @@ const selectCategory = (category: MenuCategory) => {
 </script>
 
 <template>
-  <div 
+  <div
     :class="[
-      'px-4 pt-3 z-10 bg-gradient-to-r from-secondary via-secondary-dark to-secondary backdrop-blur-sm',
-      sticky ? 'sticky top-0 shadow-lg' : ''
+      'category-tabs-bar px-4 py-3 z-10',
+      sticky ? 'sticky top-0 shadow-2xl' : ''
     ]">
     <div class="max-w-7xl mx-auto">
-      <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div role="tablist" class="flex gap-2 overflow-x-auto scrollbar-hide" aria-label="Menu categories">
         <button
           v-for="category in categories"
           :key="category.id"
-          @click="selectCategory(category.id)"
-          :disabled="isCategoryLocked(category.id)"
+          role="tab"
+          :aria-selected="activeCategory === category.id"
           :aria-disabled="isCategoryLocked(category.id)"
-          :title="isCategoryLocked(category.id) ? 'Locked during refill mode' : ''"
+          :disabled="isCategoryLocked(category.id)"
+          :title="isCategoryLocked(category.id) ? 'Locked during refill mode' : category.label"
+          @click="selectCategory(category.id)"
           :class="[
-            'relative px-5 py-3 rounded-t-xl font-medium text-sm transition-all duration-150 whitespace-nowrap flex items-center gap-2 min-h-[48px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+            'tab-pill group relative flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all duration-200 min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
             activeCategory === category.id
-              ? 'bg-primary/20 text-primary shadow-lg border-b-2 border-primary'
-              : 'bg-white/5 text-white/70 border-b-2 border-transparent active:bg-white/15 active:scale-[0.98]',
-            isCategoryLocked(category.id) ? 'opacity-50 cursor-not-allowed grayscale' : ''
+              ? 'tab-pill--active text-secondary shadow-lg'
+              : 'bg-white/[0.06] text-white/60 hover:text-white/90 hover:bg-white/[0.11]',
+            isCategoryLocked(category.id) ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'
           ]">
-          <span class="text-xl">{{ category.icon }}</span>
-          <span>{{ category.label }}</span>
-          <span v-if="isCategoryLocked(category.id)" class="text-xs text-white/70">🔒</span>
+          <!-- Active background -->
+          <span
+            v-if="activeCategory === category.id"
+            class="tab-glow absolute inset-0 rounded-full bg-gradient-to-r from-primary to-primary-dark"
+            aria-hidden="true"
+          ></span>
+
+          <component
+            :is="category.icon"
+            :size="18"
+            stroke-width="2.2"
+            class="relative z-10 flex-shrink-0 transition-transform duration-200"
+            :class="activeCategory === category.id ? 'text-secondary' : 'text-white/50 group-hover:text-white/80'"
+          />
+          <span class="relative z-10">{{ category.label }}</span>
+
+          <!-- Lock icon for locked categories -->
+          <svg v-if="isCategoryLocked(category.id)" class="relative z-10 w-3.5 h-3.5 text-white/40 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -63,6 +84,32 @@ const selectCategory = (category: MenuCategory) => {
 </template>
 
 <style scoped>
+.category-tabs-bar {
+  background: linear-gradient(to right, #1a1a1a 0%, #111111 50%, #1a1a1a 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+.tab-pill {
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab-pill:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.tab-pill--active {
+  box-shadow:
+    0 4px 16px rgba(246, 181, 109, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.tab-glow {
+  background: linear-gradient(135deg, #F6B56D 0%, #E8963A 100%);
+  transition: opacity 0.18s ease;
+}
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }

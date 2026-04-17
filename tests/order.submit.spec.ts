@@ -20,6 +20,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useDeviceStore } from '../stores/Device'
 import { useSessionStore } from '../stores/Session'
 import { useOrderStore } from '../stores/Order'
+import type { CartItem, Package } from '../types'
 
 describe('stores/order - submitOrder', () => {
   beforeEach(async () => {
@@ -62,8 +63,8 @@ describe('stores/order - submitOrder', () => {
     expect(order.currentOrder).toEqual(apiResp)
     expect(order.cartItems).toEqual([])
     // history appended
-    expect(order.history.length).toBeGreaterThanOrEqual(1)
-    expect(order.history[order.history.length - 1]).toEqual(apiResp)
+    expect(order.getHistory().length).toBeGreaterThanOrEqual(1)
+    expect(order.getHistory()[order.getHistory().length - 1]).toEqual(apiResp)
     // function returns backend data
     expect(result).toEqual(apiResp)
   })
@@ -82,6 +83,21 @@ describe('stores/order - submitOrder', () => {
     await expect(order.submitOrder()).rejects.toThrow('Network error')
 
     // ensure cartItems remain unchanged on failure
-    expect(order.cartItems.length).toBeGreaterThan(0)
+    expect(order.getCartItems().length).toBeGreaterThan(0)
+  })
+
+  it('fails cleanly when order creation response body is empty', async () => {
+    const order = useOrderStore()
+
+    order.setPackage({ id: 1, name: 'Combo', price: 100, is_taxable: false } as Package)
+    order.setGuestCount(2)
+    order.setCartItems([
+      { id: 9, name: 'Wagyu Beef', price: 0, quantity: 1, category: 'meats', isUnlimited: false } as CartItem,
+    ])
+
+    mockPost.mockResolvedValueOnce(undefined as any)
+
+    await expect(order.submitOrder()).rejects.toThrow('Order creation response missing body')
+    expect(order.getCartItems().length).toBe(1)
   })
 })

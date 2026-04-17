@@ -20,9 +20,9 @@ describe('session end behavior', () => {
     session.$state.orderId = 123
     try { localStorage.setItem('session_active', '1') } catch (e) {}
 
-    order.cartItems = [{ id: 1, name: 'Taco', price: 10, quantity: 1 } as any]
-    order.hasPlacedOrder = true
-    order.currentOrder = { order: { order_id: 123 } }
+    order.setCartItems([{ id: 1, name: 'Taco', price: 10, quantity: 1 } as any])
+    order.setHasPlacedOrder(true)
+    order.setCurrentOrder({ order: { order_id: 123 } })
 
     // Act: end session
     await session.end()
@@ -34,7 +34,7 @@ describe('session end behavior', () => {
     expect(localStorage.getItem('session_active')).toBeNull()
 
     // Assert: order cleared
-    expect(order.cartItems.length).toBe(0)
+    expect(order.getCartItems().length).toBe(0)
     expect(order.currentOrder).toBeNull()
     expect(order.hasPlacedOrder).toBe(false)
   })

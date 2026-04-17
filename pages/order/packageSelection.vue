@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import { ArrowLeft, ChevronLeft, ChevronRight, Star, Inbox } from 'lucide-vue-next';
 import type { Package } from "../../types";
 import { useMenuStore } from '../../stores/Menu';
 import { useOrderStore } from '../../stores/Order';
@@ -9,7 +8,6 @@ import { useSessionStore } from '../../stores/Session';
 import { useDeviceStore } from '../../stores/Device';
 import { logger } from '../../utils/logger'
 import { recoverActiveOrderState } from '../../composables/useActiveOrderRecovery'
-import PackageCard from '../../components/PackageCard.vue';
 
 const menuStore = useMenuStore();
 const router = useRouter();
@@ -25,13 +23,18 @@ onMounted(async () => {
   const recovery = await recoverActiveOrderState('package-selection')
   if (recovery.hasActiveOrder) {
     console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || 'active'} at ${timestamp}`)
-    await router.replace('/menu')
+    await router.replace({
+      path: '/menu',
+      query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: '1' } : { resumeMenu: '1' }
+    })
     return
   }
 
   logger.info('[PackageSelection] Loading packages from API...');
   try {
-    await menuStore.loadAllMenus();
+    // Respect cache — only fetch if stale or empty (welcome screen already preloads).
+    // Pass forceRefresh=false so a warm cache from index.vue is used immediately.
+    await menuStore.loadAllMenus(false);
     console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
     logger.info('[PackageSelection] Packages loaded:', menuStore.packages.length);
   } catch (error) {
@@ -43,6 +46,7 @@ onMounted(async () => {
 // Carousel state - force carousel mode for all screen sizes
 const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages);
+const guestCount = computed(() => Number(orderStore.guestCount))
 
 const handlePackageSelection = async (packageData: Package) => {
   // Persist selected package to order store for downstream flows
@@ -242,132 +246,229 @@ function handleTouchEnd() {
             <div class="px-3 py-2 bg-white/10 rounded-lg min-w-[60px] text-center">
               <span class="text-white font-bold text-sm">{{ currentIndex + 1 }}/{{ packages.length }}</span>
             </div>
-            <button
-              @click="nextPackage"
-              :disabled="packages.length <= 1 || currentIndex === packages.length - 1"
-              class="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-primary/20 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 border border-white/10 active:scale-95"
-            >
-              <ChevronRight :size="22" class="text-white" />
-            </button>
           </div>
+          <h1 class="text-4xl font-bold font-raleway text-white">
+            Select Your <span class="text-primary">Package</span>
+          </h1>
+          <p class="text-white/60 text-sm mt-2 font-kanit">
+            {{ guestCount }} {{ guestCount === 1 ? 'Guest' : 'Guests' }}  •  All Meats Included
+          </p>
         </div>
 
-        <!-- Package info bar - name, badge, price, select button -->
-        <div v-if="menuStore.isLoadingPackages" class="flex items-center justify-between gap-4 mb-3 px-2">
-          <div class="flex-1 min-w-0 space-y-2">
-            <div class="h-6 w-64 bg-white/10 rounded animate-pulse"></div>
-            <div class="h-3 w-80 bg-white/10 rounded animate-pulse"></div>
+        <!-- Carousel Controls -->
+        <div class="flex-shrink-0 flex items-center gap-2">
+          <button
+            @click="prevPackage"
+            :disabled="packages.length <= 1"
+            class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 hover:from-primary/40 hover:to-primary/20 ring-1 ring-primary/40 hover:ring-primary/60 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:ring-primary/40 transition-all"
+            aria-label="Previous package"
+            title="Previous (← or swipe)"
+          >
+            <ChevronLeft :size="22" stroke-width="2.5" class="text-primary" />
+          </button>
+          <div class="px-4 py-2 rounded-full bg-primary/20 ring-1 ring-primary/40">
+            <span class="text-primary text-sm font-bold">{{ currentIndex + 1 }}/{{ packages.length }}</span>
           </div>
-          <div class="flex items-center gap-4 flex-shrink-0">
-            <div class="h-12 w-32 bg-white/10 rounded-xl animate-pulse"></div>
-            <div class="h-12 w-40 bg-white/10 rounded-xl animate-pulse"></div>
+          <button
+            @click="nextPackage"
+            :disabled="packages.length <= 1"
+            class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 hover:from-primary/40 hover:to-primary/20 ring-1 ring-primary/40 hover:ring-primary/60 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:ring-primary/40 transition-all"
+            aria-label="Next package"
+            title="Next (→ or swipe)"
+          >
+            <ChevronRight :size="22" stroke-width="2.5" class="text-primary" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="menuStore.isLoadingPackages" class="flex-1 flex items-center justify-center">
+        <div class="text-center space-y-4">
+          <div class="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
+          <p class="text-white/80 font-kanit">Loading packages...</p>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="packages.length === 0" class="flex-1 flex items-center justify-center">
+        <div class="text-center space-y-4">
+          <Inbox :size="48" stroke-width="1.5" class="text-white/40 mx-auto" />
+          <div>
+            <h3 class="text-xl font-bold text-white mb-2">No Packages Available</h3>
+            <p class="text-white/60 text-sm">Contact staff to check package availability.</p>
           </div>
         </div>
+      </div>
 
-        <div v-else-if="packages[currentIndex]" class="flex items-center justify-between gap-4 mb-3 px-2">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-3 mb-1">
-              <h2 class="text-white font-bold text-xl truncate">{{ packages[currentIndex].name }}</h2>
-              <div v-if="packages[currentIndex].is_popular" 
-                  class="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold text-white bg-amber-500">
-                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                POPULAR
+      <!-- Package Card (Premium Display) -->
+      <div 
+        v-else
+        class="flex-1 min-h-0 flex flex-col gap-4"
+        @touchstart="handleTouchStart"
+        @touchmove="handleTouchMove"
+        @touchend="handleTouchEnd"
+      >
+        <!-- Package Card: centered hero layout -->
+        <transition name="pkg-card" mode="out-in">
+          <div
+            v-if="packages[currentIndex]"
+            :key="packages[currentIndex].id"
+            class="flex-1 min-h-0 rounded-2xl ring-1 ring-primary/25 overflow-hidden flex flex-col pkg-card-surface"
+          >
+            <!-- HERO ZONE: identity + price -->
+            <div class="flex-1 overflow-y-auto scrollbar-none flex flex-col items-center justify-center text-center px-8 py-6 gap-4">
+
+              <!-- Popular badge -->
+              <div
+                v-if="packages[currentIndex].is_popular"
+                class="flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary/15 ring-1 ring-primary/30"
+              >
+                <Star :size="11" stroke-width="0" fill="currentColor" class="text-primary" />
+                <span class="text-primary text-[10px] font-bold uppercase tracking-[0.18em]">Most Popular</span>
+              </div>
+
+              <!-- Package name -->
+              <h2 class="text-3xl font-bold text-white font-raleway leading-tight tracking-tight">
+                {{ packages[currentIndex].name }}
+              </h2>
+
+              <!-- Description (compact, 2-line max) -->
+              <p
+                v-if="packages[currentIndex].description"
+                class="text-white/45 text-sm max-w-xs leading-relaxed pkg-line-clamp"
+              >
+                {{ packages[currentIndex].description }}
+              </p>
+
+              <!-- Price hero -->
+              <div class="py-2 space-y-1">
+                <div class="flex items-baseline justify-center gap-1.5">
+                  <span class="text-5xl font-black text-primary leading-none tabular-nums tracking-tight">
+                    ₱{{ packages[currentIndex].price }}
+                  </span>
+                  <span class="text-white/35 text-sm font-medium">/person</span>
+                </div>
+                <p class="text-white/25 text-xs font-kanit">
+                  × {{ guestCount }} {{ guestCount === 1 ? 'guest' : 'guests' }}
+                  <span class="text-white/40 ml-1">= ₱{{ (Number(packages[currentIndex].price) * guestCount).toLocaleString() }}</span>
+                </p>
+              </div>
+
+              <!-- Feature tag row -->
+              <div class="flex flex-wrap items-center justify-center gap-2 mt-1">
+                <span
+                  v-if="packages[currentIndex].modifiers?.length"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/60 text-xs font-semibold"
+                >
+                  <span class="text-primary/80" aria-hidden="true">🥩</span>
+                  {{ packages[currentIndex].modifiers.length }} Premium Cuts
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/60 text-xs font-semibold">
+                  <span aria-hidden="true">🔄</span>
+                  Unlimited Rounds
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/60 text-xs font-semibold">
+                  <span aria-hidden="true">🥗</span>
+                  Sides &amp; Desserts
+                </span>
               </div>
             </div>
-            <!-- Package description preview -->
-            <p v-if="packages[currentIndex].description" class="text-white/60 text-sm line-clamp-1 max-w-xl">
-              {{ packages[currentIndex].description }}
-            </p>
-          </div>
-          <div class="flex items-center gap-4 flex-shrink-0">
-            <div class="flex items-baseline gap-1 px-4 py-2 rounded-xl bg-primary">
-              <span class="text-gray-900 font-bold text-sm">₱</span>
-              <span class="text-gray-900 font-extrabold text-2xl">{{ packages[currentIndex].price }}</span>
-              <span class="text-gray-900/80 text-xs">/person</span>
-            </div>
-            <button
-              @click="handlePackageSelection(packages[currentIndex])"
-              class="h-12 px-6 bg-primary text-gray-900 font-bold text-base rounded-xl transition-all duration-200 shadow-lg hover:shadow-primary/50 active:scale-95 flex items-center gap-2">
-              Select Package
-              <ChevronRight :size="20" />
-            </button>
-          </div>
-        </div>
 
-        <!-- Loading state -->
-        <div v-if="menuStore.isLoadingPackages" class="flex-1 min-h-0">
-          <div class="h-full bg-white/5 border border-white/10 rounded-2xl p-6 animate-pulse">
-            <div class="h-6 w-48 bg-white/10 rounded mb-4"></div>
-            <div class="h-4 w-80 bg-white/10 rounded mb-8"></div>
-            <div class="grid grid-cols-3 gap-4">
-              <div v-for="n in 6" :key="n" class="h-20 bg-white/10 rounded-xl"></div>
+            <!-- BOTTOM PANEL: horizontal meat chips + CTA -->
+            <div class="border-t border-white/[0.07] px-5 py-4 space-y-3 pkg-bottom-panel">
+
+              <!-- Horizontal scrollable meat name chips (no images, clean) -->
+              <div
+                v-if="packages[currentIndex].modifiers?.length"
+                class="overflow-x-auto scrollbar-none -mx-1 px-1"
+                aria-label="Included meats"
+              >
+                <div class="flex gap-1.5 pb-0.5 pkg-chips-row">
+                  <span
+                    v-for="meat in packages[currentIndex].modifiers.slice(0, 14)"
+                    :key="meat.id"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-primary/75 text-[11px] font-medium font-kanit whitespace-nowrap"
+                  >
+                    {{ meat.name }}
+                  </span>
+                  <span
+                    v-if="packages[currentIndex].modifiers.length > 14"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.08] text-white/35 text-[11px] font-medium whitespace-nowrap"
+                  >
+                    +{{ packages[currentIndex].modifiers.length - 14 }} more
+                  </span>
+                </div>
+              </div>
+              <p v-else class="text-white/25 text-xs text-center font-kanit">All meats included with package</p>
+
+              <!-- Call to Action: full-width, properly sized -->
+              <button
+                @click="handlePackageSelection(packages[currentIndex])"
+                class="w-full flex items-center justify-center gap-2 rounded-xl font-bold text-[15px] tracking-wide transition-all duration-200
+                       bg-gradient-to-br from-primary via-primary to-primary-dark text-secondary
+                       shadow-[0_2px_16px_rgba(246,181,109,0.28)]
+                       hover:shadow-[0_4px_24px_rgba(246,181,109,0.48)] hover:brightness-105
+                       active:scale-[0.985] active:shadow-none
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
+                       min-h-[52px]"
+                aria-label="Select this package and proceed to menu"
+              >
+                Select Package
+                <ChevronRight :size="17" stroke-width="2.5" />
+              </button>
             </div>
           </div>
-        </div>
-
-        <!-- Empty state -->
-        <div v-else-if="packages.length === 0" class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-            </div>
-            <h3 class="text-xl font-bold text-white mb-2">No Packages Available</h3>
-            <p class="text-white/60 text-sm">Please check back soon or contact staff.</p>
-          </div>
-        </div>
-
-        <!-- Package card - takes remaining space -->
-        <div 
-          v-else
-          class="flex-1 min-h-0"
-          @touchstart="handleTouchStart"
-          @touchmove="handleTouchMove"
-          @touchend="handleTouchEnd"
-        >
-          <transition name="slide" mode="out-in">
-            <PackageCard
-              v-if="packages[currentIndex]"
-              :key="packages[currentIndex].id"
-              :pkg="packages[currentIndex]"
-              class="h-full"
-            />
-          </transition>
-        </div>
+        </transition>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Slide transition for carousel */
-.slide-enter-active {
-  transition: all 0.3s ease;
+/* Package card gradient surface */
+.pkg-card-surface {
+  background: linear-gradient(
+    150deg,
+    rgba(246, 181, 109, 0.10) 0%,
+    rgba(12, 12, 12, 0.97) 45%,
+    rgba(246, 181, 109, 0.05) 100%
+  );
 }
 
-.slide-leave-active {
-  transition: all 0.2s ease;
+/* Bottom panel subtle dark overlay */
+.pkg-bottom-panel {
+  background: rgba(0, 0, 0, 0.30);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.slide-enter-from {
-  opacity: 0;
-  transform: translateX(30px);
+/* Meat chips row — parent is overflow-x-auto, must be wider than flex parent */
+.pkg-chips-row {
+  width: max-content;
 }
 
-.slide-leave-to {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-/* Line clamp utilities */
-.line-clamp-1 {
+/* 2-line clamp for description */
+.pkg-line-clamp {
   display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Package card swap transition — directional slide with depth */
+.pkg-card-enter-active {
+  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pkg-card-leave-active {
+  transition: opacity 160ms cubic-bezier(0.4, 0, 0.6, 1), transform 160ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+.pkg-card-enter-from {
+  opacity: 0;
+  transform: translateX(36px) scale(0.97);
+}
+.pkg-card-leave-to {
+  opacity: 0;
+  transform: translateX(-24px) scale(0.98);
 }
 </style>

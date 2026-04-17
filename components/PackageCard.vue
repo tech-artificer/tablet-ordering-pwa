@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Package, Modifier } from '../types'
-import { computed, ref } from 'vue'
 
 const props = defineProps<{ pkg: Package }>()
 // Smart categorization: group modifiers by keywords in name or group field

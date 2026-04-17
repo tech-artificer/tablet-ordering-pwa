@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import { useMenuStore } from '../stores/Menu'
 import { ShoppingCart, Clock, Info, Plus } from "lucide-vue-next";
 import type { Modifier, Menu, MenuItem, Package } from '../types'
+
+const menuStore = useMenuStore()
 
 const activeCategory = ref("All Meals");
 
@@ -20,13 +21,13 @@ const menus = ref<Menu[]>([
     category: 'Meats',
     is_refillable: true,
     is_active: true,
-    items: useMenuStore().getMeats
+    items: menuStore.modifiers as any
   }, {
     id: 'sides',
     category: 'Sides',
     is_refillable: true,
     is_active: false,
-    items: useMenuStore().getSides
+    items: menuStore.sides as any
   },
   {
     id: 'alacarte',
@@ -39,7 +40,7 @@ const menus = ref<Menu[]>([
     category: 'Beverages',
     is_refillable: true,
     is_active: false,
-    items: useMenuStore().getBeverages
+    items: menuStore.beverages as any
   }
 ]);
 
@@ -220,7 +221,7 @@ const heroImages = [
                   <h3 class="font-semibold text-sm text-black font-raleway mb-1 line-clamp-1">
                     {{ meal.name }}
                   </h3>
-                  <p class="text-xs text-gray-400 mb-2 text-secondary  line-clamp-1 font-kanit">
+                  <p class="text-xs text-secondary mb-2 line-clamp-1 font-kanit">
                     {{ meal.description }}
                   </p>
 

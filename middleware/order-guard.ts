@@ -16,14 +16,22 @@ export default defineNuxtRouteMiddleware((to, from) => {
   
   // /menu route: requires package selection (not order submission)
   if (to.path === '/menu') {
-    // Allow access if package is selected (has valid package ID)
-    const hasPackage = !!(orderStore.package && (orderStore.package as any).id)
+    // Allow access when a package is selected (route query or persisted store).
+    const packageIdFromQuery = Number(to.query?.packageId || 0) || null
+    const packageIdFromStore = Number((orderStore.package as any)?.id || 0) || null
+    const hasPackage = !!(packageIdFromQuery || packageIdFromStore)
+
+    // Also allow active-order resume paths where package may be recovered lazily.
+    const currentOrder = (orderStore.currentOrder as any)?.order || orderStore.currentOrder
+    const hasRecoveredOrder = !!(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id)
     
-    if (!hasPackage) {
+    if (!hasPackage && !hasRecoveredOrder) {
       logger.warn('🚫 Route /menu blocked: no package selected')
       logger.debug('Order state:', {
         hasPackage,
-        packageId: (orderStore.package as any)?.id,
+        packageIdFromQuery,
+        packageIdFromStore,
+        hasRecoveredOrder,
         guestCount: orderStore.guestCount
       })
       
@@ -36,12 +44,23 @@ export default defineNuxtRouteMiddleware((to, from) => {
   
   // /order/in-session route: requires order to be submitted
   if (to.path === '/order/in-session') {
+    // Guard 1: session must be active. A missing/expired session has no business
+    // being on this page regardless of any cached order state.
+    if (!sessionStore.isActive) {
+      logger.warn('🚫 Route /order/in-session blocked: no active session')
+      return navigateTo('/')
+    }
+
+    const currentOrder = (orderStore.currentOrder as any)?.order || orderStore.currentOrder
+    const hasOrderReference = !!(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id)
+
     // Check if order has been placed and confirmed by backend
-    if (!orderStore.hasPlacedOrder) {
+    if (!orderStore.hasPlacedOrder && !hasOrderReference) {
       logger.warn('🚫 Route /order/in-session blocked: no order placed')
       logger.debug('Order state:', {
         hasPlacedOrder: orderStore.hasPlacedOrder,
         orderId: sessionStore.orderId,
+        hasOrderReference,
         currentOrder: !!orderStore.currentOrder
       })
       
@@ -50,7 +69,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
     }
     
     // Additional check: must have orderId from server
-    if (!sessionStore.orderId) {
+    if (!hasOrderReference) {
       logger.warn('🚫 Route /order/in-session blocked: waiting for server confirmation')
       return navigateTo('/menu')
     }

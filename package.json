@@ -23,9 +23,10 @@
     "@element-plus/icons-vue": "^2.3.2",
     "@pinia/nuxt": "^0.11.2",
     "@vueuse/motion": "^3.0.3",
-    "axios": "^1.5.0",
+    "axios": "^1.15.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "dexie": "^4.4.2",
     "element-plus": "^2.3.0",
     "jwt-decode": "^4.0.0",
     "laravel-echo": "^2.1.5",
@@ -46,13 +47,14 @@
     "@nuxt/image": "^1.10.0",
     "@nuxtjs/tailwindcss": "^6.14.0",
     "@types/node": "^24.10.1",
-    "@vite-pwa/nuxt": "^1.0.1",
+    "@vite-pwa/nuxt": "^0.6.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/test-utils": "^2.0.0-0",
-    "jsdom": "^21.1.0",
+    "dotenv": "^17.4.2",
+    "jsdom": "^29.0.2",
     "playwright": "^1.40.1",
     "sharp": "^0.34.5",
     "typescript": "^5.4.0",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.4"
   }
 }
