@@ -8,8 +8,9 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   
   const deviceStore = useDeviceStore()
 
-  // Allow access to registration page, settings, and the root without authentication
-  const publicRoutes = ['/', '/settings', '/auth/register']
+  // Allow access to registration page, settings, the session-ended transition page,
+  // and the root without authentication
+  const publicRoutes = ['/', '/settings', '/auth/register', '/order/session-ended']
   if (publicRoutes.includes(to.path)) {
     return
   }
