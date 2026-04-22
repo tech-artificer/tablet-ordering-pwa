@@ -37,6 +37,15 @@ if (typeof (globalThis as any).formatCurrency === 'undefined') {
 
 // Helpful: clear storage before each test file runs
 import { beforeEach } from 'vitest'
+import { computed, onMounted, ref, watch } from 'vue'
+
+// Nuxt auto-imports are not available in plain Vitest runtime.
+// Provide minimal global shims for Composition API helpers used directly in SFC script setup.
+;(globalThis as any).ref ??= ref
+;(globalThis as any).computed ??= computed
+;(globalThis as any).watch ??= watch
+;(globalThis as any).onMounted ??= onMounted
+
 beforeEach(() => {
   try { globalThis.localStorage.clear() } catch (e) {}
   try { globalThis.sessionStorage.clear() } catch (e) {}

@@ -299,10 +299,16 @@ export interface Modifier {
 export interface Device {
   id: number;
   name: string;
+  device_uuid?: string;
+  security_code?: string;
+  security_code_generated_at?: string;
+  type?: string;
+  last_seen_at?: string;
+  last_ip_address?: string;
+  is_admin?: boolean;
   token?: string;
   code?: string;
   app_version?: string;
-  last_ip_address?: string;
   /** Ephemeral field populated from server `ip_used` response — diagnostics only. */
   ip_address?: string;
 }

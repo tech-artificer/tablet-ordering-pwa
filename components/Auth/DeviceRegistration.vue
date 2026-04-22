@@ -9,7 +9,7 @@ const deviceStore = useDeviceStore()
 const router = useRouter()
 
 const formData = ref({
-  deviceCode: '',
+  deviceSecurityCode: '',
   deviceName: ''
 })
 const localIp = ref<string | null>(null)
@@ -19,6 +19,12 @@ const errorMessage = computed(() => String(deviceStore.errorMessage || ''))
 const hasError = computed(() => Boolean(errorMessage.value))
 const registered = ref(false)
 const attempted = ref(false)
+
+// Validate security code: must be 6 digits, numeric only
+const securityCodeValidation = computed(() => {
+  const code = formData.value.deviceSecurityCode
+  return /^\d{6}$/.test(code)
+})
 
 const waitingForTable = computed(() => Boolean(deviceStore.waitingForTable))
 const isPolling = computed(() => Boolean(deviceStore.isPollingForTable))
@@ -72,7 +78,7 @@ watch(
 const resetRegistration = () => {
   registered.value = false
   ;(deviceStore as any).errorMessage = null
-  formData.value.deviceCode = ''
+  formData.value.deviceSecurityCode = ''
   formData.value.deviceName = ''
 }
 
@@ -147,8 +153,13 @@ const handleRegistration = async () => {
     return
   }
 
-  if (!formData.value.deviceCode) {
-    ;(deviceStore as any).errorMessage = 'Device code is required.'
+  if (!formData.value.deviceSecurityCode) {
+    ;(deviceStore as any).errorMessage = 'Security code is required.'
+    return
+  }
+
+  if (!securityCodeValidation.value) {
+    ;(deviceStore as any).errorMessage = 'Security code must be exactly 6 digits.'
     return
   }
 
@@ -156,7 +167,7 @@ const handleRegistration = async () => {
   ;(deviceStore as any).errorMessage = null
 
   try {
-    const payload: any = { code: formData.value.deviceCode, name: formData.value.deviceName }
+    const payload: any = { security_code: formData.value.deviceSecurityCode, name: formData.value.deviceName }
     if (localIp && localIp.value) payload.ip_address = localIp.value
     else if (deviceStore.device && (deviceStore.device as any).last_ip_address) payload.ip_address = (deviceStore.device as any).last_ip_address
     await deviceStore.register(payload)
@@ -210,9 +221,12 @@ const handleRegistration = async () => {
                     class="w-full text-lg font-kanit" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
                   </el-form-item>
 
-                  <el-form-item label="Device Code" required>
-                    <el-input v-model="formData.deviceCode" placeholder="e.g. 123456" size="large"
+                  <el-form-item label="Security Code" required>
+                    <el-input v-model="formData.deviceSecurityCode" placeholder="e.g. 123456" type="text" inputmode="numeric" maxlength="6" size="large"
                     class="w-full text-lg font-kanit" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
+                    <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
+                      Must be exactly 6 digits
+                    </div>
                   </el-form-item>
                 </div>
 
@@ -220,7 +234,7 @@ const handleRegistration = async () => {
                   <button
                     type="button"
                     class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
-                    @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !formData.deviceCode || registered || hasToken">
+                    @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !securityCodeValidation || registered || hasToken">
                     <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
                   </button>
 
@@ -267,8 +281,9 @@ const handleRegistration = async () => {
     <el-form :model="formData" @submit.prevent="handleRegistration" class="mb-3">
       <div class="grid gap-3">
           <div>
-            <el-input v-model="formData.deviceCode" placeholder="Enter device code" size="default"
+            <el-input v-model="formData.deviceSecurityCode" placeholder="Enter security code" type="text" inputmode="numeric" maxlength="6" size="default"
               class="w-full text-sm" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
+            <p v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="mt-2 text-sm text-error">Must be exactly 6 digits</p>
             <p v-if="hasError && attempted" class="mt-2 text-sm text-error">{{ errorMessage }}</p>
           </div>
       </div>
@@ -277,7 +292,7 @@ const handleRegistration = async () => {
         <button
           type="button"
           class="flex-1 px-4 py-3 rounded-lg bg-primary text-white border border-primary/40 font-semibold min-h-[44px] hover:opacity-95 transition"
-          @click="handleRegistration()" :disabled="isLoading || !formData.deviceCode || registered || hasToken">
+          @click="handleRegistration()" :disabled="isLoading || !securityCodeValidation || registered || hasToken">
           <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
         </button>
         <button type="button" v-if="registered || hasToken" @click="checkForTable" class="px-4 py-3 rounded bg-primary/20 min-h-[44px]">Check for Table</button>

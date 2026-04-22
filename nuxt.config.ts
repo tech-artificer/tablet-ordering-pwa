@@ -1,6 +1,7 @@
 // import { defineNuxtConfig } from 'nuxt/config';
 import 'dotenv/config';
-import path from 'path';
+import { readFile, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 // Fail explicitly at build/start time rather than shipping hardcoded dev IPs.
 // Set these variables in the .env file for every environment.
@@ -15,9 +16,52 @@ function requireEnv(name: string): string {
   return value
 }
 
+function readBooleanEnv(name: string, defaultValue = false): boolean {
+    const value = process.env[name]
+
+    if (value === undefined || value === '') {
+        return defaultValue
+    }
+
+    return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
+}
+
+const enableNuxtDevtools = process.env.NODE_ENV !== 'production' && readBooleanEnv('NUXT_DEVTOOLS', false)
+
+async function normalizeWindowsDevClientManifestPaths(buildDir: string): Promise<void> {
+    if (process.platform !== 'win32') {
+        return
+    }
+
+    const workspacePrefix = `${process.cwd().replace(/\\/g, '/')}/`
+    const manifestFiles = [
+        resolve(buildDir, 'dist/server/client.manifest.mjs'),
+        resolve(buildDir, 'dist/server/client.precomputed.mjs'),
+    ]
+
+    await Promise.all(manifestFiles.map(async (filePath) => {
+        try {
+            const original = await readFile(filePath, 'utf8')
+            const normalized = original.split(workspacePrefix).join('')
+
+            if (normalized !== original) {
+                await writeFile(filePath, normalized, 'utf8')
+            }
+        } catch {
+            // The files are generated only after Nuxt finishes preparing the dev client manifest.
+        }
+    }))
+}
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    devtools: { enabled: process.env.NODE_ENV !== 'production' },
+        devtools: { enabled: enableNuxtDevtools },
+
+    hooks: {
+        'build:done': async () => {
+            await normalizeWindowsDevClientManifestPaths(resolve(process.cwd(), '.nuxt'))
+        },
+    },
     
     debug: false,
     
@@ -45,7 +89,7 @@ export default defineNuxtConfig({
         "@nuxt/icon",
         "@nuxt/image",
         "@element-plus/nuxt",
-        "@nuxt/devtools",
+        ...(enableNuxtDevtools ? ['@nuxt/devtools'] : []),
         "@nuxt/fonts",
         '@vite-pwa/nuxt',
         '@vueuse/motion/nuxt'
@@ -155,12 +199,6 @@ export default defineNuxtConfig({
                 port: process.env.NUXT_DEV_HMR_PORT ? Number(process.env.NUXT_DEV_HMR_PORT) : undefined
             }
         },
-        resolve: {
-            alias: {
-                '~': path.resolve(__dirname, './'),
-                '@': path.resolve(__dirname, './')
-            }
-        },
     },
     
     app: {
@@ -194,7 +232,7 @@ export default defineNuxtConfig({
             offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === 'true',
 
             // API Configuration
-            mainApiUrl: process.env.MAIN_API_URL || 'http://localhost:8000',
+            apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || '/api',
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
 
             // Settings PIN lock behavior
@@ -203,25 +241,16 @@ export default defineNuxtConfig({
             // Broadcasting Configuration
             broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
 
-            // Reverb WebSocket Configuration (fallback for first boot / dev / CI).
-            // In production, broadcasting config is fetched from the server
-            // at auth time and persisted in the Device store.
+            // Reverb WebSocket Configuration
+            // In production (Docker), these are injected by docker-compose.yml
+            // In development (local), fallbacks provide sensible defaults
             reverb: {
-                appId:      process.env.NUXT_PUBLIC_REVERB_APP_ID     || '',
-                appKey:     process.env.NUXT_PUBLIC_REVERB_APP_KEY    || '',
-                host:       process.env.NUXT_PUBLIC_REVERB_HOST       || 'localhost',
-                port:       parseInt(process.env.NUXT_PUBLIC_REVERB_PORT   || '6001'),
-                scheme:     process.env.NUXT_PUBLIC_REVERB_SCHEME     || 'http',
-                serverHost: process.env.NUXT_PUBLIC_REVERB_SERVER_HOST || 'localhost',
-                serverPort: parseInt(process.env.NUXT_PUBLIC_REVERB_SERVER_PORT || '6001'),
-                serverPath: process.env.NUXT_PUBLIC_REVERB_SERVER_PATH || '',
-            },
-
-            // Laravel Echo (mirrors reverb config — kept for backwards compat)
-            echo: {
-                host:      process.env.NUXT_PUBLIC_ECHO_HOST      || 'localhost',
-                port:      parseInt(process.env.NUXT_PUBLIC_ECHO_PORT  || '6001'),
-                encrypted: process.env.NUXT_PUBLIC_ECHO_ENCRYPTED === 'true',
+                appId:  process.env.NUXT_PUBLIC_REVERB_APP_ID  || 'woosoo',
+                appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY || '',
+                host:   process.env.NUXT_PUBLIC_REVERB_HOST    || '',
+                port:   parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || '0'),
+                scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME  || 'http',
+                path:   process.env.NUXT_PUBLIC_REVERB_PATH    || '/app',
             },
         },
     },

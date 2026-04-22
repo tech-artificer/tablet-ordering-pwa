@@ -45,19 +45,20 @@ const goBack = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
-      <div class="flex items-center gap-3 mb-8">
-        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">3</div>
-        <div>
-          <h1 class="text-2xl font-bold font-raleway text-white">Review & Confirm</h1>
-          <p class="text-sm text-white/50">Double-check your order before submitting</p>
+  <NuxtErrorBoundary>
+    <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-4 md:p-8">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">3</div>
+          <div>
+            <h1 class="text-2xl font-bold font-raleway text-white">Review & Confirm</h1>
+            <p class="text-sm text-white/50">Double-check your order before submitting</p>
+          </div>
         </div>
+      
+        <OrderingStep3ReviewSubmit @orderSubmitted="handleOrderSubmitted" />
       </div>
-    
-      <OrderingStep3ReviewSubmit @orderSubmitted="handleOrderSubmitted" />
     </div>
-  </div>
     <template #error="{ error, clearError }">
       <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
         <p class="text-xl font-bold text-red-400">Something went wrong</p>

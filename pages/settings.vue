@@ -62,7 +62,7 @@ const handleSettingsVisibilityChange = () => {
 }
 
 // Settings state
-const apiUrl = ref(config.public.mainApiUrl || '')
+const apiUrl = ref(config.public.apiBaseUrl || '')
 const localIpAddress = ref('Loading...')
 const isVerifyingToken = ref(false)
 const isRefreshingToken = ref(false)
@@ -92,8 +92,27 @@ const displayTable = computed(() => {
 })
 
 const displayDeviceId = computed(() => displayDevice.value?.id ?? 'Not registered')
-const displayDeviceCode = computed(() => displayDevice.value?.code ?? 'N/A')
+const displayDeviceUuid = computed(() => displayDevice.value?.device_uuid ?? displayDevice.value?.id ?? 'Not registered')
+const displaySecurityCode = computed(() => displayDevice.value?.security_code ?? 'N/A')
+const displaySecurityCodeGeneratedAt = computed(() => {
+  const timestamp = displayDevice.value?.security_code_generated_at
+  if (!timestamp) return 'N/A'
+  try {
+    return new Date(timestamp).toLocaleString()
+  } catch {
+    return 'N/A'
+  }
+})
 const displayIpAddress = computed(() => displayDevice.value?.ip_address ?? localIpAddress.value ?? '—')
+const displayLastSeenAt = computed(() => {
+  const timestamp = displayDevice.value?.last_seen_at
+  if (!timestamp) return 'N/A'
+  try {
+    return new Date(timestamp).toLocaleString()
+  } catch {
+    return 'N/A'
+  }
+})
 const displayTableName = computed(() => displayTable.value?.name ?? deviceStore.tableName ?? '')
 const displayIsAdmin = computed(() => !!(displayDevice.value && displayDevice.value.is_admin))
 
@@ -301,7 +320,7 @@ const saveApiUrl = async () => {
 
 // Reset API URL to default
 const resetApiUrl = () => {
-  apiUrl.value = config.public.mainApiUrl || ''
+  apiUrl.value = config.public.apiBaseUrl || ''
   localStorage.removeItem('NUXT_PUBLIC_MAIN_API_URL')
   // ElMessage.info('API URL reset to default')
 }
@@ -911,7 +930,7 @@ onMounted(async () => {
                 class="flex-1 px-4 py-3 bg-white/10 rounded-lg border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-primary transition-all"
               />
             </div>
-            <p class="text-xs text-white/40 mt-2">Current: {{ config.public.mainApiUrl }}</p>
+            <p class="text-xs text-white/40 mt-2">Current: {{ config.public.apiBaseUrl }}</p>
           </div>
 
           <!-- Action Buttons -->

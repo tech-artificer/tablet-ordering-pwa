@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for tablet-ordering-pwa (Nuxt 3 SPA/SSR)
+# Multi-stage Dockerfile for tablet-ordering-pwa (Nuxt 3 SPA)
 # Supports linux/arm64 (Pi5) and linux/amd64 (dev/CI)
 
 ARG NODE_VERSION=22
@@ -11,7 +11,7 @@ FROM node:${NODE_VERSION}-alpine AS dependencies
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # ============================================================================
 # Stage: build - Build Nuxt SPA output (static assets + config)
@@ -20,8 +20,9 @@ FROM dependencies AS build
 
 COPY . .
 
-# Build static output
-RUN npm run build
+# nuxi generate = build + prerender. Outputs to dist/ (nitro.output.publicDir).
+# Plain "nuxi build" skips prerendering and won't produce the SPA index.html.
+RUN npx nuxi generate
 
 # ============================================================================
 # Stage: app - Nginx server for static PWA assets with caching strategy
@@ -35,8 +36,8 @@ RUN mkdir -p /app/public /var/cache/nginx /var/run && \
 WORKDIR /app
 
 # Copy built assets from build stage
-COPY --from=build --chown=nginx:nginx /app/.output/public ./public
-COPY --from=build --chown=nginx:nginx /app/.output/server ./server
+# nuxi generate outputs to dist/ (via nitro.output.publicDir in nuxt.config.ts)
+COPY --from=build --chown=nginx:nginx /app/dist ./public
 
 # Create nginx config for PWA serving
 RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
@@ -55,10 +56,29 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     
-    # Cache strategy: hashed assets are immutable
-    location ~* ^/.+\.[a-f0-9]{8}\.(js|css|woff|woff2|ttf)$ {
+    # Nuxt build assets must never fall back to index.html.
+    # Missing module files should return 404, not HTML (prevents MIME errors in browsers).
+    location ^~ /_nuxt/ {
+        try_files $uri =404;
         expires 365d;
         add_header Cache-Control "public, immutable";
+    }
+
+    # Cache strategy: hashed assets are immutable
+    location ~* "^/.+\\.[a-f0-9]{8}\\.(js|mjs|css|woff|woff2|ttf)$" {
+        try_files $uri =404;
+        expires 365d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Service worker and manifest should be served directly
+    location = /sw.js {
+        try_files $uri =404;
+        add_header Cache-Control "no-cache";
+    }
+
+    location = /manifest.webmanifest {
+        try_files $uri =404;
     }
     
     # HTML entry points: no-cache
@@ -69,7 +89,7 @@ server {
     
     # Default to index.html for SPA routing
     location / {
-        try_files $uri $uri/ /index.html =404;
+        try_files $uri $uri/ /index.html;
     }
     
     # Deny access to sensitive files

@@ -384,6 +384,17 @@ export const useOrderStore = defineStore('order', () => {
     return payload
   }
 
+  function buildRefillPayload() {
+    return {
+      items: state.refillItems.map((item) => ({
+        menu_id: Number(item.id),
+        name: String(item.name || ''),
+        quantity: Number(item.quantity),
+        note: item.note ?? 'Refill',
+      })),
+    }
+  }
+
   async function submitOrder(payload?: OrderPayload) {
     if (state.hasPlacedOrder && !state.isRefillMode) {
       throw new Error('An initial order has already been placed for this session. Use refill instead.')
@@ -642,16 +653,7 @@ export const useOrderStore = defineStore('order', () => {
     
     // Build payload matching POST /api/order/{orderId}/refill spec
     // RefillOrderRequest requires: items.*.name (required), items.*.menu_id, items.*.quantity
-    const refillPayload = {
-      items: state.refillItems.map(i => {
-        return {
-          menu_id: Number(i.id),
-          name: String(i.name || ''),
-          quantity: Number(i.quantity),
-          note: i.note ?? 'Refill',
-        }
-      })
-    }
+    const refillPayload = buildRefillPayload()
     
     logger.debug('[Refill] Submitting refill payload', {
       orderId: currentOrderId,
@@ -917,6 +919,7 @@ export const useOrderStore = defineStore('order', () => {
 
   async function initializeFromSession() {
     const sessionStore = useSessionStore()
+    const deviceStore = useDeviceStore()
     
     logger.debug('🔁 initializeFromSession called:', {
       sessionOrderId: sessionStore.orderId,
@@ -928,6 +931,11 @@ export const useOrderStore = defineStore('order', () => {
     // This handles direct URL access / reloads where local storage lost orderId,
     // but backend still has a pending/confirmed order for this tablet.
     if (!sessionStore.orderId) {
+      if (!deviceStore.token) {
+        logger.debug('🔁 Skipping active-order lookup until device token is available')
+        return
+      }
+
       try {
         const api = useApi()
         const activeResp = await api.get(API_ENDPOINTS.DEVICE_ORDERS, {
@@ -983,6 +991,13 @@ export const useOrderStore = defineStore('order', () => {
     
     // Mark order as placed locally and attempt to fetch canonical order details
     state.hasPlacedOrder = true
+
+    if (!deviceStore.token) {
+      state.currentOrder = { order: { order_id: sessionStore.getOrderId() } }
+      logger.debug('🔁 Deferred canonical order fetch until device token is available')
+      return
+    }
+
     try {
       const api = useApi()
       const orderIdStr = String(sessionStore.orderId)

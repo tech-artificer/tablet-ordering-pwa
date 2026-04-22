@@ -14,7 +14,7 @@ export default defineNuxtPlugin(() => {
   const api = axios.create({
     // Ensure baseURL always ends with a single trailing slash so relative paths
     // passed to axios (like 'api/menus/...') concatenate correctly.
-    baseURL: (String(config.public.mainApiUrl || '')).replace(/\/+$/, '') + '/',
+    baseURL: (String(config.public.apiBaseUrl || '')).replace(/\/+$/, '') + '/',
     timeout: 15000
   })
 
@@ -22,6 +22,9 @@ export default defineNuxtPlugin(() => {
 
   api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
     const device = useDeviceStore()
+    const requestUrl = String(req.url || '')
+    const tokenOptionalEndpoints = ['/api/devices/login', '/api/devices/register']
+    const isTokenOptionalRequest = tokenOptionalEndpoints.some((endpoint) => requestUrl.includes(endpoint))
 
     // Ensure headers exists and is type-safe
     if (!req.headers) {
@@ -41,6 +44,11 @@ export default defineNuxtPlugin(() => {
         tokenPreview: device.token.substring(0, 30) + '...',
         url: req.url,
         method: req.method
+      })
+    } else if (isTokenOptionalRequest) {
+      logger.debug('ℹ️ Authorization header not set for token-optional endpoint', {
+        url: req.url,
+        method: req.method,
       })
     } else {
       logger.warn('❌ NO TOKEN - Authorization header NOT set!', {

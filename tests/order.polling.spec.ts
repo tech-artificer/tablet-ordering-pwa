@@ -20,6 +20,7 @@ vi.mock('../composables/useApi', () => ({ useApi: () => ({ get: mockGet, post: m
 
 import { useOrderStore } from '../stores/Order'
 import { useSessionStore } from '../stores/Session'
+import { useDeviceStore } from '../stores/Device'
 import type { CartItem, Package } from '../types'
 
 describe('order polling fallback', () => {
@@ -82,12 +83,14 @@ describe('order polling fallback', () => {
   it('initializeFromSession fetches canonical order and prevents new order submission', async () => {
     const order = useOrderStore()
     const session = useSessionStore()
+    const device = useDeviceStore()
 
     // Mock API to return a full order for the session order id
     mockGet.mockResolvedValueOnce({ data: { order: { id: 19561, status: 'preparing', total_amount: 200 } } })
 
     // Simulate persisted session order id
     session.$state.orderId = 19561
+    device.$state.token = 'test-token'
 
     await order.initializeFromSession()
 
@@ -101,6 +104,20 @@ describe('order polling fallback', () => {
     order.setGuestCount(1)
 
     await expect(order.submitOrder()).rejects.toThrow('An initial order has already been placed')
+  })
+
+  it('initializeFromSession defers server active-order lookup when token is unavailable', async () => {
+    const order = useOrderStore()
+    const session = useSessionStore()
+
+    // Simulate cold boot: no token yet and no active session id restored.
+    session.$state.orderId = null as any
+
+    await order.initializeFromSession()
+
+    expect(mockGet).not.toHaveBeenCalled()
+    expect(order.hasPlacedOrder).toBe(false)
+    expect(order.getCurrentOrder()).toBeNull()
   })
 
   it('does not crash when polling receives an empty response body', async () => {

@@ -8,14 +8,6 @@ export const APP_NAME = 'Wooserve KBBQ Ordering';
 export const APP_SHORT_NAME = 'Wooserve';
 export const APP_VERSION = '1.0.0';
 
-// Broadcast/Real-time configuration
-export const BROADCAST_CONFIG = {
-  CONNECTION: 'reverb',
-  DEFAULT_HOST: '192.168.100.85',
-  DEFAULT_PORT: 6001,
-  DEFAULT_SCHEME: 'http',
-} as const;
-
 // UI configuration
 export const UI_CONFIG = {
   // Animation durations (milliseconds)
