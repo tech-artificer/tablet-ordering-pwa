@@ -1,31 +1,31 @@
 <script setup lang="ts">
 // Smooth page transitions are handled by CSS in main.css
-import flameSrc from '~/assets/images/flame.gif'
+import flameSrc from "~/assets/images/flame.gif"
 const showFlame = ref(true)
 const route = useRoute()
 </script>
 
 <template>
-  <div class="min-h-screen min-w-screen flex items-center justify-center overflow-hidden bg-with-overlay">
-    <NetworkIndicator />
-    <Transition name="slide-left" mode="out-in" appear>
-      <div :key="route.path" class="h-screen w-screen z-10 overflow-hidden relative bg-gray-950/80 backdrop-blur-sm safe-area-top safe-area-bottom">
-        <slot />
-      </div>
-    </Transition>
+    <div class="min-h-screen min-w-screen flex items-center justify-center overflow-hidden bg-with-overlay">
+        <NetworkIndicator />
+        <Transition name="slide-left" mode="out-in" appear>
+            <div :key="route.path" class="h-screen w-screen z-10 overflow-hidden relative bg-gray-950/80 backdrop-blur-sm safe-area-top safe-area-bottom">
+                <slot />
+            </div>
+        </Transition>
 
-    <!-- Ambient flame effect (z-20 = above page content; pointer-events-none = non-interactive) -->
-    <div class="absolute inset-0 pointer-events-none z-20">
-      <img
-        v-if="showFlame"
-        :src="flameSrc"
-        alt=""
-        class="absolute opacity-25 p-0 m-0 w-full h-full object-cover mix-blend-screen"
-        aria-hidden="true"
-        @error="showFlame = false"
-      />
+        <!-- Ambient flame effect (z-20 = above page content; pointer-events-none = non-interactive) -->
+        <div class="absolute inset-0 pointer-events-none z-20">
+            <img
+                v-if="showFlame"
+                :src="flameSrc"
+                alt=""
+                class="absolute opacity-25 p-0 m-0 w-full h-full object-cover mix-blend-screen"
+                aria-hidden="true"
+                @error="showFlame = false"
+            >
+        </div>
     </div>
-  </div>
 </template>
 
 <style>

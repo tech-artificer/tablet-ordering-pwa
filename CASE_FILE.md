@@ -96,6 +96,8 @@ This closes the stale-tab / incognito mismatch root cause: normal tabs were reta
 
 ## Addendum — April 23, 2026 (Hold for live API URL fix)
 
+> Historical note: this hold-state addendum is superseded by the April 24, 2026 verification addendum above.
+
 ### Current hold status
 
 Implementation is intentionally paused while the live API URL issue is being corrected and redeployed.
@@ -129,3 +131,34 @@ The first item still blocks meaningful runtime verification of the rest of the s
 3. Re-deploy the already-correct PWA build artifact.
 4. Re-test manifest icon delivery and SW startup behavior on the live host.
 5. Verify console is clear except for expected unregistered-device informational logs.
+
+---
+
+## Addendum — April 24, 2026 (Final handoff summary)
+
+### What landed
+
+- `5a05c9c` was pushed to `origin/staging` with the PWA runtime rebuild.
+- The rebuild included:
+  - service worker fallback update
+  - API request normalization
+  - menu tab binding fix
+  - regression tests
+  - generated reference docs
+  - removal of `utils/swPrecache.ts`
+
+### Follow-up state
+
+- `33928b1` regenerated `package-lock.json` to resync the manifest/lockfile pair.
+- `npm ci` and `npm run build` were verified locally for the rebuild.
+- `npm run lint` still fails because of unrelated pre-existing repo issues in:
+  - `tests/session-ended-guard.spec.ts`
+  - `tests/session-ended-page.spec.ts`
+  - `utils/getLocalIp.ts`
+  - `utils/logger.ts`
+- Current lint debt remained at `136 problems (8 errors, 128 warnings)` during the latest review.
+
+### Interpretation
+
+- The PWA fix itself is complete and pushed.
+- The remaining lint failures are outside this fix scope and should be handled in a separate cleanup pass.

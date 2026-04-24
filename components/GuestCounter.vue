@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
 import { Users, Minus, Plus } from 'lucide-vue-next'
 import { useOrderStore } from '~/stores/Order'
 
 const orderStore = useOrderStore()
-const { guestCount } = storeToRefs(orderStore)
+const { guestCount } = orderStore
 
 const MIN = 2
 const MAX = 20

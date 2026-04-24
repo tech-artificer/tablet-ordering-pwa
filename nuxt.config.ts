@@ -1,51 +1,51 @@
 // import { defineNuxtConfig } from 'nuxt/config';
-import 'dotenv/config';
-import { readFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import "dotenv/config"
+import { readFile, writeFile } from "node:fs/promises"
+import { resolve } from "node:path"
 
 // Fail explicitly at build/start time rather than shipping hardcoded dev IPs.
 // Set these variables in the .env file for every environment.
-function requireEnv(name: string): string {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(
-      `[nuxt.config] Required environment variable "${name}" is not set. ` +
-      'Add it to your .env file or deployment environment before starting the app.'
-    )
-  }
-  return value
+function requireEnv (name: string): string {
+    const value = process.env[name]
+    if (!value) {
+        throw new Error(
+            `[nuxt.config] Required environment variable "${name}" is not set. ` +
+      "Add it to your .env file or deployment environment before starting the app."
+        )
+    }
+    return value
 }
 
-function readBooleanEnv(name: string, defaultValue = false): boolean {
+function readBooleanEnv (name: string, defaultValue = false): boolean {
     const value = process.env[name]
 
-    if (value === undefined || value === '') {
+    if (value === undefined || value === "") {
         return defaultValue
     }
 
-    return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
+    return ["1", "true", "yes", "on"].includes(value.toLowerCase())
 }
 
-const enableNuxtDevtools = process.env.NODE_ENV !== 'production' && readBooleanEnv('NUXT_DEVTOOLS', false)
+const enableNuxtDevtools = process.env.NODE_ENV !== "production" && readBooleanEnv("NUXT_DEVTOOLS", false)
 
-async function normalizeWindowsDevClientManifestPaths(buildDir: string): Promise<void> {
-    if (process.platform !== 'win32') {
+async function normalizeWindowsDevClientManifestPaths (buildDir: string): Promise<void> {
+    if (process.platform !== "win32") {
         return
     }
 
-    const workspacePrefix = `${process.cwd().replace(/\\/g, '/')}/`
+    const workspacePrefix = `${process.cwd().replace(/\\/g, "/")}/`
     const manifestFiles = [
-        resolve(buildDir, 'dist/server/client.manifest.mjs'),
-        resolve(buildDir, 'dist/server/client.precomputed.mjs'),
+        resolve(buildDir, "dist/server/client.manifest.mjs"),
+        resolve(buildDir, "dist/server/client.precomputed.mjs"),
     ]
 
     await Promise.all(manifestFiles.map(async (filePath) => {
         try {
-            const original = await readFile(filePath, 'utf8')
-            const normalized = original.split(workspacePrefix).join('')
+            const original = await readFile(filePath, "utf8")
+            const normalized = original.split(workspacePrefix).join("")
 
             if (normalized !== original) {
-                await writeFile(filePath, normalized, 'utf8')
+                await writeFile(filePath, normalized, "utf8")
             }
         } catch {
             // The files are generated only after Nuxt finishes preparing the dev client manifest.
@@ -55,16 +55,16 @@ async function normalizeWindowsDevClientManifestPaths(buildDir: string): Promise
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-        devtools: { enabled: enableNuxtDevtools },
+    devtools: { enabled: enableNuxtDevtools },
 
     hooks: {
-        'build:done': async () => {
-            await normalizeWindowsDevClientManifestPaths(resolve(process.cwd(), '.nuxt'))
+        "build:done": async () => {
+            await normalizeWindowsDevClientManifestPaths(resolve(process.cwd(), ".nuxt"))
         },
     },
-    
+
     debug: false,
-    
+
     compatibilityDate: "2025-01-01",
 
     experimental: {
@@ -74,14 +74,14 @@ export default defineNuxtConfig({
     ssr: false,
 
     router: {
-        middleware: ['auth']
+        middleware: ["auth"]
     },
-    
+
     css: [
         "./assets/css/input.css",
         "./assets/css/main.css"
     ],
-    
+
     modules: [
         "@pinia/nuxt",
         "pinia-plugin-persistedstate",
@@ -89,19 +89,19 @@ export default defineNuxtConfig({
         "@nuxt/icon",
         "@nuxt/image",
         "@element-plus/nuxt",
-        ...(enableNuxtDevtools ? ['@nuxt/devtools'] : []),
+        ...(enableNuxtDevtools ? ["@nuxt/devtools"] : []),
         "@nuxt/fonts",
-        '@vite-pwa/nuxt',
-        '@vueuse/motion/nuxt'
+        "@vite-pwa/nuxt",
+        "@vueuse/motion/nuxt"
     ],
-    
+
     components: [
         {
-            path: '~/components',
+            path: "~/components",
             pathPrefix: false, // Allow <cart-sidebar> instead of <OrderCartSidebar>
         }
     ],
-    
+
     typescript: {
         strict: false,
         typeCheck: false
@@ -112,13 +112,13 @@ export default defineNuxtConfig({
     // This prevents nuxt generate from wiping static files (icons, favicon) during builds.
     // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/dist).
     nitro: {
-        preset: 'static',
+        preset: "static",
         prerender: {
             crawlLinks: false,
-            routes: ['/'],
+            routes: ["/"],
         },
         output: {
-            publicDir: 'dist',
+            publicDir: "dist",
         },
     },
 
@@ -127,11 +127,11 @@ export default defineNuxtConfig({
 
         // Explicitly include icon files so they survive nuxt generate output
         includeAssets: [
-            'favicon.ico',
-            'icons/pwa-icon-192.png',
-            'icons/pwa-icon-512.png',
-            'icons/pwa-icon-maskable.png',
-            'icons/apple-touch-icon.png',
+            "favicon.ico",
+            "icons/pwa-icon-192.png",
+            "icons/pwa-icon-512.png",
+            "icons/pwa-icon-maskable.png",
+            "icons/apple-touch-icon.png",
         ],
 
         manifest: {
@@ -163,12 +163,12 @@ export default defineNuxtConfig({
                 },
             ],
         },
-        
+
         // Custom service worker via injectManifest strategy.
         // BackgroundSyncPlugin and precaching are handled in public/sw.ts.
-        strategies: 'injectManifest' as const,
-        srcDir: 'public',
-        filename: 'sw.ts',
+        strategies: "injectManifest" as const,
+        srcDir: "public",
+        filename: "sw.ts",
 
         // Keep existing runtime caching config for menus and images in the injectManifest
         // by referencing it from the custom SW. The workbox key is unused in injectManifest mode.
@@ -176,16 +176,16 @@ export default defineNuxtConfig({
             maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
             globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
         },
-        
+
         client: {
             installPrompt: true,
             periodicSyncForUpdates: 3600,
         },
     },
-    
+
     vite: {
         build: {
-                chunkSizeWarningLimit: 1200,
+            chunkSizeWarningLimit: 1200,
         },
         // Ensure Vite dev server listens on network interfaces and allow
         // HMR to be configured via environment variables when testing on LAN.
@@ -195,12 +195,12 @@ export default defineNuxtConfig({
             // Allow overriding HMR host/port when needed (e.g., testing from other devices)
             hmr: {
                 host: process.env.NUXT_DEV_HMR_HOST || process.env.DEV_HMR_HOST || undefined,
-                protocol: process.env.NUXT_DEV_HMR_PROTOCOL || process.env.DEV_HMR_PROTOCOL || 'ws',
+                protocol: process.env.NUXT_DEV_HMR_PROTOCOL || process.env.DEV_HMR_PROTOCOL || "ws",
                 port: process.env.NUXT_DEV_HMR_PORT ? Number(process.env.NUXT_DEV_HMR_PORT) : undefined
             }
         },
     },
-    
+
     app: {
         head: {
             meta: [
@@ -208,50 +208,50 @@ export default defineNuxtConfig({
                     name: "viewport",
                     content: "width=device-width, height=device-height, initial-scale=1.0"
                 },
-                { name: 'theme-color', content: '#F6B56D' },
-                { name: 'mobile-web-app-capable', content: 'yes' },
-                { name: 'apple-mobile-web-app-capable', content: 'yes' },
-                { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
-                { name: 'apple-mobile-web-app-title', content: 'Wooserve' },
+                { name: "theme-color", content: "#F6B56D" },
+                { name: "mobile-web-app-capable", content: "yes" },
+                { name: "apple-mobile-web-app-capable", content: "yes" },
+                { name: "apple-mobile-web-app-status-bar-style", content: "black" },
+                { name: "apple-mobile-web-app-title", content: "Wooserve" },
             ],
             link: [
-                { rel: 'manifest', href: '/manifest.webmanifest' },
-                { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
-                { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
+                { rel: "manifest", href: "/manifest.webmanifest" },
+                { rel: "icon", href: "/favicon.ico", sizes: "any" },
+                { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
             ],
         },
     },
-    
+
     runtimeConfig: {
         public: {
             // App Configuration
-            appVersion: process.env.APP_VERSION || '1.0.0',
-            appEnv: process.env.APP_ENV || 'production',
+            appVersion: process.env.APP_VERSION || "1.0.0",
+            appEnv: process.env.APP_ENV || "production",
 
             // Feature Flags
-            offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === 'true',
+            offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === "true",
 
             // API Configuration
-            apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || '/api',
-            staticBaseUrl: process.env.NUXT_APP_BASE_URL || '',
+            apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || "/api",
+            staticBaseUrl: process.env.NUXT_APP_BASE_URL || "",
 
             // Settings PIN lock behavior
-            settingsPinBackgroundTimeoutMs: parseInt(process.env.NUXT_PUBLIC_SETTINGS_PIN_BACKGROUND_TIMEOUT_MS || '120000'),
+            settingsPinBackgroundTimeoutMs: parseInt(process.env.NUXT_PUBLIC_SETTINGS_PIN_BACKGROUND_TIMEOUT_MS || "120000"),
 
             // Broadcasting Configuration
-            broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || 'reverb',
+            broadcastConnection: process.env.NUXT_PUBLIC_BROADCAST_CONNECTION || "reverb",
 
             // Reverb WebSocket Configuration
             // In production (Docker), these are injected by docker-compose.yml
             // In development (local), fallbacks provide sensible defaults
             reverb: {
-                appId:  process.env.NUXT_PUBLIC_REVERB_APP_ID  || 'woosoo',
-                appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY || '',
-                host:   process.env.NUXT_PUBLIC_REVERB_HOST    || '',
-                port:   parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || '0'),
-                scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME  || 'http',
-                path:   process.env.NUXT_PUBLIC_REVERB_PATH    || '/app',
+                appId: process.env.NUXT_PUBLIC_REVERB_APP_ID || "woosoo",
+                appKey: process.env.NUXT_PUBLIC_REVERB_APP_KEY || "",
+                host: process.env.NUXT_PUBLIC_REVERB_HOST || "",
+                port: parseInt(process.env.NUXT_PUBLIC_REVERB_PORT || "0"),
+                scheme: process.env.NUXT_PUBLIC_REVERB_SCHEME || "http",
+                path: process.env.NUXT_PUBLIC_REVERB_PATH || "/app",
             },
         },
     },
-});
+})

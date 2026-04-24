@@ -1,7 +1,7 @@
-import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
-import { useDeviceStore } from '../stores/Device'
-import { logger } from '../utils/logger'
+import Echo from "laravel-echo"
+import Pusher from "pusher-js"
+import { useDeviceStore } from "../stores/Device"
+import { logger } from "../utils/logger"
 
 type EchoConfig = {
     key: string
@@ -12,39 +12,39 @@ type EchoConfig = {
     authEndpoint?: string
 }
 
-function resolveAuthEndpoint(apiBaseUrl: string, authEndpoint?: string) {
+function resolveAuthEndpoint (apiBaseUrl: string, authEndpoint?: string) {
     if (!authEndpoint) {
-        return '/broadcasting/auth'
+        return "/broadcasting/auth"
     }
 
     if (/^https?:\/\//i.test(authEndpoint)) {
         return authEndpoint
     }
 
-    if (authEndpoint.startsWith('/')) {
+    if (authEndpoint.startsWith("/")) {
         return authEndpoint
     }
 
-    return `${String(apiBaseUrl).replace(/\/$/, '')}/${authEndpoint.replace(/^\//, '')}`
+    return `${String(apiBaseUrl).replace(/\/$/, "")}/${authEndpoint.replace(/^\//, "")}`
 }
 
 /**
  * Create (or recreate) an Echo instance with the given config.
  * Disconnects any existing instance first.
  */
-function createEcho(
+function createEcho (
     nuxtApp: any,
     cfg: EchoConfig,
     apiBaseUrl: string,
     token: string | null
 ) {
     if (!cfg?.key) {
-        logger.warn('[Echo] Skipping initialization because broadcast key is missing')
+        logger.warn("[Echo] Skipping initialization because broadcast key is missing")
         return null
     }
 
     // Disconnect previous instance if any
-    if (typeof window !== 'undefined' && (window as any).Echo) {
+    if (typeof window !== "undefined" && (window as any).Echo) {
         try { (window as any).Echo.disconnect() } catch (_) {}
     }
 
@@ -56,8 +56,8 @@ function createEcho(
     const authEndpoint = resolveAuthEndpoint(apiBaseUrl, cfg.authEndpoint)
 
     const headers: Record<string, string> = {
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
+        Accept: "application/json",
+        "Content-Type": "application/json"
     }
 
     if (token) {
@@ -65,22 +65,22 @@ function createEcho(
     }
 
     // Dynamically select protocol based on current page
-    const browserHost = typeof window !== 'undefined' ? window.location.hostname : ''
-    const browserPort = typeof window !== 'undefined' ? window.location.port : ''
-    const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    const browserHost = typeof window !== "undefined" ? window.location.hostname : ""
+    const browserPort = typeof window !== "undefined" ? window.location.port : ""
+    const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:"
     const normalizedHost = cfg.host || browserHost
     const normalizedPort = cfg.port || (isHttpsPage ? 443 : 80)
     const currentOriginPort = browserPort ? parseInt(browserPort, 10) : (isHttpsPage ? 443 : 80)
     const wsPort = normalizedPort === 80 || normalizedPort === 443 ? currentOriginPort : normalizedPort
     const wssPort = wsPort
-    const forceTLS = isHttpsPage || String(cfg.scheme || '').toLowerCase() === 'https'
+    const forceTLS = isHttpsPage || String(cfg.scheme || "").toLowerCase() === "https"
 
-    const wsPath = cfg.path || '/app'
+    const wsPath = cfg.path || "/app"
 
-    logger.info(`[Echo] Connecting to Reverb: ${forceTLS ? 'wss' : 'ws'}://${normalizedHost}:${wsPort}${wsPath}`)
+    logger.info(`[Echo] Connecting to Reverb: ${forceTLS ? "wss" : "ws"}://${normalizedHost}:${wsPort}${wsPath}`)
 
-    console.log('[Echo Init] Config:', {
-        key: cfg.key?.substring(0, 8) + '...',
+    console.log("[Echo Init] Config:", {
+        key: cfg.key?.substring(0, 8) + "...",
         host: normalizedHost,
         wsPort,
         forceTLS,
@@ -90,15 +90,15 @@ function createEcho(
     })
 
     const echo = new Echo({
-        broadcaster: 'reverb',
+        broadcaster: "reverb",
         key: cfg.key,
         wsHost: normalizedHost,
-        wsPort: wsPort,
-        wssPort: wssPort,
-        forceTLS: forceTLS,
+        wsPort,
+        wssPort,
+        forceTLS,
         wsPath,
         disableStats: true,
-        enabledTransports: ['ws', 'wss'],
+        enabledTransports: ["ws", "wss"],
         authEndpoint,
         auth: {
             headers
@@ -111,34 +111,34 @@ function createEcho(
     window.$echo = echo
 
     // Provide via Nuxt injection
-    nuxtApp.provide('echo', echo)
+    nuxtApp.provide("echo", echo)
 
     // Monitor connection state
     if (echo && (echo as any).connector) {
         const connector = (echo as any).connector
-        console.log('[Echo Init] Instantiated, broadcaster=' + (echo as any).broadcaster)
+        console.log("[Echo Init] Instantiated, broadcaster=" + (echo as any).broadcaster)
 
         try {
-            if (typeof connector.socket?.on === 'function') {
-                connector.socket.on('connect', () => {
-                    console.log('[Echo Connected] WebSocket connected at', new Date().toISOString())
+            if (typeof connector.socket?.on === "function") {
+                connector.socket.on("connect", () => {
+                    console.log("[Echo Connected] WebSocket connected at", new Date().toISOString())
                 })
-                connector.socket.on('disconnect', () => {
-                    console.log('[Echo Disconnected] WebSocket disconnected at', new Date().toISOString())
+                connector.socket.on("disconnect", () => {
+                    console.log("[Echo Disconnected] WebSocket disconnected at", new Date().toISOString())
                 })
-                connector.socket.on('error', (err: any) => {
-                    console.error('[Echo Error]', err?.message || err, 'at', new Date().toISOString())
+                connector.socket.on("error", (err: any) => {
+                    console.error("[Echo Error]", err?.message || err, "at", new Date().toISOString())
                 })
             }
         } catch (e) {
-            logger.debug('[Echo] Connection hooks unavailable', e)
+            logger.debug("[Echo] Connection hooks unavailable", e)
         }
     }
 
     return echo
 }
 
-function normalizeBroadcastConfig(raw: any): EchoConfig | null {
+function normalizeBroadcastConfig (raw: any): EchoConfig | null {
     if (!raw?.key) {
         return null
     }
@@ -146,10 +146,10 @@ function normalizeBroadcastConfig(raw: any): EchoConfig | null {
     const rawPort = Number(raw.port ?? 0)
     return {
         key: String(raw.key),
-        host: String(raw.host ?? ''),
+        host: String(raw.host ?? ""),
         port: (rawPort === 8080 || rawPort === 6001) ? 0 : rawPort,
-        scheme: String(raw.scheme ?? 'http'),
-        path: String(raw.path ?? '/app'),
+        scheme: String(raw.scheme ?? "http"),
+        path: String(raw.path ?? "/app"),
         authEndpoint: raw.authEndpoint ? String(raw.authEndpoint) : (raw.auth_endpoint ? String(raw.auth_endpoint) : undefined),
     }
 }
@@ -158,16 +158,16 @@ export default defineNuxtPlugin((nuxtApp: any) => {
     const config = useRuntimeConfig()
     const mainApi = config.public.apiBaseUrl
 
-    if (!mainApi) return
+    if (!mainApi) { return }
 
     try {
         const deviceStore = useDeviceStore()
 
         // If Echo is already initialized elsewhere, reuse it
-        if (typeof window !== 'undefined' && (window as any).Echo) {
+        if (typeof window !== "undefined" && (window as any).Echo) {
             // @ts-ignore
             (window as any).$echo = (window as any).Echo
-            nuxtApp.provide('echo', (window as any).Echo)
+            nuxtApp.provide("echo", (window as any).Echo)
             // Still register initEcho for future config changes
             ;(window as any).initEcho = (cfg: any, tok: string | null) => {
                 createEcho(nuxtApp, cfg, String(mainApi), tok)
@@ -180,7 +180,7 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         ;(window as any).initEcho = (cfg: any, tok: string | null) => {
             const normalized = normalizeBroadcastConfig(cfg)
             if (!normalized) {
-                logger.warn('[Echo] Ignoring incomplete initEcho payload')
+                logger.warn("[Echo] Ignoring incomplete initEcho payload")
                 return null
             }
 
@@ -196,43 +196,43 @@ export default defineNuxtPlugin((nuxtApp: any) => {
 
         const initializeFromApiConfig = async () => {
             try {
-                const response = await $fetch<{ broadcasting?: EchoConfig | null }>('/api/config', {
-                    baseURL: String(mainApi).startsWith('/') ? undefined : String(mainApi),
+                const response = await $fetch<{ broadcasting?: EchoConfig | null }>("/api/config", {
+                    baseURL: String(mainApi).startsWith("/") ? undefined : String(mainApi),
                 })
                 const normalized = normalizeBroadcastConfig(response?.broadcasting)
 
                 if (normalized) {
-                    logger.info('[Echo] Using dynamic /api/config broadcast config')
+                    logger.info("[Echo] Using dynamic /api/config broadcast config")
                     createEcho(nuxtApp, normalized, String(mainApi), token)
                     return true
                 }
             } catch (error) {
-                logger.warn('[Echo] Failed to load /api/config broadcast config', error)
+                logger.warn("[Echo] Failed to load /api/config broadcast config", error)
             }
 
             return false
         }
 
         if (normalizeBroadcastConfig(persisted)) {
-            logger.info('[Echo] Using persisted server-provided broadcast config')
+            logger.info("[Echo] Using persisted server-provided broadcast config")
             createEcho(nuxtApp, normalizeBroadcastConfig(persisted)!, String(mainApi), token)
         } else if (config.public.reverb?.appKey) {
             // Fallback to runtimeConfig (env vars)
-            logger.info('[Echo] Using runtimeConfig fallback (no server config cached yet)')
+            logger.info("[Echo] Using runtimeConfig fallback (no server config cached yet)")
             const rawFallbackPort = Number(config.public.reverb.port ?? 0)
             createEcho(nuxtApp, {
                 key: config.public.reverb.appKey,
-                host: config.public.reverb.host || '',
+                host: config.public.reverb.host || "",
                 port: (rawFallbackPort === 8080 || rawFallbackPort === 6001) ? 0 : rawFallbackPort,
-                scheme: config.public.reverb.scheme || 'http',
-                path: config.public.reverb.path || '/app',
+                scheme: config.public.reverb.scheme || "http",
+                path: config.public.reverb.path || "/app",
             }, String(mainApi), token)
 
             void initializeFromApiConfig()
         } else {
             void initializeFromApiConfig().then((initialized) => {
                 if (!initialized) {
-                    logger.info('[Echo] No broadcast config available yet, waiting for auth')
+                    logger.info("[Echo] No broadcast config available yet, waiting for auth")
                 }
             })
         }
@@ -246,19 +246,15 @@ export default defineNuxtPlugin((nuxtApp: any) => {
                 if ((window as any).Echo && (window as any).Echo.connector && (window as any).Echo.connector.options) {
                     ;(window as any).Echo.connector.options.auth = (window as any).Echo.connector.options.auth || {}
                     ;(window as any).Echo.connector.options.auth.headers = (window as any).Echo.connector.options.auth.headers || {}
-                    if (bearer) (window as any).Echo.connector.options.auth.headers.Authorization = bearer
-                    else delete (window as any).Echo.connector.options.auth.headers.Authorization
+                    if (bearer) { (window as any).Echo.connector.options.auth.headers.Authorization = bearer } else { delete (window as any).Echo.connector.options.auth.headers.Authorization }
                 }
-                console.log('[Echo Auth Updated] Bearer token', newToken ? 'SET' : 'CLEARED', 'at', new Date().toISOString())
+                console.log("[Echo Auth Updated] Bearer token", newToken ? "SET" : "CLEARED", "at", new Date().toISOString())
             } catch (e) {
-                logger.warn('[Echo] updateEchoAuth failed', e)
-                console.error('[Echo Auth Update Failed]', e)
+                logger.warn("[Echo] updateEchoAuth failed", e)
+                console.error("[Echo Auth Update Failed]", e)
             }
         }
-
     } catch (err) {
-        logger.error('[laravel-echo] initialization failed', err)
-        return
+        logger.error("[laravel-echo] initialization failed", err)
     }
-
 })

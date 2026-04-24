@@ -4,8 +4,8 @@ export interface BreakpointConfig {
   md: number
   lg: number
   xl: number
-  '2xl': number
-  '3xl': number
+  "2xl": number
+  "3xl": number
 }
 
 export interface ResponsiveValue<T> {
@@ -15,7 +15,7 @@ export interface ResponsiveValue<T> {
   md?: T
   lg?: T
   xl?: T
-  '2xl'?: T
+  "2xl"?: T
 }
 
 export type BreakpointName = keyof BreakpointConfig
