@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useDeviceStore } from '../stores/Device'
 import { logger } from '../utils/logger'
+import { isDeviceAuthPath, normalizeApiRequestUrl } from '../utils/apiRequest'
 import type { InternalAxiosRequestConfig } from 'axios'
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
@@ -23,8 +24,14 @@ export default defineNuxtPlugin(() => {
   api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
     const device = useDeviceStore()
     const requestUrl = String(req.url || '')
-    const tokenOptionalEndpoints = ['/api/devices/login', '/api/devices/register']
-    const isTokenOptionalRequest = tokenOptionalEndpoints.some((endpoint) => requestUrl.includes(endpoint))
+    const normalizedRequestUrl = normalizeApiRequestUrl({
+      baseURL: String(req.baseURL || ''),
+      requestUrl,
+    })
+
+    req.url = normalizedRequestUrl
+
+    const isTokenOptionalRequest = /^\/?(?:api\/)?devices\/(login|register)(?:$|\?|\/)/i.test(normalizedRequestUrl)
 
     // Ensure headers exists and is type-safe
     if (!req.headers) {
@@ -111,9 +118,7 @@ export default defineNuxtPlugin(() => {
         status === 401 &&
         originalRequest &&
         !originalRequest._retry &&
-        !String(originalRequest.url || '').includes('/api/devices/login') &&
-        !String(originalRequest.url || '').includes('/api/devices/register') &&
-        !String(originalRequest.url || '').includes('/api/devices/refresh')
+        !isDeviceAuthPath(String(originalRequest.url || ''))
       ) {
         originalRequest._retry = true
 

@@ -589,7 +589,7 @@ async function confirmOrder() {
           </div>
           
           <menu-category-tabs 
-            :categories="availableCategories" 
+            :categories="categories" 
             :active-category="activeCategory" 
             :sticky="true"
             @select="setCategory" 

@@ -2,7 +2,7 @@
 
 **AUTO-GENERATED - Do not edit manually**
 **Source**: agent-continuum/issues/by-project/tablet-ordering-pwa/
-**Generated**: 2026-04-20 08:26:02
+**Generated**: 2026-04-23 19:55:37
 
 This file provides INSTANT LOOKUP for common issues.
 For COMPLETE DETAILS, read the linked ISS-* files in continuum.
@@ -14,12 +14,14 @@ For COMPLETE DETAILS, read the linked ISS-* files in continuum.
 | ID | Symptom | Severity |
 |:---|:--------|:---------|
 | [T1](E:/Projects/agent-continuum/issues/by-project/tablet-ordering-pwa/ISS-T1-npm-peer-dependency-conflict.md) | Docker build fails during `npm ci` with peer dependency conflict errors: ``` ... | [HIGH] |
+| [T7](E:/Projects/agent-continuum/issues/by-project/tablet-ordering-pwa/ISS-T7-startup-hold-api-url-icons-sw-fallback.md) | - App startup fails on a clean tablet device session. - Network requests are ... | [HIGH] |
 
 ## By Category
 
 ### Deployment
 
 - [T1: Docker Build Fails on npm Peer Dependency Conflicts](E:/Projects/agent-continuum/issues/by-project/tablet-ordering-pwa/ISS-T1-npm-peer-dependency-conflict.md)
+- [T7: PWA Startup Hold - Stale API URL, Missing Icons, and SW Fallback Mismatch](E:/Projects/agent-continuum/issues/by-project/tablet-ordering-pwa/ISS-T7-startup-hold-api-url-icons-sw-fallback.md)
 
 ---
 

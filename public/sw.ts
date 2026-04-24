@@ -13,7 +13,6 @@ import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, NetworkOnly } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { BackgroundSyncPlugin } from 'workbox-background-sync'
-import { ensureAppShellPrecached } from '../utils/swPrecache'
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>
@@ -24,9 +23,7 @@ declare const self: ServiceWorkerGlobalScope & {
 // 1. Precaching
 // ---------------------------------------------------------------------------
 
-const precacheManifest = ensureAppShellPrecached(self.__WB_MANIFEST)
-
-precacheAndRoute(precacheManifest)
+precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
 // Skip waiting so the new SW activates immediately on update
@@ -37,11 +34,12 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
-// Navigation fallback: bind to Workbox-managed precache entry for index.html.
-// This avoids stale hardcoded cache names (e.g. "precache-v1") serving old app shells.
+// Navigation fallback: bind to the revisioned root app shell.
+// The prerendered "/" entry is revisioned by Nuxt, so this avoids the stale
+// unrevisioned "/index.html" path staying alive across deployments.
 registerRoute(
   new NavigationRoute(
-    createHandlerBoundToURL('/index.html'),
+    createHandlerBoundToURL('/'),
     {
       denylist: [
         /^\/api/,

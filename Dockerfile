@@ -29,9 +29,12 @@ RUN npx nuxi generate
 # ============================================================================
 FROM nginx:alpine AS app
 
-# Prepare application and nginx runtime directories for the existing non-root nginx user
+# Prepare application and nginx runtime directories for the existing non-root nginx user.
+# Also patch the pid path: newer nginx images use /run/nginx.pid which is a root-owned tmpfs
+# at runtime; /tmp is always writable by all users.
 RUN mkdir -p /app/public /var/cache/nginx /var/run && \
-    chown -R nginx:nginx /app /var/cache/nginx /var/run
+    chown -R nginx:nginx /app /var/cache/nginx /var/run && \
+    sed -i 's|pid\s*/run/nginx.pid;|pid        /tmp/nginx.pid;|' /etc/nginx/nginx.conf
 
 WORKDIR /app
 
