@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { Component } from 'vue'
+import { Paintbrush, Droplets, CreditCard, Bell, Hand, X } from 'lucide-vue-next'
 
 interface SupportButton {
   id: string
   label: string
-  icon: string
+  icon: Component
   gradient: string
   action: () => void
 }
@@ -40,28 +42,28 @@ const supportButtons: SupportButton[] = [
   {
     id: 'clean',
     label: 'Clean Table',
-    icon: '🧹',
+    icon: Paintbrush,
     gradient: 'from-orange-400 to-orange-600',
     action: () => handleRequest('clean', 'Clean Table')
   },
   {
     id: 'water',
     label: 'Water',
-    icon: '💧',
+    icon: Droplets,
     gradient: 'from-blue-400 to-blue-600',
     action: () => handleRequest('water', 'Water')
   },
   {
     id: 'billing',
     label: 'Billing',
-    icon: '💳',
+    icon: CreditCard,
     gradient: 'from-green-400 to-green-600',
     action: () => handleRequest('billing', 'Billing/Checkout')
   },
   {
     id: 'support',
     label: 'Call Staff',
-    icon: '🔔',
+    icon: Bell,
     gradient: 'from-purple-400 to-purple-600',
     action: () => handleRequest('support', 'Staff Call')
   }
@@ -100,7 +102,7 @@ const supportButtons: SupportButton[] = [
             @click="button.action"
             :disabled="isSending"
           >
-            <span class="support-icon">{{ button.icon }}</span>
+            <component :is="button.icon" :size="24" :stroke-width="2" class="support-icon" />
           </button>
           <span class="support-label">{{ button.label }}</span>
         </div>
@@ -118,8 +120,8 @@ const supportButtons: SupportButton[] = [
       :disabled="isSending"
     >
       <Transition name="icon-rotate" mode="out-in">
-        <span v-if="!isExpanded" class="text-3xl">👋</span>
-        <span v-else class="text-3xl">✕</span>
+        <span v-if="!isExpanded"><Hand :size="28" :stroke-width="2" /></span>
+        <span v-else><X :size="28" :stroke-width="2" /></span>
       </Transition>
     </button>
 

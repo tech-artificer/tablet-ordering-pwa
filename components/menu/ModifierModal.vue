@@ -29,7 +29,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 
 const props = defineProps({ visible: Boolean, item: Object, modifiers: Array })
 const emit = defineEmits(['update:visible','confirm'])

@@ -2,7 +2,7 @@
 
 **File:** `app/Http/Controllers/Api/V1/BrowseMenuApiController.php`
 
-Base URL used in examples: `http://localhost:8000`
+Base URL used in examples: `https://192.168.100.7`
 
 ---
 
@@ -73,7 +73,7 @@ Notes:
 
 ## Endpoint Details, parameters and responses
 
-Each endpoint includes a short description, validation, and representative response using the exact resource keys. Use `http://localhost:8000` for cURL examples.
+Each endpoint includes a short description, validation, and representative response using the exact resource keys. Use `https://192.168.100.7` for cURL examples.
 
 ### GET /menus
 - Controller: `getMenus(Request $request)`
@@ -84,7 +84,7 @@ Each endpoint includes a short description, validation, and representative respo
 
 Example cURL:
 ```bash
-curl -X GET "http://localhost:8000/api/menus"
+curl -X GET "https://192.168.100.7/api/menus"
 ```
 
 Example item (MenuResource):
@@ -101,7 +101,7 @@ Example item (MenuResource):
   "is_taxable": true,
   "is_available": true,
   "is_discountable": false,
-  "img_url": "http://localhost:8000/images/menu-placeholder/1.jpg",
+  "img_url": "https://192.168.100.7/images/menu-placeholder/1.jpg",
   "tax": null,
   "tax_amount": 2.5,
   "modifiers": []
@@ -119,7 +119,7 @@ Example item (MenuResource):
 
 Example cURL:
 ```bash
-curl -X GET "http://localhost:8000/api/menus/with-modifiers"
+curl -X GET "https://192.168.100.7/api/menus/with-modifiers"
 ```
 
 Example single menu with attached modifiers (simplified):
@@ -136,7 +136,7 @@ Example single menu with attached modifiers (simplified):
   "is_taxable": false,
   "is_available": true,
   "is_discountable": true,
-  "img_url": "http://localhost:8000/images/menu-placeholder/1.jpg",
+  "img_url": "https://192.168.100.7/images/menu-placeholder/1.jpg",
   "tax": null,
   "tax_amount": 0,
   "modifiers": [
@@ -153,7 +153,7 @@ Example single menu with attached modifiers (simplified):
       "is_available": true,
       "is_modifier": true,
       "is_modifier_only": false,
-      "img_url": "http://localhost:8000/images/menu-placeholder/1.jpg"
+      "img_url": "https://192.168.100.7/images/menu-placeholder/1.jpg"
     }
   ]
 }
@@ -185,7 +185,7 @@ Example single menu with attached modifiers (simplified):
 
 Example cURL:
 ```bash
-curl -X GET "http://localhost:8000/api/menus/modifier-groups?modifiers=1"
+curl -X GET "https://192.168.100.7/api/menus/modifier-groups?modifiers=1"
 ```
 
 Example response (excerpt):
@@ -232,7 +232,7 @@ Example response (excerpt):
 
 Example cURL:
 ```bash
-curl -X GET "http://localhost:8000/api/menus/modifiers"
+curl -X GET "https://192.168.100.7/api/menus/modifiers"
 ```
 
 Example response (grouped modifiers):
@@ -252,7 +252,7 @@ Example response (grouped modifiers):
       "is_available": true,
       "is_modifier": true,
       "is_modifier_only": false,
-      "img_url": "http://localhost:8000/images/menu-placeholder/1.jpg"
+      "img_url": "https://192.168.100.7/images/menu-placeholder/1.jpg"
     }
   ],
   "BEEF": [ /* ... */ ]
@@ -275,7 +275,7 @@ Example response (grouped modifiers):
 - Behavior: runs `CALL get_menus_by_course(?)`, plucks ids, returns `MenuResource::collection(...)` for those ids.
 - Example cURL:
 ```bash
-curl -G "http://localhost:8000/api/menus/course" --data-urlencode "course=starter"
+curl -G "https://192.168.100.7/api/menus/course" --data-urlencode "course=starter"
 ```
 
 ---
@@ -287,7 +287,7 @@ curl -G "http://localhost:8000/api/menus/course" --data-urlencode "course=starte
 
 Example cURL:
 ```bash
-curl -G "http://localhost:8000/api/menus/category" --data-urlencode "category=beverage"
+curl -G "https://192.168.100.7/api/menus/category" --data-urlencode "category=beverage"
 ```
 
 ---
@@ -299,7 +299,7 @@ curl -G "http://localhost:8000/api/menus/category" --data-urlencode "category=be
 
 Example cURL:
 ```bash
-curl -G "http://localhost:8000/api/menus/group" --data-urlencode "group=Sides"
+curl -G "https://192.168.100.7/api/menus/group" --data-urlencode "group=Sides"
 ```
 
 ---
@@ -325,11 +325,11 @@ curl -G "http://localhost:8000/api/menus/group" --data-urlencode "group=Sides"
 ## Example usage (curl)
 Fetch menus:
 ```bash
-curl -X GET "http://localhost:8000/api/menus"
+curl -X GET "https://192.168.100.7/api/menus"
 ```
 Fetch grouped modifiers:
 ```bash
-curl -X GET "http://localhost:8000/api/menus/modifiers"
+curl -X GET "https://192.168.100.7/api/menus/modifiers"
 ```
 
 ---

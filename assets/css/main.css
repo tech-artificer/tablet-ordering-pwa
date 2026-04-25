@@ -1,8 +1,7 @@
 @import "./btn-primary.css";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* NOTE: @tailwind directives are in input.css (the primary entrypoint).
+   This file contains utility classes and animations. */
 
 /* ============================================
    SHIMMER ANIMATION
@@ -23,11 +22,10 @@
 }
 
 :root { 
-  --primary: #F6B56D; 
-  --primary-dark: #C78B45;
+  /* Additional custom properties (brand colors defined in input.css) */
   --kbbq-flame: #FF5C00; 
   --panel: #252525;
-  --touch-min: 48px; /* Minimum touch target size */
+  --touch-min: 48px; /* WCAG 2.5.8 minimum touch target size */
 }
 
 .bg-panel {
@@ -142,69 +140,81 @@ body {
    ============================================ */
 
 /* Fade with lift */
-.page-fade-enter-active,
+.page-fade-enter-active {
+  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
 .page-fade-leave-active {
-  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  transition: opacity 180ms cubic-bezier(0.4, 0, 0.6, 1), transform 180ms cubic-bezier(0.4, 0, 0.6, 1);
   will-change: transform, opacity;
 }
 .page-fade-enter-from {
   opacity: 0;
-  transform: translate3d(0, 12px, 0);
+  transform: translate3d(0, 18px, 0) scale(0.98);
 }
 .page-fade-leave-to {
   opacity: 0;
-  transform: translate3d(0, -8px, 0);
+  transform: translate3d(0, -12px, 0) scale(0.98);
 }
 .page-fade-enter-to,
 .page-fade-leave-from {
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0) scale(1);
 }
 
 /* Slide left (forward navigation) */
-.slide-left-enter-active,
+.slide-left-enter-active {
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
 .slide-left-leave-active {
-  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  transition: opacity 180ms cubic-bezier(0.4, 0, 0.6, 1), transform 180ms cubic-bezier(0.4, 0, 0.6, 1);
   will-change: transform, opacity;
 }
 .slide-left-enter-from {
   opacity: 0;
-  transform: translate3d(30px, 0, 0);
+  transform: translate3d(52px, 0, 0) scale(0.97);
 }
 .slide-left-leave-to {
   opacity: 0;
-  transform: translate3d(-30px, 0, 0);
+  transform: translate3d(-36px, 0, 0) scale(0.98);
 }
 .slide-left-enter-to,
 .slide-left-leave-from {
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0) scale(1);
 }
 
 /* Slide right (back navigation) */
-.slide-right-enter-active,
+.slide-right-enter-active {
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
 .slide-right-leave-active {
-  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  transition: opacity 180ms cubic-bezier(0.4, 0, 0.6, 1), transform 180ms cubic-bezier(0.4, 0, 0.6, 1);
   will-change: transform, opacity;
 }
 .slide-right-enter-from {
   opacity: 0;
-  transform: translate3d(-30px, 0, 0);
+  transform: translate3d(-52px, 0, 0) scale(0.97);
 }
 .slide-right-leave-to {
   opacity: 0;
-  transform: translate3d(30px, 0, 0);
+  transform: translate3d(36px, 0, 0) scale(0.98);
 }
 .slide-right-enter-to,
 .slide-right-leave-from {
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0) scale(1);
 }
 
 /* Scale pop (for modals, cards) */
-.scale-pop-enter-active,
+.scale-pop-enter-active {
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
 .scale-pop-leave-active {
-  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  transition: opacity 150ms cubic-bezier(0.4, 0, 1, 1), transform 150ms cubic-bezier(0.4, 0, 1, 1);
   will-change: transform, opacity;
 }
 .scale-pop-enter-from {
@@ -232,6 +242,66 @@ body {
   .scale-pop-leave-active {
     transition: none;
   }
+
+  .animate-shimmer {
+    animation: none;
+  }
+
+  .touch-btn:active,
+  .touch-btn-circle:active,
+  .icon-btn:active {
+    transform: none;
+  }
+
+  .ui-hover-lift:hover,
+  .ui-hover-lift:active {
+    transform: none;
+  }
+
+  .ripple::after {
+    transition: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   KEYPAD BUTTON (PIN dialogs, numeric inputs)
+   ============================================ */
+.keypad-btn {
+  min-width: 48px;
+  min-height: 48px;
+  height: 3rem;
+  width: 100%;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.keypad-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.keypad-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.30);
+}
+
+.keypad-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ============================================
@@ -284,11 +354,13 @@ body {
 }
 
 /* Hide scrollbar but keep functionality */
-.scrollbar-hide {
+.scrollbar-hide,
+.scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-.scrollbar-hide::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none;
 }
 
@@ -336,6 +408,28 @@ body {
   transform: scale(2);
   opacity: 1;
   transition: transform 0s, opacity 0s;
+}
+
+/* ============================================
+   GRILL GRID BACKGROUND SYSTEM
+   Grid lines at 40px (5 × 8pt) — grill grate motif
+   ============================================ */
+
+/* Neutral dark base + grid (layouts, menu, settings) */
+.bg-app-grid {
+  background-color: #0D0D0D;
+  background-image:
+    repeating-linear-gradient(rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px);
+}
+
+/* Warm dark gradient + grid (welcome, order flows) */
+.bg-screen-base {
+  background-color: #0F0F0F;
+  background-image:
+    repeating-linear-gradient(rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
+    linear-gradient(to bottom right, #0F0F0F, #1A1A1A, #3D3530);
 }
 
 /* ============================================

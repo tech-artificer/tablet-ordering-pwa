@@ -1,33 +1,42 @@
-import { defineStore } from "pinia";
-import { useApi } from "../composables/useApi";
-import { logger } from "../utils/logger";
-import type { Menu, MenuItem, Package, Modifier, MeatCategory, TabletCategory, PackageDetails } from "../types";
+import { defineStore } from "pinia"
+import { useApi } from "../composables/useApi"
+import { logger } from "../utils/logger"
+import type { Menu, MenuItem, Package, Modifier, MeatCategory, TabletCategory, PackageDetails } from "../types"
 
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
 
 const toNumber = (value: unknown): number => {
-    const n = Number(value);
-    return isNaN(n) ? 0 : n;
-};
+    const n = Number(value)
+    return isNaN(n) ? 0 : n
+}
 
 const normalizePrice = <T extends { price?: unknown }>(item: T): T => ({
     ...item,
     price: toNumber(item.price),
-});
+})
+
+const extractPayload = <T = any>(responseData: any): T | null => {
+    if (responseData == null) { return null }
+    return (responseData?.data ?? responseData) as T
+}
+
+const extractArrayPayload = <T = any>(responseData: any): T[] => {
+    const payload = extractPayload<any>(responseData)
+    return Array.isArray(payload) ? payload : []
+}
 
 const normalizePackage = (pkg: Package): Package => ({
     ...(pkg as Package),
     price: toNumber((pkg as Package).price),
-    is_popular: Boolean((pkg as Package).is_popular) || (pkg as Package).name?.toLowerCase().includes('noble'),
-    accent: String((pkg as Package).accent || ''),
-    color: String((pkg as Package).color || ''),
+    is_popular: Boolean((pkg as Package).is_popular) || (pkg as Package).name?.toLowerCase().includes("noble"),
+    accent: String((pkg as Package).accent || ""),
+    color: String((pkg as Package).color || ""),
     tax_amount: toNumber((pkg as Package).tax_amount),
     modifiers: Array.isArray((pkg as Package).modifiers)
         ? (pkg as Package).modifiers.map((m: Modifier) => normalizePrice(m))
         : [],
     tax: (pkg as Package).tax ? { ...(pkg as Package).tax, percentage: toNumber((pkg as Package).tax.percentage) } : (pkg as Package).tax,
-});
-
+})
 
 export const useMenuStore = defineStore("menu", {
     state: () => ({
@@ -38,9 +47,9 @@ export const useMenuStore = defineStore("menu", {
         packages: [] as Package[],
         alacartes: [] as MenuItem[],
         modifiers: [] as Modifier[],
-        meatCategories: [] as MeatCategory[],  // PORK, BEEF, CHICKEN
-        tabletCategories: [] as TabletCategory[],  // sides, desserts, beverages, etc.
-        packageDetails: {} as Record<number, PackageDetails>,  // Cache for package details
+        meatCategories: [] as MeatCategory[], // PORK, BEEF, CHICKEN
+        tabletCategories: [] as TabletCategory[], // sides, desserts, beverages, etc.
+        packageDetails: {} as Record<number, PackageDetails>, // Cache for package details
         loading: {
             packages: false,
             modifiers: false,
@@ -50,6 +59,7 @@ export const useMenuStore = defineStore("menu", {
             beverages: false,
             meatCategories: false,
             tabletCategories: false,
+            packageDetails: false,
         },
         errors: {
             packages: null as string | null,
@@ -65,296 +75,340 @@ export const useMenuStore = defineStore("menu", {
     }),
 
     getters: {
-        activeMenu: (state: any) => state.menus.find((m) => m.is_active),
+        activeMenu: (state: any) => state.menus.find(m => m.is_active),
         isLoading: (state: any) => Object.values(state.loading).some(Boolean),
         isLoadingPackages: (state: any) => state.loading.packages,
-        isLoadingAlacartes: (state: any) => state.loading.alacartes,    
+        isLoadingAlacartes: (state: any) => state.loading.alacartes,
         isLoadingModifiers: (state: any) => state.loading.modifiers,
         isLoadingDesserts: (state: any) => state.loading.desserts,
         isLoadingSides: (state: any) => state.loading.sides,
         isLoadingBeverages: (state: any) => state.loading.beverages,
+        isLoadingPackageDetails: (state: any) => state.loading.packageDetails,
         hasErrors: (state: any) => Object.values(state.errors).some(error => error !== null),
         isCacheStale: (state: any) => {
-            if (!state.lastFetched) return true;
-            return Date.now() - state.lastFetched > CACHE_DURATION;
+            if (!state.lastFetched) { return true }
+            return Date.now() - state.lastFetched > CACHE_DURATION
         },
     },
 
     actions: {
-        async fetchPackages(this: any) {
-            this.loading.packages = true;       
-            this.errors.packages = null;
-            const api = useApi();
+        async fetchPackages (this: any) {
+            this.loading.packages = true
+            this.errors.packages = null
+            const api = useApi()
+
             try {
-                const { data } = await api.get('/api/v2/tablet/packages');
-                this.packages = Array.isArray(data.data) ? data.data.map(normalizePackage) : [];
-                logger.debug('✅ Packages loaded:', this.packages.length);
-                return { success: true };
+                const response = await api.get("/api/v2/tablet/packages")
+                const packages = extractArrayPayload<Package>(response?.data)
+                this.packages = packages.map(normalizePackage)
+                logger.debug("✅ Packages loaded:", this.packages.length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch packages';
-                this.errors.packages = errorMessage;
-                logger.error('❌ Packages error:', error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || "Failed to fetch packages"
+                this.errors.packages = errorMessage
+                logger.error("❌ Packages error:", error)
+                throw new Error(errorMessage)
             } finally {
-                this.loading.packages = false;
+                this.loading.packages = false
             }
         },
 
-        async fetchMeatCategories(this: any) {
-            this.loading.meatCategories = true;
-            this.errors.meatCategories = null;
-            const api = useApi();
+        /**
+         * Generic fetch function for all menu item types
+         * Eliminates code duplication across 6 fetch methods
+         */
+        async _fetchMenuItem (
+            this: any,
+            key: "packages" | "modifiers" | "desserts" | "sides" | "alacartes" | "beverages",
+            endpoint: string,
+            params: Record<string, string> = {},
+            normalizer: (item: any) => any = normalizePrice
+        ) {
+            this.loading[key] = true
+            this.errors[key] = null
+            const api = useApi()
+
             try {
-                const { data } = await api.get('/api/v2/tablet/meat-categories');
-                this.meatCategories = Array.isArray(data.data) ? data.data : [];
-                logger.debug('✅ Meat categories loaded:', this.meatCategories.length);
-                return { success: true };
+                const response = await api.get(endpoint, { params })
+                const items = extractArrayPayload<any>(response?.data).map(normalizer)
+                this[key] = items
+                logger.debug(`✅ ${key.charAt(0).toUpperCase() + key.slice(1)} loaded:`, items.length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch meat categories';
-                this.errors.meatCategories = errorMessage;
-                logger.error('❌ Meat categories error:', error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || `Failed to fetch ${key}`
+                this.errors[key] = errorMessage
+                logger.error(`❌ ${key.charAt(0).toUpperCase() + key.slice(1)} error:`, error)
+                throw new Error(errorMessage)
             } finally {
-                this.loading.meatCategories = false;
+                this.loading[key] = false
             }
         },
 
-        async fetchTabletCategories(this: any) {
-            this.loading.tabletCategories = true;
-            this.errors.tabletCategories = null;
-            const api = useApi();
+        async fetchMeatCategories (this: any) {
+            this.loading.meatCategories = true
+            this.errors.meatCategories = null
+            const api = useApi()
             try {
-                const { data } = await api.get('/api/v2/tablet/categories');
-                this.tabletCategories = Array.isArray(data.data) ? data.data : [];
-                logger.debug('✅ Tablet categories loaded:', this.tabletCategories.length);
-                return { success: true };
+                const response = await api.get("/api/v2/tablet/meat-categories")
+                this.meatCategories = extractArrayPayload<MeatCategory>(response?.data)
+                logger.debug("✅ Meat categories loaded:", this.meatCategories.length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch tablet categories';
-                this.errors.tabletCategories = errorMessage;
-                logger.error('❌ Tablet categories error:', error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || "Failed to fetch meat categories"
+                this.errors.meatCategories = errorMessage
+                logger.error("❌ Meat categories error:", error)
+                throw new Error(errorMessage)
             } finally {
-                this.loading.tabletCategories = false;
+                this.loading.meatCategories = false
             }
         },
 
-        async fetchPackageDetails(this: any, packageId: number, meatCategory?: string) {
-            const api = useApi();
+        async fetchTabletCategories (this: any) {
+            this.loading.tabletCategories = true
+            this.errors.tabletCategories = null
+            const api = useApi()
             try {
-                const params = meatCategory ? { meat_category: meatCategory } : {};
-                const { data } = await api.get(`/api/v2/tablet/packages/${packageId}`, { params });
-                
+                const response = await api.get("/api/v2/tablet/categories")
+                this.tabletCategories = extractArrayPayload<TabletCategory>(response?.data)
+                logger.debug("✅ Tablet categories loaded:", this.tabletCategories.length)
+                return { success: true }
+            } catch (error) {
+                const errorMessage = (error as Error).message || "Failed to fetch tablet categories"
+                this.errors.tabletCategories = errorMessage
+                logger.error("❌ Tablet categories error:", error)
+                throw new Error(errorMessage)
+            } finally {
+                this.loading.tabletCategories = false
+            }
+        },
+
+        async fetchPackageDetails (this: any, packageId: number, meatCategory?: string) {
+            const api = useApi()
+            this.loading.packageDetails = true
+            try {
+                const params = meatCategory ? { meat_category: meatCategory } : {}
+                const response = await api.get(`/api/v2/tablet/packages/${packageId}`, { params })
+                const payload = extractPayload<PackageDetails>(response?.data)
+                if (!payload) {
+                    throw new Error(`Package ${packageId} details response missing body`)
+                }
+
                 // Cache the package details
-                this.packageDetails[packageId] = data;
-                logger.debug(`✅ Package ${packageId} details loaded`);
-                return data;
+                this.packageDetails[packageId] = payload
+                logger.debug(`✅ Package ${packageId} details loaded`)
+                return payload
             } catch (error) {
-                const errorMessage = (error as Error).message || `Failed to fetch package ${packageId} details`;
-                logger.error(`❌ Package ${packageId} details error:`, error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || `Failed to fetch package ${packageId} details`
+                logger.error(`❌ Package ${packageId} details error:`, error)
+                throw new Error(errorMessage)
+            } finally {
+                this.loading.packageDetails = false
             }
         },
 
-        async fetchModifiers(this: any) {
+        async fetchModifiers (this: any) {
             // Deprecated: Modifiers are now part of packages via fetchPackageDetails
             // Keeping for backward compatibility but using empty array
-            this.loading.modifiers = true;
-            this.errors.modifiers = null;
+            this.loading.modifiers = true
+            this.errors.modifiers = null
             try {
-                this.modifiers = [];
-                logger.debug('⚠️ fetchModifiers deprecated - use fetchPackageDetails instead');
-                return { success: true };
+                this.modifiers = []
+                logger.debug("⚠️ fetchModifiers deprecated - use fetchPackageDetails instead")
+                return { success: true }
             } finally {
-                this.loading.modifiers = false;
+                this.loading.modifiers = false
             }
         },
 
-        async fetchDesserts(this: any) {
-            this.loading.desserts = true;
-            this.errors.desserts = null;
-            const api = useApi();
+        async fetchDesserts (this: any) {
+            this.loading.desserts = true
+            this.errors.desserts = null
+            const api = useApi()
             try {
                 // Find dessert category slug from tabletCategories
-                const category = this.tabletCategories.find((c: TabletCategory) => 
-                    c.slug === 'dessert' || c.name.toLowerCase().includes('dessert')
-                );
-                
+                const category = this.tabletCategories.find((c: TabletCategory) =>
+                    c.slug === "dessert" || c.name.toLowerCase().includes("dessert")
+                )
+
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`)
+                    const payload = extractPayload<any>(response?.data)
 
                     // Defensive: Ensure data.data is a proper array of non-promise items
-                    if (!Array.isArray(data?.data)) {
-                        logger.warn('⚠️ Desserts API returned non-array data:', data?.data);
-                        this.desserts = [];
-                        return { success: true };
+                    if (!Array.isArray(payload)) {
+                        logger.warn("⚠️ Desserts API returned non-array data:", payload)
+                        this.desserts = []
+                        return { success: true }
                     }
 
                     // Filter out any promise-like objects (if any somehow exist)
-                    const filteredArr = data.data.filter((item: any) => {
-                        if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
-                            logger.warn('⚠️ Skipping promise-like object in desserts:', item);
-                            return false;
+                    const filteredArr = payload.filter((item: any) => {
+                        if (item && typeof item === "object" && typeof (item as any).then === "function") {
+                            logger.warn("⚠️ Skipping promise-like object in desserts:", item)
+                            return false
                         }
-                        return true;
-                    });
+                        return true
+                    })
 
-                    this.desserts = filteredArr.map(normalizePrice);
-                    logger.debug('✅ Desserts loaded:', this.desserts.length, '| raw items:', filteredArr);
+                    this.desserts = filteredArr.map(normalizePrice)
+                    logger.debug("✅ Desserts loaded:", this.desserts.length, "| raw items:", filteredArr)
                 } else {
-                    logger.warn('⚠️ Dessert category not found in tablet categories');
-                    this.desserts = [];
+                    logger.warn("⚠️ Dessert category not found in tablet categories")
+                    this.desserts = []
                 }
-                logger.debug('✅ Desserts final state:', this.desserts);
-                return { success: true };
+                logger.debug("✅ Desserts final state:", this.desserts)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch desserts';
-                this.errors.desserts = errorMessage;
-                logger.error('❌ Desserts error:', error);
-                this.desserts = [];
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || "Failed to fetch desserts"
+                this.errors.desserts = errorMessage
+                logger.error("❌ Desserts error:", error)
+                this.desserts = []
+                throw new Error(errorMessage)
             } finally {
-                this.loading.desserts = false;
+                this.loading.desserts = false
             }
         },
 
-        async fetchSides(this: any) {
-            this.loading.sides = true;
-            this.errors.sides = null;
-            const api = useApi();
+        async fetchSides (this: any) {
+            this.loading.sides = true
+            this.errors.sides = null
+            const api = useApi()
             try {
                 // Find sides category slug from tabletCategories
-                const category = this.tabletCategories.find((c: TabletCategory) => 
-                    c.slug === 'sides' || c.name.toLowerCase().includes('side')
-                );
-                
+                const category = this.tabletCategories.find((c: TabletCategory) =>
+                    c.slug === "sides" || c.name.toLowerCase().includes("side")
+                )
+
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    this.sides = Array.isArray(data.data) ? data.data.map(normalizePrice) : [];
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`)
+                    this.sides = extractArrayPayload<MenuItem>(response?.data).map(normalizePrice)
                 } else {
-                    logger.warn('⚠️ Sides category not found in tablet categories');
-                    this.sides = [];
+                    logger.warn("⚠️ Sides category not found in tablet categories")
+                    this.sides = []
                 }
-                logger.debug('✅ Sides loaded:', this.sides.length);
-                return { success: true };
+                logger.debug("✅ Sides loaded:", this.sides.length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch sides';
-                this.errors.sides = errorMessage;
-                logger.error('❌ Sides error:', error);
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || "Failed to fetch sides"
+                this.errors.sides = errorMessage
+                logger.error("❌ Sides error:", error)
+                throw new Error(errorMessage)
             } finally {
-                this.loading.sides = false;
+                this.loading.sides = false
             }
         },
 
-        async fetchAlacartes(this: any) {
-            this.loading.alacartes = true;
-            this.errors.alacartes = null;
-            const api = useApi();
+        async fetchAlacartes (this: any) {
+            this.loading.alacartes = true
+            this.errors.alacartes = null
+            const api = useApi()
             try {
                 // Find alacarte category slug from tabletCategories
-                const category = this.tabletCategories.find((c: TabletCategory) => 
-                    c.slug === 'alacarte' || c.name.toLowerCase().includes('alacarte')
-                );
-                
+                const category = this.tabletCategories.find((c: TabletCategory) =>
+                    c.slug === "alacarte" || c.name.toLowerCase().includes("alacarte")
+                )
+
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`)
+                    const payload = extractPayload<any>(response?.data)
+
                     // Defensive: Ensure data.data is a proper array of non-promise items
-                    if (!Array.isArray(data?.data)) {
-                        logger.warn('⚠️ Alacartes API returned non-array data:', data?.data);
-                        this.alacartes = [];
-                        return { success: true };
+                    if (!Array.isArray(payload)) {
+                        logger.warn("⚠️ Alacartes API returned non-array data:", payload)
+                        this.alacartes = []
+                        return { success: true }
                     }
 
                     // Filter out any promise-like objects
-                    const filteredArr = data.data.filter((item: any) => {
-                        if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
-                            logger.warn('⚠️ Skipping promise-like object in alacartes:', item);
-                            return false;
+                    const filteredArr = payload.filter((item: any) => {
+                        if (item && typeof item === "object" && typeof (item as any).then === "function") {
+                            logger.warn("⚠️ Skipping promise-like object in alacartes:", item)
+                            return false
                         }
-                        return true;
-                    });
+                        return true
+                    })
 
-                    this.alacartes = filteredArr.map(normalizePrice);
+                    this.alacartes = filteredArr.map(normalizePrice)
                 } else {
-                    logger.warn('⚠️ Alacarte category not found in tablet categories');
-                    this.alacartes = [];
+                    logger.warn("⚠️ Alacarte category not found in tablet categories")
+                    this.alacartes = []
                 }
-                logger.debug('✅ Alacartes loaded:', this.alacartes.length);
-                return { success: true };
+                logger.debug("✅ Alacartes loaded:", this.alacartes.length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch alacartes';
-                this.errors.alacartes = errorMessage;
-                logger.error('❌ Alacartes error:', error);
-                this.alacartes = [];
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || "Failed to fetch alacartes"
+                this.errors.alacartes = errorMessage
+                logger.error("❌ Alacartes error:", error)
+                this.alacartes = []
+                throw new Error(errorMessage)
             } finally {
-                this.loading.alacartes = false;
+                this.loading.alacartes = false
             }
         },
 
-        async fetchBeverages(this: any) {
-            this.loading.beverages = true;
-            this.errors.beverages = null;
-            const api = useApi();
+        async fetchBeverages (this: any) {
+            this.loading.beverages = true
+            this.errors.beverages = null
+            const api = useApi()
             try {
                 // Find beverage category slug from tabletCategories
-                const category = this.tabletCategories.find((c: TabletCategory) => 
-                    c.slug === 'beverage' || c.name.toLowerCase().includes('beverage')
-                );
-                
+                const category = this.tabletCategories.find((c: TabletCategory) =>
+                    c.slug === "beverage" || c.name.toLowerCase().includes("beverage")
+                )
+
                 if (category) {
-                    const { data } = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`);
-                    
+                    const response = await api.get(`/api/v2/tablet/categories/${category.slug}/menus`)
+                    const payload = extractPayload<any>(response?.data)
+
                     // Defensive: Ensure data.data is a proper array of non-promise items
-                    if (!Array.isArray(data?.data)) {
-                        logger.warn('⚠️ Beverages API returned non-array data:', data?.data);
-                        this.beverages = [];
-                        return { success: true };
+                    if (!Array.isArray(payload)) {
+                        logger.warn("⚠️ Beverages API returned non-array data:", payload)
+                        this.beverages = []
+                        return { success: true }
                     }
 
                     // Filter out any promise-like objects
-                    const filteredArr = data.data.filter((item: any) => {
-                        if (item && typeof item === 'object' && typeof (item as any).then === 'function') {
-                            logger.warn('⚠️ Skipping promise-like object in beverages:', item);
-                            return false;
+                    const filteredArr = payload.filter((item: any) => {
+                        if (item && typeof item === "object" && typeof (item as any).then === "function") {
+                            logger.warn("⚠️ Skipping promise-like object in beverages:", item)
+                            return false
                         }
-                        return true;
-                    });
+                        return true
+                    })
 
-                    this.beverages = filteredArr.map(normalizePrice);
+                    this.beverages = filteredArr.map(normalizePrice)
                 } else {
-                    logger.warn('⚠️ Beverage category not found in tablet categories');
-                    this.beverages = [];
+                    logger.warn("⚠️ Beverage category not found in tablet categories")
+                    this.beverages = []
                 }
-                logger.debug('✅ Beverages loaded:', this.beverages.length);
-                return { success: true };
+                logger.debug("✅ Beverages loaded:", this.beverages.length)
+                return { success: true }
             } catch (error) {
-                const errorMessage = (error as Error).message || 'Failed to fetch beverages';
-                this.errors.beverages = errorMessage;
-                logger.error('❌ Beverages error:', error);
-                this.beverages = [];
-                throw new Error(errorMessage);
+                const errorMessage = (error as Error).message || "Failed to fetch beverages"
+                this.errors.beverages = errorMessage
+                logger.error("❌ Beverages error:", error)
+                this.beverages = []
+                throw new Error(errorMessage)
             } finally {
-                this.loading.beverages = false;
+                this.loading.beverages = false
             }
         },
 
-        async loadAllMenus(this: any, forceRefresh = false) {
+        async loadAllMenus (this: any, forceRefresh = false) {
             if (!forceRefresh && !this.isCacheStale && this.packages.length > 0) {
-                logger.debug('📦 Using cached menu data');
-                return { success: true, fromCache: true };
+                logger.debug("📦 Using cached menu data")
+                return { success: true, fromCache: true }
             }
 
-            logger.debug('🔄 Fetching fresh menu data...');
-            
+            logger.debug("🔄 Fetching fresh menu data...")
+
             // First, load tablet categories (required for loading category-based items)
             try {
-                await this.fetchTabletCategories();
+                await this.fetchTabletCategories()
             } catch (error) {
-                logger.error('❌ Failed to load tablet categories:', error);
+                logger.error("❌ Failed to load tablet categories:", error)
             }
-            
+
             // Then load all menu data in parallel
             const fetches = [
                 this.fetchPackages(),
@@ -363,70 +417,70 @@ export const useMenuStore = defineStore("menu", {
                 this.fetchAlacartes(),
                 this.fetchSides(),
                 this.fetchBeverages(),
-            ];
+            ]
 
-            const results = await Promise.allSettled(fetches);
-            const allSucceeded = results.every(r => r.status === 'fulfilled');
+            const results = await Promise.allSettled(fetches)
+            const allSucceeded = results.every(r => r.status === "fulfilled")
 
             if (allSucceeded) {
-                this.lastFetched = Date.now();
+                this.lastFetched = Date.now()
             }
 
             return {
                 success: allSucceeded,
                 fromCache: false,
                 errors: results
-                    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+                    .filter((r): r is PromiseRejectedResult => r.status === "rejected")
                     .map(r => r.reason),
-            };
+            }
         },
 
-        async refreshMenus(this: any) {
-            return this.loadAllMenus(true);
+        async refreshMenus (this: any) {
+            return this.loadAllMenus(true)
         },
 
-        setActive(this: any, id: number) {
+        setActive (this: any, id: number) {
             this.menus.forEach((menu) => {
-                menu.is_active = menu.id === id;
-            });
+                menu.is_active = menu.id === id
+            })
         },
 
-        extractModifierGroups(pkg: Package) {
-            if (!pkg?.modifiers) return [];
+        extractModifierGroups (pkg: Package) {
+            if (!pkg?.modifiers) { return [] }
 
             // Collect unique group names
-            const groups = [...new Set(pkg.modifiers.map((m) => m.group || 'Other'))];
+            const groups = [...new Set(pkg.modifiers.map(m => m.group || "Other"))]
 
             // If any group looks like a 'meat' umbrella, split by meat keywords
-            const hasMeatGroup = groups.some(g => /meat/i.test(String(g)));
+            const hasMeatGroup = groups.some(g => /meat/i.test(String(g)))
 
-            if (!hasMeatGroup) return groups;
+            if (!hasMeatGroup) { return groups }
 
             // Split modifiers into PORK / BEEF / CHICKEN where possible, otherwise fall back
-            const mods = pkg.modifiers || [];
+            const mods = pkg.modifiers || []
             const byKeyword = {
-                PORK: mods.filter((m: any) => /pork/i.test(m.name || '')),
-                BEEF: mods.filter((m: any) => /beef/i.test(m.name || '')),
-                CHICKEN: mods.filter((m: any) => /chicken/i.test(m.name || '')),
-            } as Record<string, any[]>;
+                PORK: mods.filter((m: any) => /pork/i.test(m.name || "")),
+                BEEF: mods.filter((m: any) => /beef/i.test(m.name || "")),
+                CHICKEN: mods.filter((m: any) => /chicken/i.test(m.name || "")),
+            } as Record<string, any[]>
 
-            const other = mods.filter((m: any) => !/pork|beef|chicken/i.test(m.name || ''));
+            const other = mods.filter((m: any) => !/pork|beef|chicken/i.test(m.name || ""))
 
-            const result: string[] = [];
-            if (byKeyword.PORK.length) result.push('PORK');
-            if (byKeyword.BEEF.length) result.push('BEEF');
-            if (byKeyword.CHICKEN.length) result.push('CHICKEN');
-            if (other.length) result.push('Other');
+            const result: string[] = []
+            if (byKeyword.PORK.length) { result.push("PORK") }
+            if (byKeyword.BEEF.length) { result.push("BEEF") }
+            if (byKeyword.CHICKEN.length) { result.push("CHICKEN") }
+            if (other.length) { result.push("Other") }
 
             // If splitting failed (no keywords matched), return the original groups
-            return result.length ? result : groups;
+            return result.length ? result : groups
         },
 
-        clearError(this: any, key: string) {
-            this.errors[key] = null;
+        clearError (this: any, key: string) {
+            this.errors[key] = null
         },
 
-        clearAllErrors(this: any) {
+        clearAllErrors (this: any) {
             this.errors = {
                 packages: null,
                 modifiers: null,
@@ -434,21 +488,21 @@ export const useMenuStore = defineStore("menu", {
                 desserts: null,
                 sides: null,
                 beverages: null,
-            };
+            }
         },
 
-        clear(this: any) {
-            this.packages = [];
-            this.sides = [];
-            this.beverages = [];
-            this.desserts = [];
-            this.alacartes = [];
-            this.modifiers = [];
-            this.menus = [];
-            this.meatCategories = [];
-            this.tabletCategories = [];
-            this.packageDetails = {};
-            this.lastFetched = null;
+        clear (this: any) {
+            this.packages = []
+            this.sides = []
+            this.beverages = []
+            this.desserts = []
+            this.alacartes = []
+            this.modifiers = []
+            this.menus = []
+            this.meatCategories = []
+            this.tabletCategories = []
+            this.packageDetails = {}
+            this.lastFetched = null
             this.errors = {
                 packages: null,
                 modifiers: null,
@@ -458,7 +512,7 @@ export const useMenuStore = defineStore("menu", {
                 beverages: null,
                 meatCategories: null,
                 tabletCategories: null,
-            };
+            }
             this.loading = {
                 packages: false,
                 modifiers: false,
@@ -468,20 +522,20 @@ export const useMenuStore = defineStore("menu", {
                 beverages: false,
                 meatCategories: false,
                 tabletCategories: false,
-            };
+            }
         },
 
-        clearCache(this: any) {
-            this.clear();
-            if (typeof window !== 'undefined') {
-                localStorage.removeItem('menu-store');
+        clearCache (this: any) {
+            this.clear()
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("menu-store")
             }
         },
     },
 
     persist: {
         key: "menu-store",
-        storage: (typeof window !== 'undefined') ? localStorage : undefined,
+        storage: (typeof window !== "undefined") ? localStorage : undefined,
         pick: ["menus", "packages", "modifiers", "alacartes", "beverages", "sides", "desserts", "meatCategories", "tabletCategories", "packageDetails", "lastFetched"],
     },
-});
+})
