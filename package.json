@@ -11,7 +11,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "build": "npx nuxi build",
-    "generate": "npx nuxi build && npx nuxi generate && node -e \"const fs=require('fs'), path=require('path'); const src='.output/public', dst='public'; fs.existsSync(src) && fs.cpSync(src, dst, {recursive: true, force: true})\"",
+    "generate": "npx nuxi generate",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "npx nuxi typecheck",
