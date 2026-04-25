@@ -1,4 +1,4 @@
-import { useOrderStore } from '~/stores/Order'
+import { useOrderStore } from "~/stores/Order"
 
 // Absorbs browser back/forward gestures when an order is live.
 //
@@ -11,18 +11,18 @@ import { useOrderStore } from '~/stores/Order'
 //   Without an active order, the sentinel is still in place but the
 //   popstate handler does nothing — normal navigation continues.
 export default defineNuxtPlugin(() => {
-  const orderStore = useOrderStore()
-  const router = useRouter()
+    const orderStore = useOrderStore()
+    const router = useRouter()
 
-  // Push sentinel so back never exhausts history and closes the PWA.
-  window.history.pushState({ __kioskSentinel: true }, '')
+    // Push sentinel so back never exhausts history and closes the PWA.
+    window.history.pushState({ __kioskSentinel: true }, "")
 
-  window.addEventListener('popstate', () => {
+    window.addEventListener("popstate", () => {
     // Always re-push the sentinel to absorb the gesture.
-    window.history.pushState({ __kioskSentinel: true }, '')
+        window.history.pushState({ __kioskSentinel: true }, "")
 
-    if (orderStore.hasPlacedOrder) {
-      router.replace('/order/in-session')
-    }
-  })
+        if (orderStore.hasPlacedOrder) {
+            router.replace("/order/in-session")
+        }
+    })
 })

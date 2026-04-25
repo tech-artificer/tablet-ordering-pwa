@@ -7,7 +7,7 @@ Quick start (development)
 1. Ensure Node.js 18+ and npm are installed.
 2. cd tablet-ordering-pwa
 3. npm ci
-4. cp .env.example .env and set `MAIN_API_URL` to your Laravel app base URL (e.g. http://127.0.0.1:8000)
+4. cp .env.example .env and keep `NUXT_PUBLIC_API_BASE_URL=/api` for the canonical Docker/LAN setup behind `https://192.168.100.7`
 5. npm run dev
 
 Build & preview
@@ -25,7 +25,7 @@ Scripts of interest
 - `rebuild:esbuild`: refreshes esbuild native binary (run automatically during `postinstall`)
 
 Environment variables
-- `MAIN_API_URL`: Laravel API base URL used by the client (API routes under `/api`)
+- `NUXT_PUBLIC_API_BASE_URL`: Laravel API base URL used by the client. Keep `/api` for the canonical Docker/LAN deployment via nginx.
 - `NUXT_PUBLIC_PUSHER_KEY` / `NUXT_PUBLIC_PUSHER_CLUSTER`: Pusher/Echo realtime configuration
 
 Notes

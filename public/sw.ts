@@ -8,7 +8,7 @@
 //   3. Queue POST /api/devices/create-order with BackgroundSyncPlugin (2-hour max)
 //   4. Bridge Background Sync lifecycle events back to window clients via postMessage
 
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, NetworkOnly } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
@@ -34,16 +34,22 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
-// Navigation fallback: serve cached /index.html for all navigation requests
-// except API routes (which must not be intercepted)
+// Navigation fallback: bind to the revisioned root app shell.
+// The prerendered "/" entry is revisioned by Nuxt, so this avoids the stale
+// unrevisioned "/index.html" path staying alive across deployments.
 registerRoute(
   new NavigationRoute(
-    async () => {
-      const cache = await caches.open('precache-v1')
-      const cachedResponse = await cache.match('/')
-      return cachedResponse ?? fetch('/')
+    createHandlerBoundToURL('/'),
+    {
+      denylist: [
+        /^\/api/,
+        /^\/_nuxt\//,
+        /^\/@vite\//,
+        /\.(?:js|mjs|css|map|json|webmanifest)$/,
+        // Laravel admin/backend routes — must not be served by the PWA shell
+        /^\/(login|logout|forgot-password|reset-password|verify-email|confirm-password|dashboard|orders|menus|packages|package-configs|tablet-categories|media|admin|configuration|users|roles|permissions|branches|devices|accessibility|service-requests|event-logs|manual|reports|monitoring|settings|storage|docs|horizon|pulse|telescope|sanctum|broadcasting)([\/]|$)/,
+      ],
     },
-    { denylist: [/^\/api/] },
   ),
 )
 
@@ -116,8 +122,16 @@ const bgSyncPlugin = new BackgroundSyncPlugin(ORDER_QUEUE_NAME, {
           await queue.unshiftRequest(entry)
           await notifyClients({ type: 'orders-sync-error', message: 'auth_error: 401 — device token expired' })
           break
+        } else if (response.status === 429 || response.status >= 500) {
+          // Retryable server/rate-limit error — re-queue and stop so Workbox retries later
+          await queue.unshiftRequest(entry)
+          await notifyClients({
+            type: 'orders-sync-error',
+            message: `Retryable server response ${response.status}`,
+          })
+          throw new Error(`Retryable server response ${response.status}`)
         } else {
-          // Non-retriable server error
+          // Non-retriable client/server response
           await notifyClients({
             type: 'orders-sync-error',
             message: `Server responded ${response.status}`,

@@ -16,30 +16,30 @@
 // - 401 responses: mark the outbox row as auth_error after Axios retry chain exhausts
 // - Refill submission is explicitly blocked when offline (requires confirmed orderId)
 
-import { useNuxtApp } from '#app'
-import { useDeviceStore } from '~/stores/Device'
-import { useOrderStore } from '~/stores/Order'
-import { useOfflineSyncStore } from '~/stores/OfflineSync'
-import { logger } from '~/utils/logger'
-import type { OfflineOrderRecord } from '~/types/offline-order'
+import { useNuxtApp } from "#app"
+import { useDeviceStore } from "~/stores/Device"
+import { useOrderStore } from "~/stores/Order"
+import { useOfflineSyncStore } from "~/stores/OfflineSync"
+import { logger } from "~/utils/logger"
+import type { OfflineOrderRecord } from "~/types/offline-order"
 
-function generateIdempotencyKey(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return (crypto as any).randomUUID() as string
-  }
-  return `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+function generateIdempotencyKey (): string {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+        return (crypto as any).randomUUID() as string
+    }
+    return `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-function buildHeadersSnapshot(token: string | null): Record<string, string> {
-  const snapshot: Record<string, string> = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  }
-  // Only capture Bearer token — CSRF not applicable on auth:device routes
-  if (token) {
-    snapshot['Authorization'] = `Bearer ${token}`
-  }
-  return snapshot
+function buildHeadersSnapshot (token: string | null): Record<string, string> {
+    const snapshot: Record<string, string> = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+    }
+    // Only capture Bearer token — CSRF not applicable on auth:device routes
+    if (token) {
+        snapshot.Authorization = `Bearer ${token}`
+    }
+    return snapshot
 }
 
 export interface OrderSubmitResult {
@@ -51,86 +51,91 @@ export interface OrderSubmitResult {
   data?: unknown
 }
 
-export function useOrderSubmit() {
-  async function submitOrder(payload: Record<string, unknown>): Promise<OrderSubmitResult> {
-    const orderStore = useOrderStore()
-    const deviceStore = useDeviceStore()
-    const offlineSyncStore = useOfflineSyncStore()
-    const { $offlineOutbox } = useNuxtApp()
-    const deviceToken = typeof deviceStore.token === 'string'
-      ? deviceStore.token
-      : deviceStore.token?.value ?? null
+export function useOrderSubmit () {
+    async function submitOrder (payload: Record<string, unknown>): Promise<OrderSubmitResult> {
+        const orderStore = useOrderStore()
+        const deviceStore = useDeviceStore()
+        const offlineSyncStore = useOfflineSyncStore()
+        const { $offlineOutbox } = useNuxtApp()
+        const deviceToken = typeof deviceStore.token === "string"
+            ? deviceStore.token
+            : deviceStore.token?.value ?? null
 
-    const idempotencyKey = generateIdempotencyKey()
-
-    // -----------------------------------------------------------------------
-    // Submit via existing orderStore (handles validation + API call).
-    // If device is offline the fetch fails immediately; BackgroundSyncPlugin
-    // queues it, and the network-error catch path mirrors it in Dexie.
-    // -----------------------------------------------------------------------
-    try {
-      const result = await orderStore.submitOrder(payload)
-      return { queued: false, data: result }
-    } catch (err: any) {
-      const status: number | undefined = err?.response?.status
-
-      // 409: active order already exists; order store already handles this
-      // by calling setOrderCreated internally — treat result as success
-      if (status === 409) {
-        logger.info('[OrderSubmit] 409 — existing order resumed')
-        return { queued: false, data: err?.response?.data }
-      }
-
-      // Network failure (no response): queue for later and let Workbox replay
-      if (!err?.response) {
-        logger.warn('[OrderSubmit] Network error — queuing to outbox for SW replay')
-        const record: OfflineOrderRecord = {
-          id: idempotencyKey,
-          endpoint: '/api/devices/create-order',
-          method: 'POST',
-          payload: payload as Record<string, unknown>,
-          headersSnapshot: buildHeadersSnapshot(deviceStore.token ?? null),
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          retryCount: 0,
-          status: 'queued_sw',
-          lastError: err?.message ?? 'Network error',
-          idempotencyKey,
+        const idempotencyKey = generateIdempotencyKey()
+        const submitOptions = {
+            headers: {
+                "X-Idempotency-Key": idempotencyKey,
+            },
         }
-        if ($offlineOutbox) {
-          await ($offlineOutbox as any).enqueue(record)
-        }
-        await offlineSyncStore.refreshPendingCount()
-        return { queued: true }
-      }
 
-      // 401 after Axios retry chain exhausted: token expired, cannot auto-retry
-      if (status === 401) {
-        logger.error('[OrderSubmit] 401 auth error — marking outbox auth_error')
-        if ($offlineOutbox) {
-          const errorMsg = 'auth_error: 401 — device token expired'
-          const record: OfflineOrderRecord = {
-            id: idempotencyKey,
-            endpoint: '/api/devices/create-order',
-            method: 'POST',
-            payload: payload as Record<string, unknown>,
-            headersSnapshot: buildHeadersSnapshot(deviceStore.token ?? null),
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            retryCount: 0,
-            status: 'auth_error',
-            lastError: errorMsg,
-            idempotencyKey,
-          }
-          await ($offlineOutbox as any).enqueue(record)
-          await offlineSyncStore.refreshPendingCount()
-        }
-      }
+        // -----------------------------------------------------------------------
+        // Submit via existing orderStore (handles validation + API call).
+        // If device is offline the fetch fails immediately; BackgroundSyncPlugin
+        // queues it, and the network-error catch path mirrors it in Dexie.
+        // -----------------------------------------------------------------------
+        try {
+            const result = await (orderStore.submitOrder as any)(payload, submitOptions)
+            return { queued: false, data: result }
+        } catch (err: any) {
+            const status: number | undefined = err?.response?.status
 
-      // Re-throw all other errors (422 validation, 500, etc.) for the caller
-      throw err
+            // 409: active order already exists; order store already handles this
+            // by calling setOrderCreated internally — treat result as success
+            if (status === 409) {
+                logger.info("[OrderSubmit] 409 — existing order resumed")
+                return { queued: false, data: err?.response?.data }
+            }
+
+            // Network failure (no response): queue for later and let Workbox replay
+            if (!err?.response) {
+                logger.warn("[OrderSubmit] Network error — queuing to outbox for SW replay")
+                const record: OfflineOrderRecord = {
+                    id: idempotencyKey,
+                    endpoint: "/api/devices/create-order",
+                    method: "POST",
+                    payload: payload as Record<string, unknown>,
+                    headersSnapshot: buildHeadersSnapshot(deviceToken),
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    retryCount: 0,
+                    status: "queued_sw",
+                    lastError: err?.message ?? "Network error",
+                    idempotencyKey,
+                }
+                if ($offlineOutbox) {
+                    await ($offlineOutbox as any).enqueue(record)
+                }
+                await offlineSyncStore.refreshPendingCount()
+                return { queued: true }
+            }
+
+            // 401 after Axios retry chain exhausted: token expired, cannot auto-retry
+            if (status === 401) {
+                logger.error("[OrderSubmit] 401 auth error — marking outbox auth_error")
+                if ($offlineOutbox) {
+                    const errorMsg = "auth_error: 401 — device token expired"
+                    const record: OfflineOrderRecord = {
+                        id: idempotencyKey,
+                        endpoint: "/api/devices/create-order",
+                        method: "POST",
+                        payload: payload as Record<string, unknown>,
+                        headersSnapshot: buildHeadersSnapshot(deviceToken),
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        retryCount: 0,
+                        status: "auth_error",
+                        lastError: errorMsg,
+                        idempotencyKey,
+                    }
+                    await ($offlineOutbox as any).enqueue(record)
+                    await offlineSyncStore.refreshPendingCount()
+                }
+            }
+
+            // Re-throw all other errors (422 validation, 500, etc.) for the caller
+            throw err
+        }
     }
-  }
 
-  return { submitOrder }
+    return { submitOrder }
 }

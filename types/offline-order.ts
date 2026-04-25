@@ -2,12 +2,12 @@
 // Types for the IndexedDB offline order outbox
 
 export type OfflineOrderStatus =
-  | 'queued_local'
-  | 'queued_sw'
-  | 'syncing'
-  | 'synced'
-  | 'auth_error'
-  | 'failed'
+  | "queued_local"
+  | "queued_sw"
+  | "syncing"
+  | "synced"
+  | "auth_error"
+  | "failed"
 
 export interface OfflineOrderRecord {
   /** UUID generated at submission time — also used as X-Idempotency-Key */
