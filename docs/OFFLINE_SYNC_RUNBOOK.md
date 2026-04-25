@@ -44,7 +44,7 @@ Open Chrome DevTools → Application → Service Workers — the `sw.ts` worker 
 3. The orange **"No internet connection"** banner should appear at the top.
 4. Select items and proceed to order confirmation — tap **Confirm Order**.
 5. Expected outcome: modal closes immediately, a **"Queued for sync"** UX state is shown (no error).
-6. Open Chrome DevTools → Application → IndexedDB → `woosoo-offline-outbox` → `orders` table.
+6. Open Chrome DevTools → Application → IndexedDB → `wooserve_offline` → `orders` table.
    - One record should be present with `status: "queued_sw"`.
 
 ---
