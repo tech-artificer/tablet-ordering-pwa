@@ -122,8 +122,16 @@ const bgSyncPlugin = new BackgroundSyncPlugin(ORDER_QUEUE_NAME, {
           await queue.unshiftRequest(entry)
           await notifyClients({ type: 'orders-sync-error', message: 'auth_error: 401 — device token expired' })
           break
+        } else if (response.status === 429 || response.status >= 500) {
+          // Retryable server/rate-limit error — re-queue and stop so Workbox retries later
+          await queue.unshiftRequest(entry)
+          await notifyClients({
+            type: 'orders-sync-error',
+            message: `Retryable server response ${response.status}`,
+          })
+          throw new Error(`Retryable server response ${response.status}`)
         } else {
-          // Non-retriable server error
+          // Non-retriable client/server response
           await notifyClients({
             type: 'orders-sync-error',
             message: `Server responded ${response.status}`,
