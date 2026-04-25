@@ -27,7 +27,36 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("register() action with security_code field", () => {
-        it("should emit only security_code identity fields in the payload", async () => {
+        it("should forward ip_address when provided during registration", async () => {
+            const store = useDeviceStore()
+
+            const mockResponse = {
+                data: {
+                    device: { id: 1, name: "Test Device" },
+                    token: "test-token",
+                    table: { id: 4, name: "Table 4" },
+                }
+            }
+
+            mockPost.mockResolvedValueOnce(mockResponse)
+
+            await store.register({
+                security_code: "123456",
+                name: "Test Device",
+                ip_address: "192.168.100.7"
+            } as any)
+
+            expect(mockPost).toHaveBeenCalledWith(
+                "/api/devices/register",
+                expect.objectContaining({
+                    security_code: "123456",
+                    name: "Test Device",
+                    ip_address: "192.168.100.7"
+                })
+            )
+        })
+
+        it("should emit security_code in payload instead of legacy code field", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
@@ -51,7 +80,6 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             )
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("passcode")
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
-            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("name")
             expect(store.code).toBeNull()
         })
 
@@ -127,6 +155,32 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             ).rejects.toThrow()
 
             expect(store.errorMessage).toBeTruthy()
+        })
+    })
+
+    describe("authenticate() action with optional client ip", () => {
+        it("should call /api/devices/login with ip_address query when provided", async () => {
+            const store = useDeviceStore()
+
+            const mockResponse = {
+                data: {
+                    success: true,
+                    token: "test-token",
+                    device: { id: 1, name: "Tablet-01", ip_address: "192.168.100.7" },
+                    table: { id: 1, name: "T1" },
+                    ip_used: "192.168.100.7"
+                }
+            }
+
+            mockGet.mockResolvedValueOnce(mockResponse)
+
+            await store.authenticate("192.168.100.7")
+
+            expect(mockGet).toHaveBeenCalledWith("/api/devices/login", {
+                params: {
+                    ip_address: "192.168.100.7"
+                }
+            })
         })
     })
 
