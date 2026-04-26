@@ -12,6 +12,23 @@ type EchoConfig = {
     authEndpoint?: string
 }
 
+function normalizeWsPath (path?: string) {
+    const raw = String(path ?? "").trim()
+    if (!raw) {
+        return ""
+    }
+
+    const normalized = raw.startsWith("/") ? raw : `/${raw}`
+
+    // Reverb/Pusher endpoint is already /app/{key}; if wsPath is '/app',
+    // pusher-js produces '/app/app/{key}'.
+    if (normalized === "/app") {
+        return ""
+    }
+
+    return normalized
+}
+
 function resolveAuthEndpoint (apiBaseUrl: string, authEndpoint?: string) {
     if (!authEndpoint) {
         return "/broadcasting/auth"
@@ -75,7 +92,7 @@ function createEcho (
     const wssPort = wsPort
     const forceTLS = isHttpsPage || String(cfg.scheme || "").toLowerCase() === "https"
 
-    const wsPath = cfg.path || "/app"
+    const wsPath = normalizeWsPath(cfg.path)
 
     logger.info(`[Echo] Connecting to Reverb: ${forceTLS ? "wss" : "ws"}://${normalizedHost}:${wsPort}${wsPath}`)
 
@@ -149,7 +166,7 @@ function normalizeBroadcastConfig (raw: any): EchoConfig | null {
         host: String(raw.host ?? ""),
         port: (rawPort === 8080 || rawPort === 6001) ? 0 : rawPort,
         scheme: String(raw.scheme ?? "http"),
-        path: String(raw.path ?? "/app"),
+        path: normalizeWsPath(String(raw.path ?? "")),
         authEndpoint: raw.authEndpoint ? String(raw.authEndpoint) : (raw.auth_endpoint ? String(raw.auth_endpoint) : undefined),
     }
 }
@@ -225,7 +242,7 @@ export default defineNuxtPlugin((nuxtApp: any) => {
                 host: config.public.reverb.host || "",
                 port: (rawFallbackPort === 8080 || rawFallbackPort === 6001) ? 0 : rawFallbackPort,
                 scheme: config.public.reverb.scheme || "http",
-                path: config.public.reverb.path || "/app",
+                path: normalizeWsPath(config.public.reverb.path || ""),
             }, String(mainApi), token)
 
             void initializeFromApiConfig()
