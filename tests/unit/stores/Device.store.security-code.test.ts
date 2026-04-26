@@ -186,4 +186,67 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             )
         })
     })
+
+    describe("authenticate() IP metadata propagation", () => {
+        it("should send ip_address query param using last known server IP", async () => {
+            const store = useDeviceStore()
+
+            mockPost.mockResolvedValueOnce({
+                data: {
+                    device: {
+                        id: 1,
+                        name: "Kiosk-1",
+                        last_ip_address: "192.168.100.7"
+                    },
+                    token: "register-token",
+                    table: { id: 6, name: "Table 6" },
+                    ip_used: "192.168.100.7"
+                }
+            })
+
+            await store.register({ security_code: "333333", name: "Kiosk-1" } as any)
+
+            mockGet.mockResolvedValueOnce({
+                data: {
+                    success: true,
+                    token: "auth-token",
+                    device: {
+                        id: 1,
+                        name: "Kiosk-1",
+                        last_ip_address: "192.168.100.7"
+                    },
+                    table: { id: 6, name: "Table 6" },
+                    ip_used: "192.168.100.7"
+                }
+            })
+
+            const ok = await store.authenticate()
+
+            expect(ok).toBe(true)
+            expect(mockGet).toHaveBeenCalledWith(
+                "/api/devices/login",
+                { params: { ip_address: "192.168.100.7" } }
+            )
+        })
+
+        it("should map backend 'error' field into errorMessage when auth fails", async () => {
+            const store = useDeviceStore()
+
+            mockGet.mockRejectedValueOnce({
+                response: {
+                    status: 404,
+                    data: {
+                        success: false,
+                        error: "Device not found",
+                        ip_address: "172.18.0.1"
+                    }
+                }
+            })
+
+            const ok = await store.authenticate()
+
+            expect(ok).toBe(false)
+            expect(store.errorMessage).toBe("Device not found")
+        })
+    })
 })

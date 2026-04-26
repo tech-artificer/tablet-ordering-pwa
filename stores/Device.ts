@@ -34,6 +34,10 @@ const defaultPollIntervalMs = 5000
 const defaultMaxPollAttempts = 24
 const defaultMaxPollRuntimeMs = 2 * 60 * 1000
 
+function isIpv4Address (value: unknown): value is string {
+    return typeof value === "string" && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)
+}
+
 function normalizeTable (tbl: unknown): Table | null {
     if (!tbl) { return null }
 
@@ -71,6 +75,46 @@ export const useDeviceStore = defineStore("device", () => {
 
     let pollTimerId: number | null = null
     let pollStartedAt: number | null = null
+    let detectedClientIp: string | null | undefined
+
+    async function resolveClientIpForAuth (): Promise<string | null> {
+        const stateDevice = state.device as (Device & { ip_address?: string; last_ip_address?: string }) | null
+
+        const knownCandidates = [
+            stateDevice?.ip_address,
+            stateDevice?.last_ip_address,
+            state.lastServerIpUsed,
+        ]
+
+        for (const candidate of knownCandidates) {
+            if (isIpv4Address(candidate)) {
+                return candidate
+            }
+        }
+
+        if (detectedClientIp !== undefined) {
+            return detectedClientIp
+        }
+
+        try {
+            const { getLocalIp } = await import("~/utils/getLocalIp")
+            const localIp = await getLocalIp()
+            if (isIpv4Address(localIp)) {
+                detectedClientIp = localIp
+                return localIp
+            }
+        } catch (error) {
+            logger.debug("[DeviceStore] resolveClientIpForAuth: getLocalIp failed", error)
+        }
+
+        if (typeof window !== "undefined" && isIpv4Address(window.location?.hostname)) {
+            detectedClientIp = window.location.hostname
+            return detectedClientIp
+        }
+
+        detectedClientIp = null
+        return null
+    }
 
     function applyBroadcastConfig (responseData: any) {
         const bc = responseData?.broadcasting
@@ -178,8 +222,14 @@ export const useDeviceStore = defineStore("device", () => {
 
         try {
             const api = useApi()
+            const clientIp = await resolveClientIpForAuth()
             const authStart = typeof performance !== "undefined" ? performance.now() : Date.now()
-            const response = await api.get("/api/devices/login")
+            const response = await api.get(
+                "/api/devices/login",
+                clientIp
+                    ? { params: { ip_address: clientIp } }
+                    : undefined
+            )
             applyAuthPayload(response.data)
             syncWaitingForTable()
 
@@ -197,7 +247,7 @@ export const useDeviceStore = defineStore("device", () => {
         } catch (error: any) {
             logger.error(`[Device] Auth error ${error?.message} at ${new Date().toISOString()}`)
             logger.error("[DeviceStore] Authentication failed:", error)
-            state.errorMessage = error?.response?.data?.message || "Authentication failed"
+            state.errorMessage = error?.response?.data?.message || error?.response?.data?.error || "Authentication failed"
             return false
         } finally {
             state.isLoading = false
@@ -242,7 +292,7 @@ export const useDeviceStore = defineStore("device", () => {
             } catch (error) {
                 logger.error("[DeviceStore] table polling error", { error })
             }
-        }) as unknown as number
+        }, intervalMs) as unknown as number
     }
 
     async function register (formData: { code?: string; security_code?: string; name?: string }): Promise<void> {
