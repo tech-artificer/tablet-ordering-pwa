@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Users, Minus, Plus } from 'lucide-vue-next'
 import { useOrderStore } from '~/stores/Order'
+import { storeToRefs } from 'pinia'
 
 const orderStore = useOrderStore()
-const { guestCount } = orderStore
+const { guestCount } = storeToRefs(orderStore)
 
 const MIN = 2
 const MAX = 20
@@ -78,7 +79,8 @@ function increment() {
                active:scale-90 active:bg-primary/35
                disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-primary/15 disabled:hover:ring-primary/30
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-        :aria-label="`Increase guest count, currently ${guestCount}`"
+        :aria-label="`Increase guest count. Current: ${guestCount}`"
+        :class="{ 'opacity-50': !canIncrement }"
       >
         <Plus :size="22" stroke-width="2.5" />
       </button>

@@ -107,18 +107,10 @@ export default defineNuxtConfig({
         typeCheck: false
     },
 
-    // Build output goes to dist/ — separate from the source public/ static assets dir.
-    // nginx serves from dist/; static assets in public/ are copied to dist/ on every build.
-    // This prevents nuxt generate from wiping static files (icons, favicon) during builds.
-    // Keep in sync with nginx root directive (apps/tablet-ordering-pwa/dist).
     nitro: {
-        preset: "static",
         prerender: {
             crawlLinks: false,
             routes: ["/"],
-        },
-        output: {
-            publicDir: "dist",
         },
     },
 
