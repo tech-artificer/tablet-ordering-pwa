@@ -522,7 +522,7 @@ async function confirmOrder () {
                 >
                     <!-- Left: Back + title -->
                     <div class="flex items-center gap-3 min-w-0">
-                        <button
+                        <!-- <button
                             class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
                             aria-label="Go back"
                             @click="router.back()"
@@ -530,7 +530,7 @@ async function confirmOrder () {
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                             </svg>
-                        </button>
+                        </button> -->
                         <div class="min-w-0">
                             <p class="text-white font-bold text-base leading-tight truncate">
                                 {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill' }}
