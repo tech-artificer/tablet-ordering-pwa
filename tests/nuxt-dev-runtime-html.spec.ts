@@ -36,7 +36,9 @@ afterEach(() => {
     }
 })
 
-describe("nuxt dev runtime html", () => {
+// This test starts a real Nuxt dev server to catch Windows-specific absolute
+// path leaks in asset URLs. It is only meaningful on Windows CI runners.
+describe.skipIf(process.platform !== "win32")("nuxt dev runtime html", () => {
     it("does not expose absolute Windows filesystem paths in _nuxt entry URLs", async () => {
         devServer = spawn(process.execPath, [NUXT_CLI_PATH, "dev", "--host", "127.0.0.1", "--port", String(DEV_SERVER_PORT)], {
             cwd: process.cwd(),
