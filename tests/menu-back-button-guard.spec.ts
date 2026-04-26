@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
-const menuPagePath = "e:/Projects/woosoo-integrated-stack/tablet-ordering-pwa/pages/menu.vue"
+const menuPagePath = resolve(__dirname, "../pages/menu.vue")
 
 describe("menu page back button guard", () => {
     it("disables the back button while an order session is ongoing", () => {

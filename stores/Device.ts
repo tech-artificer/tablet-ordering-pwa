@@ -107,11 +107,6 @@ export const useDeviceStore = defineStore("device", () => {
             logger.debug("[DeviceStore] resolveClientIpForAuth: getLocalIp failed", error)
         }
 
-        if (typeof window !== "undefined" && isIpv4Address(window.location?.hostname)) {
-            detectedClientIp = window.location.hostname
-            return detectedClientIp
-        }
-
         detectedClientIp = null
         return null
     }
