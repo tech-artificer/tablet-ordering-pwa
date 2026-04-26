@@ -8,6 +8,7 @@
  * key directly to prevent prior-guest orders bleeding into the next session.
  */
 import { getCurrentInstance, onUnmounted } from "vue"
+import { useNuxtApp } from "#app"
 import { logger } from "~/utils/logger"
 import { useApi } from "~/composables/useApi"
 import { API_ENDPOINTS } from "~/config/api"
