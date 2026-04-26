@@ -1,5 +1,5 @@
-# ── Build stage ───────────────────────────────────────────────────────────
-FROM node:18-alpine AS builder
+# ── Build stage ────────────────────────────────────────────────────────
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -12,13 +12,13 @@ COPY . .
 ENV NITRO_PRESET=node-server
 RUN npm run build
 
-# ── Runtime stage ─────────────────────────────────────────────────────────
-FROM node:18-alpine
+# ── Runtime stage ────────────────────────────────────────────────────────
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Copy only the compiled output — no source, no node_modules
-COPY --from=builder /app/.output ./
+COPY --from=builder --chown=node:node /app/.output ./
 
 EXPOSE 3000
 
@@ -33,5 +33,10 @@ ENV HOST=0.0.0.0 \
 #   NUXT_PUBLIC_REVERB_HOST
 #   NUXT_PUBLIC_REVERB_PORT
 #   NUXT_PUBLIC_REVERB_SCHEME
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/ > /dev/null 2>&1 || exit 1
+
+USER node
 
 CMD ["node", "server/index.mjs"]
