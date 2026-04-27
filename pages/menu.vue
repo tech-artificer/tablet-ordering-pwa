@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch } from "vue"
 import { Beef, UtensilsCrossed, CakeSlice, Wine, Paintbrush, Droplets, CreditCard, RefreshCw, CircleCheck } from "lucide-vue-next"
-import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
 import { recoverActiveOrderState } from "../composables/useActiveOrderRecovery"
@@ -79,8 +78,6 @@ onMounted(async () => {
             logger.warn("[Menu] Error while inferring package from recovered order:", err)
         }
     }
-
-    const orderStatus = orderStore.getCurrentOrderStatus()
 
     // Cart recovery notification: if session is active with a placed order but cart is empty
     // AND nothing has been submitted yet — the in-progress cart was likely lost
@@ -175,10 +172,10 @@ const hasLiveOrderReference = (): boolean => {
 
 const isBackButtonDisabled = (): boolean => {
     return Boolean(
-        unref(sessionStore.isActive)
-        || unref(orderStore.hasPlacedOrder)
-        || hasLiveOrderReference()
-        || unref(orderStore.isRefillMode)
+        unref(sessionStore.isActive) ||
+        unref(orderStore.hasPlacedOrder) ||
+        hasLiveOrderReference() ||
+        unref(orderStore.isRefillMode)
     )
 }
 
