@@ -57,7 +57,9 @@ const handleSettingsVisibilityChange = () => {
 
     if (elapsed >= SETTINGS_PIN_MAX_BACKGROUND_MS.value) {
         clearSettingsPinAuth()
-        void router.replace({ path: "/", query: { settingsLocked: "1" } })
+        router.replace({ path: "/", query: { settingsLocked: "1" } }).catch((error) => {
+            logger.debug("[Settings] settings PIN redirect failed", error)
+        })
     }
 }
 
@@ -68,9 +70,6 @@ const isVerifyingToken = ref(false)
 const isRefreshingToken = ref(false)
 const tokenStatus = ref<"valid" | "invalid" | "unknown">("unknown")
 const tokenMessage = ref("")
-
-// Device login state
-const isLoggingIn = ref(false)
 
 // No local banner — use Element Plus notification on successful registration
 
@@ -92,28 +91,8 @@ const displayTable = computed(() => {
 })
 
 const displayDeviceId = computed(() => displayDevice.value?.id ?? "Not registered")
-const displayDeviceUuid = computed(() => displayDevice.value?.device_uuid ?? displayDevice.value?.id ?? "Not registered")
 const displayDeviceCode = computed(() => displayDevice.value?.security_code ?? displayDevice.value?.device_uuid ?? "N/A")
-const displaySecurityCode = computed(() => displayDevice.value?.security_code ?? "N/A")
-const displaySecurityCodeGeneratedAt = computed(() => {
-    const timestamp = displayDevice.value?.security_code_generated_at
-    if (!timestamp) { return "N/A" }
-    try {
-        return new Date(timestamp).toLocaleString()
-    } catch {
-        return "N/A"
-    }
-})
 const displayIpAddress = computed(() => displayDevice.value?.ip_address ?? localIpAddress.value ?? "—")
-const displayLastSeenAt = computed(() => {
-    const timestamp = displayDevice.value?.last_seen_at
-    if (!timestamp) { return "N/A" }
-    try {
-        return new Date(timestamp).toLocaleString()
-    } catch {
-        return "N/A"
-    }
-})
 const displayTableName = computed(() => displayTable.value?.name ?? deviceStore.tableName ?? "")
 const displayIsAdmin = computed(() => !!(displayDevice.value && displayDevice.value.is_admin))
 
@@ -413,29 +392,6 @@ const refreshToken = async () => {
     }
 }
 
-// Device login/authentication (IP-only)
-const authenticateDevice = async () => {
-    isLoggingIn.value = true
-    try {
-        const success = await deviceStore.authenticate()
-        if (success) {
-            tokenStatus.value = "valid"
-            tokenMessage.value = "Device authenticated successfully"
-            logger.debug("✅ Device authenticated via IP")
-        } else {
-            tokenStatus.value = "invalid"
-            tokenMessage.value = "Device not registered or authentication failed"
-            logger.warn("Authentication returned no device")
-        }
-    } catch (err: any) {
-        tokenStatus.value = "invalid"
-        tokenMessage.value = err?.message || "Authentication failed"
-        logger.error("❌ Authentication error", err)
-    } finally {
-        isLoggingIn.value = false
-    }
-}
-
 // PIN modal removed - now handled on home page (index.vue)
 
 const logout = async () => {
@@ -620,8 +576,7 @@ onMounted(async () => {
         const ip = (deviceStore.device?.value?.last_ip_address) || localIpAddress.value
         const lookedUp = await fetchDeviceByIp(typeof ip === "string" ? ip : null)
         if (!lookedUp) {
-            // Fallback: try device IP authentication endpoint (IP-only)
-            await authenticateDevice()
+            tokenMessage.value = "Register this tablet with the setup code above."
         }
 
     // If after lookup/auth there is no authenticated device, the registration UI will be
@@ -894,15 +849,11 @@ onMounted(async () => {
                     <!-- Device Login/Logout -->
                     <div class="border-t border-white/10 pt-4">
                         <div v-if="!deviceStore.isAuthenticated" class="space-y-3">
-                            <button
-                                :disabled="isLoggingIn || Boolean(deviceStore.isLoading)"
-                                class="w-full px-6 py-3 rounded-lg bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 active:scale-95 transition-all font-semibold flex items-center justify-center gap-2"
-                                @click="authenticateDevice"
-                            >
-                                <span v-if="isLoggingIn || deviceStore.isLoading" class="animate-spin">⏳</span>
-                                <span v-else>🔑</span>
-                                {{ isLoggingIn || deviceStore.isLoading ? 'Authenticating...' : 'Authenticate Device (IP)' }}
-                            </button>
+                            <div class="p-4 bg-white/5 rounded-lg border border-white/10">
+                                <p class="text-sm text-white/60">
+                                    Register this tablet with the setup code above.
+                                </p>
+                            </div>
 
                             <p v-if="deviceStore.errorMessage" class="text-sm text-red-400">
                                 {{ deviceStore.errorMessage }}

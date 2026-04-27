@@ -10,7 +10,6 @@ const router = useRouter()
 
 const formData = ref({
     deviceSecurityCode: "",
-    deviceName: ""
 })
 const localIp = ref<string | null>(null)
 
@@ -26,10 +25,8 @@ const securityCodeValidation = computed(() => {
     return /^\d{6}$/.test(code)
 })
 
-const waitingForTable = computed(() => Boolean(deviceStore.waitingForTable))
 const isPolling = computed(() => Boolean(deviceStore.isPollingForTable))
 const hasToken = computed(() => Boolean(deviceStore.token))
-const suggestedDeviceName = computed(() => String(localIp.value || "kiosk").replace(/[^a-zA-Z0-9.-]/g, "").replace(/\./g, "-"))
 
 const checkForTable = async () => {
     try {
@@ -79,7 +76,6 @@ const resetRegistration = () => {
     registered.value = false
     ;(deviceStore as any).errorMessage = null
     formData.value.deviceSecurityCode = ""
-    formData.value.deviceName = ""
 }
 
 onMounted(() => {
@@ -88,7 +84,7 @@ onMounted(() => {
         registered.value = true
     }
 
-    // Try to obtain a local LAN IP (preferred) to use as suggested device name.
+    // Try to obtain a local LAN IP (preferred) for server-side metadata.
     ;(async () => {
         try {
             // Prefer server-provided last_ip_address when available
@@ -100,22 +96,8 @@ onMounted(() => {
                 const ip = await getLocalIp()
                 if (ip) { localIp.value = ip }
             }
-
-            // If no explicit device name provided, prefill with formatted IP (dots -> hyphens)
-            if (!formData.value.deviceName) {
-                if (localIp.value) {
-                    formData.value.deviceName = String(localIp.value).replace(/[^a-zA-Z0-9.-]/g, "").replace(/\./g, "-")
-                } else {
-                    formData.value.deviceName = "kiosk"
-                }
-            }
         } catch (e) {
-            // ignore failures and fall back to a generic kiosk name
-            try {
-                if (!formData.value.deviceName) {
-                    formData.value.deviceName = "kiosk"
-                }
-            } catch (e) { /* ignore */ }
+            logger.debug("[DeviceRegistration] local IP detection failed", e)
         }
     })()
 })
@@ -146,13 +128,6 @@ const handleRegistration = async () => {
 
     attempted.value = true
 
-    // If not inline, require a device name; inline mode keeps the UI compact and
-    // only requires the code so registration can proceed from Settings quickly.
-    if (!props.inline && !formData.value.deviceName) {
-        ;(deviceStore as any).errorMessage = "Device name is required."
-        return
-    }
-
     if (!formData.value.deviceSecurityCode) {
         ;(deviceStore as any).errorMessage = "Security code is required."
         return
@@ -167,7 +142,7 @@ const handleRegistration = async () => {
     ;(deviceStore as any).errorMessage = null
 
     try {
-        const payload: any = { passcode: formData.value.deviceSecurityCode, security_code: formData.value.deviceSecurityCode, name: formData.value.deviceName }
+        const payload: any = { security_code: formData.value.deviceSecurityCode }
         if (localIp && localIp.value) { payload.ip_address = localIp.value } else if (deviceStore.device && (deviceStore.device as any).last_ip_address) { payload.ip_address = (deviceStore.device as any).last_ip_address }
         await deviceStore.register(payload)
 
@@ -218,17 +193,6 @@ const handleRegistration = async () => {
                         <slot name="form">
                             <el-form :model="formData" class="mb-3" @submit.prevent="handleRegistration">
                                 <div class="grid gap-3">
-                                    <el-form-item label="Device Name" required>
-                                        <el-input
-                                            v-model="formData.deviceName"
-                                            placeholder="e.g. Table 4 - Kiosk"
-                                            size="large"
-                                            class="w-full text-lg font-kanit"
-                                            :class="{ 'border-error': hasError }"
-                                            :disabled="registered || hasToken"
-                                        />
-                                    </el-form-item>
-
                                     <el-form-item label="Security Code" required>
                                         <el-input
                                             v-model="formData.deviceSecurityCode"
@@ -251,7 +215,7 @@ const handleRegistration = async () => {
                                     <button
                                         type="button"
                                         class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
-                                        :disabled="isLoading || !formData.deviceName || !securityCodeValidation || registered || hasToken"
+                                        :disabled="isLoading || !securityCodeValidation || registered || hasToken"
                                         @click="handleRegistration()"
                                     >
                                         <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
@@ -310,7 +274,7 @@ const handleRegistration = async () => {
                     Device Registration
                 </h3>
                 <p class="text-sm text-white/60">
-                    Quick register this device. Using the suggested name speeds setup.
+                    Enter the setup code from the device list.
                 </p>
             </div>
         </div>
@@ -354,15 +318,6 @@ const handleRegistration = async () => {
 
             <div v-if="hasError && attempted" class="mt-3">
                 <el-alert title="Registration Failed" :description="errorMessage" type="error" show-icon />
-            </div>
-
-            <div class="mt-3 text-xs text-white/50">
-                <div class="flex items-center justify-between">
-                    <div>Suggested name: <span class="font-mono">{{ formData.deviceName }}</span></div>
-                    <button v-if="!formData.deviceName" type="button" class="text-sm text-primary" @click="formData.deviceName = suggestedDeviceName">
-                        Use suggested
-                    </button>
-                </div>
             </div>
         </el-form>
     </div>

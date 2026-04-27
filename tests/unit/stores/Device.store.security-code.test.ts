@@ -27,15 +27,14 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("register() action with security_code field", () => {
-        it("should emit security_code in payload instead of legacy code field", async () => {
+        it("should emit only security_code identity fields in the payload", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
                 data: {
                     device: { id: 1, name: "Test Device" },
                     token: "test-token",
-                    table: { id: 4, name: "Table 4" },
-                    code: "123456"
+                    table: { id: 4, name: "Table 4" }
                 }
             }
 
@@ -44,17 +43,19 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             // Call register with security_code field
             await store.register({ security_code: "123456", name: "Test Device" } as any)
 
-            // Verify API was called with security_code, not code
             expect(mockPost).toHaveBeenCalledWith(
                 "/api/devices/register",
                 expect.objectContaining({
-                    security_code: "123456",
-                    name: "Test Device"
+                    security_code: "123456"
                 })
             )
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("passcode")
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("name")
+            expect(store.code).toBeNull()
         })
 
-        it("should store security_code from response in state", async () => {
+        it("should not retain setup code as reusable local auth state", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
@@ -62,12 +63,10 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                     device: {
                         id: 1,
                         name: "Kiosk-1",
-                        security_code: "654321",
                         security_code_generated_at: "2026-04-21T10:00:00Z"
                     },
                     token: "test-token",
-                    table: { id: 4, name: "Table 4" },
-                    code: "654321"
+                    table: { id: 4, name: "Table 4" }
                 }
             }
 
@@ -75,12 +74,11 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
 
             await store.register({ security_code: "654321", name: "Kiosk-1" } as any)
 
-            // Verify device object includes security_code metadata
+            expect(store.code).toBeNull()
             expect(store.device).toEqual(
                 expect.objectContaining({
                     id: 1,
                     name: "Kiosk-1",
-                    security_code: "654321",
                     security_code_generated_at: "2026-04-21T10:00:00Z"
                 })
             )
@@ -133,7 +131,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("backward compatibility with legacy code field", () => {
-        it("should still accept code field as alias for one release", async () => {
+        it("should still accept code field as a setup-code input alias", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
@@ -150,6 +148,8 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             await store.register({ code: "555555", name: "Test Device" } as any)
 
             expect(mockPost).toHaveBeenCalled()
+            expect(mockPost.mock.calls[0][1]).toEqual(expect.objectContaining({ security_code: "555555" }))
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
             expect(store.device).toEqual(
                 expect.objectContaining({
                     id: 1,
@@ -194,7 +194,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("authenticate() IP metadata propagation", () => {
-        it("should send ip_address query param using last known server IP", async () => {
+        it("should send ip_address query param using last known server IP without setup code", async () => {
             const store = useDeviceStore()
 
             mockPost.mockResolvedValueOnce({
@@ -234,8 +234,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 {
                     params: {
                         ip: "192.168.100.7",
-                        ip_address: "192.168.100.7",
-                        passcode: "333333"
+                        ip_address: "192.168.100.7"
                     }
                 }
             )
