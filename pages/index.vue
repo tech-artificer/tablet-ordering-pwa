@@ -7,7 +7,7 @@
         <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(246,181,109,0.06) 0%, transparent 70%)" />
 
         <!-- Welcome-only flame layer -->
-        <div class="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
+        <!-- <div class="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
             <img
                 v-if="showFlame"
                 :src="flameSrc"
@@ -15,7 +15,7 @@
                 class="absolute opacity-20 p-0 m-0 w-full h-full object-cover mix-blend-screen"
                 @error="showFlame = false"
             >
-        </div>
+        </div> -->
 
         <!-- CSS atmospheric glow (replaces flame.gif - no image bleed, no 9.8MB load) -->
         <div class="absolute inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
@@ -221,7 +221,7 @@
 
 <script setup lang="ts">
 import { Settings, UtensilsCrossed } from "lucide-vue-next"
-import flameSrc from "~/assets/images/flame.gif"
+// import flameSrc from "~/assets/images/flame.gif"
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
 import { useBroadcasts } from "~/composables/useBroadcasts"

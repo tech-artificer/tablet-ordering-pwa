@@ -4,6 +4,7 @@ import { useDeviceStore } from "~/stores/Device"
 
 const mockPost = vi.fn()
 const mockGet = vi.fn()
+const mockGetLocalIp = vi.fn()
 
 // Mock the API composable
 vi.mock("~/composables/useApi", () => ({
@@ -13,11 +14,16 @@ vi.mock("~/composables/useApi", () => ({
     })
 }))
 
+vi.mock("~/utils/getLocalIp", () => ({
+    getLocalIp: mockGetLocalIp
+}))
+
 describe("Device Store — Security Code Contract (Batch 3)", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         mockPost.mockReset()
         mockGet.mockReset()
+        mockGetLocalIp.mockReset()
     })
 
     describe("register() action with security_code field", () => {
@@ -225,7 +231,13 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             expect(ok).toBe(true)
             expect(mockGet).toHaveBeenCalledWith(
                 "/api/devices/login",
-                { params: { ip_address: "192.168.100.7" } }
+                {
+                    params: {
+                        ip: "192.168.100.7",
+                        ip_address: "192.168.100.7",
+                        passcode: "333333"
+                    }
+                }
             )
         })
 
@@ -247,6 +259,37 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
 
             expect(ok).toBe(false)
             expect(store.errorMessage).toBe("Device not found")
+        })
+
+        it("should not use window.location.hostname as tablet ip when local ip detection fails", async () => {
+            const store = useDeviceStore()
+            mockGetLocalIp.mockResolvedValueOnce(null)
+            mockGet.mockResolvedValueOnce({
+                data: {
+                    success: true,
+                    token: "auth-token",
+                    device: { id: 1, name: "Kiosk-1" },
+                    table: { id: 6, name: "Table 6" },
+                }
+            })
+
+            const originalLocation = window.location
+            Object.defineProperty(window, "location", {
+                configurable: true,
+                value: { ...originalLocation, hostname: "192.168.100.7" },
+            })
+
+            try {
+                const ok = await store.authenticate()
+
+                expect(ok).toBe(true)
+                expect(mockGet).toHaveBeenCalledWith("/api/devices/login", undefined)
+            } finally {
+                Object.defineProperty(window, "location", {
+                    configurable: true,
+                    value: originalLocation,
+                })
+            }
         })
     })
 })

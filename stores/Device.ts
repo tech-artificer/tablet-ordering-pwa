@@ -38,6 +38,23 @@ function isIpv4Address (value: unknown): value is string {
     return typeof value === "string" && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)
 }
 
+function resolveConfiguredDevicePasscode (): string {
+    try {
+        const maybeUseRuntimeConfig = (globalThis as any)?.useRuntimeConfig
+        if (typeof maybeUseRuntimeConfig === "function") {
+            const runtime = maybeUseRuntimeConfig()
+            const fromRuntime = String(runtime?.public?.deviceAuthPasscode || "").trim()
+            if (fromRuntime) {
+                return fromRuntime
+            }
+        }
+    } catch (error) {
+        logger.debug("[DeviceStore] resolveConfiguredDevicePasscode: runtime config unavailable", error)
+    }
+
+    return String(process.env.NUXT_PUBLIC_DEVICE_AUTH_PASSCODE || "").trim()
+}
+
 function normalizeTable (tbl: unknown): Table | null {
     if (!tbl) { return null }
 
@@ -105,11 +122,6 @@ export const useDeviceStore = defineStore("device", () => {
             }
         } catch (error) {
             logger.debug("[DeviceStore] resolveClientIpForAuth: getLocalIp failed", error)
-        }
-
-        if (typeof window !== "undefined" && isIpv4Address(window.location?.hostname)) {
-            detectedClientIp = window.location.hostname
-            return detectedClientIp
         }
 
         detectedClientIp = null
@@ -223,11 +235,25 @@ export const useDeviceStore = defineStore("device", () => {
         try {
             const api = useApi()
             const clientIp = await resolveClientIpForAuth()
+            const configuredPasscode = resolveConfiguredDevicePasscode()
+            const rememberedPasscode = state.code !== null ? String(state.code).trim() : ""
+            const passcode = rememberedPasscode || configuredPasscode || undefined
             const authStart = typeof performance !== "undefined" ? performance.now() : Date.now()
+
+            const params: Record<string, string> = {}
+            if (clientIp) {
+                params.ip_address = clientIp
+                // Backward-compat for backend variants still reading `ip`
+                params.ip = clientIp
+            }
+            if (passcode) {
+                params.passcode = passcode
+            }
+
             const response = await api.get(
                 "/api/devices/login",
-                clientIp
-                    ? { params: { ip_address: clientIp } }
+                Object.keys(params).length > 0
+                    ? { params }
                     : undefined
             )
             applyAuthPayload(response.data)
@@ -295,22 +321,37 @@ export const useDeviceStore = defineStore("device", () => {
         }, intervalMs) as unknown as number
     }
 
-    async function register (formData: { code?: string; security_code?: string; name?: string }): Promise<void> {
+    async function register (formData: { passcode?: string; code?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
         state.isLoading = true
         state.errorMessage = null
 
-        // Support both legacy code and new security_code for one release
+        // Primary contract: passcode; keep legacy aliases for compatibility.
         const payload: any = {}
-        if (formData.security_code) {
-            payload.security_code = formData.security_code
-            state.code = formData.security_code
-        } else if (formData.code) {
-            // Backward compatibility: accept code as alias for security_code
-            payload.code = formData.code
-            state.code = formData.code
+        const normalizedPasscode = String(formData.passcode ?? formData.security_code ?? formData.code ?? "").trim()
+
+        if (normalizedPasscode) {
+            payload.passcode = normalizedPasscode
+            state.code = normalizedPasscode
+
+            if (formData.security_code) {
+                payload.security_code = formData.security_code
+            } else if (formData.code) {
+                payload.code = formData.code
+            }
         }
+
         if (formData.name) {
             payload.name = formData.name
+        }
+
+        const formIp = formData.ip_address
+        const fallbackIp = await resolveClientIpForAuth()
+        const ipToUse = isIpv4Address(formIp) ? formIp : fallbackIp
+
+        if (ipToUse) {
+            payload.ip_address = ipToUse
+            // Backward-compat for backend variants still reading `ip`
+            payload.ip = ipToUse
         }
 
         try {
@@ -444,6 +485,6 @@ export const useDeviceStore = defineStore("device", () => {
     persist: {
         key: "device-store",
         storage: typeof window !== "undefined" ? localStorage : undefined,
-        paths: ["device", "token", "expiration", "table", "broadcastConfig", "kioskUnlocked"],
+        paths: ["device", "code", "token", "expiration", "table", "broadcastConfig", "kioskUnlocked"],
     },
 })

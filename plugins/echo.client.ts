@@ -2,6 +2,7 @@ import Echo from "laravel-echo"
 import Pusher from "pusher-js"
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
+import { resolveReverbSocketConfig } from "../utils/reverbSocketConfig"
 
 type EchoConfig = {
     key: string
@@ -81,16 +82,20 @@ function createEcho (
         headers.Authorization = `Bearer ${token}`
     }
 
-    // Dynamically select protocol based on current page
-    const browserHost = typeof window !== "undefined" ? window.location.hostname : ""
-    const browserPort = typeof window !== "undefined" ? window.location.port : ""
-    const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:"
-    const normalizedHost = cfg.host || browserHost
-    const normalizedPort = cfg.port || (isHttpsPage ? 443 : 80)
-    const currentOriginPort = browserPort ? parseInt(browserPort, 10) : (isHttpsPage ? 443 : 80)
-    const wsPort = normalizedPort === 80 || normalizedPort === 443 ? currentOriginPort : normalizedPort
+    const socketConfig = resolveReverbSocketConfig(
+        cfg,
+        typeof window !== "undefined"
+            ? {
+                hostname: window.location.hostname,
+                port: window.location.port,
+                protocol: window.location.protocol,
+            }
+            : undefined
+    )
+    const normalizedHost = socketConfig.host
+    const wsPort = socketConfig.port
     const wssPort = wsPort
-    const forceTLS = isHttpsPage || String(cfg.scheme || "").toLowerCase() === "https"
+    const forceTLS = socketConfig.forceTLS
 
     const wsPath = normalizeWsPath(cfg.path)
 

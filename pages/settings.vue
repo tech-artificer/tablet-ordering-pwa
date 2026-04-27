@@ -163,7 +163,7 @@ const getLocalIpAddress = async () => {
             return
         }
 
-        // Try to detect local LAN IP using WebRTC helper, then hostname fallback
+        // Try to detect the tablet LAN IP using the WebRTC helper.
         try {
             const { getLocalIp } = await import("~/utils/getLocalIp")
             const ip = await getLocalIp()
@@ -175,8 +175,7 @@ const getLocalIpAddress = async () => {
             logger.warn("[Settings] Local IP detection failed:", e)
         }
 
-        // Fallback: show hostname
-        localIpAddress.value = window.location.hostname
+        localIpAddress.value = "Unable to detect"
     } catch (error) {
         localIpAddress.value = "Unable to detect"
     }
