@@ -14,7 +14,6 @@ type BroadcastConfig = {
 
 type DeviceStoreState = {
     device: Device | null
-    code: string | number | null
     table: Table | null
     token: string | null
     expiration: number | string | null
@@ -57,7 +56,6 @@ function normalizeTable (tbl: unknown): Table | null {
 export const useDeviceStore = defineStore("device", () => {
     const state = reactive<DeviceStoreState>({
         device: null,
-        code: null,
         table: null,
         token: null,
         expiration: null,
@@ -328,7 +326,7 @@ export const useDeviceStore = defineStore("device", () => {
         }, intervalMs) as unknown as number
     }
 
-    async function register (formData: { passcode?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
+    async function register (formData: { passcode?: string; security_code?: string; ip_address?: string }): Promise<void> {
         state.isLoading = true
         state.errorMessage = null
 
@@ -340,7 +338,6 @@ export const useDeviceStore = defineStore("device", () => {
         if (normalizedSecurityCode) {
             payload.security_code = normalizedSecurityCode
         }
-        state.code = null
 
         const formIp = formData.ip_address
         const fallbackIp = await resolveClientIpForAuth()
@@ -420,7 +417,6 @@ export const useDeviceStore = defineStore("device", () => {
     function clearAuth (): void {
         stopTablePolling()
         state.device = null
-        state.code = null
         state.table = null
         state.token = null
         state.expiration = null
