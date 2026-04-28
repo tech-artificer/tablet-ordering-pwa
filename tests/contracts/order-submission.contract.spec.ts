@@ -74,7 +74,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         expect(payload.items.length).toBe(2)
 
         // Assert: Each item has required fields
-        payload.items.forEach((item: any, index: number) => {
+        payload.items.forEach((item: any, _index: number) => {
             expect(item).toHaveProperty("menu_id")
             expect(typeof item.menu_id).toBe("number")
             expect(item.menu_id).toBeGreaterThan(0)

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
 import { useOrderStore } from "../stores/Order"
 import { useSessionStore } from "../stores/Session"
@@ -186,7 +186,7 @@ describe("Order Restrictions (Frontend)", () => {
             expect(orderStore.hasPlacedOrder).toBe(true)
         })
 
-        it("should wait for orderId before allowing refill toggle", async () => {
+        it("should wait for orderId before allowing refill toggle", () => {
             const sessionStore: any = useSessionStore()
             const orderStore: any = useOrderStore()
 

@@ -150,7 +150,7 @@ export const useBroadcasts = () => {
     const scheduleReconnection = () => {
         if (reconnectTimer) { return } // Already scheduled
         if (reconnectAttempts >= MAX_RECONNECTION_ATTEMPTS) {
-            console.log(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
+            logger.warn(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
             logger.warn("WebSocket max reconnection attempts reached")
             ElNotification({
                 title: "⚠️ Connection Lost",
@@ -166,11 +166,11 @@ export const useBroadcasts = () => {
         const backoffIndex = Math.min(reconnectAttempts - 1, RECONNECTION_BACKOFF.length - 1)
         const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
 
-        console.log(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
+        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
 
         reconnectTimer = window.setTimeout(() => {
             reconnectTimer = null
-            console.log(`[🔄 WebSocket] Attempting reconnection (attempt ${reconnectAttempts})`)
+            logger.debug(`[🔄 WebSocket] Attempting reconnection (attempt ${reconnectAttempts})`)
 
             // Re-subscribe to channels (Echo handles socket reconnection internally)
             subscribeToDeviceChannel()
@@ -196,76 +196,6 @@ export const useBroadcasts = () => {
         order: false,
         serviceRequest: false
     })
-
-    // Event deduplication: Track last 100 processed event IDs (BUG-9 fix)
-    const processedEventIds = new Set<number>()
-    const MAX_PROCESSED_EVENT_CACHE = 100
-    const eventIdQueue: number[] = []
-
-    const isEventProcessed = (eventId: number): boolean => {
-        return processedEventIds.has(eventId)
-    }
-
-    const markEventProcessed = (eventId: number) => {
-        if (processedEventIds.has(eventId)) { return }
-
-        processedEventIds.add(eventId)
-        eventIdQueue.push(eventId)
-
-        // LRU eviction: Remove oldest event ID when cache exceeds limit
-        if (eventIdQueue.length > MAX_PROCESSED_EVENT_CACHE) {
-            const oldestId = eventIdQueue.shift()
-            if (oldestId !== undefined) {
-                processedEventIds.delete(oldestId)
-            }
-        }
-    }
-
-    // Track last event ID for reliability
-    const getLastEventId = (): number => {
-        return parseInt(localStorage.getItem("lastEventId") || "0")
-    }
-
-    const setLastEventId = (eventId: number) => {
-        localStorage.setItem("lastEventId", eventId.toString())
-    }
-
-    // Process events based on type
-    const processEvent = (eventType: string, payload: any) => {
-    // BUG-9 Fix: Event deduplication to prevent duplicate processing
-        if (payload.eventId) {
-            if (isEventProcessed(payload.eventId)) {
-                console.log(`[🔄 Duplicate Event] eventId=${payload.eventId} type=${eventType} already processed, skipping`)
-                logger.debug("Duplicate event skipped:", { eventId: payload.eventId, type: eventType })
-                return // Silently drop duplicate event
-            }
-
-            markEventProcessed(payload.eventId)
-            setLastEventId(payload.eventId)
-        }
-
-        logger.debug("Processing event:", eventType, payload)
-        switch (eventType) {
-        case "order.created":
-            handleOrderCreated(payload)
-            break
-        case "order.updated":
-            handleOrderUpdated(payload)
-            break
-        case "order.completed":
-            handleOrderCompleted(payload)
-            break
-        case "order.cancelled":
-            handleOrderCancelled(payload)
-            break
-        case "service-request.notification":
-            handleServiceRequest(payload)
-            break
-        case "device.control":
-            handleDeviceControl(payload)
-            break
-        }
-    }
 
     // Event Handlers
     const handleOrderCreated = (event: OrderCreatedEvent) => {
@@ -458,14 +388,6 @@ export const useBroadcasts = () => {
         }
     }
 
-    const clearReconnectTimer = () => {
-        if (reconnectTimer) {
-            try { window.clearTimeout(reconnectTimer) } catch (e) { logger.debug("[Broadcasts] clearReconnectTimer failed", e) }
-            reconnectTimer = null
-        }
-        reconnectAttempts = 0 // Reset on successful connection
-    }
-
     const resetChannelStatus = () => {
         channelStatus.value = {
             device: false,
@@ -499,14 +421,14 @@ export const useBroadcasts = () => {
         if (!deviceId || !(window as any).Echo) { return }
 
         // Subscribe to device.{deviceId} for order updates
-        console.log("[Echo] Subscribing to channel: device." + deviceId)
+        logger.debug("[Echo] Subscribing to channel: device." + deviceId)
         deviceChannel = (window as any).Echo.channel(`device.${deviceId}`)
             .listen(".order.updated", (event: OrderUpdatedEvent) => {
                 handleOrderUpdated(event)
             })
 
         channelStatus.value.device = true
-        console.log("[Echo] ✅ Subscribed to channel: device." + deviceId)
+        logger.debug("[Echo] ✅ Subscribed to channel: device." + deviceId)
         logger.debug(`✅ Subscribed to device.${deviceId}`)
 
         ElNotification({
@@ -618,11 +540,11 @@ export const useBroadcasts = () => {
 
         boundStateChangeHandler = (states: any) => {
             const timestamp = new Date().toISOString()
-            console.log(`[🔗 WebSocket State Change] ${states.previous || "?"} → ${states.current} at ${timestamp}`)
+            logger.debug(`[🔗 WebSocket State Change] ${states.previous || "?"} → ${states.current} at ${timestamp}`)
             logger.debug("WebSocket state change:", states.current)
 
             if (states.current === "connected") {
-                console.log(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
+                logger.debug(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
                 logger.debug("✅ WebSocket connected")
                 cancelReconnection()
                 resubscribeChannels()

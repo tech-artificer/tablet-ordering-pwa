@@ -43,7 +43,6 @@ describe("session-ended page logic", () => {
     })
 
     it("countdown timer calls finalizeAndReturnHome after 5 ticks", () => {
-        const { finalizeAndReturnHome } = useSessionEndFlow()
         const spy = vi.fn()
 
         // Simulate the countdown logic from the page

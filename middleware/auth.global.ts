@@ -3,7 +3,7 @@ import { useDeviceStore } from "~/stores/Device"
 import { logger } from "~/utils/logger"
 
 // @ts-ignore - Nuxt auto-imports
-export default defineNuxtRouteMiddleware(async (to, from) => {
+export default defineNuxtRouteMiddleware(async (to, _from) => {
     logger.debug("🔒 Auth middleware RUNNING for route:", to.path)
 
     const deviceStore = useDeviceStore()

@@ -95,7 +95,7 @@ export const useTimedSubmission = () => {
 
             if (options.successDelayMs && options.successDelayMs > 0) {
                 successTimer = window.setTimeout(() => {
-                    void finalize()
+                    finalize()
                 }, options.successDelayMs)
             } else {
                 await finalize()
@@ -115,7 +115,7 @@ export const useTimedSubmission = () => {
         }
     }
 
-    const start = async <TResult>(
+    const start = <TResult>(
         task: () => Promise<TResult>,
         options: SubmissionOptions<TResult>
     ) => {
@@ -134,7 +134,7 @@ export const useTimedSubmission = () => {
             countdown.value -= 1
 
             if (countdown.value <= 0) {
-                void runSubmission(task, options)
+                runSubmission(task, options)
             }
         }, 1000)
     }

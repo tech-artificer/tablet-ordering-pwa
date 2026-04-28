@@ -4,23 +4,6 @@ import { logger } from "~/utils/logger"
 const menuStore = useMenuStore()
 const route = useRoute()
 
-const retryLoad = async () => {
-    menuStore.clearAllErrors()
-    try {
-        await menuStore.loadAllMenus(true)
-    } catch (error) {
-        logger.error("Retry failed:", error)
-    }
-}
-
-const refreshMenu = async () => {
-    try {
-        await menuStore.refreshMenus()
-    } catch (error) {
-        logger.error("Refresh failed:", error)
-    }
-}
-
 // Listen for online/offline events
 if (import.meta.client) {
     onMounted(() => {
@@ -39,7 +22,6 @@ if (import.meta.client) {
                 <slot />
             </div>
         </Transition>
-
     </div>
 </template>
 

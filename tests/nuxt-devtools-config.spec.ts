@@ -10,14 +10,14 @@ describe("nuxt devtools config", () => {
     it("gates Nuxt devtools behind an explicit env toggle", () => {
         const config = readProjectFile("nuxt.config.ts")
 
-        expect(config).toContain('readBooleanEnv("NUXT_DEVTOOLS", false)')
+        expect(config).toContain("readBooleanEnv(\"NUXT_DEVTOOLS\", false)")
         expect(config).toMatch(/devtools:\s*\{\s*enabled:\s*enableNuxtDevtools\s*\}/)
     })
 
     it("does not include the Nuxt devtools module unconditionally", () => {
         const config = readProjectFile("nuxt.config.ts")
 
-        expect(config).toContain('...(enableNuxtDevtools ? ["@nuxt/devtools"] : [])')
+        expect(config).toContain("...(enableNuxtDevtools ? [\"@nuxt/devtools\"] : [])")
     })
 
     it("defaults the shared example env to devtools off", () => {

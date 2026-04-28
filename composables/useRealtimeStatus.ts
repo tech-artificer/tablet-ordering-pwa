@@ -1,7 +1,6 @@
 import { ref, computed } from "vue"
 import type { OrderApiResponse } from "../types"
 import { useDeviceStore } from "../stores/Device"
-import { useSessionStore } from "../stores/Session"
 import { useOrderStore } from "../stores/Order"
 import { logger } from "../utils/logger"
 
@@ -16,7 +15,6 @@ import { logger } from "../utils/logger"
  */
 export const useRealtimeStatus = () => {
     const deviceStore = useDeviceStore()
-    const sessionStore = useSessionStore()
     const orderStore = useOrderStore()
 
     // Interval tracking for cleanup

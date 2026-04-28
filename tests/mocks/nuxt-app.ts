@@ -1,8 +1,8 @@
 export function useNuxtApp () {
     return {
         $router: {
-            replace: async () => undefined,
-            push: async () => undefined,
+            replace: () => Promise.resolve(undefined),
+            push: () => Promise.resolve(undefined),
         },
         $offlineOutbox: undefined,
     }

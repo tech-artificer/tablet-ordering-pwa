@@ -29,7 +29,7 @@ vi.mock("~/stores/OfflineSync", () => ({
 }))
 
 const mockEnqueuedRecords: any[] = []
-const mockEnqueue = vi.fn().mockImplementation(async (rec: any) => {
+const mockEnqueue = vi.fn().mockImplementation((rec: any) => {
     mockEnqueuedRecords.push(rec)
 })
 const mockMarkStatus = vi.fn().mockResolvedValue(undefined)
