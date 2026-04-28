@@ -445,7 +445,12 @@ export const useDeviceStore = defineStore("device", () => {
     function setKioskUnlocked (value: boolean) { state.kioskUnlocked = value }
     function getKioskUnlocked (): boolean { return state.kioskUnlocked }
     function clearError () { state.errorMessage = null }
-    function setWaitingForTable (value: boolean) { state.waitingForTable = value }
+    function setWaitingForTable (value: boolean) {
+        state.waitingForTable = value
+        if (!value) {
+            state.pollTimedOut = false
+        }
+    }
 
     const isAuthenticated = computed(() => Boolean(state.token && state.table?.id))
     const hasDevice = computed(() => Boolean(state.token))
