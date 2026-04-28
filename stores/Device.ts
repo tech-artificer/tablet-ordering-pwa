@@ -247,7 +247,7 @@ export const useDeviceStore = defineStore("device", () => {
 
         try {
             const api = useApi()
-            const resolvedIp = (clientIp !== undefined && clientIp !== null) ? clientIp : await resolveClientIpForAuth()
+            const resolvedIp = isIpv4Address(clientIp) ? clientIp : await resolveClientIpForAuth()
             const authStart = typeof performance !== "undefined" ? performance.now() : Date.now()
             const params = resolvedIp ? { ip_address: resolvedIp, ip: resolvedIp } : undefined
             const response = params
@@ -342,9 +342,6 @@ export const useDeviceStore = defineStore("device", () => {
             payload.ip_address = ipToUse
             // Backward-compat for backend variants still reading `ip`
             payload.ip = ipToUse
-        }
-        if (formData.ip_address) {
-            payload.ip_address = formData.ip_address
         }
 
         if (formData.name) {

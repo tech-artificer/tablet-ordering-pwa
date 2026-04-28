@@ -420,6 +420,9 @@ export const useBroadcasts = () => {
         const deviceId = deviceStore.getDeviceId()
         if (!deviceId || !(window as any).Echo) { return }
 
+        // Tear down any existing subscriptions before creating new ones to prevent duplicate handlers
+        unsubscribeDeviceChannels()
+
         // Subscribe to device.{deviceId} for order updates
         logger.debug("[Echo] Subscribing to channel: device." + deviceId)
         deviceChannel = (window as any).Echo.channel(`device.${deviceId}`)

@@ -876,9 +876,19 @@ onMounted(async () => {
                         <div v-if="!deviceStore.isAuthenticated" class="space-y-3">
                             <div class="p-4 bg-white/5 rounded-lg border border-white/10">
                                 <p class="text-sm text-white/60">
-                                    Register this tablet with the setup code above.
+                                    Register this tablet with the setup code above, or authenticate via IP.
                                 </p>
                             </div>
+
+                            <button
+                                :disabled="isLoggingIn"
+                                class="w-full px-6 py-3 min-h-[48px] rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 active:scale-95 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                @click="authenticateDevice"
+                            >
+                                <span v-if="isLoggingIn" class="animate-spin">⏳</span>
+                                <span v-else>🔑</span>
+                                {{ isLoggingIn ? 'Authenticating...' : 'Authenticate Device (IP)' }}
+                            </button>
 
                             <p v-if="deviceStore.errorMessage" class="text-sm text-red-400">
                                 {{ deviceStore.errorMessage }}

@@ -29,7 +29,7 @@ const securityCodeValidation = computed(() => {
 const isPolling = computed(() => Boolean(deviceStore.isPollingForTable))
 const hasToken = computed(() => Boolean(deviceStore.token))
 const pollTimedOut = computed(() => Boolean(deviceStore.pollTimedOut))
-const suggestedDeviceName = computed(() => String(localIp.value || (typeof window !== 'undefined' ? window.location.hostname : 'kiosk') || 'kiosk').replace(/[^a-zA-Z0-9.\-]/g, '').replace(/\./g, '-'))
+const suggestedDeviceName = computed(() => String(localIp.value || (typeof window !== 'undefined' ? window.location.hostname : 'kiosk') || 'kiosk').replace(/[^a-zA-Z0-9.-]/g, '').replace(/\./g, '-'))
 
 const displayDevice = computed(() =>
     (deviceStore.device && (deviceStore.device as any).value)
@@ -53,15 +53,15 @@ const setDeviceError = (message: string | null) => {
 }
 
 const clearDeviceError = () => {
-    if (typeof deviceStore.clearError === 'function') deviceStore.clearError()
-    else setDeviceError(null)
+    if (typeof deviceStore.clearError === 'function') { deviceStore.clearError() }
+    else { setDeviceError(null) }
 }
 
 const checkForTable = async () => {
     try {
     // Call the refresh endpoint directly to force the server to re-evaluate table assignment
         await deviceStore.refresh()
-        const t = deviceStore.table as any
+        const t = unref(deviceStore.table as any)
         if (t && (t.id || t.name)) {
             // stop polling if running and navigate away
             try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
@@ -82,7 +82,7 @@ const checkForTable = async () => {
 watch(
     () => deviceStore.table,
     (newTable) => {
-        const t = newTable as any
+        const t = unref(newTable as any)
         if (t && (t.id || t.name)) {
             logger.debug('[DeviceRegistration] detected table assignment', t)
             // stop background polling if running
@@ -141,7 +141,7 @@ const handleRegistration = async () => {
     if (deviceStore.device) {
         try {
             await deviceStore.refresh()
-            const t = deviceStore.table as any
+            const t = unref(deviceStore.table as any)
             if (t && (t.id || t.name)) {
                 registered.value = true
                 deviceStore.setWaitingForTable(false)
@@ -185,8 +185,9 @@ const handleRegistration = async () => {
             clearDeviceError()
 
             // If table assigned already, navigate away
-            const tableId = (deviceStore.table && (deviceStore.table as any).id) || (deviceStore.table && (deviceStore.table as any).value?.id)
-            const tableName = (deviceStore.table && (deviceStore.table as any).name) || null
+            const unwrappedTable = unref(deviceStore.table as any)
+            const tableId = unwrappedTable?.id
+            const tableName = unwrappedTable?.name || null
             if (tableId || tableName) {
                 try {
                     const currentPath = router.currentRoute?.value?.path
@@ -313,8 +314,17 @@ const handleRegistration = async () => {
         <el-form :model="formData" class="mb-3" @submit.prevent="handleRegistration">
           <div class="grid gap-3">
             <el-form-item label="Security Code" required>
-              <el-input v-model="formData.deviceSecurityCode" placeholder="Enter security code" type="text" inputmode="numeric" maxlength="6" size="large"
-              class="w-full text-lg font-kanit" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
+              <el-input
+                v-model="formData.deviceSecurityCode"
+                placeholder="Enter security code"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                size="large"
+                class="w-full text-lg font-kanit"
+                :class="{ 'border-error': hasError }"
+                :disabled="registered || hasToken"
+              />
               <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
                 Must be exactly 6 digits
               </div>

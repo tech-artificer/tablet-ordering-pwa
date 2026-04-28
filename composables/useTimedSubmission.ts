@@ -95,7 +95,10 @@ export const useTimedSubmission = () => {
 
             if (options.successDelayMs && options.successDelayMs > 0) {
                 successTimer = window.setTimeout(() => {
-                    finalize()
+                    finalize().catch((err) => {
+                        phase.value = "error"
+                        errorMessage.value = err?.message || "An error occurred after success."
+                    })
                 }, options.successDelayMs)
             } else {
                 await finalize()
