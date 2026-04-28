@@ -249,8 +249,10 @@ export const useDeviceStore = defineStore("device", () => {
             const api = useApi()
             const resolvedIp = (clientIp !== undefined && clientIp !== null) ? clientIp : await resolveClientIpForAuth()
             const authStart = typeof performance !== "undefined" ? performance.now() : Date.now()
-            const params = resolvedIp ? { ip_address: resolvedIp } : undefined
-            const response = await api.get("/api/devices/login", params ? { params } : undefined)
+            const params = resolvedIp ? { ip_address: resolvedIp, ip: resolvedIp } : undefined
+            const response = params
+                ? await api.get("/api/devices/login", { params })
+                : await api.get("/api/devices/login")
             applyAuthPayload(response.data)
             syncWaitingForTable()
 

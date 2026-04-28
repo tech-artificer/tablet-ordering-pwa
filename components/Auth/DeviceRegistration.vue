@@ -43,6 +43,20 @@ const displayTable = computed(() =>
         : (deviceStore.table as any)
 )
 
+const setDeviceError = (message: string | null) => {
+    const target = deviceStore.errorMessage as any
+    if (target && typeof target === 'object' && 'value' in target) {
+        target.value = message
+        return
+    }
+    ;(deviceStore as any).errorMessage = message
+}
+
+const clearDeviceError = () => {
+    if (typeof deviceStore.clearError === 'function') deviceStore.clearError()
+    else setDeviceError(null)
+}
+
 const checkForTable = async () => {
     try {
     // Call the refresh endpoint directly to force the server to re-evaluate table assignment
@@ -90,7 +104,7 @@ const resetRegistration = () => {
     registered.value = false
     attempted.value = false
     deviceStore.clearAuth()
-    deviceStore.clearError()
+    clearDeviceError()
     formData.value.deviceSecurityCode = ''
     formData.value.deviceName = ''
 }
@@ -145,28 +159,22 @@ const handleRegistration = async () => {
 
     attempted.value = true
 
-    // If not inline, require a device name; inline mode keeps the UI compact and
-    // only requires the code so registration can proceed from Settings quickly.
-    if (!props.inline && !formData.value.deviceName) {
-        deviceStore.errorMessage.value = 'Device name is required.'
-        return
-    }
-
     if (!formData.value.deviceSecurityCode) {
-        deviceStore.errorMessage.value = 'Security code is required.'
+        setDeviceError('Security code is required.')
         return
     }
 
     if (!securityCodeValidation.value) {
-        deviceStore.errorMessage.value = 'Security code must be exactly 6 digits.'
+        setDeviceError('Security code must be exactly 6 digits.')
         return
     }
 
     // Clear previous errors
-    deviceStore.clearError()
+    clearDeviceError()
 
     try {
-        const payload: any = { security_code: formData.value.deviceSecurityCode, name: formData.value.deviceName }
+        const payload: any = { security_code: formData.value.deviceSecurityCode }
+        if (formData.value.deviceName) payload.name = formData.value.deviceName
         if (localIp && localIp.value) payload.ip_address = localIp.value
         else if (deviceStore.device && (deviceStore.device as any).last_ip_address) payload.ip_address = (deviceStore.device as any).last_ip_address
         await deviceStore.register(payload)
@@ -174,7 +182,7 @@ const handleRegistration = async () => {
         // If registration returned a device (with or without token), mark as registered; table may still be pending.
         if (deviceStore.device) {
             registered.value = true
-            deviceStore.clearError()
+            clearDeviceError()
 
             // If table assigned already, navigate away
             const tableId = (deviceStore.table && (deviceStore.table as any).id) || (deviceStore.table && (deviceStore.table as any).value?.id)
@@ -189,7 +197,7 @@ const handleRegistration = async () => {
             }
             // else: remain on page; show waiting-for-table state
         } else {
-            deviceStore.errorMessage.value = 'Registration succeeded but device details missing from server response. Please contact management.'
+            setDeviceError('Registration succeeded but device details missing from server response. Please contact management.')
         }
     } catch (error) {
         // Error is already set in deviceStore.errorMessage by the register action
@@ -305,7 +313,7 @@ const handleRegistration = async () => {
         <el-form :model="formData" class="mb-3" @submit.prevent="handleRegistration">
           <div class="grid gap-3">
             <el-form-item label="Security Code" required>
-              <el-input v-model="formData.deviceSecurityCode" placeholder="e.g. 123456" type="text" inputmode="numeric" maxlength="6" size="large"
+              <el-input v-model="formData.deviceSecurityCode" placeholder="Enter security code" type="text" inputmode="numeric" maxlength="6" size="large"
               class="w-full text-lg font-kanit" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
               <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
                 Must be exactly 6 digits
@@ -317,7 +325,7 @@ const handleRegistration = async () => {
             <button
               type="button"
               class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
-              @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !securityCodeValidation || registered || hasToken">
+              @click="handleRegistration()" :disabled="isLoading || !securityCodeValidation || registered || hasToken">
               <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
             </button>
 

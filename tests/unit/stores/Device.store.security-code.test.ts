@@ -178,6 +178,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
 
             expect(mockGet).toHaveBeenCalledWith("/api/devices/login", {
                 params: {
+                    ip: "192.168.100.7",
                     ip_address: "192.168.100.7"
                 }
             })
@@ -347,7 +348,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 const ok = await store.authenticate()
 
                 expect(ok).toBe(true)
-                expect(mockGet).toHaveBeenCalledWith("/api/devices/login", undefined)
+                expect(mockGet).toHaveBeenCalledWith("/api/devices/login")
             } finally {
                 Object.defineProperty(window, "location", {
                     configurable: true,
