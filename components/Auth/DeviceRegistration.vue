@@ -148,17 +148,17 @@ const handleRegistration = async () => {
     // If not inline, require a device name; inline mode keeps the UI compact and
     // only requires the code so registration can proceed from Settings quickly.
     if (!props.inline && !formData.value.deviceName) {
-        deviceStore.errorMessage = 'Device name is required.'
+        deviceStore.errorMessage.value = 'Device name is required.'
         return
     }
 
     if (!formData.value.deviceSecurityCode) {
-        deviceStore.errorMessage = 'Security code is required.'
+        deviceStore.errorMessage.value = 'Security code is required.'
         return
     }
 
     if (!securityCodeValidation.value) {
-        deviceStore.errorMessage = 'Security code must be exactly 6 digits.'
+        deviceStore.errorMessage.value = 'Security code must be exactly 6 digits.'
         return
     }
 
@@ -189,7 +189,7 @@ const handleRegistration = async () => {
             }
             // else: remain on page; show waiting-for-table state
         } else {
-            deviceStore.errorMessage = 'Registration succeeded but device details missing from server response. Please contact management.'
+            deviceStore.errorMessage.value = 'Registration succeeded but device details missing from server response. Please contact management.'
         }
     } catch (error) {
         // Error is already set in deviceStore.errorMessage by the register action
