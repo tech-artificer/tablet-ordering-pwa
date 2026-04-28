@@ -649,7 +649,7 @@ async function confirmOrder () {
                                 </p>
                                 <el-button
                                     type="danger"
-                                    @click="menuStore[`fetch${activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}`]()"
+                                    @click="reloadCategory()"
                                 >
                                     Try Again
                                 </el-button>
