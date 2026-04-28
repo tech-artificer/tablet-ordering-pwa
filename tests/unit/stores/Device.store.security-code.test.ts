@@ -80,7 +80,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             )
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("passcode")
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
-            expect(store.code).toBeNull()
+            expect((store as any).code).toBeUndefined()
         })
 
         it("should not retain setup code as reusable local auth state", async () => {
@@ -102,7 +102,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
 
             await store.register({ security_code: "654321", name: "Kiosk-1" } as any)
 
-            expect(store.code).toBeNull()
+            expect((store as any).code).toBeUndefined()
             expect(store.device).toEqual(
                 expect.objectContaining({
                     id: 1,

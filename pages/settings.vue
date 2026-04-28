@@ -68,6 +68,7 @@ const apiUrl = ref(config.public.apiBaseUrl || "")
 const localIpAddress = ref("Loading...")
 const isVerifyingToken = ref(false)
 const isRefreshingToken = ref(false)
+const isLoggingIn = ref(false)
 const tokenStatus = ref<"valid" | "invalid" | "unknown">("unknown")
 const tokenMessage = ref("")
 

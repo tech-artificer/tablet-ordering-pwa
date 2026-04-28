@@ -10,6 +10,7 @@ const router = useRouter()
 
 const formData = ref({
     deviceSecurityCode: "",
+    deviceName: "",
 })
 const localIp = ref<string | null>(null)
 
@@ -29,6 +30,18 @@ const isPolling = computed(() => Boolean(deviceStore.isPollingForTable))
 const hasToken = computed(() => Boolean(deviceStore.token))
 const pollTimedOut = computed(() => Boolean(deviceStore.pollTimedOut))
 const suggestedDeviceName = computed(() => String(localIp.value || (typeof window !== 'undefined' ? window.location.hostname : 'kiosk') || 'kiosk').replace(/[^a-zA-Z0-9.\-]/g, '').replace(/\./g, '-'))
+
+const displayDevice = computed(() =>
+    (deviceStore.device && (deviceStore.device as any).value)
+        ? (deviceStore.device as any).value
+        : (deviceStore.device as any)
+)
+
+const displayTable = computed(() =>
+    (deviceStore.table && (deviceStore.table as any).value)
+        ? (deviceStore.table as any).value
+        : (deviceStore.table as any)
+)
 
 const checkForTable = async () => {
     try {
@@ -235,12 +248,12 @@ const handleRegistration = async () => {
                                     <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
                                         <!-- Already-registered identity display -->
                                         <div v-if="deviceStore.device" class="text-sm text-white/80">
-                                            <span class="font-semibold text-white">{{ deviceStore.device.name }}</span>
-                                            <span v-if="deviceStore.table?.name" class="ml-2 text-green-400">— {{ deviceStore.table.name }}</span>
+                                            <span class="font-semibold text-white">{{ displayDevice?.name }}</span>
+                                            <span v-if="displayTable?.name" class="ml-2 text-green-400">— {{ displayTable.name }}</span>
                                             <span v-else class="ml-2 text-yellow-400">— waiting for table</span>
                                         </div>
                                         <!-- Poll timeout feedback -->
-                                        <div v-if="pollTimedOut && !deviceStore.table?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
+                                        <div v-if="pollTimedOut && !displayTable?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
                                             Timeout: table not yet assigned. Ask your manager to assign a table to this device, then tap "Check for Table".
                                         </div>
                                         <div class="flex flex-wrap gap-2">
@@ -311,12 +324,12 @@ const handleRegistration = async () => {
             <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
               <!-- Already-registered identity display -->
               <div v-if="deviceStore.device" class="text-sm text-white/80">
-                <span class="font-semibold text-white">{{ deviceStore.device.name }}</span>
-                <span v-if="deviceStore.table?.name" class="ml-2 text-green-400">— {{ deviceStore.table.name }}</span>
+                <span class="font-semibold text-white">{{ displayDevice?.name }}</span>
+                <span v-if="displayTable?.name" class="ml-2 text-green-400">— {{ displayTable.name }}</span>
                 <span v-else class="ml-2 text-yellow-400">— waiting for table</span>
               </div>
               <!-- Poll timeout feedback -->
-              <div v-if="pollTimedOut && !deviceStore.table?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
+              <div v-if="pollTimedOut && !displayTable?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
                 Timeout: table not yet assigned. Ask your manager to assign a table to this device, then tap "Check for Table".
               </div>
               <div class="flex flex-wrap gap-2">
