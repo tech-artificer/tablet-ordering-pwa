@@ -1,7 +1,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-ENV NODE_ENV=production
+# NODE_ENV must NOT be production here — npm ci skips devDependencies otherwise,
+# breaking Nuxt modules (@element-plus/nuxt, @nuxt/icon, etc.) required at build time.
 ENV NITRO_PRESET=node-server
 
 COPY package*.json ./
