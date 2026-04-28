@@ -46,6 +46,12 @@ registerRoute(
         /^\/_nuxt\//,
         /^\/@vite\//,
         /\.(?:js|mjs|css|map|json|webmanifest)$/,
+        // Certificate download endpoints must bypass app-shell fallback.
+        // If intercepted as navigation, tablets can land back in SPA flow
+        // (e.g., settings lock redirect) instead of downloading the CA file.
+        /^\/ca\.crt$/,
+        /^\/ca\.der$/,
+        /^\/ca\.pem$/,
         // Laravel admin/backend routes — must not be served by the PWA shell
         /^\/(login|logout|forgot-password|reset-password|verify-email|confirm-password|dashboard|orders|menus|packages|package-configs|tablet-categories|media|admin|configuration|users|roles|permissions|branches|devices|accessibility|service-requests|event-logs|manual|reports|monitoring|settings|storage|docs|horizon|pulse|telescope|sanctum|broadcasting)([\/]|$)/,
       ],

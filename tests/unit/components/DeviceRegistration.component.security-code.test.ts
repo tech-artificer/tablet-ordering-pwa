@@ -92,7 +92,6 @@ describe("DeviceRegistration Component — Security Code Contract (Batch 3)", ()
 
     it("blocks submission when security code is invalid", async () => {
         const wrapper = mountRegistration(false)
-        await wrapper.find("input[placeholder=\"e.g. Table 4 - Kiosk\"]").setValue("Kiosk-1")
         await wrapper.find("input[placeholder=\"e.g. 123456\"]").setValue("12345")
         const submitButton = wrapper.find("button")
 
@@ -100,20 +99,20 @@ describe("DeviceRegistration Component — Security Code Contract (Batch 3)", ()
         expect(mockRegister).not.toHaveBeenCalled()
     })
 
-    it("emits security_code payload on successful submission", async () => {
+    it("submits setup code without device name or reusable passcode", async () => {
         mockRegister.mockResolvedValueOnce(undefined)
 
         const wrapper = mountRegistration(false)
-        await wrapper.find("input[placeholder=\"e.g. Table 4 - Kiosk\"]").setValue("Kiosk-1")
         await wrapper.find("input[placeholder=\"e.g. 123456\"]").setValue("654321")
         await wrapper.find("button").trigger("click")
 
         expect(mockRegister).toHaveBeenCalledWith(
             expect.objectContaining({
                 security_code: "654321",
-                name: "Kiosk-1",
             })
         )
+        expect(mockRegister.mock.calls[0][0]).not.toHaveProperty("passcode")
+        expect(mockRegister.mock.calls[0][0]).not.toHaveProperty("name")
     })
 
     it("supports inline registration with security_code only", async () => {
@@ -126,8 +125,9 @@ describe("DeviceRegistration Component — Security Code Contract (Batch 3)", ()
         expect(mockRegister).toHaveBeenCalledWith(
             expect.objectContaining({
                 security_code: "123456",
-                name: "",
             })
         )
+        expect(mockRegister.mock.calls[0][0]).not.toHaveProperty("passcode")
+        expect(mockRegister.mock.calls[0][0]).not.toHaveProperty("name")
     })
 })

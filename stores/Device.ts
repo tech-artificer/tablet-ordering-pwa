@@ -34,6 +34,10 @@ const defaultPollIntervalMs = 5000
 const defaultMaxPollAttempts = 24
 const defaultMaxPollRuntimeMs = 2 * 60 * 1000
 
+function isIpv4Address (value: unknown): value is string {
+    return typeof value === "string" && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)
+}
+
 function normalizeTable (tbl: unknown): Table | null {
     if (!tbl) { return null }
 
@@ -71,6 +75,73 @@ export const useDeviceStore = defineStore("device", () => {
 
     let pollTimerId: number | null = null
     let pollStartedAt: number | null = null
+    let detectedClientIp: string | null | undefined
+    let refreshTimerId: ReturnType<typeof setInterval> | null = null
+
+    const REFRESH_INTERVAL_MS = 10 * 60 * 1000   // check every 10 min
+    const REFRESH_THRESHOLD_MS = 15 * 60 * 1000   // refresh if expiry < 15 min away
+
+    function parseExpiryMs (raw: number | string | null): number | null {
+        if (!raw) { return null }
+        if (typeof raw === "number") {
+            return raw > 1e10 ? raw : raw * 1000
+        }
+        const parsed = Date.parse(raw)
+        return isNaN(parsed) ? null : parsed
+    }
+
+    function startRefreshTimer () {
+        if (refreshTimerId !== null) { return }
+        refreshTimerId = setInterval(async () => {
+            if (!state.token) { return }
+            const expiryMs = parseExpiryMs(state.expiration)
+            if (expiryMs !== null && expiryMs - Date.now() <= REFRESH_THRESHOLD_MS) {
+                logger.info("[DeviceStore] Token nearing expiry; proactive refresh")
+                await refresh()
+            }
+        }, REFRESH_INTERVAL_MS)
+    }
+
+    function stopRefreshTimer () {
+        if (refreshTimerId !== null) {
+            clearInterval(refreshTimerId)
+            refreshTimerId = null
+        }
+    }
+
+    async function resolveClientIpForAuth (): Promise<string | null> {
+        const stateDevice = state.device as (Device & { ip_address?: string; last_ip_address?: string }) | null
+
+        const knownCandidates = [
+            stateDevice?.ip_address,
+            stateDevice?.last_ip_address,
+            state.lastServerIpUsed,
+        ]
+
+        for (const candidate of knownCandidates) {
+            if (isIpv4Address(candidate)) {
+                return candidate
+            }
+        }
+
+        if (detectedClientIp !== undefined) {
+            return detectedClientIp
+        }
+
+        try {
+            const { getLocalIp } = await import("~/utils/getLocalIp")
+            const localIp = await getLocalIp()
+            if (isIpv4Address(localIp)) {
+                detectedClientIp = localIp
+                return localIp
+            }
+        } catch (error) {
+            logger.debug("[DeviceStore] resolveClientIpForAuth: getLocalIp failed", error)
+        }
+
+        detectedClientIp = null
+        return null
+    }
 
     function applyBroadcastConfig (responseData: any) {
         const bc = responseData?.broadcasting
@@ -98,8 +169,6 @@ export const useDeviceStore = defineStore("device", () => {
         const ipUsedFromServer = payload?.ip_used
 
         state.lastAuthResponse = payload ?? null
-        state.code = payload?.code ?? authDevice?.code ?? state.code
-
         if (ipUsedFromServer) {
             state.lastServerIpUsed = String(ipUsedFromServer)
         }
@@ -178,8 +247,22 @@ export const useDeviceStore = defineStore("device", () => {
 
         try {
             const api = useApi()
+            const clientIp = await resolveClientIpForAuth()
             const authStart = typeof performance !== "undefined" ? performance.now() : Date.now()
-            const response = await api.get("/api/devices/login")
+
+            const params: Record<string, string> = {}
+            if (clientIp) {
+                params.ip_address = clientIp
+                // Backward-compat for backend variants still reading `ip`
+                params.ip = clientIp
+            }
+
+            const response = await api.get(
+                "/api/devices/login",
+                Object.keys(params).length > 0
+                    ? { params }
+                    : undefined
+            )
             applyAuthPayload(response.data)
             syncWaitingForTable()
 
@@ -197,7 +280,7 @@ export const useDeviceStore = defineStore("device", () => {
         } catch (error: any) {
             logger.error(`[Device] Auth error ${error?.message} at ${new Date().toISOString()}`)
             logger.error("[DeviceStore] Authentication failed:", error)
-            state.errorMessage = error?.response?.data?.message || "Authentication failed"
+            state.errorMessage = error?.response?.data?.message || error?.response?.data?.error || "Authentication failed"
             return false
         } finally {
             state.isLoading = false
@@ -242,25 +325,31 @@ export const useDeviceStore = defineStore("device", () => {
             } catch (error) {
                 logger.error("[DeviceStore] table polling error", { error })
             }
-        }) as unknown as number
+        }, intervalMs) as unknown as number
     }
 
-    async function register (formData: { code?: string; security_code?: string; name?: string }): Promise<void> {
+    async function register (formData: { passcode?: string; code?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
         state.isLoading = true
         state.errorMessage = null
 
-        // Support both legacy code and new security_code for one release
+        // Primary contract: security_code. Keep input aliases but normalize the
+        // outgoing payload so the setup code is never retained as login state.
         const payload: any = {}
-        if (formData.security_code) {
-            payload.security_code = formData.security_code
-            state.code = formData.security_code
-        } else if (formData.code) {
-            // Backward compatibility: accept code as alias for security_code
-            payload.code = formData.code
-            state.code = formData.code
+        const normalizedSecurityCode = String(formData.security_code ?? formData.passcode ?? formData.code ?? "").trim()
+
+        if (normalizedSecurityCode) {
+            payload.security_code = normalizedSecurityCode
         }
-        if (formData.name) {
-            payload.name = formData.name
+        state.code = null
+
+        const formIp = formData.ip_address
+        const fallbackIp = await resolveClientIpForAuth()
+        const ipToUse = isIpv4Address(formIp) ? formIp : fallbackIp
+
+        if (ipToUse) {
+            payload.ip_address = ipToUse
+            // Backward-compat for backend variants still reading `ip`
+            payload.ip = ipToUse
         }
 
         try {
@@ -364,6 +453,7 @@ export const useDeviceStore = defineStore("device", () => {
 
     onScopeDispose(() => {
         stopTablePolling()
+        stopRefreshTimer()
     })
 
     return {
@@ -389,6 +479,8 @@ export const useDeviceStore = defineStore("device", () => {
         setToken,
         setTable,
         setKioskUnlocked,
+        startRefreshTimer,
+        stopRefreshTimer,
     }
 }, {
     persist: {

@@ -6,6 +6,7 @@ import { isDeviceAuthPath, normalizeApiRequestUrl } from "../utils/apiRequest"
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
+  _networkRetries?: number
 }
 
 export default defineNuxtPlugin(() => {
@@ -163,13 +164,27 @@ export default defineNuxtPlugin(() => {
                 }
             }
 
-            // Handle timeout / network-level errors before generic path
-            if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
-                logger.error("⏱️ API Request timed out:", {
+            // Retry GET requests on timeout / network errors (max 2 retries, 1s backoff)
+            // POST/PUT/DELETE are not retried — they are not idempotent.
+            const isTransient = error.code === "ECONNABORTED" || error.message?.includes("timeout") || error.code === "ECONNRESET" || error.code === "ERR_NETWORK"
+            const isGetRequest = (error.config?.method || "").toUpperCase() === "GET"
+            const retries = (error.config as RetriableRequestConfig)?._networkRetries ?? 0
+
+            if (isTransient && isGetRequest && retries < 2 && error.config) {
+                const cfg = error.config as RetriableRequestConfig
+                cfg._networkRetries = retries + 1
+                const delay = retries === 0 ? 1000 : 2000
+                logger.warn(`⚡ Transient network error on GET; retry ${cfg._networkRetries}/2 in ${delay}ms`, { url: cfg.url })
+                await new Promise(resolve => setTimeout(resolve, delay))
+                return api.request(cfg)
+            }
+
+            if (isTransient) {
+                logger.error("⏱️ API Request timed out (no retry):", {
                     url: error.config?.url,
                     method: error.config?.method,
                     timeout: error.config?.timeout,
-                    message: error.message
+                    message: error.message,
                 })
                 return Promise.reject(error)
             }
@@ -186,6 +201,21 @@ export default defineNuxtPlugin(() => {
             })
             return Promise.reject(error)
         }
+    )
+
+    // Start proactive token refresh timer once a token is present.
+    // watch is imported via Nuxt auto-imports.
+    const device = useDeviceStore()
+    watch(
+        () => device.token,
+        (token) => {
+            if (token) {
+                device.startRefreshTimer()
+            } else {
+                device.stopRefreshTimer()
+            }
+        },
+        { immediate: true },
     )
 
     return {

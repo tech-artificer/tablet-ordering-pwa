@@ -14,4 +14,12 @@ describe("service worker navigation fallback", () => {
         expect(source).not.toContain("createHandlerBoundToURL('/index.html')")
         expect(source).not.toContain("ensureAppShellPrecached")
     })
+
+    it("does not hijack certificate download routes", () => {
+        const source = readServiceWorkerSource()
+
+        expect(source).toContain("/^\\/ca\\.crt$/")
+        expect(source).toContain("/^\\/ca\\.der$/")
+        expect(source).toContain("/^\\/ca\\.pem$/")
+    })
 })

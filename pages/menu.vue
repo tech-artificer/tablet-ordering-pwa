@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef, watch } from "vue"
+import { computed, onMounted, ref, toRef, unref, watch } from "vue"
 import { Beef, UtensilsCrossed, CakeSlice, Wine, Paintbrush, Droplets, CreditCard, RefreshCw, CircleCheck } from "lucide-vue-next"
-import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
 import { recoverActiveOrderState } from "../composables/useActiveOrderRecovery"
@@ -79,8 +78,6 @@ onMounted(async () => {
             logger.warn("[Menu] Error while inferring package from recovered order:", err)
         }
     }
-
-    const orderStatus = orderStore.getCurrentOrderStatus()
 
     // Cart recovery notification: if session is active with a placed order but cart is empty
     // AND nothing has been submitted yet — the in-progress cart was likely lost
@@ -164,9 +161,28 @@ const supportRequests = [
 
 // Check if refills are available (order placed AND we have a valid order ID)
 const canRequestRefill = computed(() => {
-    const hasOrder = orderStore.hasPlacedOrder && !!sessionStore.orderId
+    const hasOrder = Boolean(unref(orderStore.hasPlacedOrder)) && !!unref(sessionStore.orderId)
     return hasOrder
 })
+
+const hasLiveOrderReference = (): boolean => {
+    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
+    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
+}
+
+const isBackButtonDisabled = (): boolean => {
+    return Boolean(
+        unref(sessionStore.isActive) ||
+        unref(orderStore.hasPlacedOrder) ||
+        hasLiveOrderReference() ||
+        unref(orderStore.isRefillMode)
+    )
+}
+
+const handleBackButtonClick = () => {
+    if (isBackButtonDisabled()) { return }
+    router.back()
+}
 
 // Order summary now uses the order store
 const UNLIMITED_ITEM_CAP = 5
@@ -522,15 +538,20 @@ async function confirmOrder () {
                 >
                     <!-- Left: Back + title -->
                     <div class="flex items-center gap-3 min-w-0">
-                        <!-- <button
-                            class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
+                        <button
+                            :disabled="isBackButtonDisabled()"
+                            :aria-disabled="isBackButtonDisabled()"
+                            class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
+                            :class="isBackButtonDisabled()
+                                ? 'text-white/25 cursor-not-allowed'
+                                : 'text-white/70 hover:text-white hover:bg-white/15 active:scale-95'"
                             aria-label="Go back"
-                            @click="router.back()"
+                            @click="handleBackButtonClick"
                         >
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                             </svg>
-                        </button> -->
+                        </button>
                         <div class="min-w-0">
                             <p class="text-white font-bold text-base leading-tight truncate">
                                 {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill' }}

@@ -130,6 +130,10 @@ const orderGuestCount = computed(() => {
   return Number(order?.guest_count || props.guestCount)
 })
 
+const displayedGuestCount = computed(() => {
+  return orderStore.hasPlacedOrder ? orderGuestCount.value : Number(props.guestCount)
+})
+
 const displayOrderId = computed(() => {
   const currentOrder = orderStore.getCurrentOrder() as any
   const order = currentOrder?.order || currentOrder
@@ -197,43 +201,10 @@ const submitOrder = () => {
           </div>
         </div>
       </div>
-
       <!-- Guests row -->
       <div class="flex items-center justify-between py-2">
         <span class="text-white/60 text-sm font-medium">Guests</span>
-        <div v-if="!orderStore.hasPlacedOrder" class="flex items-center gap-2">
-          <button
-            @click="emit('setGuestCount', Math.max(2, guestCount - 1))"
-            class="w-8 h-8 rounded-lg bg-white/[0.08] flex items-center justify-center text-white font-bold text-base transition-colors hover:bg-white/15 active:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
-            :disabled="guestCount <= 2"
-            aria-label="Decrease guests">−</button>
-          <span class="text-white font-bold text-base min-w-[2ch] text-center tabular-nums">{{ guestCount }}</span>
-          <button
-            @click="emit('setGuestCount', Math.min(20, guestCount + 1))"
-            class="w-8 h-8 rounded-lg bg-white/[0.08] flex items-center justify-center text-white font-bold text-base transition-colors hover:bg-white/15 active:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
-            :disabled="guestCount >= 20"
-            aria-label="Increase guests">+</button>
-        </div>
-        <span v-else class="text-white font-bold text-base tabular-nums">{{ orderGuestCount }}</span>
-      </div>
-
-      <!-- Package info (hide in refill mode) -->
-      <div v-if="selectedPackage && !isRefillMode"
-        class="flex items-center justify-between bg-white/5 rounded-lg px-3 py-1.5 border border-white/10">
-        <span class="text-primary font-semibold text-sm">{{ selectedPackage.name }}</span>
-        <div v-if="!orderStore.hasPlacedOrder" class="flex items-center gap-1.5 bg-white/10 rounded-lg px-2 py-1">
-          <button @click="emit('setGuestCount', Math.max(2, guestCount - 1))"
-            class="touch-btn-circle min-w-[44px] min-h-[44px] w-11 h-11 text-white font-bold bg-white/10 active:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            :disabled="guestCount <= 2"
-            aria-label="Decrease guest count">−</button>
-          <span class="text-white font-semibold min-w-[2ch] text-center text-sm">{{ guestCount }}</span>
-          <button @click="emit('setGuestCount', Math.min(20, guestCount + 1))"
-            class="touch-btn-circle min-w-[44px] min-h-[44px] w-11 h-11 text-white font-bold bg-white/10 active:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            :disabled="guestCount >= 20"
-            aria-label="Increase guest count">+</button>
-          <span class="text-white/70 text-[10px] ml-0.5">Guests</span>
-        </div>
-        <div v-else class="text-white/60 text-sm">{{ orderGuestCount }} guests</div>
+        <span class="text-white font-bold text-base tabular-nums">{{ displayedGuestCount }}</span>
       </div>
     </div>
 

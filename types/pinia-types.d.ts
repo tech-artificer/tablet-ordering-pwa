@@ -35,4 +35,5 @@ declare module 'pinia' {
   // Runtime helpers (kept minimal)
   export function createPinia(...args: any[]): any;
   export function setActivePinia(pinia?: any): void;
+  export function storeToRefs<T extends object>(store: T): any;
 }

@@ -4,6 +4,7 @@ import { useDeviceStore } from "~/stores/Device"
 
 const mockPost = vi.fn()
 const mockGet = vi.fn()
+const mockGetLocalIp = vi.fn()
 
 // Mock the API composable
 vi.mock("~/composables/useApi", () => ({
@@ -13,23 +14,27 @@ vi.mock("~/composables/useApi", () => ({
     })
 }))
 
+vi.mock("~/utils/getLocalIp", () => ({
+    getLocalIp: mockGetLocalIp
+}))
+
 describe("Device Store — Security Code Contract (Batch 3)", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
         mockPost.mockReset()
         mockGet.mockReset()
+        mockGetLocalIp.mockReset()
     })
 
     describe("register() action with security_code field", () => {
-        it("should emit security_code in payload instead of legacy code field", async () => {
+        it("should emit only security_code identity fields in the payload", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
                 data: {
                     device: { id: 1, name: "Test Device" },
                     token: "test-token",
-                    table: { id: 4, name: "Table 4" },
-                    code: "123456"
+                    table: { id: 4, name: "Table 4" }
                 }
             }
 
@@ -38,17 +43,19 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             // Call register with security_code field
             await store.register({ security_code: "123456", name: "Test Device" } as any)
 
-            // Verify API was called with security_code, not code
             expect(mockPost).toHaveBeenCalledWith(
                 "/api/devices/register",
                 expect.objectContaining({
-                    security_code: "123456",
-                    name: "Test Device"
+                    security_code: "123456"
                 })
             )
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("passcode")
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("name")
+            expect(store.code).toBeNull()
         })
 
-        it("should store security_code from response in state", async () => {
+        it("should not retain setup code as reusable local auth state", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
@@ -56,12 +63,10 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                     device: {
                         id: 1,
                         name: "Kiosk-1",
-                        security_code: "654321",
                         security_code_generated_at: "2026-04-21T10:00:00Z"
                     },
                     token: "test-token",
-                    table: { id: 4, name: "Table 4" },
-                    code: "654321"
+                    table: { id: 4, name: "Table 4" }
                 }
             }
 
@@ -69,12 +74,11 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
 
             await store.register({ security_code: "654321", name: "Kiosk-1" } as any)
 
-            // Verify device object includes security_code metadata
+            expect(store.code).toBeNull()
             expect(store.device).toEqual(
                 expect.objectContaining({
                     id: 1,
                     name: "Kiosk-1",
-                    security_code: "654321",
                     security_code_generated_at: "2026-04-21T10:00:00Z"
                 })
             )
@@ -127,7 +131,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("backward compatibility with legacy code field", () => {
-        it("should still accept code field as alias for one release", async () => {
+        it("should still accept code field as a setup-code input alias", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
@@ -144,6 +148,8 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             await store.register({ code: "555555", name: "Test Device" } as any)
 
             expect(mockPost).toHaveBeenCalled()
+            expect(mockPost.mock.calls[0][1]).toEqual(expect.objectContaining({ security_code: "555555" }))
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
             expect(store.device).toEqual(
                 expect.objectContaining({
                     id: 1,
@@ -184,6 +190,105 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                     last_ip_address: "192.168.1.100"
                 })
             )
+        })
+    })
+
+    describe("authenticate() IP metadata propagation", () => {
+        it("should send ip_address query param using last known server IP without setup code", async () => {
+            const store = useDeviceStore()
+
+            mockPost.mockResolvedValueOnce({
+                data: {
+                    device: {
+                        id: 1,
+                        name: "Kiosk-1",
+                        last_ip_address: "192.168.100.7"
+                    },
+                    token: "register-token",
+                    table: { id: 6, name: "Table 6" },
+                    ip_used: "192.168.100.7"
+                }
+            })
+
+            await store.register({ security_code: "333333", name: "Kiosk-1" } as any)
+
+            mockGet.mockResolvedValueOnce({
+                data: {
+                    success: true,
+                    token: "auth-token",
+                    device: {
+                        id: 1,
+                        name: "Kiosk-1",
+                        last_ip_address: "192.168.100.7"
+                    },
+                    table: { id: 6, name: "Table 6" },
+                    ip_used: "192.168.100.7"
+                }
+            })
+
+            const ok = await store.authenticate()
+
+            expect(ok).toBe(true)
+            expect(mockGet).toHaveBeenCalledWith(
+                "/api/devices/login",
+                {
+                    params: {
+                        ip: "192.168.100.7",
+                        ip_address: "192.168.100.7"
+                    }
+                }
+            )
+        })
+
+        it("should map backend 'error' field into errorMessage when auth fails", async () => {
+            const store = useDeviceStore()
+
+            mockGet.mockRejectedValueOnce({
+                response: {
+                    status: 404,
+                    data: {
+                        success: false,
+                        error: "Device not found",
+                        ip_address: "172.18.0.1"
+                    }
+                }
+            })
+
+            const ok = await store.authenticate()
+
+            expect(ok).toBe(false)
+            expect(store.errorMessage).toBe("Device not found")
+        })
+
+        it("should not use window.location.hostname as tablet ip when local ip detection fails", async () => {
+            const store = useDeviceStore()
+            mockGetLocalIp.mockResolvedValueOnce(null)
+            mockGet.mockResolvedValueOnce({
+                data: {
+                    success: true,
+                    token: "auth-token",
+                    device: { id: 1, name: "Kiosk-1" },
+                    table: { id: 6, name: "Table 6" },
+                }
+            })
+
+            const originalLocation = window.location
+            Object.defineProperty(window, "location", {
+                configurable: true,
+                value: { ...originalLocation, hostname: "192.168.100.7" },
+            })
+
+            try {
+                const ok = await store.authenticate()
+
+                expect(ok).toBe(true)
+                expect(mockGet).toHaveBeenCalledWith("/api/devices/login", undefined)
+            } finally {
+                Object.defineProperty(window, "location", {
+                    configurable: true,
+                    value: originalLocation,
+                })
+            }
         })
     })
 })

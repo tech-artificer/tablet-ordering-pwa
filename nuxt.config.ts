@@ -226,6 +226,7 @@ export default defineNuxtConfig({
             // API Configuration
             apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || "/api",
             staticBaseUrl: process.env.NUXT_APP_BASE_URL || "",
+            deviceAuthPasscode: process.env.NUXT_PUBLIC_DEVICE_AUTH_PASSCODE || "",
 
             // Settings PIN lock behavior
             settingsPinBackgroundTimeoutMs: parseInt(process.env.NUXT_PUBLIC_SETTINGS_PIN_BACKGROUND_TIMEOUT_MS || "120000"),

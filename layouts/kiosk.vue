@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { useMenuStore } from "~/stores/Menu"
 import { logger } from "~/utils/logger"
-import flameSrc from "~/assets/images/flame.gif"
 const menuStore = useMenuStore()
-const showFlame = ref(true)
 const route = useRoute()
 
 const retryLoad = async () => {
@@ -42,22 +40,6 @@ if (import.meta.client) {
             </div>
         </Transition>
 
-        <!-- Ambient flame effect (z-20 = above page content; pointer-events-none = non-interactive) -->
-        <div class="absolute inset-0 pointer-events-none z-20">
-            <img
-                v-if="showFlame"
-                :src="flameSrc"
-                alt=""
-                role="presentation"
-                width="1400"
-                height="900"
-                loading="lazy"
-                decoding="async"
-                class="absolute opacity-30 p-0 m-0 w-full h-full object-cover mix-blend-screen"
-                aria-hidden="true"
-                @error="showFlame = false"
-            >
-        </div>
     </div>
 </template>
 

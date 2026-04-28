@@ -1,7 +1,5 @@
 <script setup lang="ts">
 // Smooth page transitions are handled by CSS in main.css
-import flameSrc from "~/assets/images/flame.gif"
-const showFlame = ref(true)
 const route = useRoute()
 </script>
 
@@ -14,17 +12,6 @@ const route = useRoute()
             </div>
         </Transition>
 
-        <!-- Ambient flame effect (z-20 = above page content; pointer-events-none = non-interactive) -->
-        <div class="absolute inset-0 pointer-events-none z-20">
-            <img
-                v-if="showFlame"
-                :src="flameSrc"
-                alt=""
-                class="absolute opacity-25 p-0 m-0 w-full h-full object-cover mix-blend-screen"
-                aria-hidden="true"
-                @error="showFlame = false"
-            >
-        </div>
     </div>
 </template>
 

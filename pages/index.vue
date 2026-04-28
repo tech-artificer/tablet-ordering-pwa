@@ -6,7 +6,17 @@
         <!-- Radial glow at center -->
         <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(246,181,109,0.06) 0%, transparent 70%)" />
 
-        <!-- CSS atmospheric glow (replaces flame.gif - no image bleed, no 9.8MB load) -->
+        <!-- Welcome-screen flame layer (lazy: loads after first paint, hidden on error) -->
+        <div v-if="showFlame" class="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
+            <img
+                :src="flameSrc"
+                alt=""
+                class="absolute opacity-20 p-0 m-0 w-full h-full object-cover mix-blend-screen"
+                @error="showFlame = false"
+            >
+        </div>
+
+        <!-- CSS atmospheric glow (fallback + base layer beneath flame) -->
         <div class="absolute inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
             <!-- Warm amber pulse at bottom-center -->
             <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60vw] h-[40vh] rounded-full bg-primary/10 blur-3xl animate-pulse-glow" />
@@ -210,6 +220,8 @@
 
 <script setup lang="ts">
 import { Settings, UtensilsCrossed } from "lucide-vue-next"
+import flameSrc from "~/assets/images/flame.gif"
+
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
 import { useBroadcasts } from "~/composables/useBroadcasts"
@@ -228,6 +240,15 @@ const { isOnline } = useNetworkStatus()
 // state, which is always false here because no channels are subscribed until the
 // device is authenticated and an order session starts.
 const isWebSocketConnected = computed(() => isOnline.value)
+
+// Flame overlay — lazy: starts hidden so CTA/menus paint first, reveals after load
+const showFlame = ref(false)
+onMounted(() => {
+    const img = new Image()
+    img.onload = () => { showFlame.value = true }
+    img.onerror = () => { showFlame.value = false }
+    img.src = flameSrc
+})
 
 // PIN modal state
 const showPinModal = ref(false)

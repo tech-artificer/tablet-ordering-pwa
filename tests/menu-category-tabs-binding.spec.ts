@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, it, expect } from "vitest"
 
-const menuPagePath = "e:/Projects/woosoo-integrated-stack/tablet-ordering-pwa/pages/menu.vue"
+const menuPagePath = resolve(__dirname, "../pages/menu.vue")
 
 describe("menu page category tabs binding", () => {
     it("binds the category tabs to the page category list", () => {
