@@ -392,6 +392,30 @@ const refreshToken = async () => {
     }
 }
 
+// Device login/authentication (IP-only)
+const authenticateDevice = async () => {
+    isLoggingIn.value = true
+    try {
+        const clientIp = String(displayDevice.value?.last_ip_address || localIpAddress.value || "").trim()
+        const success = await deviceStore.authenticate(clientIp || undefined)
+        if (success) {
+            tokenStatus.value = "valid"
+            tokenMessage.value = "Device authenticated successfully"
+            logger.debug("✅ Device authenticated via IP")
+        } else {
+            tokenStatus.value = "invalid"
+            tokenMessage.value = "Device not registered or authentication failed"
+            logger.warn("Authentication returned no device")
+        }
+    } catch (err: any) {
+        tokenStatus.value = "invalid"
+        tokenMessage.value = err?.message || "Authentication failed"
+        logger.error("❌ Authentication error", err)
+    } finally {
+        isLoggingIn.value = false
+    }
+}
+
 // PIN modal removed - now handled on home page (index.vue)
 
 const logout = async () => {

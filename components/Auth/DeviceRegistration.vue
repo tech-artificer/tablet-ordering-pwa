@@ -27,6 +27,8 @@ const securityCodeValidation = computed(() => {
 
 const isPolling = computed(() => Boolean(deviceStore.isPollingForTable))
 const hasToken = computed(() => Boolean(deviceStore.token))
+const pollTimedOut = computed(() => Boolean(deviceStore.pollTimedOut))
+const suggestedDeviceName = computed(() => String(localIp.value || (typeof window !== 'undefined' ? window.location.hostname : 'kiosk') || 'kiosk').replace(/[^a-zA-Z0-9.\-]/g, '').replace(/\./g, '-'))
 
 const checkForTable = async () => {
     try {
@@ -37,16 +39,15 @@ const checkForTable = async () => {
             // stop polling if running and navigate away
             try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
             registered.value = true
-            ;(deviceStore as any).waitingForTable = false
+            deviceStore.setWaitingForTable(false)
             try {
                 const currentPath = router.currentRoute?.value?.path
-                if (currentPath !== "/settings") { await router.replace("/") }
+                if (currentPath !== '/settings') await router.replace('/')
             } catch (e) { /* ignore */ }
-        } else {
-            // still no table; UI will show waiting state
         }
+        // else: still no table; UI shows waiting state
     } catch (err) {
-        logger.error("checkForTable failed", err)
+        logger.error('checkForTable failed', err)
     }
 }
 
@@ -56,17 +57,17 @@ watch(
     (newTable) => {
         const t = newTable as any
         if (t && (t.id || t.name)) {
-            logger.debug("[DeviceRegistration] detected table assignment", t)
+            logger.debug('[DeviceRegistration] detected table assignment', t)
             // stop background polling if running
             try { deviceStore.stopTablePolling() } catch (e) { /* ignore */ }
             // mark registered and navigate after short delay
             registered.value = true
-            ;(deviceStore as any).waitingForTable = false
+            deviceStore.setWaitingForTable(false)
             setTimeout(async () => {
                 try {
                     const currentPath = router.currentRoute?.value?.path
-                    if (currentPath !== "/settings") { await router.replace("/") }
-                } catch (e) { logger.debug("navigate replace ignored", e) }
+                    if (currentPath !== '/settings') await router.replace('/')
+                } catch (e) { logger.debug('navigate replace ignored', e) }
             }, 600)
         }
     }
@@ -74,8 +75,11 @@ watch(
 
 const resetRegistration = () => {
     registered.value = false
-    ;(deviceStore as any).errorMessage = null
-    formData.value.deviceSecurityCode = ""
+    attempted.value = false
+    deviceStore.clearAuth()
+    deviceStore.clearError()
+    formData.value.deviceSecurityCode = ''
+    formData.value.deviceName = ''
 }
 
 onMounted(() => {
@@ -113,43 +117,51 @@ const handleRegistration = async () => {
             const t = deviceStore.table as any
             if (t && (t.id || t.name)) {
                 registered.value = true
-                ;(deviceStore as any).waitingForTable = false
+                deviceStore.setWaitingForTable(false)
                 try {
                     const currentPath = router.currentRoute?.value?.path
-                    if (currentPath !== "/settings") { await router.replace("/") }
+                    if (currentPath !== '/settings') await router.replace('/')
                 } catch (e) { /* ignore */ }
             }
             return
         } catch (e) {
-            logger.error("Refresh during handleRegistration failed", e)
+            logger.error('Refresh during handleRegistration failed', e)
             return
         }
     }
 
     attempted.value = true
 
+    // If not inline, require a device name; inline mode keeps the UI compact and
+    // only requires the code so registration can proceed from Settings quickly.
+    if (!props.inline && !formData.value.deviceName) {
+        deviceStore.errorMessage = 'Device name is required.'
+        return
+    }
+
     if (!formData.value.deviceSecurityCode) {
-        ;(deviceStore as any).errorMessage = "Security code is required."
+        deviceStore.errorMessage = 'Security code is required.'
         return
     }
 
     if (!securityCodeValidation.value) {
-        ;(deviceStore as any).errorMessage = "Security code must be exactly 6 digits."
+        deviceStore.errorMessage = 'Security code must be exactly 6 digits.'
         return
     }
 
     // Clear previous errors
-    ;(deviceStore as any).errorMessage = null
+    deviceStore.clearError()
 
     try {
-        const payload: any = { security_code: formData.value.deviceSecurityCode }
-        if (localIp && localIp.value) { payload.ip_address = localIp.value } else if (deviceStore.device && (deviceStore.device as any).last_ip_address) { payload.ip_address = (deviceStore.device as any).last_ip_address }
+        const payload: any = { security_code: formData.value.deviceSecurityCode, name: formData.value.deviceName }
+        if (localIp && localIp.value) payload.ip_address = localIp.value
+        else if (deviceStore.device && (deviceStore.device as any).last_ip_address) payload.ip_address = (deviceStore.device as any).last_ip_address
         await deviceStore.register(payload)
 
         // If registration returned a device (with or without token), mark as registered; table may still be pending.
         if (deviceStore.device) {
             registered.value = true
-            ;(deviceStore as any).errorMessage = null
+            deviceStore.clearError()
 
             // If table assigned already, navigate away
             const tableId = (deviceStore.table && (deviceStore.table as any).id) || (deviceStore.table && (deviceStore.table as any).value?.id)
@@ -157,19 +169,18 @@ const handleRegistration = async () => {
             if (tableId || tableName) {
                 try {
                     const currentPath = router.currentRoute?.value?.path
-                    if (currentPath !== "/settings") {
-                        await router.replace("/")
+                    if (currentPath !== '/settings') {
+                        await router.replace('/')
                     }
                 } catch (e) { /* ignore */ }
-            } else {
-                // remain on page; show refresh button to check assignment
             }
+            // else: remain on page; show waiting-for-table state
         } else {
-            ;(deviceStore as any).errorMessage = "Registration succeeded but device details missing from server response. Please contact management."
+            deviceStore.errorMessage = 'Registration succeeded but device details missing from server response. Please contact management.'
         }
     } catch (error) {
-    // Error is already set in deviceStore.errorMessage by the register action
-        logger.error("Registration failed:", error)
+        // Error is already set in deviceStore.errorMessage by the register action
+        logger.error('Registration failed:', error)
     }
 }
 </script>
@@ -221,23 +232,22 @@ const handleRegistration = async () => {
                                         <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
                                     </button>
 
-                                    <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                                        <p class="text-sm text-white/70 mb-2">
-                                            Device registered. Waiting for table assignment.
-                                        </p>
-                                        <div class="flex gap-2">
-                                            <button v-if="!isPolling" type="button" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20" @click="deviceStore.startTablePolling()">
-                                                Start Auto-Check
-                                            </button>
-                                            <button v-else type="button" class="px-4 py-2 rounded bg-error/20" @click="deviceStore.stopTablePolling()">
-                                                Stop Auto-Check
-                                            </button>
-                                            <button type="button" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20" @click="checkForTable">
-                                                Check for Table
-                                            </button>
-                                            <button type="button" class="px-4 py-2 rounded bg-white/10" @click="resetRegistration">
-                                                Retry Register
-                                            </button>
+                                    <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+                                        <!-- Already-registered identity display -->
+                                        <div v-if="deviceStore.device" class="text-sm text-white/80">
+                                            <span class="font-semibold text-white">{{ deviceStore.device.name }}</span>
+                                            <span v-if="deviceStore.table?.name" class="ml-2 text-green-400">— {{ deviceStore.table.name }}</span>
+                                            <span v-else class="ml-2 text-yellow-400">— waiting for table</span>
+                                        </div>
+                                        <!-- Poll timeout feedback -->
+                                        <div v-if="pollTimedOut && !deviceStore.table?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
+                                            Timeout: table not yet assigned. Ask your manager to assign a table to this device, then tap "Check for Table".
+                                        </div>
+                                        <div class="flex flex-wrap gap-2">
+                                            <button v-if="!isPolling" type="button" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20 text-sm" @click="deviceStore.startTablePolling()">Start Auto-Check</button>
+                                            <button v-else type="button" class="px-4 py-2 rounded bg-error/20 text-sm" @click="deviceStore.stopTablePolling()">Stop Auto-Check</button>
+                                            <button type="button" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20 text-sm" @click="checkForTable">Check for Table</button>
+                                            <button type="button" class="px-4 py-2 rounded bg-white/10 text-sm" @click="resetRegistration">Re-register</button>
                                         </div>
                                     </div>
                                 </div>
@@ -280,45 +290,55 @@ const handleRegistration = async () => {
         </div>
 
         <el-form :model="formData" class="mb-3" @submit.prevent="handleRegistration">
-            <div class="grid gap-3">
-                <div>
-                    <el-input
-                        v-model="formData.deviceSecurityCode"
-                        placeholder="Enter security code"
-                        type="text"
-                        inputmode="numeric"
-                        maxlength="6"
-                        size="default"
-                        class="w-full text-sm"
-                        :class="{ 'border-error': hasError }"
-                        :disabled="registered || hasToken"
-                    />
-                    <p v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="mt-2 text-sm text-error">
-                        Must be exactly 6 digits
-                    </p>
-                    <p v-if="hasError && attempted" class="mt-2 text-sm text-error">
-                        {{ errorMessage }}
-                    </p>
-                </div>
-            </div>
+          <div class="grid gap-3">
+            <el-form-item label="Security Code" required>
+              <el-input v-model="formData.deviceSecurityCode" placeholder="e.g. 123456" type="text" inputmode="numeric" maxlength="6" size="large"
+              class="w-full text-lg font-kanit" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
+              <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
+                Must be exactly 6 digits
+              </div>
+            </el-form-item>
+          </div>
 
-            <div class="mt-4 flex gap-3">
-                <button
-                    type="button"
-                    class="flex-1 px-4 py-3 rounded-lg bg-primary text-white border border-primary/40 font-semibold min-h-[44px] hover:opacity-95 transition"
-                    :disabled="isLoading || !securityCodeValidation || registered || hasToken"
-                    @click="handleRegistration()"
-                >
-                    <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
-                </button>
-                <button v-if="registered || hasToken" type="button" class="px-4 py-3 rounded bg-primary/20 min-h-[44px]" @click="checkForTable">
-                    Check for Table
-                </button>
-            </div>
+          <div class="space-y-2">
+            <button
+              type="button"
+              class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
+              @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !securityCodeValidation || registered || hasToken">
+              <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
+            </button>
 
-            <div v-if="hasError && attempted" class="mt-3">
-                <el-alert title="Registration Failed" :description="errorMessage" type="error" show-icon />
+            <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+              <!-- Already-registered identity display -->
+              <div v-if="deviceStore.device" class="text-sm text-white/80">
+                <span class="font-semibold text-white">{{ deviceStore.device.name }}</span>
+                <span v-if="deviceStore.table?.name" class="ml-2 text-green-400">— {{ deviceStore.table.name }}</span>
+                <span v-else class="ml-2 text-yellow-400">— waiting for table</span>
+              </div>
+              <!-- Poll timeout feedback -->
+              <div v-if="pollTimedOut && !deviceStore.table?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
+                Timeout: table not yet assigned. Ask your manager to assign a table to this device, then tap "Check for Table".
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button v-if="!isPolling" type="button" @click="deviceStore.startTablePolling()" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20 text-sm">Start Auto-Check</button>
+                <button v-else type="button" @click="deviceStore.stopTablePolling()" class="px-4 py-2 rounded bg-error/20 text-sm">Stop Auto-Check</button>
+                <button type="button" @click="checkForTable" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20 text-sm">Check for Table</button>
+                <button type="button" @click="resetRegistration" class="px-4 py-2 rounded bg-white/10 text-sm">Re-register</button>
+              </div>
             </div>
+          </div>
         </el-form>
+
+        <div v-if="hasError && attempted" class="mt-4">
+          <div class="p-3 bg-error/10 border border-error/20 rounded-lg text-error/80 text-sm flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.516 9.8A1.75 1.75 0 0116.75 16.5H3.25a1.75 1.75 0 01-1.508-2.601l5.515-9.8zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a.9.9 0 00-.9.9v4.2c0 .5.4.9.9.9s.9-.4.9-.9V5.9A.9.9 0 0010 5z" clip-rule="evenodd" />
+            </svg>
+            <div>
+              <div class="font-semibold">Registration Error</div>
+              <div class="text-sm mt-1 text-error">{{ errorMessage }}</div>
+            </div>
+          </div>
+        </div>
     </div>
 </template>
