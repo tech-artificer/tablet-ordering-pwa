@@ -130,32 +130,24 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
         })
     })
 
-    describe("backward compatibility with legacy code field", () => {
-        it("should still accept code field as a setup-code input alias", async () => {
+    describe("code alias sunset (CT-01/CT-06)", () => {
+        it("should not normalize legacy code field to security_code — alias removed", async () => {
             const store = useDeviceStore()
 
-            const mockResponse = {
+            mockPost.mockResolvedValueOnce({
                 data: {
-                    device: { id: 1, name: "Test Device", code: "555555" },
+                    device: { id: 1, name: "Test Device" },
                     token: "test-token",
                     table: { id: 5, name: "Table 5" }
                 }
-            }
+            })
 
-            mockPost.mockResolvedValueOnce(mockResponse)
-
-            // Call with legacy code field for backward compatibility
+            // CT-01/CT-06 alias sunset: code field is no longer accepted.
+            // Passing only `code` must NOT populate security_code in the outgoing payload.
             await store.register({ code: "555555", name: "Test Device" } as any)
 
-            expect(mockPost).toHaveBeenCalled()
-            expect(mockPost.mock.calls[0][1]).toEqual(expect.objectContaining({ security_code: "555555" }))
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("security_code")
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
-            expect(store.device).toEqual(
-                expect.objectContaining({
-                    id: 1,
-                    name: "Test Device"
-                })
-            )
         })
     })
 

@@ -78,8 +78,8 @@ export const useDeviceStore = defineStore("device", () => {
     let detectedClientIp: string | null | undefined
     let refreshTimerId: ReturnType<typeof setInterval> | null = null
 
-    const REFRESH_INTERVAL_MS = 10 * 60 * 1000   // check every 10 min
-    const REFRESH_THRESHOLD_MS = 15 * 60 * 1000   // refresh if expiry < 15 min away
+    const REFRESH_INTERVAL_MS = 10 * 60 * 1000 // check every 10 min
+    const REFRESH_THRESHOLD_MS = 15 * 60 * 1000 // refresh if expiry < 15 min away
 
     function parseExpiryMs (raw: number | string | null): number | null {
         if (!raw) { return null }
@@ -328,14 +328,14 @@ export const useDeviceStore = defineStore("device", () => {
         }, intervalMs) as unknown as number
     }
 
-    async function register (formData: { passcode?: string; code?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
+    async function register (formData: { passcode?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
         state.isLoading = true
         state.errorMessage = null
 
         // Primary contract: security_code. Keep input aliases but normalize the
         // outgoing payload so the setup code is never retained as login state.
         const payload: any = {}
-        const normalizedSecurityCode = String(formData.security_code ?? formData.passcode ?? formData.code ?? "").trim()
+        const normalizedSecurityCode = String(formData.security_code ?? formData.passcode ?? "").trim()
 
         if (normalizedSecurityCode) {
             payload.security_code = normalizedSecurityCode
@@ -439,6 +439,7 @@ export const useDeviceStore = defineStore("device", () => {
     function getToken (): string | null { return state.token }
     function getTable (): Table | null { return state.table }
 
+    function clearLastAuthResponse () { state.lastAuthResponse = null }
     function setToken (value: string | null) { state.token = value }
     function setTable (value: Table | null) {
         state.table = value
@@ -476,6 +477,7 @@ export const useDeviceStore = defineStore("device", () => {
         getToken,
         getTable,
         getKioskUnlocked,
+        clearLastAuthResponse,
         setToken,
         setTable,
         setKioskUnlocked,
