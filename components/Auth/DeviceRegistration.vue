@@ -290,45 +290,55 @@ const handleRegistration = async () => {
         </div>
 
         <el-form :model="formData" class="mb-3" @submit.prevent="handleRegistration">
-            <div class="grid gap-3">
-                <div>
-                    <el-input
-                        v-model="formData.deviceSecurityCode"
-                        placeholder="Enter security code"
-                        type="text"
-                        inputmode="numeric"
-                        maxlength="6"
-                        size="default"
-                        class="w-full text-sm"
-                        :class="{ 'border-error': hasError }"
-                        :disabled="registered || hasToken"
-                    />
-                    <p v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="mt-2 text-sm text-error">
-                        Must be exactly 6 digits
-                    </p>
-                    <p v-if="hasError && attempted" class="mt-2 text-sm text-error">
-                        {{ errorMessage }}
-                    </p>
-                </div>
-            </div>
+          <div class="grid gap-3">
+            <el-form-item label="Security Code" required>
+              <el-input v-model="formData.deviceSecurityCode" placeholder="e.g. 123456" type="text" inputmode="numeric" maxlength="6" size="large"
+              class="w-full text-lg font-kanit" :class="{ 'border-error': hasError }" :disabled="registered || hasToken" />
+              <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
+                Must be exactly 6 digits
+              </div>
+            </el-form-item>
+          </div>
 
-            <div class="mt-4 flex gap-3">
-                <button
-                    type="button"
-                    class="flex-1 px-4 py-3 rounded-lg bg-primary text-white border border-primary/40 font-semibold min-h-[44px] hover:opacity-95 transition"
-                    :disabled="isLoading || !securityCodeValidation || registered || hasToken"
-                    @click="handleRegistration()"
-                >
-                    <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
-                </button>
-                <button v-if="registered || hasToken" type="button" class="px-4 py-3 rounded bg-primary/20 min-h-[44px]" @click="checkForTable">
-                    Check for Table
-                </button>
-            </div>
+          <div class="space-y-2">
+            <button
+              type="button"
+              class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
+              @click="handleRegistration()" :disabled="isLoading || !formData.deviceName || !securityCodeValidation || registered || hasToken">
+              <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
+            </button>
 
-            <div v-if="hasError && attempted" class="mt-3">
-                <el-alert title="Registration Failed" :description="errorMessage" type="error" show-icon />
+            <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+              <!-- Already-registered identity display -->
+              <div v-if="deviceStore.device" class="text-sm text-white/80">
+                <span class="font-semibold text-white">{{ deviceStore.device.name }}</span>
+                <span v-if="deviceStore.table?.name" class="ml-2 text-green-400">— {{ deviceStore.table.name }}</span>
+                <span v-else class="ml-2 text-yellow-400">— waiting for table</span>
+              </div>
+              <!-- Poll timeout feedback -->
+              <div v-if="pollTimedOut && !deviceStore.table?.name" class="text-xs text-yellow-400 bg-yellow-400/10 rounded p-2">
+                Timeout: table not yet assigned. Ask your manager to assign a table to this device, then tap "Check for Table".
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button v-if="!isPolling" type="button" @click="deviceStore.startTablePolling()" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20 text-sm">Start Auto-Check</button>
+                <button v-else type="button" @click="deviceStore.stopTablePolling()" class="px-4 py-2 rounded bg-error/20 text-sm">Stop Auto-Check</button>
+                <button type="button" @click="checkForTable" :disabled="isLoading" class="px-4 py-2 rounded bg-primary/20 text-sm">Check for Table</button>
+                <button type="button" @click="resetRegistration" class="px-4 py-2 rounded bg-white/10 text-sm">Re-register</button>
+              </div>
             </div>
+          </div>
         </el-form>
+
+        <div v-if="hasError && attempted" class="mt-4">
+          <div class="p-3 bg-error/10 border border-error/20 rounded-lg text-error/80 text-sm flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.516 9.8A1.75 1.75 0 0116.75 16.5H3.25a1.75 1.75 0 01-1.508-2.601l5.515-9.8zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a.9.9 0 00-.9.9v4.2c0 .5.4.9.9.9s.9-.4.9-.9V5.9A.9.9 0 0010 5z" clip-rule="evenodd" />
+            </svg>
+            <div>
+              <div class="font-semibold">Registration Error</div>
+              <div class="text-sm mt-1 text-error">{{ errorMessage }}</div>
+            </div>
+          </div>
+        </div>
     </div>
 </template>
