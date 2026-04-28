@@ -182,6 +182,25 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 }
             })
         })
+
+        it("should call /api/devices/login without ip_address query when not provided", async () => {
+            const store = useDeviceStore()
+
+            const mockResponse = {
+                data: {
+                    success: true,
+                    token: "test-token",
+                    device: { id: 1, name: "Tablet-01" },
+                    table: { id: 1, name: "T1" }
+                }
+            }
+
+            mockGet.mockResolvedValueOnce(mockResponse)
+
+            await store.authenticate()
+
+            expect(mockGet).toHaveBeenCalledWith("/api/devices/login")
+        })
     })
 
     describe("code alias sunset (CT-01/CT-06)", () => {
