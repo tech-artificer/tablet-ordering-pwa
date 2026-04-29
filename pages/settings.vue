@@ -134,25 +134,44 @@ watch(collapsed, (val) => {
     }
 }, { deep: true })
 
+/** Minimal IPv4 check — avoids importing private isIpv4Address from Device store. */
+const isValidIpv4 = (v: unknown): v is string =>
+    typeof v === "string" && /^(\d{1,3}\.){3}\d{1,3}$/.test(v)
+
 // Get local IP address
 const getLocalIpAddress = async () => {
     try {
-    // Try to get from device store if available (use last_ip_address per Device type)
-        if (displayDevice.value?.last_ip_address) {
-            localIpAddress.value = displayDevice.value.last_ip_address
+        // 1. Use stored IP from authenticated device (most reliable).
+        if (isValidIpv4(displayDevice.value?.last_ip_address)) {
+            localIpAddress.value = displayDevice.value!.last_ip_address!
             return
         }
 
-        // Try to detect the tablet LAN IP using the WebRTC helper.
+        // 2. WebRTC ICE candidate detection (works without network round-trip).
         try {
             const { getLocalIp } = await import("~/utils/getLocalIp")
             const ip = await getLocalIp()
-            if (ip) {
+            if (isValidIpv4(ip)) {
                 localIpAddress.value = ip
                 return
             }
         } catch (e) {
-            logger.warn("[Settings] Local IP detection failed:", e)
+            logger.warn("[Settings] WebRTC local IP detection failed:", e)
+        }
+
+        // 3. Server-side detection fallback: ask the API what IP it sees for this request.
+        //    Requires nginx to forward X-Forwarded-For to PHP-FPM (now configured).
+        try {
+            const { useApi } = await import("~/composables/useApi")
+            const api = useApi()
+            const res = await api.get("/api/device/ip")
+            const serverIp = res?.data?.ip
+            if (isValidIpv4(serverIp)) {
+                localIpAddress.value = serverIp
+                return
+            }
+        } catch (e) {
+            logger.warn("[Settings] /api/device/ip server-side fallback failed:", e)
         }
 
         localIpAddress.value = "Unable to detect"
@@ -233,7 +252,7 @@ onBeforeUnmount(() => {
 
 // Try to resolve device & table by local IP. Server may accept POST or GET for this helper.
 const fetchDeviceByIp = async (ip: string | null) => {
-    if (!ip) { return false }
+    if (!isValidIpv4(ip)) { return false }  // guard: never send non-IP strings to the API
     try {
         const { useApi } = await import("~/composables/useApi")
         const api = useApi()
@@ -596,10 +615,11 @@ onMounted(async () => {
 
     await getLocalIpAddress()
 
-    // After detecting local IP, attempt to resolve device/table
+    // After detecting local IP, attempt to resolve device/table.
+    // fetchDeviceByIp validates the IP itself — only sends if it's a real IPv4 address.
     try {
         const ip = (deviceStore.device?.value?.last_ip_address) || localIpAddress.value
-        const lookedUp = await fetchDeviceByIp(typeof ip === "string" ? ip : null)
+        const lookedUp = await fetchDeviceByIp(isValidIpv4(ip) ? ip : null)
         if (!lookedUp) {
             tokenMessage.value = "Register this tablet with the setup code above."
         }

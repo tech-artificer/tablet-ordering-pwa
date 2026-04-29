@@ -218,7 +218,7 @@ export default defineNuxtPlugin((nuxtApp: any) => {
 
         const initializeFromApiConfig = async () => {
             try {
-                const response = await $fetch<{ broadcasting?: EchoConfig | null }>("/api/config", {
+                const response = await $fetch<{ broadcasting?: EchoConfig | null }>("/config", {
                     baseURL: String(mainApi).startsWith("/") ? undefined : String(mainApi),
                 })
                 const normalized = normalizeBroadcastConfig(response?.broadcasting)
