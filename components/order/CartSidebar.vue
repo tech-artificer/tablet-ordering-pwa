@@ -74,6 +74,7 @@ const statusConfig = computed(() => {
     'served':    { label: 'Served',         color: 'text-success',      bgColor: 'bg-success/20 border-success/30',      icon: CheckCircle },
     'completed': { label: 'Completed',      color: 'text-white/40',     bgColor: 'bg-white/5 border-white/10',           icon: CheckCircle },
     'cancelled': { label: 'Cancelled',      color: 'text-error',        bgColor: 'bg-error/20 border-error/30',          icon: AlertCircle },
+    'voided':    { label: 'Voided',         color: 'text-error',        bgColor: 'bg-error/20 border-error/30',          icon: AlertCircle },
   }
   return configs[orderStatus.value] || configs['pending']
 })
@@ -145,25 +146,6 @@ const removeItem = (itemId: number) => {
   emit('removeItem', itemId);
 };
 
-// Order status progress tracker
-const trackerSteps = [
-  { key: 'pending',   label: 'Received' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'preparing', label: 'Preparing' },
-  { key: 'ready',     label: 'Ready' },
-  { key: 'served',    label: 'Served' },
-] as const
-
-const trackerOrder = ['pending', 'confirmed', 'preparing', 'ready', 'served']
-
-const stepState = (key: string): 'completed' | 'active' | 'pending' => {
-  const currentIdx = trackerOrder.indexOf(orderStatus.value)
-  const stepIdx = trackerOrder.indexOf(key)
-  if (currentIdx < 0 || stepIdx < 0) return 'pending'
-  if (stepIdx < currentIdx) return 'completed'
-  if (stepIdx === currentIdx) return 'active'
-  return 'pending'
-}
 
 const submitOrder = () => {
   if (orderStore.isSubmitting) {
@@ -235,42 +217,21 @@ const submitOrder = () => {
       <!-- POST-ORDER: Show ordered items (read-only) -->
       <template v-if="orderStore.hasPlacedOrder && !isRefillMode">
 
-        <!-- Order Status Progress Tracker -->
-        <div class="order-status-tracker mb-1">
-          <div class="tracker-header">
-            <component :is="statusConfig.icon" class="w-4 h-4" :class="statusConfig.color" />
-            <span class="text-xs font-bold uppercase tracking-wide" :class="statusConfig.color">{{ statusConfig.label }}</span>
+        <!-- Order Status Badge -->
+        <div
+          :class="['rounded-xl border px-3 py-2.5 mb-1 flex items-center justify-between gap-2', statusConfig.bgColor]"
+          role="status"
+          :aria-label="`Order status: ${statusConfig.label}`"
+        >
+          <div class="flex items-center gap-2">
+            <component :is="statusConfig.icon" class="w-4 h-4 flex-shrink-0" :class="statusConfig.color" />
+            <span class="text-xs font-bold uppercase tracking-widest" :class="statusConfig.color">
+              {{ statusConfig.label }}
+            </span>
           </div>
-          <div class="tracker-steps" role="progressbar" :aria-label="`Order status: ${statusConfig.label}`">
-            <template v-for="(step, index) in trackerSteps" :key="step.key">
-              <!-- Step node -->
-              <div class="tracker-step">
-                <!-- Checkmark for completed, pulse circle for active, empty for future -->
-                <div
-                  :class="[
-                    'tracker-dot',
-                    stepState(step.key) === 'completed' ? 'tracker-dot--done' : '',
-                    stepState(step.key) === 'active' ? 'tracker-dot--active' : '',
-                    stepState(step.key) === 'pending' ? 'tracker-dot--pending' : '',
-                  ]">
-                  <!-- Completed: checkmark -->
-                  <svg v-if="stepState(step.key) === 'completed'" class="w-2.5 h-2.5 text-secondary" fill="none" viewBox="0 0 12 12">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <!-- Active: inner dot -->
-                  <span v-else-if="stepState(step.key) === 'active'" class="tracker-pulse"></span>
-                </div>
-                <span class="tracker-label" :class="stepState(step.key) === 'pending' ? 'text-white/30' : 'text-white/80'">
-                  {{ step.label }}
-                </span>
-              </div>
-              <!-- Connector line (not after last step) -->
-              <div v-if="index < trackerSteps.length - 1"
-                class="tracker-line"
-                :class="stepState(step.key) === 'completed' ? 'tracker-line--done' : ''"
-              ></div>
-            </template>
-          </div>
+          <span v-if="displayOrderId !== '-'" class="text-[10px] font-mono text-white/40 tabular-nums">
+            #{{ displayOrderId }}
+          </span>
         </div>
 
         <div v-if="orderedItems.length > 0">
@@ -558,91 +519,4 @@ const submitOrder = () => {
   font-variant-numeric: tabular-nums;
 }
 
-/* Order Status Progress Tracker */
-.order-status-tracker {
-  background: linear-gradient(135deg, rgba(246, 181, 109, 0.06) 0%, rgba(255,255,255,0.02) 100%);
-  border: 1px solid rgba(246, 181, 109, 0.15);
-  border-radius: 14px;
-  padding: 10px 12px 12px;
-}
-
-.tracker-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.tracker-steps {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.tracker-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.tracker-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.tracker-dot--done {
-  background: linear-gradient(135deg, #F6B56D 0%, #C78B45 100%);
-  box-shadow: 0 2px 8px rgba(246, 181, 109, 0.4);
-}
-
-.tracker-dot--active {
-  background: linear-gradient(135deg, #F6B56D 0%, #C78B45 100%);
-  box-shadow: 0 0 0 4px rgba(246, 181, 109, 0.2);
-  animation: tracker-glow 1.8s ease-in-out infinite;
-}
-
-.tracker-dot--pending {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-}
-
-@keyframes tracker-glow {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(246, 181, 109, 0.2); }
-  50%       { box-shadow: 0 0 0 6px rgba(246, 181, 109, 0.35); }
-}
-
-.tracker-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #1a1a1a;
-}
-
-.tracker-label {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.tracker-line {
-  flex: 1;
-  height: 1.5px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 0 2px;
-  margin-bottom: 14px; /* offset to align with dot center */
-  transition: background 0.3s ease;
-}
-
-.tracker-line--done {
-  background: linear-gradient(to right, #F6B56D, #C78B45);
-}
 </style>

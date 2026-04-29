@@ -832,58 +832,57 @@ export const useOrderStore = defineStore("order", () => {
                         // ignore
                     }
 
-                    // Stop polling if terminal status observed
-                    if (status === "completed" || status === "cancelled" || status === "voided") {
+                    // Stop polling on any terminal status and end the session.
+                    // completed = order paid; voided = order voided.
+                    // Both reset the guest session and navigate home.
+                    if (status === "completed" || status === "voided") {
                         logger.info("[Polling] Terminal status observed", { orderId, status })
                         stopPolling()
 
-                        // End session and navigate to home on completed status
-                        if (status === "completed") {
-                            try {
-                                const sessionStore = useSessionStore()
+                        try {
+                            const sessionStore = useSessionStore()
 
-                                // Small delay to allow any final UI updates. Await session end
-                                // and clear order state immediately to avoid a refill UI loop.
-                                clearCompletionTimeout()
-                                completionTimeoutId = window.setTimeout(async () => {
+                            // Small delay to allow any final UI updates. Await session end
+                            // and clear order state immediately to avoid a refill UI loop.
+                            clearCompletionTimeout()
+                            completionTimeoutId = window.setTimeout(async () => {
+                                try {
+                                    // Load session store instance and call end
+                                    const sessionStore = useSessionStore()
+
                                     try {
-                                        // Load session store instance and call end
-                                        const sessionStore = useSessionStore()
-
-                                        try {
-                                            if (sessionStore.end) {
-                                                const res = sessionStore.end()
-                                                if (res && typeof (res as any).then === "function") { await res }
-                                            }
-                                        } catch (e) {
-                                            logger.warn("sessionStore.end() threw:", e)
+                                        if (sessionStore.end) {
+                                            const res = sessionStore.end()
+                                            if (res && typeof (res as any).then === "function") { await res }
                                         }
-
-                                        // Immediately clear local order state to prevent UI flicker/loop
-                                        try {
-                                            state.cartItems = []
-                                            state.refillItems = []
-                                            state.submittedItems = []
-                                            state.package = null
-                                            state.currentOrder = null
-                                            state.hasPlacedOrder = false
-                                            state.isRefillMode = false
-                                        } catch (e) {
-                                            logger.warn("Failed to clear order state after completion:", e)
-                                        }
-
-                                        // Navigate to home page without reload to preserve fullscreen
-                                        const nuxtApp = useNuxtApp()
-                                        await nuxtApp.$router.replace("/")
                                     } catch (e) {
-                                        logger.warn("Failed to end session on order completion:", e)
-                                    } finally {
-                                        completionTimeoutId = null
+                                        logger.warn("sessionStore.end() threw:", e)
                                     }
-                                }, 2000)
-                            } catch (e) {
-                                logger.warn("Failed to end session on order completion:", e)
-                            }
+
+                                    // Immediately clear local order state to prevent UI flicker/loop
+                                    try {
+                                        state.cartItems = []
+                                        state.refillItems = []
+                                        state.submittedItems = []
+                                        state.package = null
+                                        state.currentOrder = null
+                                        state.hasPlacedOrder = false
+                                        state.isRefillMode = false
+                                    } catch (e) {
+                                        logger.warn("Failed to clear order state after terminal status:", e)
+                                    }
+
+                                    // Navigate to home page without reload to preserve fullscreen
+                                    const nuxtApp = useNuxtApp()
+                                    await nuxtApp.$router.replace("/")
+                                } catch (e) {
+                                    logger.warn("Failed to end session on terminal order status:", e)
+                                } finally {
+                                    completionTimeoutId = null
+                                }
+                            }, 2000)
+                        } catch (e) {
+                            logger.warn("Failed to end session on terminal order status:", e)
                         }
                     }
                 }
@@ -939,7 +938,7 @@ export const useOrderStore = defineStore("order", () => {
                 const api = useApi()
                 const activeResp = await api.get(API_ENDPOINTS.DEVICE_ORDERS, {
                     params: {
-                        status: "pending,confirmed,preparing,ready,served",
+                        status: "pending,confirmed",
                         per_page: 1,
                     },
                 })
@@ -948,7 +947,7 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "cancelled", "voided"].includes(activeStatus)) {
+                if (activeOrderId && !["completed", "voided"].includes(activeStatus)) {
                     // Session-scope guard: skip orders that pre-date this session.
                     // Prevents a previous customer's unfinished order from being adopted
                     // by the next customer's fresh session.

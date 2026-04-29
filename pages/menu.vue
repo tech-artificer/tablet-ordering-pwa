@@ -129,8 +129,11 @@ watch(selectedPackage, (newPackage) => {
 // or a spurious sessionStore.end() call) while the user is still on the menu screen.
 // The existing watch above only fires when selectedPackage changes — it won't fire if
 // selectedPackage stays the same but orderStore.package is cleared to null underneath.
+// Guard: only restore when the session is still active. clearInternal() sets isActive=false
+// BEFORE calling clearPackage(), so this check reliably prevents the watcher from undoing
+// a legitimate session-end cleanup and overwriting the explicit null in localStorage.
 watch(() => orderStore.package, (storePackage) => {
-    if (!storePackage && selectedPackage.value) {
+    if (!storePackage && selectedPackage.value && sessionStore.isActive) {
         logger.warn("[Menu] orderStore.package was cleared while on menu — restoring from selectedPackage")
         orderStore.setPackage(selectedPackage.value)
     }
@@ -140,7 +143,7 @@ watch(() => orderStore.package, (storePackage) => {
 watch(
     () => orderStore.getCurrentOrderStatus(),
     (newStatus) => {
-        if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
+        if (newStatus === "completed" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
             setTimeout(() => {
                 sessionStore.end()

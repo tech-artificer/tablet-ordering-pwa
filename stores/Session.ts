@@ -190,11 +190,23 @@ export const useSessionStore = defineStore("session", () => {
                 const localOffset = Date.now() - serverNow
                 const newSessionEndsAt = serverEndAt + localOffset
 
-                // Guard against stale or cross-session data wiping an active session.
-                // If the computed expiry is imminent (< 30s) but the server elapsed time
-                // is less than the session duration, the /session/latest response returned
-                // data for a different (older) session. Skip the update so the 1-second
-                // timer doesn't fire expireSession() prematurely.
+                // Guard 1: session-start identity check.
+                // If the server returned a session that started BEFORE the one we know about
+                // locally (minus 5 s for rounding), it's data from a previous customer's session.
+                // Applying it would set sessionEndsAt to the past and trigger expireSession()
+                // even though the current session is still active. Skip to protect order state.
+                if (state.sessionStartedAt !== null && sessionStart < state.sessionStartedAt - 5_000) {
+                    logger.warn("[Session] syncFromServer: server returned an older session — skipping update to protect active order", {
+                        serverSessionStart: new Date(sessionStart).toISOString(),
+                        localSessionStart: new Date(state.sessionStartedAt).toISOString(),
+                    })
+                    return
+                }
+
+                // Guard 2: imminent-expiry check (original RC-3 fix).
+                // If the computed expiry is within 30 s but the server's own elapsed time is
+                // less than the session duration, the response is from a stale session whose
+                // start time happens to be close to ours. Skip to avoid premature expiry.
                 const clientNow = Date.now()
                 if (newSessionEndsAt < clientNow + 30_000) {
                     const serverElapsedMs = serverNow - sessionStart

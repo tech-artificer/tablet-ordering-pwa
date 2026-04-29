@@ -183,6 +183,21 @@ export const useMenuStore = defineStore("menu", {
         },
 
         async fetchPackageDetails (this: any, packageId: number, meatCategory?: string) {
+            // Return cached data immediately when it is still valid and no specific meat category
+            // is requested. This eliminates the ~500ms skeleton flash on every menu mount because
+            // packageDetails is persisted to localStorage (it's in the menu-store pick list).
+            // Per-category fetches (meatCategory set) must always hit the API for accurate results.
+            if (!meatCategory && !this.isCacheStale) {
+                const cached = this.packageDetails[packageId]
+                if (cached && (
+                    (Array.isArray(cached.meats) && cached.meats.length > 0) ||
+                    (Array.isArray(cached.items) && cached.items.length > 0)
+                )) {
+                    logger.debug(`📦 fetchPackageDetails: cache hit for package ${packageId} — skipping network call`)
+                    return cached
+                }
+            }
+
             const api = useApi()
             this.loading.packageDetails = true
             try {
