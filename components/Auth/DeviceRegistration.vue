@@ -43,6 +43,10 @@ const displayTable = computed(() =>
         : (deviceStore.table as any)
 )
 
+const hasTableAssignment = computed(() => Boolean(displayTable.value?.id || displayTable.value?.name))
+const isFullyRegistered = computed(() => Boolean(deviceStore.token && hasTableAssignment.value))
+const registrationComplete = computed(() => Boolean(registered.value || isFullyRegistered.value))
+
 const setDeviceError = (message: string | null) => {
     const target = deviceStore.errorMessage as any
     if (target && typeof target === 'object' && 'value' in target) {
@@ -110,8 +114,8 @@ const resetRegistration = () => {
 }
 
 onMounted(() => {
-    // If a device is already present in the store, mark as registered
-    if (deviceStore.device) {
+    // Only complete auth state should lock the setup-code form.
+    if (isFullyRegistered.value) {
         registered.value = true
     }
 
@@ -136,26 +140,6 @@ onMounted(() => {
 const handleRegistration = async () => {
     // Prevent concurrent calls (e.g. double-fire from @click + @submit.prevent)
     if (isLoading.value) { return }
-
-    // If device already exists, do not re-register — trigger a refresh to check assignment
-    if (deviceStore.device) {
-        try {
-            await deviceStore.refresh()
-            const t = unref(deviceStore.table as any)
-            if (t && (t.id || t.name)) {
-                registered.value = true
-                deviceStore.setWaitingForTable(false)
-                try {
-                    const currentPath = router.currentRoute?.value?.path
-                    if (currentPath !== '/settings') await router.replace('/')
-                } catch (e) { /* ignore */ }
-            }
-            return
-        } catch (e) {
-            logger.error('Refresh during handleRegistration failed', e)
-            return
-        }
-    }
 
     attempted.value = true
 
@@ -236,7 +220,7 @@ const handleRegistration = async () => {
                                             size="large"
                                             class="w-full text-lg font-kanit"
                                             :class="{ 'border-error': hasError }"
-                                            :disabled="registered || hasToken"
+                                            :disabled="registrationComplete"
                                         />
                                         <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
                                             Must be exactly 6 digits
@@ -248,13 +232,13 @@ const handleRegistration = async () => {
                                     <button
                                         type="button"
                                         class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
-                                        :disabled="isLoading || !securityCodeValidation || registered || hasToken"
+                                        :disabled="isLoading || !securityCodeValidation || registrationComplete"
                                         @click="handleRegistration()"
                                     >
-                                        <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
+                                        <span>{{ isLoading ? 'Registering...' : (registrationComplete ? 'Registered' : 'Register Device') }}</span>
                                     </button>
 
-                                    <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+                                    <div v-if="registered || hasToken || displayDevice" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
                                         <!-- Already-registered identity display -->
                                         <div v-if="deviceStore.device" class="text-sm text-white/80">
                                             <span class="font-semibold text-white">{{ displayDevice?.name }}</span>
@@ -323,7 +307,7 @@ const handleRegistration = async () => {
                 size="large"
                 class="w-full text-lg font-kanit"
                 :class="{ 'border-error': hasError }"
-                :disabled="registered || hasToken"
+                :disabled="registrationComplete"
               />
               <div v-if="attempted && formData.deviceSecurityCode && !securityCodeValidation" class="text-error text-xs mt-1">
                 Must be exactly 6 digits
@@ -335,11 +319,11 @@ const handleRegistration = async () => {
             <button
               type="button"
               class="w-full py-3 bg-primary/20 text-primary border border-primary/30 font-semibold rounded-lg"
-              @click="handleRegistration()" :disabled="isLoading || !securityCodeValidation || registered || hasToken">
-              <span>{{ isLoading ? 'Registering...' : (registered || hasToken ? 'Registered' : 'Register Device') }}</span>
+              @click="handleRegistration()" :disabled="isLoading || !securityCodeValidation || registrationComplete">
+              <span>{{ isLoading ? 'Registering...' : (registrationComplete ? 'Registered' : 'Register Device') }}</span>
             </button>
 
-            <div v-if="registered || hasToken" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+            <div v-if="registered || hasToken || displayDevice" class="mt-2 p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
               <!-- Already-registered identity display -->
               <div v-if="deviceStore.device" class="text-sm text-white/80">
                 <span class="font-semibold text-white">{{ displayDevice?.name }}</span>

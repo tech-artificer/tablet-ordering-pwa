@@ -939,7 +939,7 @@ export const useOrderStore = defineStore("order", () => {
                 const api = useApi()
                 const activeResp = await api.get(API_ENDPOINTS.DEVICE_ORDERS, {
                     params: {
-                        status: "pending,confirmed,ready",
+                        status: "pending,confirmed,preparing,ready,served",
                         per_page: 1,
                     },
                 })
@@ -949,6 +949,22 @@ export const useOrderStore = defineStore("order", () => {
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
                 if (activeOrderId && !["completed", "cancelled", "voided"].includes(activeStatus)) {
+                    // Session-scope guard: skip orders that pre-date this session.
+                    // Prevents a previous customer's unfinished order from being adopted
+                    // by the next customer's fresh session.
+                    const sessionStartedAt = sessionStore.sessionStartedAt
+                    const orderCreatedAt = activeOrder?.created_at
+                        ? new Date(activeOrder.created_at).getTime()
+                        : null
+                    if (sessionStartedAt && orderCreatedAt && orderCreatedAt < sessionStartedAt - 60_000) {
+                        logger.info("🔁 Recovered order pre-dates current session — skipping to avoid cross-session contamination", {
+                            orderId: activeOrderId,
+                            orderCreatedAt: new Date(orderCreatedAt).toISOString(),
+                            sessionStartedAt: new Date(sessionStartedAt).toISOString(),
+                        })
+                        return
+                    }
+
                     sessionStore.setOrderId(Number(activeOrderId))
                     sessionStore.setIsActive(true)
                     if (typeof window !== "undefined" && window.localStorage) {
@@ -1040,6 +1056,8 @@ export const useOrderStore = defineStore("order", () => {
     function clearOrder () {
         stopPolling()
         state.currentOrder = null
+        state.hasPlacedOrder = false
+        state.submittedItems = []
     }
 
     // Typed cross-store mutation helpers — avoids TypeScript Ref<T> false-positives

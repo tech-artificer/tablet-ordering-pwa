@@ -15,7 +15,7 @@ export default defineEventHandler((event) => {
     let apiOrigin = ""
     try {
         if (apiBaseUrl.startsWith("http")) {
-            apiOrigin = new URL(apiBaseUrl).origin  // e.g. https://192.168.100.7
+            apiOrigin = new URL(apiBaseUrl).origin // e.g. https://192.168.100.7
         }
     } catch { /* ignore malformed URLs */ }
 

@@ -56,10 +56,7 @@ const canSubmit = computed(() => {
   if (orderStore.isSubmitting) return false
   if (orderStore.hasPlacedOrder && !props.isRefillMode) return false
   if (props.isRefillMode) return hasCartItems.value && hasGuestCount.value && hasTableAssigned.value
-  const packageSelected = hasPackage.value
-  const packageHasValue = Number(props.packageTotal) > 0
-  const addOnsPresent = hasCartItems.value
-  return packageSelected && hasGuestCount.value && hasTableAssigned.value && (packageHasValue || addOnsPresent)
+  return hasPackage.value && hasGuestCount.value && hasTableAssigned.value
 })
 
 // Order status helpers
@@ -204,7 +201,31 @@ const submitOrder = () => {
       <!-- Guests row -->
       <div class="flex items-center justify-between py-2">
         <span class="text-white/60 text-sm font-medium">Guests</span>
-        <span class="text-white font-bold text-base tabular-nums">{{ displayedGuestCount }}</span>
+        <!-- Editable stepper before order is placed; read-only after -->
+        <div v-if="!hasPlacedOrder" class="flex items-center gap-1.5">
+          <button
+            class="w-6 h-6 rounded-md flex items-center justify-center text-sm font-bold transition-colors
+                   bg-white/[0.08] border border-white/10 text-white/60
+                   hover:bg-white/15 hover:text-white active:scale-90
+                   disabled:opacity-30 disabled:cursor-not-allowed
+                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
+            :disabled="guestCount <= 2"
+            aria-label="Decrease guest count"
+            @click="emit('setGuestCount', guestCount - 1)"
+          >−</button>
+          <span class="text-white font-bold text-base tabular-nums min-w-[1.5ch] text-center">{{ displayedGuestCount }}</span>
+          <button
+            class="w-6 h-6 rounded-md flex items-center justify-center text-sm font-bold transition-colors
+                   bg-primary/15 border border-primary/30 text-primary
+                   hover:bg-primary/25 active:scale-90
+                   disabled:opacity-30 disabled:cursor-not-allowed
+                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary/50"
+            :disabled="guestCount >= 20"
+            aria-label="Increase guest count"
+            @click="emit('setGuestCount', guestCount + 1)"
+          >+</button>
+        </div>
+        <span v-else class="text-white font-bold text-base tabular-nums">{{ displayedGuestCount }}</span>
       </div>
     </div>
 

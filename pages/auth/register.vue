@@ -2,10 +2,10 @@
 definePageMeta({
     layout: "default"
 })
-// Navigation after successful registration is handled internally by AuthDeviceRegistration.
+// Navigation after successful registration is handled internally by DeviceRegistration.
 // Non-inline mode: the component calls router.replace('/') once table is assigned.
 </script>
 
 <template>
-    <AuthDeviceRegistration />
+    <DeviceRegistration />
 </template>

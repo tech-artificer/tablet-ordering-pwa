@@ -130,4 +130,26 @@ describe("DeviceRegistration Component — Security Code Contract (Batch 3)", ()
         expect(mockRegister.mock.calls[0][0]).not.toHaveProperty("passcode")
         expect(mockRegister.mock.calls[0][0]).not.toHaveProperty("name")
     })
+
+    it("keeps setup code entry available when saved device state is not fully authenticated", async () => {
+        mockDeviceStore.device = { id: 99, name: "Stale Tablet" }
+        mockDeviceStore.token = "stale-token"
+        mockDeviceStore.table = null
+        mockRegister.mockResolvedValueOnce(undefined)
+
+        const wrapper = mountRegistration(true)
+        const securityInput = wrapper.find("input[placeholder=\"Enter security code\"]")
+
+        expect(securityInput.attributes("disabled")).toBeUndefined()
+
+        await securityInput.setValue("570792")
+        await wrapper.find("button").trigger("click")
+
+        expect(mockRegister).toHaveBeenCalledWith(
+            expect.objectContaining({
+                security_code: "570792",
+            })
+        )
+        expect(mockRefresh).not.toHaveBeenCalled()
+    })
 })

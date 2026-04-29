@@ -188,7 +188,28 @@ export const useSessionStore = defineStore("session", () => {
                 const serverEndAt = sessionStart + durationMs
                 // Correct for client/server clock skew
                 const localOffset = Date.now() - serverNow
-                state.sessionEndsAt = serverEndAt + localOffset
+                const newSessionEndsAt = serverEndAt + localOffset
+
+                // Guard against stale or cross-session data wiping an active session.
+                // If the computed expiry is imminent (< 30s) but the server elapsed time
+                // is less than the session duration, the /session/latest response returned
+                // data for a different (older) session. Skip the update so the 1-second
+                // timer doesn't fire expireSession() prematurely.
+                const clientNow = Date.now()
+                if (newSessionEndsAt < clientNow + 30_000) {
+                    const serverElapsedMs = serverNow - sessionStart
+                    if (serverElapsedMs < durationMs) {
+                        logger.warn("[Session] syncFromServer: would cause premature expiry — stale session data returned, skipping sessionEndsAt update", {
+                            serverNow: new Date(serverNow).toISOString(),
+                            sessionStart: new Date(sessionStart).toISOString(),
+                            serverElapsedMs: Math.round(serverElapsedMs / 1000) + "s",
+                            durationMs: Math.round(durationMs / 1000) + "s",
+                        })
+                        return
+                    }
+                }
+
+                state.sessionEndsAt = newSessionEndsAt
                 logger.debug("[Session] syncFromServer: sessionEndsAt recalibrated", {
                     serverNow: new Date(serverNow).toISOString(),
                     sessionStart: new Date(sessionStart).toISOString(),
@@ -303,16 +324,21 @@ export const useSessionStore = defineStore("session", () => {
                 logger.warn("[SessionStore] preload menus failed:", e)
             }
 
-            // Reset order store to fresh state for new dining session
+            // Reset order store to fresh state — only when truly starting a new session.
+            // If the session is already active (e.g. called again from packageSelection as an
+            // auth-guard), skip the reset so the guest count and package the user already
+            // set are not wiped out.
             const orderStore = useOrderStore()
-            orderStore.setGuestCount(2) // Default guest count
-            orderStore.clearCart()
-            orderStore.clearRefillItems()
-            orderStore.clearSubmittedItems()
-            orderStore.clearPackage()
-            orderStore.clearCurrentOrder()
-            orderStore.setHasPlacedOrder(false)
-            orderStore.setIsRefillMode(false)
+            if (!state.isActive) {
+                orderStore.setGuestCount(2) // Default guest count
+                orderStore.clearCart()
+                orderStore.clearRefillItems()
+                orderStore.clearSubmittedItems()
+                orderStore.clearPackage()
+                orderStore.clearCurrentOrder()
+                orderStore.setHasPlacedOrder(false)
+                orderStore.setIsRefillMode(false)
+            }
 
             state.isActive = true
             state.timerExpired = false

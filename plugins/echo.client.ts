@@ -132,8 +132,14 @@ function createEcho (
     // @ts-ignore
     window.$echo = echo
 
-    // Provide via Nuxt injection
-    nuxtApp.provide("echo", echo)
+    // Provide via Nuxt injection — only once.
+    // nuxtApp.provide uses Object.defineProperty with configurable:false;
+    // calling it a second time (e.g. when initEcho is triggered after token
+    // refresh) throws "TypeError: Cannot redefine property: $echo" and
+    // crashes the entire app, producing a black screen.
+    if (!Object.getOwnPropertyDescriptor(nuxtApp, "$echo")) {
+        nuxtApp.provide("echo", echo)
+    }
 
     // Monitor connection state
     if (echo && (echo as any).connector) {

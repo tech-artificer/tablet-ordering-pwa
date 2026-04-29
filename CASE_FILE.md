@@ -162,3 +162,35 @@ The first item still blocks meaningful runtime verification of the rest of the s
 
 - The PWA fix itself is complete and pushed.
 - The remaining lint failures are outside this fix scope and should be handled in a separate cleanup pass.
+
+---
+
+## Addendum — April 29, 2026 (Blank `/auth/register` screen)
+
+### Incident summary
+
+- Symptom: `/auth/register` rendered a black/empty screen on tablet while routes loaded.
+- Console evidence: `TypeError: Cannot redefine property: $echo` from the Echo initialization path.
+
+### Root cause
+
+`plugins/echo.client.ts` could call `nuxtApp.provide("echo", echo)` multiple times:
+
+1. initial plugin bootstrap (persisted/fallback config), and
+2. subsequent `window.initEcho(...)` invocations after token/config refresh.
+
+Nuxt `provide()` defines `$echo` as a non-configurable property. A second define attempt throws `Cannot redefine property: $echo`, aborting app initialization and producing a blank screen.
+
+### Remediation
+
+- Added a one-time guard before Nuxt injection in `createEcho()`:
+  - Only call `nuxtApp.provide("echo", echo)` when `$echo` is not already defined on `nuxtApp`.
+- Kept runtime replacement behavior for `window.Echo` / `window.$echo` so socket instance can still be refreshed safely.
+
+### Validation target
+
+After redeploying the tablet image:
+
+1. `/auth/register` renders the registration UI (no black screen).
+2. Console no longer logs `Cannot redefine property: $echo`.
+3. Reverb socket reconnects without crashing when auth token/broadcast config updates.

@@ -123,6 +123,10 @@ onMounted(() => {
     } catch (e) {
     // ignore
     }
+    // Always show registration when device is not fully authenticated
+    if (!deviceStore.isAuthenticated) {
+        collapsed.registration = false
+    }
 })
 
 // Persist when collapsed changes
@@ -252,7 +256,7 @@ onBeforeUnmount(() => {
 
 // Try to resolve device & table by local IP. Server may accept POST or GET for this helper.
 const fetchDeviceByIp = async (ip: string | null) => {
-    if (!isValidIpv4(ip)) { return false }  // guard: never send non-IP strings to the API
+    if (!isValidIpv4(ip)) { return false } // guard: never send non-IP strings to the API
     try {
         const { useApi } = await import("~/composables/useApi")
         const api = useApi()
@@ -681,33 +685,20 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <!-- Device Registration (topmost, collapsible) -->
+            <!-- Device Registration (always visible) -->
             <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
-                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2 justify-between">
+                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
                     <div class="flex items-center gap-2">
                         <span>🛠️</span>
                         <span>Device Registration</span>
                     </div>
-                    <button class="text-sm text-white/60" aria-label="Toggle Registration" @click.prevent="toggle('registration')">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-4 h-4 transition-transform duration-150"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            :style="{ transform: collapsed.registration ? 'rotate(0deg)' : 'rotate(90deg)' }"
-                        >
-                            <path fill-rule="evenodd" d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
                 </h2>
 
-                <div v-show="!collapsed.registration" class="space-y-4">
-                    <div v-if="!deviceStore.isAuthenticated">
-                        <AuthDeviceRegistration inline />
-                    </div>
-                    <div v-else class="p-4 bg-white/5 rounded-lg border border-white/10">
+                <div class="space-y-4">
+                    <DeviceRegistration inline />
+                    <div v-if="deviceStore.isAuthenticated" class="p-4 bg-white/5 rounded-lg border border-white/10">
                         <p class="text-sm text-white/60">
-                            Device is already registered — see Device Information below.
+                            Already registered? You can still use <span class="text-white">Re-register</span> above if this tablet needs a new setup code.
                         </p>
                     </div>
                 </div>
@@ -968,7 +959,7 @@ onMounted(async () => {
                             <input
                                 v-model="apiUrl"
                                 type="text"
-                                placeholder="http://192.168.100.85:8000"
+                                placeholder="https://woosoo.local/api"
                                 class="flex-1 px-4 py-3 bg-white/10 rounded-lg border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-primary transition-all"
                             >
                         </div>

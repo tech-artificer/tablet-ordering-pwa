@@ -125,6 +125,17 @@ watch(selectedPackage, (newPackage) => {
     }
 }, { immediate: true })
 
+// Restore package if the order store is cleared unexpectedly (e.g. by a session resync
+// or a spurious sessionStore.end() call) while the user is still on the menu screen.
+// The existing watch above only fires when selectedPackage changes — it won't fire if
+// selectedPackage stays the same but orderStore.package is cleared to null underneath.
+watch(() => orderStore.package, (storePackage) => {
+    if (!storePackage && selectedPackage.value) {
+        logger.warn("[Menu] orderStore.package was cleared while on menu — restoring from selectedPackage")
+        orderStore.setPackage(selectedPackage.value)
+    }
+})
+
 // Watch for order completion status changes and redirect when completed
 watch(
     () => orderStore.getCurrentOrderStatus(),
@@ -207,14 +218,6 @@ const meats = computed(() => {
     }
     // If both missing, return empty array (UI will show 'No meats available')
     return []
-})
-
-// Get modifiers from selected package allowed menus (from API)
-const modifiers = computed(() => {
-    if (!selectedPackageId.value) { return [] }
-    const packageId = Number(selectedPackageId.value)
-    const packageDetails = menuStore.packageDetails[packageId]
-    return Array.isArray(packageDetails?.allowed_menus?.meat) ? packageDetails.allowed_menus.meat : []
 })
 
 // Get items based on active category for MenuItemGrid
@@ -439,8 +442,11 @@ const openOrderDrawer = () => {
         logger.warn("Order already placed; only refill allowed")
         return
     }
+    // Safety guardrail: opening the drawer must never auto-submit.
+    // Submission is allowed only via explicit user confirm action.
+    cancelCountdown()
+    placeOrderError.value = null
     isOrderDrawerOpen.value = true
-    startCountdown()
 }
 
 // Cancel countdown whenever the confirmation drawer closes
@@ -455,24 +461,9 @@ const isSubmitting = ref(false)
 const placeOrderError = ref<string | null>(null)
 const orderSnapshot = ref<any | null>(null)
 const showSuccessBanner = ref(false)
-const countdownIntervalId = ref<number | null>(null)
 const undoTimerId = ref<number | null>(null)
 
-function startCountdown () {
-    if (isSubmitting.value) { return }
-    countdown.value = 5
-    isCountingDown.value = true
-    countdownIntervalId.value = window.setInterval(() => {
-        countdown.value = countdown.value - 1
-        if (countdown.value <= 0) {
-            if (countdownIntervalId.value) { clearInterval(countdownIntervalId.value); countdownIntervalId.value = null }
-            confirmOrder()
-        }
-    }, 1000)
-}
-
 function cancelCountdown () {
-    if (countdownIntervalId.value) { clearInterval(countdownIntervalId.value); countdownIntervalId.value = null }
     isCountingDown.value = false
     countdown.value = 5
 }
@@ -480,6 +471,15 @@ function cancelCountdown () {
 async function confirmOrder () {
     logger.debug("confirmOrder called")
     if (isSubmitting.value) { return }
+
+    // Defensive: re-sync package to the order store right before submission.
+    // Guards against the race where the store was cleared by a background resync
+    // but selectedPackage (from menuStore.packages) is still valid.
+    if (!orderStore.package && selectedPackage.value) {
+        logger.warn("[Menu] confirmOrder: package missing from order store — restoring before submission")
+        orderStore.setPackage(selectedPackage.value)
+    }
+
     isSubmitting.value = true
     placeOrderError.value = null
 
@@ -520,8 +520,6 @@ async function confirmOrder () {
         isSubmitting.value = false
         isCountingDown.value = false
         placeOrderError.value = err?.message || String(err)
-        const errorMsg = orderStore.isRefillMode ? "Failed to place refill order" : "Failed to place order"
-    // ElMessage.error(placeOrderError.value || errorMsg)
     }
 }
 </script>
