@@ -143,7 +143,7 @@ watch(() => orderStore.package, (storePackage) => {
 watch(
     () => orderStore.getCurrentOrderStatus(),
     (newStatus) => {
-        if (newStatus === "completed" || newStatus === "voided") {
+        if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
             setTimeout(() => {
                 sessionStore.end()

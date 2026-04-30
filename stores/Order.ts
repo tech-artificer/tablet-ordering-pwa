@@ -833,9 +833,9 @@ export const useOrderStore = defineStore("order", () => {
                     }
 
                     // Stop polling on any terminal status and end the session.
-                    // completed = order paid; voided = order voided.
-                    // Both reset the guest session and navigate home.
-                    if (status === "completed" || status === "voided") {
+                    // completed = order paid; voided = order voided; cancelled = order cancelled.
+                    // All three reset the guest session and navigate home.
+                    if (status === "completed" || status === "voided" || status === "cancelled") {
                         logger.info("[Polling] Terminal status observed", { orderId, status })
                         stopPolling()
 
@@ -947,11 +947,11 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "voided"].includes(activeStatus)) {
+                if (activeOrderId && !["completed", "voided", "cancelled"].includes(activeStatus)) {
                     // Session-scope guard: skip orders that pre-date this session.
                     // Prevents a previous customer's unfinished order from being adopted
                     // by the next customer's fresh session.
-                    const sessionStartedAt = sessionStore.sessionStartedAt
+                    const sessionStartedAt = (sessionStore.sessionStartedAt as unknown as number | null)
                     const orderCreatedAt = activeOrder?.created_at
                         ? new Date(activeOrder.created_at).getTime()
                         : null
