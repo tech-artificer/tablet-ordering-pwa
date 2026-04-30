@@ -422,6 +422,7 @@ export const useOrderStore = defineStore("order", () => {
                 logger.warn("Device authenticate retry failed before submitOrder", e)
             }
             if (!deviceStore.getToken()) {
+                state.isSubmitting = false
                 throw new Error("❌ Device not authenticated - missing token. Please register device first.")
             }
         }
@@ -445,15 +446,18 @@ export const useOrderStore = defineStore("order", () => {
 
         if (refreshedTableId == null) {
             logger.error("❌ Table validation failed - no table ID found", { tableName: refreshedTableName })
+            state.isSubmitting = false
             throw new Error("❌ No table assigned to this device. Please contact staff.")
         }
         logger.debug("✅ Table validated:", refreshedTableName)
 
         if (!state.package?.id) {
+            state.isSubmitting = false
             throw new Error("❌ No package selected. Please select a package first.")
         }
 
         if (state.guestCount < 1) {
+            state.isSubmitting = false
             throw new Error("❌ Guest count must be at least 1.")
         }
 
@@ -641,13 +645,51 @@ export const useOrderStore = defineStore("order", () => {
         }
 
         const api = useApi()
+        const sessionStore = useSessionStore()
+        const terminalStatuses = new Set(["completed", "voided", "cancelled"])
 
         // Use order_id (business ID) - goes in URL path
-        const currentOrderId = state.currentOrder?.order?.order_id ?? state.currentOrder?.order?.id
+        const currentOrderId = state.currentOrder?.order?.order_id ??
+            state.currentOrder?.order?.id ??
+            sessionStore.getOrderId()
 
         if (!currentOrderId) {
             state.isSubmitting = false
             throw new Error("Cannot submit refill: missing order ID")
+        }
+
+        // Safety gate: never submit refill against terminal orders.
+        // We verify against the live backend status to handle stale local state after transient failures.
+        const localStatus = String(state.currentOrder?.order?.status || state.currentOrder?.status || "").toLowerCase()
+        if (terminalStatuses.has(localStatus)) {
+            try { await Promise.resolve(sessionStore.end()) } catch (e) { logger.warn("[Refill] sessionStore.end() failed after local terminal status", e) }
+            state.isSubmitting = false
+            throw new Error("This order is already completed/cancelled. Session has ended.")
+        }
+
+        try {
+            const statusResp = await api.get(`/api/device-order/by-order-id/${currentOrderId}`)
+            const statusData = statusResp?.data ?? null
+            const liveOrder = statusData?.order || statusData?.data || statusData
+
+            if (!liveOrder) {
+                state.isSubmitting = false
+                throw new Error("Unable to verify current order status. Please try again in a moment.")
+            }
+
+            const liveStatus = String(liveOrder?.status || "").toLowerCase()
+            state.currentOrder = { order: liveOrder }
+            if (terminalStatuses.has(liveStatus)) {
+                try { await Promise.resolve(sessionStore.end()) } catch (e) { logger.warn("[Refill] sessionStore.end() failed after live terminal status", e) }
+                state.isSubmitting = false
+                throw new Error("This order is already completed/cancelled. Session has ended.")
+            }
+        } catch (error) {
+            state.isSubmitting = false
+            if (error instanceof Error && /completed\/cancelled|Unable to verify current order status/i.test(error.message)) {
+                throw error
+            }
+            throw new Error("Unable to verify current order status. Please try again in a moment.")
         }
 
         // Build payload matching POST /api/order/{orderId}/refill spec
