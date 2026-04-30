@@ -14,7 +14,6 @@ type BroadcastConfig = {
 
 type DeviceStoreState = {
     device: Device | null
-    code: string | number | null
     table: Table | null
     token: string | null
     expiration: number | string | null
@@ -27,6 +26,7 @@ type DeviceStoreState = {
     isPollingForTable: boolean
     pollAttempts: number
     maxPollAttempts: number
+    pollTimedOut: boolean
     kioskUnlocked: boolean
 }
 
@@ -57,7 +57,6 @@ function normalizeTable (tbl: unknown): Table | null {
 export const useDeviceStore = defineStore("device", () => {
     const state = reactive<DeviceStoreState>({
         device: null,
-        code: null,
         table: null,
         token: null,
         expiration: null,
@@ -70,6 +69,7 @@ export const useDeviceStore = defineStore("device", () => {
         isPollingForTable: false,
         pollAttempts: 0,
         maxPollAttempts: defaultMaxPollAttempts,
+        pollTimedOut: false,
         kioskUnlocked: false,
     })
 
@@ -78,8 +78,8 @@ export const useDeviceStore = defineStore("device", () => {
     let detectedClientIp: string | null | undefined
     let refreshTimerId: ReturnType<typeof setInterval> | null = null
 
-    const REFRESH_INTERVAL_MS = 10 * 60 * 1000   // check every 10 min
-    const REFRESH_THRESHOLD_MS = 15 * 60 * 1000   // refresh if expiry < 15 min away
+    const REFRESH_INTERVAL_MS = 10 * 60 * 1000 // check every 10 min
+    const REFRESH_THRESHOLD_MS = 15 * 60 * 1000 // refresh if expiry < 15 min away
 
     function parseExpiryMs (raw: number | string | null): number | null {
         if (!raw) { return null }
@@ -241,28 +241,18 @@ export const useDeviceStore = defineStore("device", () => {
         }
     }
 
-    async function authenticate (): Promise<boolean> {
+    async function authenticate (clientIp?: string | null): Promise<boolean> {
         state.isLoading = true
         state.errorMessage = null
 
         try {
             const api = useApi()
-            const clientIp = await resolveClientIpForAuth()
+            const resolvedIp = isIpv4Address(clientIp) ? clientIp : await resolveClientIpForAuth()
             const authStart = typeof performance !== "undefined" ? performance.now() : Date.now()
-
-            const params: Record<string, string> = {}
-            if (clientIp) {
-                params.ip_address = clientIp
-                // Backward-compat for backend variants still reading `ip`
-                params.ip = clientIp
-            }
-
-            const response = await api.get(
-                "/api/devices/login",
-                Object.keys(params).length > 0
-                    ? { params }
-                    : undefined
-            )
+            const params = resolvedIp ? { ip_address: resolvedIp, ip: resolvedIp } : undefined
+            const response = params
+                ? await api.get("/api/devices/login", { params })
+                : await api.get("/api/devices/login")
             applyAuthPayload(response.data)
             syncWaitingForTable()
 
@@ -298,6 +288,7 @@ export const useDeviceStore = defineStore("device", () => {
         state.waitingForTable = true
         state.pollAttempts = 0
         state.maxPollAttempts = maxAttempts
+        state.pollTimedOut = false
         pollStartedAt = Date.now()
 
         pollTimerId = window.setInterval(async () => {
@@ -305,6 +296,7 @@ export const useDeviceStore = defineStore("device", () => {
 
             if (pollStartedAt && Date.now() - pollStartedAt > defaultMaxPollRuntimeMs) {
                 logger.warn("[DeviceStore] table polling max runtime exceeded")
+                state.pollTimedOut = true
                 stopTablePolling()
                 return
             }
@@ -320,6 +312,7 @@ export const useDeviceStore = defineStore("device", () => {
 
                 if (state.pollAttempts >= maxAttempts) {
                     logger.debug("[DeviceStore] table polling max attempts reached")
+                    state.pollTimedOut = true
                     stopTablePolling()
                 }
             } catch (error) {
@@ -328,19 +321,18 @@ export const useDeviceStore = defineStore("device", () => {
         }, intervalMs) as unknown as number
     }
 
-    async function register (formData: { passcode?: string; code?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
+    async function register (formData: { passcode?: string; security_code?: string; name?: string; ip_address?: string }): Promise<void> {
         state.isLoading = true
         state.errorMessage = null
 
         // Primary contract: security_code. Keep input aliases but normalize the
         // outgoing payload so the setup code is never retained as login state.
         const payload: any = {}
-        const normalizedSecurityCode = String(formData.security_code ?? formData.passcode ?? formData.code ?? "").trim()
+        const normalizedSecurityCode = String(formData.security_code ?? formData.passcode ?? "").trim()
 
         if (normalizedSecurityCode) {
             payload.security_code = normalizedSecurityCode
         }
-        state.code = null
 
         const formIp = formData.ip_address
         const fallbackIp = await resolveClientIpForAuth()
@@ -350,6 +342,10 @@ export const useDeviceStore = defineStore("device", () => {
             payload.ip_address = ipToUse
             // Backward-compat for backend variants still reading `ip`
             payload.ip = ipToUse
+        }
+
+        if (formData.name) {
+            payload.name = formData.name
         }
 
         try {
@@ -420,7 +416,6 @@ export const useDeviceStore = defineStore("device", () => {
     function clearAuth (): void {
         stopTablePolling()
         state.device = null
-        state.code = null
         state.table = null
         state.token = null
         state.expiration = null
@@ -429,6 +424,7 @@ export const useDeviceStore = defineStore("device", () => {
         state.lastAuthResponse = null
         state.lastServerIpUsed = null
         state.waitingForTable = false
+        state.pollTimedOut = false
     }
 
     function getDeviceId (): number | null { return state.device?.id ?? null }
@@ -439,6 +435,7 @@ export const useDeviceStore = defineStore("device", () => {
     function getToken (): string | null { return state.token }
     function getTable (): Table | null { return state.table }
 
+    function clearLastAuthResponse () { state.lastAuthResponse = null }
     function setToken (value: string | null) { state.token = value }
     function setTable (value: Table | null) {
         state.table = value
@@ -446,6 +443,13 @@ export const useDeviceStore = defineStore("device", () => {
     }
     function setKioskUnlocked (value: boolean) { state.kioskUnlocked = value }
     function getKioskUnlocked (): boolean { return state.kioskUnlocked }
+    function clearError () { state.errorMessage = null }
+    function setWaitingForTable (value: boolean) {
+        state.waitingForTable = value
+        if (!value) {
+            state.pollTimedOut = false
+        }
+    }
 
     const isAuthenticated = computed(() => Boolean(state.token && state.table?.id))
     const hasDevice = computed(() => Boolean(state.token))
@@ -476,11 +480,14 @@ export const useDeviceStore = defineStore("device", () => {
         getToken,
         getTable,
         getKioskUnlocked,
+        clearLastAuthResponse,
         setToken,
         setTable,
         setKioskUnlocked,
         startRefreshTimer,
         stopRefreshTimer,
+        clearError,
+        setWaitingForTable,
     }
 }, {
     persist: {

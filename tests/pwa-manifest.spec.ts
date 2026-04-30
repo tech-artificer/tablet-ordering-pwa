@@ -49,7 +49,7 @@ describe("pwa manifest config", () => {
 
     it("custom SW filename points to sw.ts", () => {
         const config = readNuxtConfig()
-        expect(config).toContain('filename: "sw.ts"')
+        expect(config).toContain("filename: \"sw.ts\"")
     })
 
     it("offline order sync feature flag is declared in runtimeConfig", () => {

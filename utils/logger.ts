@@ -1,5 +1,6 @@
 // utils/logger.ts
 // Minimal logger wrapper that silences debug output in production.
+/* eslint-disable no-console */
 const isProd = typeof process !== "undefined" && process.env?.NODE_ENV === "production"
 
 // Check if debug mode is enabled via localStorage (for on-device debugging)

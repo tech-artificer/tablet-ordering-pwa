@@ -10,7 +10,7 @@ import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
 import { logger } from "~/utils/logger"
 
-export default defineNuxtRouteMiddleware((to, from) => {
+export default defineNuxtRouteMiddleware((to, _from) => {
     const orderStore = useOrderStore()
     const sessionStore = useSessionStore()
 

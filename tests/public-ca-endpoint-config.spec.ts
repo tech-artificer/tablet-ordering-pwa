@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
-const nginxConfigPath = "e:/Projects/woosoo-integrated-stack/nginx/default.conf"
+const nginxConfigPath = resolve(process.cwd(), "nginx/default.conf")
 
 describe("public root CA endpoint config", () => {
     it("serves the root CA at /ca.crt without requiring application auth", () => {

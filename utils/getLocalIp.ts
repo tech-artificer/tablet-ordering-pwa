@@ -1,6 +1,6 @@
 import { logger } from "~/utils/logger"
 
-export async function getLocalIp (timeout = 1500): Promise<string | null> {
+export function getLocalIp (timeout = 1500): Promise<string | null> {
     // Try to extract local LAN IP using WebRTC ICE candidates.
     // This may be blocked or return mDNS names in some browsers; handle gracefully.
     return new Promise((resolve) => {

@@ -215,7 +215,7 @@ export default defineNuxtPlugin(() => {
                 device.stopRefreshTimer()
             }
         },
-        { immediate: true },
+        { immediate: true }
     )
 
     return {

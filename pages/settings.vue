@@ -68,6 +68,7 @@ const apiUrl = ref(config.public.apiBaseUrl || "")
 const localIpAddress = ref("Loading...")
 const isVerifyingToken = ref(false)
 const isRefreshingToken = ref(false)
+const isLoggingIn = ref(false)
 const tokenStatus = ref<"valid" | "invalid" | "unknown">("unknown")
 const tokenMessage = ref("")
 
@@ -133,25 +134,44 @@ watch(collapsed, (val) => {
     }
 }, { deep: true })
 
+/** Minimal IPv4 check — avoids importing private isIpv4Address from Device store. */
+const isValidIpv4 = (v: unknown): v is string =>
+    typeof v === "string" && /^(\d{1,3}\.){3}\d{1,3}$/.test(v)
+
 // Get local IP address
 const getLocalIpAddress = async () => {
     try {
-    // Try to get from device store if available (use last_ip_address per Device type)
-        if (displayDevice.value?.last_ip_address) {
-            localIpAddress.value = displayDevice.value.last_ip_address
+        // 1. Use stored IP from authenticated device (most reliable).
+        if (isValidIpv4(displayDevice.value?.last_ip_address)) {
+            localIpAddress.value = displayDevice.value!.last_ip_address!
             return
         }
 
-        // Try to detect the tablet LAN IP using the WebRTC helper.
+        // 2. WebRTC ICE candidate detection (works without network round-trip).
         try {
             const { getLocalIp } = await import("~/utils/getLocalIp")
             const ip = await getLocalIp()
-            if (ip) {
+            if (isValidIpv4(ip)) {
                 localIpAddress.value = ip
                 return
             }
         } catch (e) {
-            logger.warn("[Settings] Local IP detection failed:", e)
+            logger.warn("[Settings] WebRTC local IP detection failed:", e)
+        }
+
+        // 3. Server-side detection fallback: ask the API what IP it sees for this request.
+        //    Requires nginx to forward X-Forwarded-For to PHP-FPM (now configured).
+        try {
+            const { useApi } = await import("~/composables/useApi")
+            const api = useApi()
+            const res = await api.get("/api/device/ip")
+            const serverIp = res?.data?.ip
+            if (isValidIpv4(serverIp)) {
+                localIpAddress.value = serverIp
+                return
+            }
+        } catch (e) {
+            logger.warn("[Settings] /api/device/ip server-side fallback failed:", e)
         }
 
         localIpAddress.value = "Unable to detect"
@@ -232,7 +252,7 @@ onBeforeUnmount(() => {
 
 // Try to resolve device & table by local IP. Server may accept POST or GET for this helper.
 const fetchDeviceByIp = async (ip: string | null) => {
-    if (!ip) { return false }
+    if (!isValidIpv4(ip)) { return false }  // guard: never send non-IP strings to the API
     try {
         const { useApi } = await import("~/composables/useApi")
         const api = useApi()
@@ -389,6 +409,30 @@ const refreshToken = async () => {
         logger.error("❌ Token refresh failed:", error)
     } finally {
         isRefreshingToken.value = false
+    }
+}
+
+// Device login/authentication (IP-only)
+const authenticateDevice = async () => {
+    isLoggingIn.value = true
+    try {
+        const clientIp = String(displayDevice.value?.last_ip_address || localIpAddress.value || "").trim()
+        const success = await deviceStore.authenticate(clientIp || undefined)
+        if (success) {
+            tokenStatus.value = "valid"
+            tokenMessage.value = "Device authenticated successfully"
+            logger.debug("✅ Device authenticated via IP")
+        } else {
+            tokenStatus.value = "invalid"
+            tokenMessage.value = "Device not registered or authentication failed"
+            logger.warn("Authentication returned no device")
+        }
+    } catch (err: any) {
+        tokenStatus.value = "invalid"
+        tokenMessage.value = err?.message || "Authentication failed"
+        logger.error("❌ Authentication error", err)
+    } finally {
+        isLoggingIn.value = false
     }
 }
 
@@ -571,10 +615,11 @@ onMounted(async () => {
 
     await getLocalIpAddress()
 
-    // After detecting local IP, attempt to resolve device/table
+    // After detecting local IP, attempt to resolve device/table.
+    // fetchDeviceByIp validates the IP itself — only sends if it's a real IPv4 address.
     try {
         const ip = (deviceStore.device?.value?.last_ip_address) || localIpAddress.value
-        const lookedUp = await fetchDeviceByIp(typeof ip === "string" ? ip : null)
+        const lookedUp = await fetchDeviceByIp(isValidIpv4(ip) ? ip : null)
         if (!lookedUp) {
             tokenMessage.value = "Register this tablet with the setup code above."
         }
@@ -851,9 +896,19 @@ onMounted(async () => {
                         <div v-if="!deviceStore.isAuthenticated" class="space-y-3">
                             <div class="p-4 bg-white/5 rounded-lg border border-white/10">
                                 <p class="text-sm text-white/60">
-                                    Register this tablet with the setup code above.
+                                    Register this tablet with the setup code above, or authenticate via IP.
                                 </p>
                             </div>
+
+                            <button
+                                :disabled="isLoggingIn"
+                                class="w-full px-6 py-3 min-h-[48px] rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 active:scale-95 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                @click="authenticateDevice"
+                            >
+                                <span v-if="isLoggingIn" class="animate-spin">⏳</span>
+                                <span v-else>🔑</span>
+                                {{ isLoggingIn ? 'Authenticating...' : 'Authenticate Device (IP)' }}
+                            </button>
 
                             <p v-if="deviceStore.errorMessage" class="text-sm text-red-400">
                                 {{ deviceStore.errorMessage }}

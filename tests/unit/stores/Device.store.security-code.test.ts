@@ -27,7 +27,36 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("register() action with security_code field", () => {
-        it("should emit only security_code identity fields in the payload", async () => {
+        it("should forward ip_address when provided during registration", async () => {
+            const store = useDeviceStore()
+
+            const mockResponse = {
+                data: {
+                    device: { id: 1, name: "Test Device" },
+                    token: "test-token",
+                    table: { id: 4, name: "Table 4" },
+                }
+            }
+
+            mockPost.mockResolvedValueOnce(mockResponse)
+
+            await store.register({
+                security_code: "123456",
+                name: "Test Device",
+                ip_address: "192.168.100.7"
+            } as any)
+
+            expect(mockPost).toHaveBeenCalledWith(
+                "/api/devices/register",
+                expect.objectContaining({
+                    security_code: "123456",
+                    name: "Test Device",
+                    ip_address: "192.168.100.7"
+                })
+            )
+        })
+
+        it("should emit security_code in payload instead of legacy code field", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
@@ -51,8 +80,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
             )
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("passcode")
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
-            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("name")
-            expect(store.code).toBeNull()
+            expect((store as any).code).toBeUndefined()
         })
 
         it("should not retain setup code as reusable local auth state", async () => {
@@ -74,7 +102,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
 
             await store.register({ security_code: "654321", name: "Kiosk-1" } as any)
 
-            expect(store.code).toBeNull()
+            expect((store as any).code).toBeUndefined()
             expect(store.device).toEqual(
                 expect.objectContaining({
                     id: 1,
@@ -130,32 +158,70 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
         })
     })
 
-    describe("backward compatibility with legacy code field", () => {
-        it("should still accept code field as a setup-code input alias", async () => {
+    describe("authenticate() action with optional client ip", () => {
+        it("should call /api/devices/login with ip_address query when provided", async () => {
             const store = useDeviceStore()
 
             const mockResponse = {
                 data: {
-                    device: { id: 1, name: "Test Device", code: "555555" },
+                    success: true,
                     token: "test-token",
-                    table: { id: 5, name: "Table 5" }
+                    device: { id: 1, name: "Tablet-01", ip_address: "192.168.100.7" },
+                    table: { id: 1, name: "T1" },
+                    ip_used: "192.168.100.7"
                 }
             }
 
-            mockPost.mockResolvedValueOnce(mockResponse)
+            mockGet.mockResolvedValueOnce(mockResponse)
 
-            // Call with legacy code field for backward compatibility
+            await store.authenticate("192.168.100.7")
+
+            expect(mockGet).toHaveBeenCalledWith("/api/devices/login", {
+                params: {
+                    ip: "192.168.100.7",
+                    ip_address: "192.168.100.7"
+                }
+            })
+        })
+
+        it("should call /api/devices/login without ip_address query when not provided", async () => {
+            const store = useDeviceStore()
+
+            const mockResponse = {
+                data: {
+                    success: true,
+                    token: "test-token",
+                    device: { id: 1, name: "Tablet-01" },
+                    table: { id: 1, name: "T1" }
+                }
+            }
+
+            mockGet.mockResolvedValueOnce(mockResponse)
+
+            await store.authenticate()
+
+            expect(mockGet).toHaveBeenCalledWith("/api/devices/login")
+        })
+    })
+
+    describe("code alias sunset (CT-01/CT-06)", () => {
+        it("should not normalize legacy code field to security_code — alias removed", async () => {
+            const store = useDeviceStore()
+
+            mockPost.mockResolvedValueOnce({
+                data: {
+                    device: { id: 1, name: "Test Device" },
+                    token: "test-token",
+                    table: { id: 5, name: "Table 5" }
+                }
+            })
+
+            // CT-01/CT-06 alias sunset: code field is no longer accepted.
+            // Passing only `code` must NOT populate security_code in the outgoing payload.
             await store.register({ code: "555555", name: "Test Device" } as any)
 
-            expect(mockPost).toHaveBeenCalled()
-            expect(mockPost.mock.calls[0][1]).toEqual(expect.objectContaining({ security_code: "555555" }))
+            expect(mockPost.mock.calls[0][1]).not.toHaveProperty("security_code")
             expect(mockPost.mock.calls[0][1]).not.toHaveProperty("code")
-            expect(store.device).toEqual(
-                expect.objectContaining({
-                    id: 1,
-                    name: "Test Device"
-                })
-            )
         })
     })
 
@@ -282,7 +348,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 const ok = await store.authenticate()
 
                 expect(ok).toBe(true)
-                expect(mockGet).toHaveBeenCalledWith("/api/devices/login", undefined)
+                expect(mockGet).toHaveBeenCalledWith("/api/devices/login")
             } finally {
                 Object.defineProperty(window, "location", {
                     configurable: true,

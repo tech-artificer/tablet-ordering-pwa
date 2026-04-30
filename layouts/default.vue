@@ -11,7 +11,6 @@ const route = useRoute()
                 <slot />
             </div>
         </Transition>
-
     </div>
 </template>
 

@@ -29,9 +29,11 @@ export function resolveReverbSocketConfig (
     const configuredScheme = String(config.scheme ?? "http").toLowerCase()
 
     const host = configuredHost || browserHost
-    const normalizedPort = configuredPort || (isHttpsPage ? 443 : 80)
-    const currentOriginPort = browserPort ? parseInt(browserPort, 10) : (isHttpsPage ? 443 : 80)
-    const port = normalizedPort === 80 || normalizedPort === 443 ? currentOriginPort : normalizedPort
+    // Use the explicitly configured port when provided.
+    // Do NOT fall back to the browser's current port when the configured port is 443/80 —
+    // the tablet PWA lives on port 4443 while Reverb is on port 443; substituting the
+    // browser port would send WebSocket traffic to the wrong listener.
+    const port = configuredPort !== 0 ? configuredPort : (isHttpsPage ? 443 : 80)
     const forceTLS = isHttpsPage || configuredScheme === "https"
 
     return {

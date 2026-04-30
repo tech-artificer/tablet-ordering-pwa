@@ -3,7 +3,6 @@ import { setActivePinia, createPinia } from "pinia"
 
 import { useSessionEndStore } from "../stores/SessionEnd"
 import { useSessionStore } from "../stores/Session"
-import { useOrderStore } from "../stores/Order"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 
 // Mock vue-router
@@ -83,7 +82,7 @@ describe("useSessionEndFlow", () => {
     })
 
     it("finalizeAndReturnHome clears store and navigates home", () => {
-        const { triggerSessionEnd, finalizeAndReturnHome } = useSessionEndFlow()
+        const { finalizeAndReturnHome } = useSessionEndFlow()
         const sessionEndStore = useSessionEndStore()
 
         // Set active state manually

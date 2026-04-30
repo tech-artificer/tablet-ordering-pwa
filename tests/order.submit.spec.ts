@@ -23,7 +23,7 @@ const mockPost = vi.fn()
 vi.mock("../composables/useApi", () => ({ useApi: () => ({ post: mockPost }) }))
 
 describe("stores/order - submitOrder", () => {
-    beforeEach(async () => {
+    beforeEach(() => {
         const pinia = createPinia()
         setActivePinia(pinia)
         mockPost.mockReset()

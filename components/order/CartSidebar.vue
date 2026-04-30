@@ -90,18 +90,18 @@ const orderedItems = computed(() => {
 
   // If server items exist and have any displayable name fields, use them
   if (serverItems.length > 0 && serverItems.some((it: any) => it?.name || it?.menu?.name || it?.menu_item?.name || it?.menu_name)) {
-    console.log('[CartSidebar] Using server order_items:', serverItems.length)
+    logger.debug('[CartSidebar] Using server order_items:', serverItems.length)
     return serverItems
   }
 
   // Otherwise, use our locally stored submittedItems (which have names)
   if (submittedItems.length > 0) {
-    console.log('[CartSidebar] Using submittedItems fallback:', submittedItems.length)
+    logger.debug('[CartSidebar] Using submittedItems fallback:', submittedItems.length)
     return submittedItems
   }
 
   // Last resort: try to merge server items with names by mapping menu_id to local menu data
-  console.log('[CartSidebar] No named items available, returning server items:', serverItems.length)
+  logger.debug('[CartSidebar] No named items available, returning server items:', serverItems.length)
   return serverItems
 })
 

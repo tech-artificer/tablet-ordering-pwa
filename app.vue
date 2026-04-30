@@ -112,7 +112,7 @@ function scheduleBroadcastInitialization (): void {
     }, 1000)
 }
 
-async function handleVisibilityChange (): Promise<void> {
+function handleVisibilityChange (): void {
     if (typeof document === "undefined") { return }
 
     if (document.hidden) {
@@ -175,13 +175,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <SplashScreen :visible="isLoading" />
+    <div class="contents">
+        <SplashScreen :visible="isLoading" />
 
-    <NuxtLayout name="kiosk">
-        <NetworkStatus />
+        <NuxtLayout name="kiosk">
+            <NetworkStatus />
 
-        <Transition name="page-fade" mode="out-in">
-            <NuxtPage :key="route.path" />
-        </Transition>
-    </NuxtLayout>
+            <Transition name="page-fade" mode="out-in">
+                <NuxtPage :key="route.path" />
+            </Transition>
+        </NuxtLayout>
+    </div>
 </template>

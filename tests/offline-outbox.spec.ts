@@ -33,13 +33,13 @@ function makeOutboxDb () {
         async remove (id: string) {
             await orders.delete(id)
         },
-        async countPending () {
+        countPending () {
             return orders.where("status").anyOf("queued_local", "queued_sw", "syncing").count()
         },
-        async listPending () {
+        listPending () {
             return orders.where("status").anyOf("queued_local", "queued_sw", "syncing").toArray()
         },
-        async findById (id: string) {
+        findById (id: string) {
             return orders.get(id)
         },
     }

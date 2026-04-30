@@ -1,7 +1,7 @@
 import { useMenuStore } from "~/stores/Menu"
 import { logger } from "~/utils/logger"
 
-export default defineNuxtRouteMiddleware(async (to, from) => {
+export default defineNuxtRouteMiddleware(async (to, _from) => {
     const menuStore = useMenuStore()
 
     // Only check on specific routes that need menu data
