@@ -840,8 +840,6 @@ export const useOrderStore = defineStore("order", () => {
                         stopPolling()
 
                         try {
-                            const sessionStore = useSessionStore()
-
                             // Small delay to allow any final UI updates. Await session end
                             // and clear order state immediately to avoid a refill UI loop.
                             clearCompletionTimeout()

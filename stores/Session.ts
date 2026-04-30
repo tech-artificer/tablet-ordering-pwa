@@ -205,15 +205,17 @@ export const useSessionStore = defineStore("session", () => {
 
                 // Guard 2: imminent-expiry check (original RC-3 fix).
                 // If the computed expiry is within 30 s but the server's own elapsed time is
-                // less than the session duration, the response is from a stale session whose
-                // start time happens to be close to ours. Skip to avoid premature expiry.
+                // more than 30 s short of the session duration, the response is from a stale
+                // session whose start time happens to be close to ours. Skip to avoid premature expiry.
                 const clientNow = Date.now()
                 if (newSessionEndsAt < clientNow + 30_000) {
                     const serverElapsedMs = serverNow - sessionStart
-                    if (serverElapsedMs < durationMs) {
+                    if (serverElapsedMs < Math.max(0, durationMs - 30_000)) {
                         logger.warn("[Session] syncFromServer: would cause premature expiry — stale session data returned, skipping sessionEndsAt update", {
                             serverNow: new Date(serverNow).toISOString(),
                             sessionStart: new Date(sessionStart).toISOString(),
+                            newSessionEndsAt: new Date(newSessionEndsAt).toISOString(),
+                            sessionEndsAt: state.sessionEndsAt ? new Date(state.sessionEndsAt).toISOString() : null,
                             serverElapsedMs: Math.round(serverElapsedMs / 1000) + "s",
                             durationMs: Math.round(durationMs / 1000) + "s",
                         })
