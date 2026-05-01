@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { ElMessageBox, ElNotification } from "element-plus"
 import { useDeviceStore } from "../stores/Device"
+import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "../utils/logger"
 
 // @ts-ignore - Nuxt auto-imports
@@ -185,7 +186,7 @@ const getLocalIpAddress = async () => {
 }
 
 // Fullscreen helpers
-const isFullscreen = ref(false)
+const { isFullscreen, adminUnlock, adminLock } = useKioskFullscreen()
 const startInFullscreen = ref(false)
 
 // Helper to copy text to clipboard (safe for template use)
@@ -202,23 +203,16 @@ const saveFullscreenPreference = (value: boolean) => {
     }
 }
 
-const updateFullscreenState = () => {
-    isFullscreen.value = !!(typeof document !== "undefined" && (document as any).fullscreenElement)
-}
-
 const toggleFullscreen = async () => {
-    if (typeof document === "undefined") { return }
     try {
         if (!isFullscreen.value) {
-            await (document.documentElement as any).requestFullscreen()
-            isFullscreen.value = true
-            localStorage.setItem("START_FULLSCREEN", "true")
+            await adminLock(deviceStore)
             startInFullscreen.value = true
+            saveFullscreenPreference(true)
         } else {
-            if (document.exitFullscreen) { await document.exitFullscreen() }
-            isFullscreen.value = false
-            localStorage.setItem("START_FULLSCREEN", "false")
+            await adminUnlock(deviceStore)
             startInFullscreen.value = false
+            saveFullscreenPreference(false)
         }
     } catch (err) {
         logger.warn("Fullscreen toggle failed", err)
@@ -226,30 +220,20 @@ const toggleFullscreen = async () => {
 }
 
 onMounted(() => {
-    // initialize fullscreen values
-    updateFullscreenState()
     try {
         const v = localStorage.getItem("START_FULLSCREEN")
-        startInFullscreen.value = v === "true"
-        // attempt to enter fullscreen if requested — may require user gesture
-        if (startInFullscreen.value && typeof document !== "undefined" && !(document as any).fullscreenElement) {
-            // best-effort: won't always work without gesture
-            ;(document.documentElement as any).requestFullscreen().catch(() => { /* ignore */ })
-        }
+        startInFullscreen.value = v !== "false"
     } catch (e) {
     // ignore storage errors
     }
 
-    // listen to fullscreen changes
     if (typeof document !== "undefined") {
-        document.addEventListener("fullscreenchange", updateFullscreenState)
         document.addEventListener("visibilitychange", handleSettingsVisibilityChange)
     }
 })
 
 onBeforeUnmount(() => {
     if (typeof document !== "undefined") {
-        document.removeEventListener("fullscreenchange", updateFullscreenState)
         document.removeEventListener("visibilitychange", handleSettingsVisibilityChange)
     }
 })
@@ -1029,13 +1013,13 @@ onMounted(async () => {
 
                     <div class="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
                         <div>
-                            <label class="text-sm text-white/50 block mb-1">Start in Fullscreen</label>
+                            <label class="text-sm text-white/50 block mb-1">Kiosk Fullscreen Policy</label>
                             <p class="text-xs text-white/60">
-                                When enabled, the app will attempt to enter fullscreen on load (may require user permission).
+                                This tablet enforces fullscreen mode. Admin unlock allows temporary exit for maintenance.
                             </p>
                         </div>
-                        <div>
-                            <input id="startFullscreen" v-model="startInFullscreen" type="checkbox" class="w-5 h-5" @change="saveFullscreenPreference(startInFullscreen)">
+                        <div class="text-xs px-3 py-1 rounded-full border border-white/20 text-white/70">
+                            {{ startInFullscreen ? 'Enforced' : 'Temporarily Unlocked' }}
                         </div>
                     </div>
                 </div>

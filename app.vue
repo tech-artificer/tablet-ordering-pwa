@@ -4,6 +4,7 @@ import { useSessionStore } from "~/stores/Session"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
+import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
@@ -13,8 +14,10 @@ const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { registerOnlineListener } = useOfflineOrderQueue()
+const { attachListener, requestFullscreen } = useKioskFullscreen()
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
+let gestureListenersAttached = false
 
 // Sleep/wake tracking
 let hiddenSince: number | null = null
@@ -112,6 +115,33 @@ function scheduleBroadcastInitialization (): void {
     }, 1000)
 }
 
+function enforceFullscreenIfNeeded (): void {
+    if (typeof document === "undefined") { return }
+    if (deviceStore.getKioskUnlocked()) { return }
+
+    void requestFullscreen()
+}
+
+function handleFullscreenGestureRecovery (): void {
+    enforceFullscreenIfNeeded()
+}
+
+function registerGestureFullscreenRecovery (): void {
+    if (typeof document === "undefined" || gestureListenersAttached) { return }
+
+    gestureListenersAttached = true
+    document.addEventListener("pointerdown", handleFullscreenGestureRecovery, { passive: true })
+    document.addEventListener("touchstart", handleFullscreenGestureRecovery, { passive: true })
+}
+
+function unregisterGestureFullscreenRecovery (): void {
+    if (typeof document === "undefined" || !gestureListenersAttached) { return }
+
+    document.removeEventListener("pointerdown", handleFullscreenGestureRecovery)
+    document.removeEventListener("touchstart", handleFullscreenGestureRecovery)
+    gestureListenersAttached = false
+}
+
 function handleVisibilityChange (): void {
     if (typeof document === "undefined") { return }
 
@@ -123,6 +153,8 @@ function handleVisibilityChange (): void {
     // Device woke up
     const hiddenDurationMs = hiddenSince !== null ? Date.now() - hiddenSince : 0
     hiddenSince = null
+
+    enforceFullscreenIfNeeded()
 
     logger.info(`[App] Wake detected after ${Math.round(hiddenDurationMs / 1000)}s`)
 
@@ -142,6 +174,9 @@ function handleVisibilityChange (): void {
 }
 
 onMounted(async () => {
+    attachListener()
+    registerGestureFullscreenRecovery()
+
     try {
         const authenticated = await resolveAuthenticationState()
         await nuxtApp.callHook("app:auth-ready", { authenticated })
@@ -155,6 +190,9 @@ onMounted(async () => {
     // Register global online event listener to drain the offline order queue
     registerOnlineListener()
 
+    // Enforce fullscreen as early as possible (browser may defer until user gesture)
+    enforceFullscreenIfNeeded()
+
     // Register sleep/wake handler
     if (typeof document !== "undefined") {
         document.addEventListener("visibilitychange", handleVisibilityChange)
@@ -167,6 +205,7 @@ onUnmounted(() => {
     }
 
     cleanup()
+    unregisterGestureFullscreenRecovery()
 
     if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", handleVisibilityChange)
@@ -180,6 +219,7 @@ onUnmounted(() => {
 
         <NuxtLayout name="kiosk">
             <NetworkStatus />
+            <FullscreenRecovery />
 
             <Transition name="page-fade" mode="out-in">
                 <NuxtPage :key="route.path" />
