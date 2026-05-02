@@ -344,14 +344,7 @@ export const useSessionStore = defineStore("session", () => {
             // set are not wiped out.
             const orderStore = useOrderStore()
             if (!state.isActive) {
-                orderStore.setGuestCount(2) // Default guest count
-                orderStore.clearCart()
-                orderStore.clearRefillItems()
-                orderStore.clearSubmittedItems()
-                orderStore.clearPackage()
-                orderStore.clearCurrentOrder()
-                orderStore.setHasPlacedOrder(false)
-                orderStore.setIsRefillMode(false)
+                orderStore.resetTransactionalState()
             }
 
             state.isActive = true
@@ -410,14 +403,7 @@ export const useSessionStore = defineStore("session", () => {
         // Stop any active polling first
         try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[SessionStore] stopOrderPolling failed", e) }
 
-        orderStore.setGuestCount(2)
-        orderStore.clearCart()
-        orderStore.clearRefillItems()
-        orderStore.clearSubmittedItems()
-        orderStore.clearPackage()
-        orderStore.clearCurrentOrder()
-        orderStore.setHasPlacedOrder(false)
-        orderStore.setIsRefillMode(false)
+        orderStore.resetTransactionalState()
         // Note: orderStore.history is KEPT for historical tracking
 
         logger.info(`[Session] State cleared at ${timestamp}`)
@@ -440,7 +426,9 @@ export const useSessionStore = defineStore("session", () => {
                     currentOrder: null,
                     submittedItems: [],
                     isRefillMode: false,
-                    history: orderStore.getHistory() // Keep history
+                    history: orderStore.getHistory(), // Keep history
+                    cartItems: [],
+                    refillItems: [],
                 }))
 
                 logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
@@ -495,15 +483,7 @@ export const useSessionStore = defineStore("session", () => {
             // Stop any active polling first
             try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[SessionStore] stopOrderPolling failed", e) }
 
-            orderStore.setGuestCount(2)
-            orderStore.clearCart()
-            orderStore.clearRefillItems()
-            orderStore.clearSubmittedItems()
-            orderStore.clearPackage()
-            orderStore.clearCurrentOrder()
-            orderStore.setHasPlacedOrder(false)
-            orderStore.setIsRefillMode(false)
-            orderStore.clearHistory()
+            orderStore.resetTransactionalState({ clearHistory: true })
 
             // Force persist to localStorage immediately
             if (typeof window !== "undefined" && window.localStorage) {
@@ -522,7 +502,9 @@ export const useSessionStore = defineStore("session", () => {
                         currentOrder: null,
                         submittedItems: [],
                         isRefillMode: false,
-                        history: []
+                        history: [],
+                        cartItems: [],
+                        refillItems: [],
                     }))
 
                     logger.debug("✅ Session and order stores fully reset and persisted")

@@ -194,3 +194,62 @@ After redeploying the tablet image:
 1. `/auth/register` renders the registration UI (no black screen).
 2. Console no longer logs `Cannot redefine property: $echo`.
 3. Reverb socket reconnects without crashing when auth token/broadcast config updates.
+
+---
+
+## Addendum — May 1, 2026 (Session residue + intermittent Place Order no-op)
+
+### Reported symptoms
+
+- Returning to welcome sometimes showed previous-customer residue (guest count, cart/order remnants).
+- Intermittent “Place Order” button non-response on menu.
+
+### Root causes verified
+
+1. **Cold-boot stale-state branch in `Order.initializeFromSession()` did not clear transactional state when token was unavailable.**
+   - Condition: `session.orderId === null` and `device.token === null`.
+   - Previous behavior: early return, leaving stale `hasPlacedOrder`, `currentOrder`, `guestCount`, `cartItems`, and `package` intact.
+
+2. **State-reset logic was duplicated across `Session.start()`, `Session.clearInternal()`, and `Session.reset()`, creating drift risk.**
+   - Multiple call sites manually cleared subsets of order fields.
+   - Persisted order-store snapshot omitted some picked fields (`cartItems`, `refillItems`) in manual writes.
+
+3. **`CartSidebar` submit readiness only trusted route-derived `selectedPackage` prop.**
+   - During transient route/store drift, package could exist in `orderStore.package` while `selectedPackage` prop was null.
+   - Result: `canSubmit === false` and “Place Order” appears non-responsive.
+
+### Fixes applied
+
+- Added single-source transactional reset helper in `stores/Order.ts`:
+  - `resetTransactionalState({ clearHistory?: boolean })`
+  - Clears: cart/refill/submitted/package/currentOrder/hasPlacedOrder/isRefillMode/error, resets guest count to 2.
+- Updated stale recovery path in `initializeFromSession()`:
+  - On `no session.orderId + no token`, stale transactional state is now cleared immediately.
+  - On `no session.orderId + token present`, stale fallback clear now uses unified reset helper.
+- Updated `stores/Session.ts` to use `orderStore.resetTransactionalState(...)` in start/end/reset lifecycle.
+- Aligned manual persisted order-store snapshots with pick contract by including `cartItems` and `refillItems`.
+- Updated `components/order/CartSidebar.vue`:
+  - `hasPackage` now accepts either `selectedPackage.id` **or** `orderStore.package.id`.
+
+### Regression coverage added
+
+- `tests/order.polling.spec.ts`
+  - Expanded stale-cold-boot test to assert guest/package/cart/order cleanup when token is unavailable.
+- `tests/cartsidebar.ui.spec.ts`
+  - Added test ensuring “Place Order” remains enabled when package exists in store but prop is null.
+
+### Verification evidence
+
+- `npx vitest run tests/order.polling.spec.ts tests/cartsidebar.ui.spec.ts` → **6/6 passed**
+- `npx vitest run tests/session-end.spec.ts tests/useGuestReset.spec.ts tests/order.submit.spec.ts` → **5/5 passed**
+- `npx tsc --noEmit` → completed with no output (no type errors)
+
+### Retain vs clear contract (session boundary)
+
+**Retain on welcome/new session:**
+- Device auth and assignment: `device-store` token/device/table/broadcast config.
+- Menu cache: `menu-store` packages/categories/details and `lastFetched`.
+
+**Clear on welcome/new session:**
+- Transactional order/session data: guest count (back to 2), package selection, carts, submitted items, active order ref, refill mode, hasPlacedOrder, in-session flags.
+- Session-local idempotency/offline queue artifacts at session end.

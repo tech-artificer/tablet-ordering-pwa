@@ -59,6 +59,22 @@ export const useOrderStore = defineStore("order", () => {
         completionTimeoutId = null
     }
 
+    function resetTransactionalState (options?: { clearHistory?: boolean }) {
+        stopPolling()
+        state.cartItems = []
+        state.refillItems = []
+        state.submittedItems = []
+        state.package = null
+        state.guestCount = 2
+        state.currentOrder = null
+        state.isRefillMode = false
+        state.hasPlacedOrder = false
+        state.error = null
+        if (options?.clearHistory) {
+            state.history = []
+        }
+    }
+
     function extractResponseData<T = any> (response: any): T | null {
         return (response?.data ?? null) as T | null
     }
@@ -403,227 +419,228 @@ export const useOrderStore = defineStore("order", () => {
             throw new Error("Order submission already in progress. Please wait.")
         }
         state.isSubmitting = true
+        try {
         // 🔒 VALIDATION: Ensure everything is set before submitting
-        const deviceStore = useDeviceStore()
+            const deviceStore = useDeviceStore()
 
-        logger.debug("🔍 Pre-submission validation:", {
-            hasPackage: !!state.package?.id,
-            packageId: state.package?.id,
-            guestCount: state.guestCount,
-            cartItemsCount: state.cartItems.length,
-            isAuthenticated: deviceStore.isAuthenticated
-        })
+            logger.debug("🔍 Pre-submission validation:", {
+                hasPackage: !!state.package?.id,
+                packageId: state.package?.id,
+                guestCount: state.guestCount,
+                cartItemsCount: state.cartItems.length,
+                isAuthenticated: deviceStore.isAuthenticated
+            })
 
-        // ❌ Validation checks
-        if (!deviceStore.getToken()) {
-            try {
-                await deviceStore.authenticate()
-            } catch (e) {
-                logger.warn("Device authenticate retry failed before submitOrder", e)
-            }
+            // ❌ Validation checks
             if (!deviceStore.getToken()) {
+                try {
+                    await deviceStore.authenticate()
+                } catch (e) {
+                    logger.warn("Device authenticate retry failed before submitOrder", e)
+                }
+                if (!deviceStore.getToken()) {
+                    state.isSubmitting = false
+                    throw new Error("❌ Device not authenticated - missing token. Please register device first.")
+                }
+            }
+
+            // Pinia stores auto-unwrap refs — deviceStore.table is always the plain object value.
+            const tableId = deviceStore.getTableId()
+            const tableName = deviceStore.getTableName()
+
+            logger.debug("🔍 Table validation:", { tableId, tableName })
+
+            if (tableId == null) {
+                try {
+                    await deviceStore.checkTableAssignment()
+                } catch (e) {
+                    logger.warn("Table assignment refresh failed before submitOrder", e)
+                }
+            }
+
+            const refreshedTableId = deviceStore.getTableId()
+            const refreshedTableName = deviceStore.getTableName()
+
+            if (refreshedTableId == null) {
+                logger.error("❌ Table validation failed - no table ID found", { tableName: refreshedTableName })
                 state.isSubmitting = false
-                throw new Error("❌ Device not authenticated - missing token. Please register device first.")
+                throw new Error("❌ No table assigned to this device. Please contact staff.")
             }
-        }
+            logger.debug("✅ Table validated:", refreshedTableName)
 
-        // Pinia stores auto-unwrap refs — deviceStore.table is always the plain object value.
-        const tableId = deviceStore.getTableId()
-        const tableName = deviceStore.getTableName()
-
-        logger.debug("🔍 Table validation:", { tableId, tableName })
-
-        if (tableId == null) {
-            try {
-                await deviceStore.checkTableAssignment()
-            } catch (e) {
-                logger.warn("Table assignment refresh failed before submitOrder", e)
+            if (!state.package?.id) {
+                state.isSubmitting = false
+                throw new Error("❌ No package selected. Please select a package first.")
             }
-        }
 
-        const refreshedTableId = deviceStore.getTableId()
-        const refreshedTableName = deviceStore.getTableName()
-
-        if (refreshedTableId == null) {
-            logger.error("❌ Table validation failed - no table ID found", { tableName: refreshedTableName })
-            state.isSubmitting = false
-            throw new Error("❌ No table assigned to this device. Please contact staff.")
-        }
-        logger.debug("✅ Table validated:", refreshedTableName)
-
-        if (!state.package?.id) {
-            state.isSubmitting = false
-            throw new Error("❌ No package selected. Please select a package first.")
-        }
-
-        if (state.guestCount < 1) {
-            state.isSubmitting = false
-            throw new Error("❌ Guest count must be at least 1.")
-        }
-
-        logger.debug("✅ All validations passed - proceeding with order submission")
-
-        const api = useApi()
-        let body = payload ?? buildPayload()
-
-        // Inject table_id from deviceStore if not already set
-        if (!body.table_id) {
-            body = {
-                ...body,
-                table_id: refreshedTableId
+            if (state.guestCount < 1) {
+                state.isSubmitting = false
+                throw new Error("❌ Guest count must be at least 1.")
             }
-        }
 
-        logger.debug("📦 Order Payload:", body)
+            logger.debug("✅ All validations passed - proceeding with order submission")
 
-        // ── Offline queue ────────────────────────────────────────────────────
-        // If the device is offline, queue the order locally instead of failing.
-        // The queue will be drained when connectivity is restored.
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-            state.isSubmitting = false
-            const { queueOrder } = useOfflineOrderQueue()
-            // Generate / reuse the idempotency key even in the offline path so the
-            // drain attempt sends the same key (avoids duplicates when both the queue
-            // drain and a manual retry fire).
+            const api = useApi()
+            let body = payload ?? buildPayload()
+
+            // Inject table_id from deviceStore if not already set
+            if (!body.table_id) {
+                body = {
+                    ...body,
+                    table_id: refreshedTableId
+                }
+            }
+
+            logger.debug("📦 Order Payload:", body)
+
+            // ── Offline queue ────────────────────────────────────────────────────
+            // If the device is offline, queue the order locally instead of failing.
+            // The queue will be drained when connectivity is restored.
+            if (typeof navigator !== "undefined" && !navigator.onLine) {
+                const { queueOrder } = useOfflineOrderQueue()
+                // Generate / reuse the idempotency key even in the offline path so the
+                // drain attempt sends the same key (avoids duplicates when both the queue
+                // drain and a manual retry fire).
+                const IDEM_KEY_STORAGE = "woosoo_order_idem_key"
+                let offlineIdemKey = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
+                if (!offlineIdemKey) {
+                    offlineIdemKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                        ? crypto.randomUUID()
+                        : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+                    if (typeof sessionStorage !== "undefined") {
+                        try { sessionStorage.setItem(IDEM_KEY_STORAGE, offlineIdemKey) } catch (e) { /* ignore */ }
+                    }
+                }
+                queueOrder(body, offlineIdemKey)
+                throw new Error("📶 No internet connection. Your order has been queued and will be sent automatically when you're back online.")
+            }
+
+            // ── Idempotency key: persist across retries ──────────────────────────
+            // The header is always sent. The key is generated ONCE and stored in
+            // sessionStorage so retries reuse the same key (preventing server-side
+            // duplicates). The key is cleared on success; on failure it survives so
+            // the next retry reuses it. Session.ts clear() also removes it.
             const IDEM_KEY_STORAGE = "woosoo_order_idem_key"
-            let offlineIdemKey = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
-            if (!offlineIdemKey) {
-                offlineIdemKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            let idempotencyKey = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
+            if (!idempotencyKey) {
+                idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
                     ? crypto.randomUUID()
                     : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
                 if (typeof sessionStorage !== "undefined") {
-                    try { sessionStorage.setItem(IDEM_KEY_STORAGE, offlineIdemKey) } catch (e) { /* ignore */ }
+                    try { sessionStorage.setItem(IDEM_KEY_STORAGE, idempotencyKey) } catch (e) { logger.debug("Failed to persist idempotency key", e) }
                 }
             }
-            queueOrder(body, offlineIdemKey)
-            throw new Error("📶 No internet connection. Your order has been queued and will be sent automatically when you're back online.")
-        }
 
-        // ── Idempotency key: persist across retries ──────────────────────────
-        // The header is always sent. The key is generated ONCE and stored in
-        // sessionStorage so retries reuse the same key (preventing server-side
-        // duplicates). The key is cleared on success; on failure it survives so
-        // the next retry reuses it. Session.ts clear() also removes it.
-        const IDEM_KEY_STORAGE = "woosoo_order_idem_key"
-        let idempotencyKey = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
-        if (!idempotencyKey) {
-            idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                ? crypto.randomUUID()
-                : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-            if (typeof sessionStorage !== "undefined") {
-                try { sessionStorage.setItem(IDEM_KEY_STORAGE, idempotencyKey) } catch (e) { logger.debug("Failed to persist idempotency key", e) }
-            }
-        }
+            try {
+                const resp = await api.post(API_ENDPOINTS.DEVICE_CREATE_ORDER, body, { headers: { "X-Idempotency-Key": idempotencyKey } })
+                const responseData = resp?.data ?? null
+                logger.info("✅ Order submission SUCCESS")
+                logger.debug("📥 Response:", responseData)
 
-        try {
-            const resp = await api.post(API_ENDPOINTS.DEVICE_CREATE_ORDER, body, { headers: { "X-Idempotency-Key": idempotencyKey } })
-            const responseData = resp?.data ?? null
-            logger.info("✅ Order submission SUCCESS")
-            logger.debug("📥 Response:", responseData)
+                if (!responseData) {
+                    handleOrderError("Order creation response missing body")
+                    throw new Error("Order creation response missing body")
+                }
 
-            if (!responseData) {
-                handleOrderError("Order creation response missing body")
-                throw new Error("Order creation response missing body")
-            }
+                // Update session with order ID from response
+                const sessionStore = useSessionStore()
 
-            // Update session with order ID from response
-            const sessionStore = useSessionStore()
+                // Check for success flag first
+                if (!responseData.success) {
+                    logger.error("❌ Server returned success=false:", responseData)
+                    throw new Error(responseData.message || "Order processing failed on server")
+                }
 
-            // Check for success flag first
-            if (!responseData.success) {
-                logger.error("❌ Server returned success=false:", responseData)
-                throw new Error(responseData.message || "Order processing failed on server")
-            }
+                // Only mark as placed if we get order_number or order_id from server
+                const orderNumber = responseData.order?.order_number
+                const orderId = responseData.order?.id
 
-            // Only mark as placed if we get order_number or order_id from server
-            const orderNumber = responseData.order?.order_number
-            const orderId = responseData.order?.id
+                logger.debug("🔍 Order created:", { orderNumber, orderId })
 
-            logger.debug("🔍 Order created:", { orderNumber, orderId })
-
-            if (orderNumber || orderId) {
+                if (orderNumber || orderId) {
                 // Centralize marking order created
-                await setOrderCreated(responseData)
-                // Clear persisted idempotency key — next order gets a fresh key
-                if (typeof sessionStorage !== "undefined") {
-                    try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { /* ignore */ }
+                    await setOrderCreated(responseData)
+                    // Clear persisted idempotency key — next order gets a fresh key
+                    if (typeof sessionStorage !== "undefined") {
+                        try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { /* ignore */ }
+                    }
+                } else {
+                    logger.error("❌ Missing order identifiers in response:", responseData)
+                    throw new Error("Order confirmation failed: No order ID received from server")
                 }
-            } else {
-                logger.error("❌ Missing order identifiers in response:", responseData)
-                throw new Error("Order confirmation failed: No order ID received from server")
-            }
 
-            return responseData
-        } catch (error: any) {
-            logger.error("❌ Order submission failed:", error.message)
-            const errorResponse = extractErrorResponse(error)
+                return responseData
+            } catch (error: any) {
+                logger.error("❌ Order submission failed:", error.message)
+                const errorResponse = extractErrorResponse(error)
 
-            // Handle authentication errors specifically
-            if (error.response?.status === 401 || errorResponse?.exception === "authentication") {
-                logger.error("🔐 Authentication error - token invalid or expired")
-                throw new Error("❌ Your session has expired. Please re-register this device in Settings.")
-            }
+                // Handle authentication errors specifically
+                if (error.response?.status === 401 || errorResponse?.exception === "authentication") {
+                    logger.error("🔐 Authentication error - token invalid or expired")
+                    throw new Error("❌ Your session has expired. Please re-register this device in Settings.")
+                }
 
-            // Handle validation errors
-            if (error.response?.status === 422) {
-                const validationErrors = errorResponse?.errors
-                logger.error("📋 Validation errors:", validationErrors)
-                const errorMessages = Object.values(validationErrors || {}).flat().join(", ")
-                throw new Error(`❌ Validation failed: ${errorMessages}`)
-            }
+                // Handle validation errors
+                if (error.response?.status === 422) {
+                    const validationErrors = errorResponse?.errors
+                    logger.error("📋 Validation errors:", validationErrors)
+                    const errorMessages = Object.values(validationErrors || {}).flat().join(", ")
+                    throw new Error(`❌ Validation failed: ${errorMessages}`)
+                }
 
-            // Handle active-order conflicts by resuming the existing order
-            if (error.response?.status === 409) {
-                const existingOrder = errorResponse?.order
-                if (existingOrder) {
-                    logger.warn("↩️ Active order already exists for this device/session. Resuming existing order instead of creating a new one.", {
-                        orderId: existingOrder?.order_id ?? existingOrder?.id,
-                        status: existingOrder?.status,
-                    })
+                // Handle active-order conflicts by resuming the existing order
+                if (error.response?.status === 409) {
+                    const existingOrder = errorResponse?.order
+                    if (existingOrder) {
+                        logger.warn("↩️ Active order already exists for this device/session. Resuming existing order instead of creating a new one.", {
+                            orderId: existingOrder?.order_id ?? existingOrder?.id,
+                            status: existingOrder?.status,
+                        })
 
-                    const recoveredResponse = {
-                        success: true,
-                        resumed: true,
-                        message: errorResponse?.message || "Existing active order found. Resuming current order.",
-                        order: existingOrder,
+                        const recoveredResponse = {
+                            success: true,
+                            resumed: true,
+                            message: errorResponse?.message || "Existing active order found. Resuming current order.",
+                            order: existingOrder,
+                        }
+
+                        await setOrderCreated(recoveredResponse)
+                        return recoveredResponse
                     }
 
-                    await setOrderCreated(recoveredResponse)
-                    return recoveredResponse
+                    throw new Error(errorResponse?.message || "An active order already exists for this device. Please continue the existing session.")
                 }
 
-                throw new Error(errorResponse?.message || "An active order already exists for this device. Please continue the existing session.")
-            }
+                if (error.response?.status === 503 && errorResponse?.code === "SESSION_NOT_FOUND") {
+                    throw new Error("❌ No active POS terminal session found. Please ask staff to open a POS session, then try again.")
+                }
 
-            if (error.response?.status === 503 && errorResponse?.code === "SESSION_NOT_FOUND") {
-                throw new Error("❌ No active POS terminal session found. Please ask staff to open a POS session, then try again.")
-            }
+                // Handle server errors with debugging guidance
+                if (error.response?.status === 500) {
+                    const serverMessage = errorResponse?.message || "Internal server error"
+                    logger.error("🔴 SERVER ERROR (500) - Backend crashed")
 
-            // Handle server errors with debugging guidance
-            if (error.response?.status === 500) {
-                const serverMessage = errorResponse?.message || "Internal server error"
-                logger.error("🔴 SERVER ERROR (500) - Backend crashed")
-
-                throw new Error(
-                    `❌ ${serverMessage}\n\n` +
+                    throw new Error(
+                        `❌ ${serverMessage}\n\n` +
           "🔧 Backend debugging needed:\n" +
           "1. Check Laravel logs (storage/logs/laravel.log)\n" +
           "2. Enable APP_DEBUG=true in .env\n" +
           "3. Verify database schema and OrderService\n\n" +
           "Use Settings > Backend Diagnostics to test directly."
-                )
-            }
+                    )
+                }
 
-            if (error instanceof Error && /missing body|Cannot mark order created from empty response/.test(error.message)) {
+                if (error instanceof Error && /missing body|Cannot mark order created from empty response/.test(error.message)) {
+                    throw error
+                }
+
+                // Handle network errors
+                if (!error.response) {
+                    throw new Error("❌ Network error: Cannot reach backend server. Check if Laravel is running.")
+                }
+
                 throw error
             }
-
-            // Handle network errors
-            if (!error.response) {
-                throw new Error("❌ Network error: Cannot reach backend server. Check if Laravel is running.")
-            }
-
-            throw error
         } finally {
             state.isSubmitting = false
         }
@@ -637,88 +654,83 @@ export const useOrderStore = defineStore("order", () => {
             throw new Error("Order submission already in progress. Please wait.")
         }
         state.isSubmitting = true
+        try {
+            const invalidRefillItem = state.refillItems.find(i => i.category !== "meats" && i.category !== "sides")
+            if (invalidRefillItem) {
+                throw new Error("Refill validation failed: only meats and sides are allowed")
+            }
 
-        const invalidRefillItem = state.refillItems.find(i => i.category !== "meats" && i.category !== "sides")
-        if (invalidRefillItem) {
-            state.isSubmitting = false
-            throw new Error("Refill validation failed: only meats and sides are allowed")
-        }
+            const api = useApi()
+            const sessionStore = useSessionStore()
+            const terminalStatuses = new Set(["completed", "voided", "cancelled"])
 
-        const api = useApi()
-        const sessionStore = useSessionStore()
-        const terminalStatuses = new Set(["completed", "voided", "cancelled"])
-
-        // Use order_id (business ID) - goes in URL path
-        const currentOrderId = state.currentOrder?.order?.order_id ??
+            // Use order_id (business ID) - goes in URL path
+            const currentOrderId = state.currentOrder?.order?.order_id ??
             state.currentOrder?.order?.id ??
             sessionStore.getOrderId()
 
-        if (!currentOrderId) {
-            state.isSubmitting = false
-            throw new Error("Cannot submit refill: missing order ID")
-        }
+            if (!currentOrderId) {
+                throw new Error("Cannot submit refill: missing order ID")
+            }
 
-        // Safety gate: never submit refill against terminal orders.
-        // We verify against the live backend status to handle stale local state after transient failures.
-        const localStatus = String(state.currentOrder?.order?.status || state.currentOrder?.status || "").toLowerCase()
-        if (terminalStatuses.has(localStatus)) {
-            try { await Promise.resolve(sessionStore.end()) } catch (e) { logger.warn("[Refill] sessionStore.end() failed after local terminal status", e) }
-            state.isSubmitting = false
-            throw new Error("This order is already completed/cancelled. Session has ended.")
-        }
+            // Safety gate: never submit refill against terminal orders.
+            // We verify against the live backend status to handle stale local state after transient failures.
+            const localStatus = String(state.currentOrder?.order?.status || state.currentOrder?.status || "").toLowerCase()
+            if (terminalStatuses.has(localStatus)) {
+                try { await Promise.resolve(sessionStore.end()) } catch (e) { logger.warn("[Refill] sessionStore.end() failed after local terminal status", e) }
+                throw new Error("This order is already completed/cancelled. Session has ended.")
+            }
 
-        try {
-            const statusResp = await api.get(`/api/device-order/by-order-id/${currentOrderId}`)
-            const statusData = statusResp?.data ?? null
-            const liveOrder = statusData?.order || statusData?.data || statusData
+            try {
+                const statusResp = await api.get(`/api/device-order/by-order-id/${currentOrderId}`)
+                const statusData = statusResp?.data ?? null
+                const liveOrder = statusData?.order || statusData?.data || statusData
 
-            if (!liveOrder) {
-                state.isSubmitting = false
+                if (!liveOrder) {
+                    throw new Error("Unable to verify current order status. Please try again in a moment.")
+                }
+
+                const liveStatus = String(liveOrder?.status || "").toLowerCase()
+                state.currentOrder = { order: liveOrder }
+                if (terminalStatuses.has(liveStatus)) {
+                    try { await Promise.resolve(sessionStore.end()) } catch (e) { logger.warn("[Refill] sessionStore.end() failed after live terminal status", e) }
+                    throw new Error("This order is already completed/cancelled. Session has ended.")
+                }
+            } catch (error) {
+                if (error instanceof Error && /completed\/cancelled|Unable to verify current order status/i.test(error.message)) {
+                    throw error
+                }
                 throw new Error("Unable to verify current order status. Please try again in a moment.")
             }
 
-            const liveStatus = String(liveOrder?.status || "").toLowerCase()
-            state.currentOrder = { order: liveOrder }
-            if (terminalStatuses.has(liveStatus)) {
-                try { await Promise.resolve(sessionStore.end()) } catch (e) { logger.warn("[Refill] sessionStore.end() failed after live terminal status", e) }
-                state.isSubmitting = false
-                throw new Error("This order is already completed/cancelled. Session has ended.")
-            }
-        } catch (error) {
-            state.isSubmitting = false
-            if (error instanceof Error && /completed\/cancelled|Unable to verify current order status/i.test(error.message)) {
+            // Build payload matching POST /api/order/{orderId}/refill spec
+            // RefillOrderRequest requires: items.*.name (required), items.*.menu_id, items.*.quantity
+            const refillPayload = buildRefillPayload()
+
+            logger.debug("[Refill] Submitting refill payload", {
+                orderId: currentOrderId,
+                refillPayload,
+            })
+
+            try {
+                const idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                    ? crypto.randomUUID()
+                    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { "X-Idempotency-Key": idempotencyKey } })
+                const responseData = extractResponseData(resp)
+                if (!responseData) {
+                    handleOrderError("Refill response missing body")
+                    throw new Error("Refill response missing body")
+                }
+                state.refillItems = []
+                state.isRefillMode = false
+                state.history = [...state.history, { ...responseData, type: "refill" }]
+                logger.info("[Refill] Success")
+                return responseData
+            } catch (error: any) {
+                logger.error("[Refill] Failed:", error?.response?.data || error)
                 throw error
             }
-            throw new Error("Unable to verify current order status. Please try again in a moment.")
-        }
-
-        // Build payload matching POST /api/order/{orderId}/refill spec
-        // RefillOrderRequest requires: items.*.name (required), items.*.menu_id, items.*.quantity
-        const refillPayload = buildRefillPayload()
-
-        logger.debug("[Refill] Submitting refill payload", {
-            orderId: currentOrderId,
-            refillPayload,
-        })
-
-        try {
-            const idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                ? crypto.randomUUID()
-                : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-            const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { "X-Idempotency-Key": idempotencyKey } })
-            const responseData = extractResponseData(resp)
-            if (!responseData) {
-                handleOrderError("Refill response missing body")
-                throw new Error("Refill response missing body")
-            }
-            state.refillItems = []
-            state.isRefillMode = false
-            state.history = [...state.history, { ...responseData, type: "refill" }]
-            logger.info("[Refill] Success")
-            return responseData
-        } catch (error: any) {
-            logger.error("[Refill] Failed:", error?.response?.data || error)
-            throw error
         } finally {
             state.isSubmitting = false
         }
@@ -969,7 +981,22 @@ export const useOrderStore = defineStore("order", () => {
         // This handles direct URL access / reloads where local storage lost orderId,
         // but backend still has a pending/confirmed order for this tablet.
         if (!sessionStore.getOrderId()) {
+            const hasStaleTransactionalState = (
+                state.hasPlacedOrder ||
+                !!state.currentOrder ||
+                state.isRefillMode ||
+                !!state.package ||
+                state.guestCount !== 2 ||
+                state.cartItems.length > 0 ||
+                state.refillItems.length > 0 ||
+                state.submittedItems.length > 0
+            )
+
             if (!deviceStore.getToken()) {
+                if (hasStaleTransactionalState) {
+                    logger.info("🔁 No token + no session.orderId: clearing stale transactional order state")
+                    resetTransactionalState()
+                }
                 logger.debug("🔁 Skipping active-order lookup until device token is available")
                 return
             }
@@ -1025,17 +1052,14 @@ export const useOrderStore = defineStore("order", () => {
             }
 
             // If still no orderId, reset stale hasPlacedOrder flag after a short grace
-            if (state.hasPlacedOrder || state.currentOrder || state.isRefillMode) {
+            if (hasStaleTransactionalState) {
                 logger.info("🔁 No session.orderId found, resetting stale order state (with grace)")
                 // Apply a short grace period to avoid clearing during quick transitions
                 await new Promise(resolve => setTimeout(resolve, 1500))
                 // Re-check the session store in case orderId was set during grace
                 const refreshed = useSessionStore()
                 if (!refreshed.getOrderId()) {
-                    state.hasPlacedOrder = false
-                    state.currentOrder = null
-                    state.isRefillMode = false
-                    state.submittedItems = []
+                    resetTransactionalState()
                 } else {
                     logger.debug("initializeFromSession: session.orderId appeared during grace, skipping clear")
                 }
@@ -1163,6 +1187,7 @@ export const useOrderStore = defineStore("order", () => {
         updateOrderStatus,
         completeOrder,
         clearOrder,
+        resetTransactionalState,
         clearCart,
         clearRefillItems,
         clearSubmittedItems,

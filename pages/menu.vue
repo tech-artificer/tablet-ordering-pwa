@@ -717,7 +717,7 @@ async function confirmOrder () {
             :tax-amount="orderStore.isRefillMode ? 0 : taxAmount"
             :grand-total="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal"
             :place-order-error="placeOrderError"
-            :is-submitting="orderStore.isSubmitting"
+            :is-submitting="isSubmitting || orderStore.isSubmitting"
             :is-refill-mode="orderStore.isRefillMode"
             :is-counting-down="isCountingDown"
             :countdown="countdown"

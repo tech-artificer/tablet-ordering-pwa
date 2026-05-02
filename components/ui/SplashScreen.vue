@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const logoSrc = new URL('../../assets/images/logo/woosoo-icon-color.png', import.meta.url).href
+const logoSrc = new URL("../../assets/images/logo/woosoo-icon-color.png", import.meta.url).href
 
 defineProps<{
   visible: boolean
@@ -9,47 +9,54 @@ const dots = [0, 1, 2]
 </script>
 
 <template>
-  <Transition name="splash-fade" appear>
-    <div
-      v-if="visible"
-      class="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-[#0F0F0F]"
-      aria-live="polite"
-      aria-label="Loading Wooserve"
-    >
-      <div class="absolute inset-0 splash-grid"></div>
-      <div class="absolute inset-0 splash-noise opacity-30"></div>
-      <div class="absolute -left-20 top-[-10%] h-72 w-72 rounded-full bg-[#F6B56D]/10 blur-3xl"></div>
-      <div class="absolute -right-24 bottom-[-12%] h-96 w-96 rounded-full bg-[#F6B56D]/12 blur-3xl"></div>
+    <Transition name="splash-fade" appear>
+        <div
+            v-if="visible"
+            class="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-[#0F0F0F]"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading Wooserve"
+        >
+            <div class="absolute inset-0 splash-grid" />
+            <div class="absolute inset-0 splash-noise opacity-30" />
+            <div class="absolute -left-20 top-[-10%] h-72 w-72 rounded-full bg-[#F6B56D]/10 blur-3xl" />
+            <div class="absolute -right-24 bottom-[-12%] h-96 w-96 rounded-full bg-[#F6B56D]/12 blur-3xl" />
 
-      <div class="relative flex flex-col items-center gap-6 px-6 text-center">
-        <div class="relative flex h-36 w-36 items-center justify-center">
-          <div class="absolute inset-0 rounded-full border border-[#F6B56D]/20"></div>
-          <div class="absolute inset-3 rounded-full border border-[#F6B56D]/10 splash-orbit"></div>
-          <div class="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(246,181,109,0.22)_0%,rgba(246,181,109,0)_68%)] splash-pulse"></div>
-          <img
-            :src="logoSrc"
-            alt="Wooserve"
-            class="relative h-24 w-24 object-contain drop-shadow-[0_0_32px_rgba(246,181,109,0.25)]"
-          />
-        </div>
+            <div class="relative flex flex-col items-center gap-6 px-6 text-center">
+                <div class="relative flex h-36 w-36 items-center justify-center">
+                    <div class="absolute inset-0 rounded-full border border-[#F6B56D]/20" />
+                    <div class="absolute inset-3 rounded-full border border-[#F6B56D]/10 splash-orbit" />
+                    <div class="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(246,181,109,0.22)_0%,rgba(246,181,109,0)_68%)] splash-pulse" />
+                    <img
+                        :src="logoSrc"
+                        alt="Wooserve"
+                        class="relative h-24 w-24 object-contain drop-shadow-[0_0_32px_rgba(246,181,109,0.25)]"
+                    >
+                </div>
 
-        <div class="space-y-2">
-          <p class="text-xs font-semibold uppercase tracking-[0.45em] text-[#F6B56D]/75">Wooserve</p>
-          <h1 class="font-raleway text-4xl font-extrabold tracking-[0.08em] text-white">Welcome to the Grill</h1>
-          <p class="font-kanit text-base tracking-[0.2em] text-white/55 uppercase">Korean BBQ Ordering</p>
-        </div>
+                <div class="space-y-2">
+                    <p class="text-xs font-semibold uppercase tracking-[0.45em] text-[#F6B56D]/75">
+                        Wooserve
+                    </p>
+                    <h1 class="font-raleway text-4xl font-extrabold tracking-[0.08em] text-white">
+                        Welcome to the Grill
+                    </h1>
+                    <p class="font-kanit text-base tracking-[0.2em] text-white/55 uppercase">
+                        Korean BBQ Ordering
+                    </p>
+                </div>
 
-        <div class="flex items-center gap-3">
-          <span
-            v-for="dot in dots"
-            :key="dot"
-            class="h-2.5 w-2.5 rounded-full bg-[#F6B56D] splash-dot"
-            :style="{ animationDelay: `${dot * 0.16}s` }"
-          ></span>
+                <div class="flex items-center gap-3">
+                    <span
+                        v-for="dot in dots"
+                        :key="dot"
+                        class="h-2.5 w-2.5 rounded-full bg-[#F6B56D] splash-dot"
+                        :style="{ animationDelay: `${dot * 0.16}s` }"
+                    />
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  </Transition>
+    </Transition>
 </template>
 
 <style scoped>

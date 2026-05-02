@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { ElMessageBox, ElNotification } from "element-plus"
 import { useDeviceStore } from "../stores/Device"
-import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "../utils/logger"
+import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 
 // @ts-ignore - Nuxt auto-imports
 definePageMeta({
