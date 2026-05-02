@@ -345,13 +345,12 @@ export const useSessionStore = defineStore("session", () => {
             const orderStore = useOrderStore()
             if (!state.isActive) {
                 orderStore.resetTransactionalState()
+                state.isActive = true
+                state.timerExpired = false
+                startTimer()
+                startSyncResyncTimer()
+                _registerVisibilitySync()
             }
-
-            state.isActive = true
-            state.timerExpired = false
-            startTimer()
-            startSyncResyncTimer()
-            _registerVisibilitySync()
 
             // Centralized lightweight flag to signal session is active for simple pages
             // Avoid direct localStorage writes from pages/components — use this store instead

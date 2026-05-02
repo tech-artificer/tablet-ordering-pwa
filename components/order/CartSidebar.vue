@@ -43,6 +43,7 @@ const hasPackage = computed(() => Boolean(
   ((orderStore.package as any)?.id)
 ))
 const hasCartItems = computed(() => Array.isArray(props.cartItems) && props.cartItems.length > 0 && props.cartItems.some((i: any) => Number(i.quantity) > 0))
+const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => i?.category === "meats" && Number(i.quantity) > 0))
 const hasGuestCount = computed(() => Number(props.guestCount) >= 2)
 const hasTableAssigned = computed(() => {
     const tableData = deviceStore.table?.value || deviceStore.table
@@ -59,7 +60,7 @@ const canSubmit = computed(() => {
     if (orderStore.isSubmitting) { return false }
     if (orderStore.hasPlacedOrder && !props.isRefillMode) { return false }
     if (props.isRefillMode) { return hasCartItems.value && hasGuestCount.value && hasTableAssigned.value }
-    return hasPackage.value && hasGuestCount.value && hasTableAssigned.value
+    return hasPackage.value && hasMeatSelection.value && hasGuestCount.value && hasTableAssigned.value
 })
 
 // Order status helpers

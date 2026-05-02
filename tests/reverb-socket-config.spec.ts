@@ -21,7 +21,7 @@ describe("resolveReverbSocketConfig", () => {
         expect(resolved.forceTLS).toBe(true)
     })
 
-    it("keeps the current browser port when Reverb is configured for default tls port 443", () => {
+    it("keeps configured tls port when Reverb is explicitly set to 443", () => {
         const resolved = resolveReverbSocketConfig(
             {
                 host: "",
@@ -36,7 +36,7 @@ describe("resolveReverbSocketConfig", () => {
         )
 
         expect(resolved.host).toBe("woosoo.local")
-        expect(resolved.port).toBe(8443)
+        expect(resolved.port).toBe(443)
         expect(resolved.forceTLS).toBe(true)
     })
 

@@ -63,7 +63,7 @@ describe("CartSidebar UI", () => {
         expect(hasRefill).toBe(true)
     })
 
-    it("keeps Place Order enabled when package exists in order store but selectedPackage prop is null", async () => {
+    it("keeps Place Order enabled when package exists in order store and at least one meat is selected", async () => {
         const order = useOrderStore()
         const device = useDeviceStore()
 
@@ -80,7 +80,7 @@ describe("CartSidebar UI", () => {
             props: {
                 selectedPackage: null,
                 guestCount: 2,
-                cartItems: [{ id: 10, name: "Beef", price: 100, quantity: 1 } as any],
+                cartItems: [{ id: 10, name: "Beef", price: 100, quantity: 1, category: "meats" } as any],
                 packageTotal: 249,
                 addOnsTotal: 0,
                 taxAmount: 0,

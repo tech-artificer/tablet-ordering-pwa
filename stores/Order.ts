@@ -1005,7 +1005,7 @@ export const useOrderStore = defineStore("order", () => {
                 const api = useApi()
                 const activeResp = await api.get(API_ENDPOINTS.DEVICE_ORDERS, {
                     params: {
-                        status: "pending,confirmed",
+                        status: "pending,confirmed,ready",
                         per_page: 1,
                     },
                 })

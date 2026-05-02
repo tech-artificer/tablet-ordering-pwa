@@ -65,7 +65,12 @@ const handleSettingsVisibilityChange = () => {
 }
 
 // Settings state
-const apiUrl = ref(config.public.apiBaseUrl || "")
+const normalizeApiOrigin = (value: string) => {
+    const trimmed = String(value || "").trim().replace(/\/+$/, "")
+    return trimmed.replace(/\/api$/i, "")
+}
+
+const apiUrl = ref(normalizeApiOrigin(String(config.public.apiBaseUrl || "")))
 const localIpAddress = ref("Loading...")
 const isVerifyingToken = ref(false)
 const isRefreshingToken = ref(false)
@@ -290,8 +295,8 @@ const saveApiUrl = async () => {
             }
         )
 
-        // Save to localStorage
-        localStorage.setItem("NUXT_PUBLIC_MAIN_API_URL", String(apiUrl.value))
+        // Save normalized origin to localStorage
+        localStorage.setItem("NUXT_PUBLIC_MAIN_API_URL", normalizeApiOrigin(String(apiUrl.value)))
 
         // ElMessage.success('API URL saved. Please restart the app.')
 
@@ -306,7 +311,7 @@ const saveApiUrl = async () => {
 
 // Reset API URL to default
 const resetApiUrl = () => {
-    apiUrl.value = config.public.apiBaseUrl || ""
+    apiUrl.value = normalizeApiOrigin(String(config.public.apiBaseUrl || ""))
     localStorage.removeItem("NUXT_PUBLIC_MAIN_API_URL")
     // ElMessage.info('API URL reset to default')
 }
@@ -314,7 +319,8 @@ const resetApiUrl = () => {
 // Test API connection
 const testConnection = async () => {
     try {
-        const response = await fetch(`${apiUrl.value}/api/health`)
+        const normalizedOrigin = normalizeApiOrigin(String(apiUrl.value))
+        const response = await fetch(`${normalizedOrigin}/api/health`)
         if (response.ok) {
             // ElMessage.success('API connection successful!')
         } else {
@@ -641,7 +647,7 @@ onMounted(async () => {
     // Load saved API URL if exists
     const savedApiUrl = localStorage.getItem("NUXT_PUBLIC_MAIN_API_URL")
     if (savedApiUrl) {
-        apiUrl.value = savedApiUrl
+        apiUrl.value = normalizeApiOrigin(savedApiUrl)
     }
 })
 </script>
@@ -943,7 +949,7 @@ onMounted(async () => {
                             <input
                                 v-model="apiUrl"
                                 type="text"
-                                placeholder="https://woosoo.local/api"
+                                placeholder="https://woosoo.local"
                                 class="flex-1 px-4 py-3 bg-white/10 rounded-lg border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-primary transition-all"
                             >
                         </div>
