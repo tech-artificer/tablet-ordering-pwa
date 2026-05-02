@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.18.0"
   },
   "scripts": {
     "dev": "npx nuxi dev --host 0.0.0.0",
@@ -14,10 +14,12 @@
     "generate": "npx nuxi generate",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "npx nuxi typecheck",
     "rebuild:esbuild": "npm rebuild esbuild || true",
     "postinstall": "nuxi prepare && npm run rebuild:esbuild",
-    "clean": "rm -rf .nuxt .output node_modules package-lock.json"
+    "clean": "rm -rf .nuxt .output node_modules package-lock.json",
+    "prepare": "husky"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -54,15 +56,23 @@
     "dotenv": "^17.4.2",
     "eslint": "^8.57.1",
     "fake-indexeddb": "^6.2.5",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.2",
+    "lint-staged": "^16.4.0",
     "playwright": "^1.40.1",
     "sharp": "^0.34.5",
     "typescript": "^5.4.0",
     "vitest": "^4.1.4"
   },
+  "lint-staged": {
+    "*.{ts,vue,js}": [
+      "eslint --fix"
+    ]
+  },
   "overrides": {
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.9"
-    }
+    },
+    "serialize-javascript": "7.0.5"
   }
 }

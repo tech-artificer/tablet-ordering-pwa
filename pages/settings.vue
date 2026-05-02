@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { ElMessageBox, ElNotification } from "element-plus"
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
+import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 
 // @ts-ignore - Nuxt auto-imports
 definePageMeta({
@@ -64,7 +65,12 @@ const handleSettingsVisibilityChange = () => {
 }
 
 // Settings state
-const apiUrl = ref(config.public.apiBaseUrl || "")
+const normalizeApiOrigin = (value: string) => {
+    const trimmed = String(value || "").trim().replace(/\/+$/, "")
+    return trimmed.replace(/\/api$/i, "")
+}
+
+const apiUrl = ref(normalizeApiOrigin(String(config.public.apiBaseUrl || "")))
 const localIpAddress = ref("Loading...")
 const isVerifyingToken = ref(false)
 const isRefreshingToken = ref(false)
@@ -122,6 +128,10 @@ onMounted(() => {
         }
     } catch (e) {
     // ignore
+    }
+    // Always show registration when device is not fully authenticated
+    if (!deviceStore.isAuthenticated) {
+        collapsed.registration = false
     }
 })
 
@@ -181,7 +191,7 @@ const getLocalIpAddress = async () => {
 }
 
 // Fullscreen helpers
-const isFullscreen = ref(false)
+const { isFullscreen, adminUnlock, adminLock } = useKioskFullscreen()
 const startInFullscreen = ref(false)
 
 // Helper to copy text to clipboard (safe for template use)
@@ -198,23 +208,16 @@ const saveFullscreenPreference = (value: boolean) => {
     }
 }
 
-const updateFullscreenState = () => {
-    isFullscreen.value = !!(typeof document !== "undefined" && (document as any).fullscreenElement)
-}
-
 const toggleFullscreen = async () => {
-    if (typeof document === "undefined") { return }
     try {
         if (!isFullscreen.value) {
-            await (document.documentElement as any).requestFullscreen()
-            isFullscreen.value = true
-            localStorage.setItem("START_FULLSCREEN", "true")
+            await adminLock(deviceStore)
             startInFullscreen.value = true
+            saveFullscreenPreference(true)
         } else {
-            if (document.exitFullscreen) { await document.exitFullscreen() }
-            isFullscreen.value = false
-            localStorage.setItem("START_FULLSCREEN", "false")
+            await adminUnlock(deviceStore)
             startInFullscreen.value = false
+            saveFullscreenPreference(false)
         }
     } catch (err) {
         logger.warn("Fullscreen toggle failed", err)
@@ -222,37 +225,27 @@ const toggleFullscreen = async () => {
 }
 
 onMounted(() => {
-    // initialize fullscreen values
-    updateFullscreenState()
     try {
         const v = localStorage.getItem("START_FULLSCREEN")
-        startInFullscreen.value = v === "true"
-        // attempt to enter fullscreen if requested — may require user gesture
-        if (startInFullscreen.value && typeof document !== "undefined" && !(document as any).fullscreenElement) {
-            // best-effort: won't always work without gesture
-            ;(document.documentElement as any).requestFullscreen().catch(() => { /* ignore */ })
-        }
+        startInFullscreen.value = v !== "false"
     } catch (e) {
     // ignore storage errors
     }
 
-    // listen to fullscreen changes
     if (typeof document !== "undefined") {
-        document.addEventListener("fullscreenchange", updateFullscreenState)
         document.addEventListener("visibilitychange", handleSettingsVisibilityChange)
     }
 })
 
 onBeforeUnmount(() => {
     if (typeof document !== "undefined") {
-        document.removeEventListener("fullscreenchange", updateFullscreenState)
         document.removeEventListener("visibilitychange", handleSettingsVisibilityChange)
     }
 })
 
 // Try to resolve device & table by local IP. Server may accept POST or GET for this helper.
 const fetchDeviceByIp = async (ip: string | null) => {
-    if (!isValidIpv4(ip)) { return false }  // guard: never send non-IP strings to the API
+    if (!isValidIpv4(ip)) { return false } // guard: never send non-IP strings to the API
     try {
         const { useApi } = await import("~/composables/useApi")
         const api = useApi()
@@ -302,8 +295,8 @@ const saveApiUrl = async () => {
             }
         )
 
-        // Save to localStorage
-        localStorage.setItem("NUXT_PUBLIC_MAIN_API_URL", String(apiUrl.value))
+        // Save normalized origin to localStorage
+        localStorage.setItem("NUXT_PUBLIC_MAIN_API_URL", normalizeApiOrigin(String(apiUrl.value)))
 
         // ElMessage.success('API URL saved. Please restart the app.')
 
@@ -318,7 +311,7 @@ const saveApiUrl = async () => {
 
 // Reset API URL to default
 const resetApiUrl = () => {
-    apiUrl.value = config.public.apiBaseUrl || ""
+    apiUrl.value = normalizeApiOrigin(String(config.public.apiBaseUrl || ""))
     localStorage.removeItem("NUXT_PUBLIC_MAIN_API_URL")
     // ElMessage.info('API URL reset to default')
 }
@@ -326,7 +319,8 @@ const resetApiUrl = () => {
 // Test API connection
 const testConnection = async () => {
     try {
-        const response = await fetch(`${apiUrl.value}/api/health`)
+        const normalizedOrigin = normalizeApiOrigin(String(apiUrl.value))
+        const response = await fetch(`${normalizedOrigin}/api/health`)
         if (response.ok) {
             // ElMessage.success('API connection successful!')
         } else {
@@ -653,7 +647,7 @@ onMounted(async () => {
     // Load saved API URL if exists
     const savedApiUrl = localStorage.getItem("NUXT_PUBLIC_MAIN_API_URL")
     if (savedApiUrl) {
-        apiUrl.value = savedApiUrl
+        apiUrl.value = normalizeApiOrigin(savedApiUrl)
     }
 })
 </script>
@@ -681,33 +675,20 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <!-- Device Registration (topmost, collapsible) -->
+            <!-- Device Registration (always visible) -->
             <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
-                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2 justify-between">
+                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
                     <div class="flex items-center gap-2">
                         <span>🛠️</span>
                         <span>Device Registration</span>
                     </div>
-                    <button class="text-sm text-white/60" aria-label="Toggle Registration" @click.prevent="toggle('registration')">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-4 h-4 transition-transform duration-150"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            :style="{ transform: collapsed.registration ? 'rotate(0deg)' : 'rotate(90deg)' }"
-                        >
-                            <path fill-rule="evenodd" d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
                 </h2>
 
-                <div v-show="!collapsed.registration" class="space-y-4">
-                    <div v-if="!deviceStore.isAuthenticated">
-                        <AuthDeviceRegistration inline />
-                    </div>
-                    <div v-else class="p-4 bg-white/5 rounded-lg border border-white/10">
+                <div class="space-y-4">
+                    <DeviceRegistration inline />
+                    <div v-if="deviceStore.isAuthenticated" class="p-4 bg-white/5 rounded-lg border border-white/10">
                         <p class="text-sm text-white/60">
-                            Device is already registered — see Device Information below.
+                            Already registered? You can still use <span class="text-white">Re-register</span> above if this tablet needs a new setup code.
                         </p>
                     </div>
                 </div>
@@ -968,7 +949,7 @@ onMounted(async () => {
                             <input
                                 v-model="apiUrl"
                                 type="text"
-                                placeholder="http://192.168.100.85:8000"
+                                placeholder="https://woosoo.local"
                                 class="flex-1 px-4 py-3 bg-white/10 rounded-lg border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-primary transition-all"
                             >
                         </div>
@@ -1038,13 +1019,13 @@ onMounted(async () => {
 
                     <div class="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
                         <div>
-                            <label class="text-sm text-white/50 block mb-1">Start in Fullscreen</label>
+                            <label class="text-sm text-white/50 block mb-1">Kiosk Fullscreen Policy</label>
                             <p class="text-xs text-white/60">
-                                When enabled, the app will attempt to enter fullscreen on load (may require user permission).
+                                This tablet enforces fullscreen mode. Admin unlock allows temporary exit for maintenance.
                             </p>
                         </div>
-                        <div>
-                            <input id="startFullscreen" v-model="startInFullscreen" type="checkbox" class="w-5 h-5" @change="saveFullscreenPreference(startInFullscreen)">
+                        <div class="text-xs px-3 py-1 rounded-full border border-white/20 text-white/70">
+                            {{ startInFullscreen ? 'Enforced' : 'Temporarily Unlocked' }}
                         </div>
                     </div>
                 </div>

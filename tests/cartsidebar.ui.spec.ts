@@ -62,4 +62,36 @@ describe("CartSidebar UI", () => {
         const hasRefill = buttons.some(b => b.text().toLowerCase().includes("refill"))
         expect(hasRefill).toBe(true)
     })
+
+    it("keeps Place Order enabled when package exists in order store and at least one meat is selected", async () => {
+        const order = useOrderStore()
+        const device = useDeviceStore()
+
+        order.setPackage({ id: 5, name: "Store Package", price: 249 } as any)
+        order.setHasPlacedOrder(false)
+        order.setIsRefillMode(false)
+        device.setTable({ id: 1, name: "T1", status: "active", is_available: true, is_locked: false } as any)
+
+        const wrapper = mount(CartSidebar, {
+            global: {
+                plugins: [pinia],
+                stubs: globalStubs
+            },
+            props: {
+                selectedPackage: null,
+                guestCount: 2,
+                cartItems: [{ id: 10, name: "Beef", price: 100, quantity: 1, category: "meats" } as any],
+                packageTotal: 249,
+                addOnsTotal: 0,
+                taxAmount: 0,
+                grandTotal: 249,
+                isRefillMode: false,
+                hasPlacedOrder: false
+            }
+        })
+
+        const placeOrderButton = wrapper.findAll("button").find(b => b.text().toLowerCase().includes("place order"))
+        expect(placeOrderButton).toBeTruthy()
+        expect(placeOrderButton!.attributes("disabled")).toBeUndefined()
+    })
 })

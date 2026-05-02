@@ -188,7 +188,42 @@ export const useSessionStore = defineStore("session", () => {
                 const serverEndAt = sessionStart + durationMs
                 // Correct for client/server clock skew
                 const localOffset = Date.now() - serverNow
-                state.sessionEndsAt = serverEndAt + localOffset
+                const newSessionEndsAt = serverEndAt + localOffset
+
+                // Guard 1: session-start identity check.
+                // If the server returned a session that started BEFORE the one we know about
+                // locally (minus 5 s for rounding), it's data from a previous customer's session.
+                // Applying it would set sessionEndsAt to the past and trigger expireSession()
+                // even though the current session is still active. Skip to protect order state.
+                if (state.sessionStartedAt !== null && sessionStart < state.sessionStartedAt - 5_000) {
+                    logger.warn("[Session] syncFromServer: server returned an older session — skipping update to protect active order", {
+                        serverSessionStart: new Date(sessionStart).toISOString(),
+                        localSessionStart: new Date(state.sessionStartedAt).toISOString(),
+                    })
+                    return
+                }
+
+                // Guard 2: imminent-expiry check (original RC-3 fix).
+                // If the computed expiry is within 30 s but the server's own elapsed time is
+                // more than 30 s short of the session duration, the response is from a stale
+                // session whose start time happens to be close to ours. Skip to avoid premature expiry.
+                const clientNow = Date.now()
+                if (newSessionEndsAt < clientNow + 30_000) {
+                    const serverElapsedMs = serverNow - sessionStart
+                    if (serverElapsedMs < Math.max(0, durationMs - 30_000)) {
+                        logger.warn("[Session] syncFromServer: would cause premature expiry — stale session data returned, skipping sessionEndsAt update", {
+                            serverNow: new Date(serverNow).toISOString(),
+                            sessionStart: new Date(sessionStart).toISOString(),
+                            newSessionEndsAt: new Date(newSessionEndsAt).toISOString(),
+                            sessionEndsAt: state.sessionEndsAt ? new Date(state.sessionEndsAt).toISOString() : null,
+                            serverElapsedMs: Math.round(serverElapsedMs / 1000) + "s",
+                            durationMs: Math.round(durationMs / 1000) + "s",
+                        })
+                        return
+                    }
+                }
+
+                state.sessionEndsAt = newSessionEndsAt
                 logger.debug("[Session] syncFromServer: sessionEndsAt recalibrated", {
                     serverNow: new Date(serverNow).toISOString(),
                     sessionStart: new Date(sessionStart).toISOString(),
@@ -303,22 +338,19 @@ export const useSessionStore = defineStore("session", () => {
                 logger.warn("[SessionStore] preload menus failed:", e)
             }
 
-            // Reset order store to fresh state for new dining session
+            // Reset order store to fresh state — only when truly starting a new session.
+            // If the session is already active (e.g. called again from packageSelection as an
+            // auth-guard), skip the reset so the guest count and package the user already
+            // set are not wiped out.
             const orderStore = useOrderStore()
-            orderStore.setGuestCount(2) // Default guest count
-            orderStore.clearCart()
-            orderStore.clearRefillItems()
-            orderStore.clearSubmittedItems()
-            orderStore.clearPackage()
-            orderStore.clearCurrentOrder()
-            orderStore.setHasPlacedOrder(false)
-            orderStore.setIsRefillMode(false)
-
-            state.isActive = true
-            state.timerExpired = false
-            startTimer()
-            startSyncResyncTimer()
-            _registerVisibilitySync()
+            if (!state.isActive) {
+                orderStore.resetTransactionalState()
+                state.isActive = true
+                state.timerExpired = false
+                startTimer()
+                startSyncResyncTimer()
+                _registerVisibilitySync()
+            }
 
             // Centralized lightweight flag to signal session is active for simple pages
             // Avoid direct localStorage writes from pages/components — use this store instead
@@ -370,14 +402,7 @@ export const useSessionStore = defineStore("session", () => {
         // Stop any active polling first
         try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[SessionStore] stopOrderPolling failed", e) }
 
-        orderStore.setGuestCount(2)
-        orderStore.clearCart()
-        orderStore.clearRefillItems()
-        orderStore.clearSubmittedItems()
-        orderStore.clearPackage()
-        orderStore.clearCurrentOrder()
-        orderStore.setHasPlacedOrder(false)
-        orderStore.setIsRefillMode(false)
+        orderStore.resetTransactionalState()
         // Note: orderStore.history is KEPT for historical tracking
 
         logger.info(`[Session] State cleared at ${timestamp}`)
@@ -400,7 +425,9 @@ export const useSessionStore = defineStore("session", () => {
                     currentOrder: null,
                     submittedItems: [],
                     isRefillMode: false,
-                    history: orderStore.getHistory() // Keep history
+                    history: orderStore.getHistory(), // Keep history
+                    cartItems: [],
+                    refillItems: [],
                 }))
 
                 logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
@@ -455,15 +482,7 @@ export const useSessionStore = defineStore("session", () => {
             // Stop any active polling first
             try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[SessionStore] stopOrderPolling failed", e) }
 
-            orderStore.setGuestCount(2)
-            orderStore.clearCart()
-            orderStore.clearRefillItems()
-            orderStore.clearSubmittedItems()
-            orderStore.clearPackage()
-            orderStore.clearCurrentOrder()
-            orderStore.setHasPlacedOrder(false)
-            orderStore.setIsRefillMode(false)
-            orderStore.clearHistory()
+            orderStore.resetTransactionalState({ clearHistory: true })
 
             // Force persist to localStorage immediately
             if (typeof window !== "undefined" && window.localStorage) {
@@ -482,7 +501,9 @@ export const useSessionStore = defineStore("session", () => {
                         currentOrder: null,
                         submittedItems: [],
                         isRefillMode: false,
-                        history: []
+                        history: [],
+                        cartItems: [],
+                        refillItems: [],
                     }))
 
                     logger.debug("✅ Session and order stores fully reset and persisted")

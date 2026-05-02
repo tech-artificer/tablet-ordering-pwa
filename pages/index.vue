@@ -220,6 +220,7 @@
 
 <script setup lang="ts">
 import { Settings, UtensilsCrossed } from "lucide-vue-next"
+import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
@@ -264,6 +265,24 @@ const DEFAULT_PIN = "0711"
 onMounted(async () => {
     const recovery = await recoverActiveOrderState("index")
     if (recovery.hasActiveOrder) {
+        let canResumeActiveOrder = unref(deviceStore.isAuthenticated)
+
+        if (!canResumeActiveOrder) {
+            try {
+                const hasToken = Boolean(deviceStore.token)
+                canResumeActiveOrder = hasToken
+                    ? await deviceStore.refresh()
+                    : await deviceStore.authenticate()
+            } catch (error) {
+                canResumeActiveOrder = false
+            }
+        }
+
+        if (!canResumeActiveOrder || !unref(deviceStore.isAuthenticated)) {
+            console.warn("[⚠️ Resume Blocked] Active order found but device is not authenticated; staying on welcome page")
+            return
+        }
+
         await router.replace({
             path: "/menu",
             query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
@@ -285,7 +304,7 @@ const start = () => {
     const timestamp = new Date().toISOString()
     console.log(`[🎬 Session START] Welcome screen → Start button clicked at ${timestamp}`)
 
-    if (!deviceStore.isAuthenticated) {
+    if (!unref(deviceStore.isAuthenticated)) {
         console.log(`[⚠️ Device Auth Failed] Prompting PIN for Settings at ${timestamp}`)
         openSettings()
         return

@@ -112,12 +112,20 @@ describe("order polling fallback", () => {
 
         // Simulate cold boot: no token yet and no active session id restored.
         session.setOrderId(null)
+        order.setGuestCount(6)
+        order.setPackage({ id: 99, name: "Stale Package", price: 100 } as Package)
+        order.setCartItems([{ id: 88, name: "Stale Item", price: 12, quantity: 2 } as CartItem])
+        order.setHasPlacedOrder(true)
+        order.setCurrentOrder({ order: { id: 1234, status: "pending" } } as any)
 
         await order.initializeFromSession()
 
         expect(mockGet).not.toHaveBeenCalled()
         expect(order.hasPlacedOrder).toBe(false)
         expect(order.getCurrentOrder()).toBeNull()
+        expect(order.getCartItems()).toEqual([])
+        expect(order.guestCount).toBe(2)
+        expect(order.package).toBeNull()
     })
 
     it("does not crash when polling receives an empty response body", async () => {

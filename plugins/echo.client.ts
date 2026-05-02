@@ -132,8 +132,14 @@ function createEcho (
     // @ts-ignore
     window.$echo = echo
 
-    // Provide via Nuxt injection
-    nuxtApp.provide("echo", echo)
+    // Provide via Nuxt injection — only once.
+    // nuxtApp.provide uses Object.defineProperty with configurable:false;
+    // calling it a second time (e.g. when initEcho is triggered after token
+    // refresh) throws "TypeError: Cannot redefine property: $echo" and
+    // crashes the entire app, producing a black screen.
+    if (!Object.getOwnPropertyDescriptor(nuxtApp, "$echo")) {
+        nuxtApp.provide("echo", echo)
+    }
 
     // Monitor connection state
     if (echo && (echo as any).connector) {
@@ -187,26 +193,34 @@ export default defineNuxtPlugin((nuxtApp: any) => {
 
         // If Echo is already initialized elsewhere, reuse it
         if (typeof window !== "undefined" && (window as any).Echo) {
-            // @ts-ignore
-            (window as any).$echo = (window as any).Echo
-            nuxtApp.provide("echo", (window as any).Echo)
+            if (!(window as any).$echo) {
+                // @ts-ignore
+                (window as any).$echo = (window as any).Echo
+            }
+            if (!Object.getOwnPropertyDescriptor(nuxtApp, "$echo")) {
+                nuxtApp.provide("echo", (window as any).Echo)
+            }
             // Still register initEcho for future config changes
-            ;(window as any).initEcho = (cfg: any, tok: string | null) => {
-                createEcho(nuxtApp, cfg, String(mainApi), tok)
+            if (typeof (window as any).initEcho !== "function") {
+                ;(window as any).initEcho = (cfg: any, tok: string | null) => {
+                    createEcho(nuxtApp, cfg, String(mainApi), tok)
+                }
             }
             return
         }
 
         // Expose initEcho globally — called by Device store after auth when
         // server provides broadcasting config
-        ;(window as any).initEcho = (cfg: any, tok: string | null) => {
-            const normalized = normalizeBroadcastConfig(cfg)
-            if (!normalized) {
-                logger.warn("[Echo] Ignoring incomplete initEcho payload")
-                return null
-            }
+        if (typeof (window as any).initEcho !== "function") {
+            ;(window as any).initEcho = (cfg: any, tok: string | null) => {
+                const normalized = normalizeBroadcastConfig(cfg)
+                if (!normalized) {
+                    logger.warn("[Echo] Ignoring incomplete initEcho payload")
+                    return null
+                }
 
-            return createEcho(nuxtApp, normalized, String(mainApi), tok)
+                return createEcho(nuxtApp, normalized, String(mainApi), tok)
+            }
         }
 
         // Determine initial config source:

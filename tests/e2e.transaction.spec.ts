@@ -228,6 +228,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             order.setIsRefillMode(true)
             order.setRefillItems([{ ...REFILL_ITEM_1 }, { ...REFILL_ITEM_2 }] as CartItem[])
 
+            mockGet.mockResolvedValueOnce({ data: { order: { ...API_ORDER_RESP.order, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: { success: true } })
 
             await order.submitRefill()
@@ -258,6 +259,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             order.setIsRefillMode(true)
             order.setRefillItems([{ id: 30, name: "Sliced Beef", price: 0, quantity: 1, category: "meats", note: "No sauce" }] as CartItem[])
 
+            mockGet.mockResolvedValueOnce({ data: { order: { ...API_ORDER_RESP.order, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: { success: true } })
 
             await order.submitRefill()
@@ -272,6 +274,50 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             order.clearCurrentOrder()
 
             await expect(order.submitRefill()).rejects.toThrow("No existing order found")
+        })
+
+        it("blocks refill when local order is already terminal and ends session", async () => {
+            const order = useOrderStore()
+            const session = useSessionStore()
+            seedDevice()
+
+            session.setIsActive(true)
+            session.setOrderId(19561)
+            order.setHasPlacedOrder(true)
+            order.setCurrentOrder({ order: { ...API_ORDER_RESP.order, status: "completed" } } as any)
+            order.setIsRefillMode(true)
+            order.setRefillItems([{ ...REFILL_ITEM_1 }] as CartItem[])
+
+            await expect(order.submitRefill()).rejects.toThrow("already completed/cancelled")
+
+            expect(mockGet).not.toHaveBeenCalled()
+            expect(mockPost).not.toHaveBeenCalled()
+            expect(session.isActive).toBe(false)
+            expect(order.hasPlacedOrder).toBe(false)
+        })
+
+        it("blocks refill when live order status is terminal and ends session", async () => {
+            const order = useOrderStore()
+            const session = useSessionStore()
+            seedDevice()
+
+            session.setIsActive(true)
+            session.setOrderId(19561)
+            order.setHasPlacedOrder(true)
+            order.setCurrentOrder({ order: { ...API_ORDER_RESP.order, status: "preparing" } } as any)
+            order.setIsRefillMode(true)
+            order.setRefillItems([{ ...REFILL_ITEM_1 }] as CartItem[])
+
+            mockGet.mockResolvedValueOnce({
+                data: { order: { ...API_ORDER_RESP.order, status: "completed" } },
+            })
+
+            await expect(order.submitRefill()).rejects.toThrow("already completed/cancelled")
+
+            expect(mockGet).toHaveBeenCalledWith(`/api/device-order/by-order-id/${API_ORDER_RESP.order.order_id}`)
+            expect(mockPost).not.toHaveBeenCalled()
+            expect(session.isActive).toBe(false)
+            expect(order.hasPlacedOrder).toBe(false)
         })
     })
 
@@ -357,6 +403,19 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             seedOrderState(order)
 
             await expect(order.submitOrder()).rejects.toThrow("Device not authenticated")
+        })
+
+        it("resets isSubmitting after pre-flight validation failure", async () => {
+            const order = useOrderStore()
+            const ds = useDeviceStore()
+
+            // Missing token forces a pre-flight throw path.
+            ds.setToken(null)
+            ds.setTable({ id: 1, name: "T1", status: "unknown", is_available: false, is_locked: false })
+            seedOrderState(order)
+
+            await expect(order.submitOrder()).rejects.toThrow("Device not authenticated")
+            expect(order.isSubmitting).toBe(false)
         })
 
         it("throws if table is not assigned", async () => {
