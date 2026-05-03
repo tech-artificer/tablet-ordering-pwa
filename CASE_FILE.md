@@ -244,6 +244,53 @@ After redeploying the tablet image:
 - `npx vitest run tests/session-end.spec.ts tests/useGuestReset.spec.ts tests/order.submit.spec.ts` → **5/5 passed**
 - `npx tsc --noEmit` → completed with no output (no type errors)
 
+---
+
+## Addendum — May 3, 2026 (Guest count mismatch from guest counter to menu)
+
+### Reported symptom
+
+- Guest count selected on `order/start` (guest counter screen) did not carry correctly into the menu/cart summary after welcome flow.
+
+### Root cause
+
+- `sessionStore.start()` always reset transactional order state on first successful start (`orderStore.resetTransactionalState()`), which resets `guestCount` to `2`.
+- In the package-selection path, this could run before entering `/menu` when the earlier welcome-start attempt did not establish an active session (for example, start race/failure/retry path).
+- Result: user-selected guest count was overwritten to default even though package selection continued normally.
+
+### Fix implemented
+
+- Added optional `preserveSelection` start mode in `stores/Session.ts`:
+  - `start(options?: { preserveSelection?: boolean })`
+  - On fresh session start, store now preserves preselected `guestCount` and `package` only when `preserveSelection` is explicitly requested.
+- Updated package flow in `pages/order/packageSelection.vue`:
+  - `sessionStore.start({ preserveSelection: true })`
+- Kept default behavior unchanged for welcome-start and other callers:
+  - `sessionStore.start()` still resets transactional order state by default.
+
+### Mermaid — Failure and corrected path
+
+```mermaid
+flowchart TD
+  A[Welcome screen] --> B[Guest counter sets guestCount]
+  B --> C[Package selection]
+  C --> D[session.start on first active session]
+  D -->|old behavior| E[resetTransactionalState guestCount=2]
+  E --> F[Menu shows wrong guest count]
+
+  D -->|new preserveSelection mode| G[Reset + restore guestCount/package]
+  G --> H[Menu reflects selected guest count]
+```
+
+### Verification
+
+- Added regression test: `tests/session.start.spec.ts`
+  - `preserves selected guestCount and package when starting session from package selection`
+  - `resets guestCount and package by default when starting a fresh session`
+- Validation runs:
+  - `npx vitest run tests/session.start.spec.ts` → **2 passed**
+  - `npx tsc --noEmit` → **no errors**
+
 ### Retain vs clear contract (session boundary)
 
 **Retain on welcome/new session:**

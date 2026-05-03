@@ -72,7 +72,7 @@ const handlePackageSelection = async (packageData: Package) => {
     // Start session if not already active and ensure token/menu ready
     try {
         console.log(`[🔄 Session Start Attempt] Starting session before navigating to menu at ${timestamp}`)
-        const started = await sessionStore.start()
+        const started = await sessionStore.start({ preserveSelection: true })
         if (!started) {
             console.log(`[⚠️ Session Start Failed] But proceeding with device credentials check at ${timestamp}`)
             logger.warn("Session start failed — device may require registration")
