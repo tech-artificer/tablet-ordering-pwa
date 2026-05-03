@@ -1,5 +1,5 @@
 import { defineStore } from "pinia"
-import { reactive, toRefs } from "vue"
+import { reactive, toRefs, unref } from "vue"
 import { useApi } from "../composables/useApi"
 import { logger } from "../utils/logger"
 import { useOrderStore } from "./Order"
@@ -272,7 +272,7 @@ export const useSessionStore = defineStore("session", () => {
         }
     }
 
-    async function start (): Promise<boolean> {
+    async function start (options?: { preserveSelection?: boolean }): Promise<boolean> {
     // BUG-13 Fix: Serialize session operations to prevent race conditions
         return sessionMutex.runExclusive(async () => {
             const timestamp = new Date().toISOString()
@@ -344,7 +344,19 @@ export const useSessionStore = defineStore("session", () => {
             // set are not wiped out.
             const orderStore = useOrderStore()
             if (!state.isActive) {
+                const preserveSelection = Boolean(options?.preserveSelection)
+                const preservedGuestCount = Number(orderStore.guestCount || 2)
+                const preservedPackage = unref(orderStore.package)
+
                 orderStore.resetTransactionalState()
+
+                if (preserveSelection) {
+                    orderStore.setGuestCount(preservedGuestCount)
+                    if (preservedPackage) {
+                        orderStore.setPackage(preservedPackage)
+                    }
+                }
+
                 state.isActive = true
                 state.timerExpired = false
                 startTimer()
