@@ -9,6 +9,7 @@ import { useDeviceStore } from "../stores/Device"
 const mockGet = vi.fn()
 const mockPost = vi.fn()
 const mockLoadAllMenus = vi.fn()
+let mockPackages: any[] = []
 
 vi.mock("../composables/useApi", () => ({
     useApi: () => ({
@@ -20,6 +21,7 @@ vi.mock("../composables/useApi", () => ({
 vi.mock("../stores/Menu", () => ({
     useMenuStore: () => ({
         loadAllMenus: mockLoadAllMenus,
+        get packages () { return mockPackages },
     }),
 }))
 
@@ -29,6 +31,7 @@ describe("session start flow", () => {
         mockGet.mockReset()
         mockPost.mockReset()
         mockLoadAllMenus.mockReset()
+        mockPackages = []
 
         mockGet.mockResolvedValue({ data: null })
         mockPost.mockResolvedValue({ data: {} })
@@ -43,15 +46,20 @@ describe("session start flow", () => {
         device.setToken("test-device-token")
         ;(device as any).expiration = Date.now() + 60 * 60 * 1000
 
-        order.setGuestCount(6)
-        order.setPackage({
+        const pkg = {
             id: 101,
             name: "Premium Grill",
             price: 799,
             modifiers: [],
             is_taxable: false,
             tax: { percentage: 0 },
-        } as any)
+        } as any
+
+        // Ensure the package is present in the refreshed menu store data
+        mockPackages.push(pkg)
+
+        order.setGuestCount(6)
+        order.setPackage(pkg)
 
         const started = await session.start({ preserveSelection: true })
 
@@ -83,5 +91,26 @@ describe("session start flow", () => {
         expect(started).toBe(true)
         expect(order.guestCount).toBe(2)
         expect(order.package).toBeNull()
+    })
+
+    it("clears transactional state (cart items) even when preserveSelection is true", async () => {
+        const session = useSessionStore()
+        const order = useOrderStore()
+        const device = useDeviceStore()
+
+        device.setToken("test-device-token")
+        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+
+        // Seed transactional cart state that must be cleared on session start
+        order.setCartItems([{ id: 1, name: "Pre-existing Item", quantity: 2 } as any])
+        order.setGuestCount(4)
+
+        const started = await session.start({ preserveSelection: true })
+
+        expect(started).toBe(true)
+        // Guest count is preserved by preserveSelection
+        expect(order.guestCount).toBe(4)
+        // Cart items are transactional state and must be cleared regardless of preserveSelection
+        expect(order.getCartItems()).toHaveLength(0)
     })
 })

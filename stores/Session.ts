@@ -346,14 +346,19 @@ export const useSessionStore = defineStore("session", () => {
             if (!state.isActive) {
                 const preserveSelection = Boolean(options?.preserveSelection)
                 const preservedGuestCount = Number(orderStore.guestCount || 2)
-                const preservedPackage = unref(orderStore.package)
+                // Save only the id so we can re-resolve the package from the freshly loaded
+                // menu data after the reset — avoids restoring a stale price/tax/modifier snapshot.
+                const preservedPackageId = unref(orderStore.package)?.id ?? null
 
                 orderStore.resetTransactionalState()
 
                 if (preserveSelection) {
                     orderStore.setGuestCount(preservedGuestCount)
-                    if (preservedPackage) {
-                        orderStore.setPackage(preservedPackage)
+                    if (preservedPackageId !== null) {
+                        const freshPackage = menuStore.packages.find(p => p.id === preservedPackageId) ?? null
+                        if (freshPackage) {
+                            orderStore.setPackage(freshPackage)
+                        }
                     }
                 }
 
