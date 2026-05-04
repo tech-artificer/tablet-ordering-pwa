@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, ref, unref, watch } from "vue"
 import { useOrderStore } from "~/stores/Order"
 import { logger } from "~/utils/logger"
 
@@ -10,14 +10,14 @@ const emit = defineEmits<{
 const orderStore = useOrderStore()
 const submitError = ref<string | null>(null)
 
-const activeCart = computed(() => orderStore.activeCart || [])
+const activeCart = computed<any[]>(() => (unref(orderStore.activeCart) as any[]) || [])
 
 // When the order is already placed (Continue to Session), activeCart is empty
 // because setOrderCreated() clears cartItems. Use submittedItems for display
 // so the breakdown reflects what was actually ordered.
 const displayItems = computed<any[]>(() =>
     orderStore.hasPlacedOrder && !orderStore.isRefillMode
-        ? (orderStore.submittedItems as any[])
+        ? (unref(orderStore.submittedItems) as any[])
         : activeCart.value
 )
 
