@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ArrowLeft } from "lucide-vue-next"
 import confetti from "canvas-confetti"
 import { useSessionStore } from "../../stores/Session"
 import { logger } from "~/utils/logger"
 
+definePageMeta({ middleware: ["order-guard"] })
+
 const router = useRouter()
+const sessionStore = useSessionStore()
 
 const triggerCelebration = () => {
     const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
@@ -23,24 +25,21 @@ const handleOrderSubmitted = async () => {
 
     triggerCelebration()
 
-    try {
-        const sessionStore = useSessionStore()
-        logger.info("[Order Review] Marking session active", { timestamp })
-        await sessionStore.start()
-        logger.info("[Session Flow] Order submitted, session active, ready for refill or completion")
-    } catch (e) {
-        logger.error("[Order Review] Failed to start session store", {
-            timestamp,
-            error: (e as any)?.message,
-        })
+    if (!sessionStore.isActive) {
+        try {
+            logger.info("[Order Review] Marking session active", { timestamp })
+            await sessionStore.start()
+            logger.info("[Session Flow] Order submitted, session active, ready for refill or completion")
+        } catch (e) {
+            logger.error("[Order Review] Failed to start session store", {
+                timestamp,
+                error: (e as any)?.message,
+            })
+        }
     }
 
     logger.info("[Order Review] Navigating to in-session screen", { timestamp })
     router.replace("/order/in-session")
-}
-
-const goBack = () => {
-    router.push("/menu")
 }
 </script>
 

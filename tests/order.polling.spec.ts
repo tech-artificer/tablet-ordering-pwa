@@ -54,17 +54,19 @@ describe("order polling fallback", () => {
     it("starts polling after setOrderCreated and stops when order becomes completed", async () => {
         const order = useOrderStore()
 
-        // Arrange: first tick remains non-terminal, second tick transitions terminal
+        // Arrange: first tick remains live (confirmed), second tick transitions to terminal
+        // Note: "preparing", "ready", "completed", "voided", "cancelled" are all terminal
+        // per the POS Payment Sync spec. Only "pending" and "confirmed" are live.
         mockGet
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "preparing" } } })
+            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "confirmed" } } })
             .mockResolvedValueOnce({ data: { order: { id: 19561, status: "completed" } } })
 
         // Act: simulate order creation response
         await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561" } })
 
-        // After the await, the immediate tick has already run (preparing) — polling still active
+        // After the await, the immediate tick has already run (confirmed) — polling still active
         expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBe("preparing")
+        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
 
         // Advance past the 5 s interval to fire the second tick (completed)
         vi.advanceTimersByTime(6000)
@@ -131,8 +133,10 @@ describe("order polling fallback", () => {
     it("does not crash when polling receives an empty response body", async () => {
         const order = useOrderStore()
 
+        // Use "confirmed" (live status) for first tick so polling continues;
+        // "preparing" is now terminal per POS Payment Sync spec.
         mockGet
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "preparing" } } })
+            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "confirmed" } } })
             .mockResolvedValueOnce(undefined as any)
 
         await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561" } })
@@ -144,6 +148,6 @@ describe("order polling fallback", () => {
         await Promise.resolve()
 
         expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBe("preparing")
+        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
     })
 })

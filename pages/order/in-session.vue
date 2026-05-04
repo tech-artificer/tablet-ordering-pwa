@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, unref, watch } from "vue"
-import { Bell, ChevronRight, Clock, ShoppingBag, Users, UtensilsCrossed } from "lucide-vue-next"
+import { Bell, Clock, ShoppingBag, Users, UtensilsCrossed } from "lucide-vue-next"
 import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
@@ -9,16 +9,12 @@ import { useApi } from "~/composables/useApi"
 import { useIdleDetector } from "~/composables/useIdleDetector"
 import { logger } from "~/utils/logger"
 
-// ────────────────────────────────────────────────────────────────────────────
-// Stores
-// ────────────────────────────────────────────────────────────────────────────
+// ── Stores ───────────────────────────────────────────────────────────────────
 const sessionStore = useSessionStore()
 const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
 
-// ────────────────────────────────────────────────────────────────────────────
-// Derived state
-// ────────────────────────────────────────────────────────────────────────────
+// ── Derived state ─────────────────────────────────────────────────────────────
 const currentOrder = computed(() => {
     const raw = orderStore.currentOrder
     if (!raw) { return null }
@@ -33,13 +29,8 @@ const orderId = computed<number | null>(() => currentOrder.value?.order_id ?? se
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as number)
 
-/** Submitted items for the current (initial) order */
 const submittedItems = computed<any[]>(() => (unref(orderStore.submittedItems) ?? []) as any[])
 
-/**
- * Refill history: history entries after the first (index 0 is the initial order,
- * subsequent entries are confirmed refills).
- */
 const refillHistory = computed(() => {
     const h = (unref(orderStore.history) ?? []) as any[]
     if (h.length <= 1) { return [] }
@@ -49,9 +40,65 @@ const refillHistory = computed(() => {
     }))
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Timer — server-authoritative via sessionStore.remainingMs (updated every 1 s)
-// ────────────────────────────────────────────────────────────────────────────
+// ── Display helpers ───────────────────────────────────────────────────────────
+const packageName = computed(() =>
+    (orderStore.package as any)?.name ??
+    (currentOrder.value as any)?.package_name ??
+    "Package"
+)
+
+const totalItemsOrdered = computed(() =>
+    submittedItems.value.reduce((s: number, i: any) => s + Number(i?.quantity ?? 0), 0)
+)
+
+const displayTotal = computed(() =>
+    submittedItems.value.reduce(
+        (s: number, i: any) => s + Number(i?.price ?? i?.unit_price ?? 0) * Number(i?.quantity ?? 0),
+        0
+    )
+)
+
+function getStatusDarkStyle (status: string): string {
+    const m: Record<string, string> = {
+        pending: "background:rgba(217,119,6,0.15);color:#d97706;border-color:rgba(217,119,6,0.3)",
+        confirmed: "background:rgba(59,130,246,0.15);color:#60a5fa;border-color:rgba(59,130,246,0.3)",
+        preparing: "background:rgba(167,139,250,0.15);color:#a78bfa;border-color:rgba(167,139,250,0.3)",
+        ready: "background:rgba(34,197,94,0.15);color:#4ade80;border-color:rgba(34,197,94,0.3)",
+        completed: "background:rgba(156,163,175,0.15);color:#9ca3af;border-color:rgba(156,163,175,0.3)",
+        cancelled: "background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)",
+        voided: "background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)",
+    }
+    return m[status] ?? "background:rgba(156,163,175,0.15);color:#9ca3af;border-color:rgba(156,163,175,0.3)"
+}
+
+function getStatusDotStyle (status: string): string {
+    const m: Record<string, string> = {
+        pending: "background:#d97706",
+        confirmed: "background:#60a5fa",
+        preparing: "background:#a78bfa",
+        ready: "background:#4ade80",
+        completed: "background:#9ca3af",
+        cancelled: "background:#f87171",
+        voided: "background:#f87171",
+    }
+    return m[status] ?? "background:#9ca3af"
+}
+
+function itemEmoji (item: any): string {
+    const cat = String(item?.category ?? "").toLowerCase()
+    if (cat.includes("meat")) { return "🔥" }
+    if (cat.includes("side")) { return "🌿" }
+    if (
+        cat.includes("drink") || cat.includes("bev") ||
+        cat.includes("soju") || cat.includes("beer") ||
+        cat.includes("wine") || cat.includes("juice") ||
+        cat.includes("tea") || cat.includes("coffee")
+    ) { return "🥤" }
+    if (cat.includes("dessert")) { return "🍮" }
+    return "🍽️"
+}
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
 const formatTime = (ms: number): string => {
     const totalSeconds = Math.max(0, Math.floor(ms / 1000))
     const hours = Math.floor(totalSeconds / 3600)
@@ -65,9 +112,42 @@ const formatTime = (ms: number): string => {
 const timeRemaining = computed<string>(() => formatTime((unref(sessionStore.remainingMs) ?? 0) as number))
 const isTimerCritical = computed<boolean>(() => ((unref(sessionStore.remainingMs) ?? 0) as number) < 5 * 60 * 1000)
 
-// ────────────────────────────────────────────────────────────────────────────
-// Session-end screen
-// ────────────────────────────────────────────────────────────────────────────
+// ── Wall clock (12-hour AM/PM) ────────────────────────────────────────────────
+const currentTime = ref<string>("")
+
+function updateCurrentTime () {
+    const now = new Date()
+    currentTime.value = now.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    })
+}
+
+let clockIntervalId: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+    updateCurrentTime()
+    clockIntervalId = setInterval(updateCurrentTime, 1000)
+})
+
+onUnmounted(() => {
+    if (clockIntervalId) {
+        clearInterval(clockIntervalId)
+        clockIntervalId = null
+    }
+})
+
+// ── Order round label (Initial Order / Refill #N) ─────────────────────────────
+const orderRound = computed<string>(() => {
+    const h = (unref(orderStore.history) ?? []) as any[]
+    // history[0] = initial order; history[1..n] = refills
+    const refillCount = Math.max(0, h.length - 1)
+    if (refillCount === 0) { return "Initial Order" }
+    return `Refill #${refillCount}`
+})
+
+// ── Session-end screen ────────────────────────────────────────────────────────
 const showEndScreen = ref(false)
 let endRedirectTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -75,6 +155,9 @@ const handleSessionEnd = () => {
     if (showEndScreen.value) { return }
     showEndScreen.value = true
     logger.info("[in-session] Session ended — showing thank-you screen")
+    if (sessionStore.isActive) {
+        void sessionStore.end().catch((e: unknown) => logger.warn("[in-session] sessionStore.end() failed", e))
+    }
     endRedirectTimer = setTimeout(() => {
         navigateTo("/")
     }, 5000)
@@ -86,19 +169,14 @@ watch(
     { immediate: true }
 )
 
-// Watch for order completion driven by the polling/WS layer in Order.ts
-// (Order.ts already calls sessionStore.end() + navigates to '/' on 'completed' status,
-//  but we guard here too in case the navigation doesn't fire inside this component)
 watch(orderStatus, (status) => {
-    if (status === "completed") {
-        logger.info("[in-session] Order completed — ending session")
+    if (status !== "pending" && status !== "confirmed") {
+        logger.info("[in-session] Order status changed to non-live — ending session", { status })
         handleSessionEnd()
     }
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Idle lock — 2 min warn, 5 min auto-end
-// ────────────────────────────────────────────────────────────────────────────
+// ── Idle lock ─────────────────────────────────────────────────────────────────
 const showIdleWarning = ref(false)
 
 const { isWarning: idleWarning, start: startIdleDetector, stop: stopIdleDetector } = useIdleDetector({
@@ -117,9 +195,7 @@ watch(idleWarning, (v) => {
     if (!v) { showIdleWarning.value = false }
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Navigation guards — also enforced by middleware/order-guard.ts
-// ────────────────────────────────────────────────────────────────────────────
+// ── Navigation guards ─────────────────────────────────────────────────────────
 onMounted(() => {
     if (!sessionStore.isActive) {
         logger.warn("[in-session] No active session — redirecting to home")
@@ -142,9 +218,7 @@ onUnmounted(() => {
     }
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Refill navigation
-// ────────────────────────────────────────────────────────────────────────────
+// ── Refill navigation ─────────────────────────────────────────────────────────
 const goToRefill = () => {
     try {
         orderStore.toggleRefillMode(true)
@@ -154,14 +228,7 @@ const goToRefill = () => {
     navigateTo("/menu")
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Order summary drawer
-// ────────────────────────────────────────────────────────────────────────────
-const showOrderDrawer = ref(false)
-
-// ────────────────────────────────────────────────────────────────────────────
-// Service request modal
-// ────────────────────────────────────────────────────────────────────────────
+// ── Service request modal ─────────────────────────────────────────────────────
 const showServiceModal = ref(false)
 const isSubmittingService = ref(false)
 
@@ -188,9 +255,7 @@ const callForService = async (tableServiceId: number) => {
     }
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Status helpers
-// ────────────────────────────────────────────────────────────────────────────
+// ── Status helpers ────────────────────────────────────────────────────────────
 const STATUS_LABELS: Record<string, string> = {
     pending: "Order Received",
     confirmed: "Confirmed",
@@ -201,18 +266,7 @@ const STATUS_LABELS: Record<string, string> = {
     voided: "Voided",
 }
 
-const STATUS_COLORS: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-800",
-    confirmed: "bg-blue-100 text-blue-800",
-    preparing: "bg-purple-100 text-purple-800",
-    ready: "bg-green-100 text-green-800",
-    completed: "bg-gray-100 text-gray-700",
-    cancelled: "bg-red-100 text-red-800",
-    voided: "bg-red-100 text-red-800",
-}
-
 const statusLabel = computed(() => STATUS_LABELS[orderStatus.value] ?? orderStatus.value)
-const statusColor = computed(() => STATUS_COLORS[orderStatus.value] ?? "bg-gray-100 text-gray-700")
 
 definePageMeta({ middleware: ["order-guard"] })
 </script>
@@ -225,146 +279,251 @@ definePageMeta({ middleware: ["order-guard"] })
             <!-- ── Session-end Thank-You Screen ────────────────────────────────── -->
             <div
                 v-if="showEndScreen"
-                class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-orange-500 to-amber-600 text-white"
+                class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#080706]"
             >
-                <UtensilsCrossed class="mb-6 h-20 w-20 opacity-90" />
-                <h1 class="text-4xl font-bold tracking-tight">
-                    Thank You!
-                </h1>
-                <p class="mt-3 text-lg opacity-80">
-                    We hope you enjoyed your meal.
-                </p>
-                <p class="mt-6 text-sm opacity-60">
-                    Returning to the welcome screen…
-                </p>
+                <div class="flex flex-col items-center gap-6">
+                    <div class="flex h-24 w-24 items-center justify-center rounded-full border border-[#e9d3aa]/20 bg-[#1e1a16]">
+                        <UtensilsCrossed class="h-10 w-10 text-[#e9d3aa]" />
+                    </div>
+                    <div class="text-center">
+                        <h1 class="text-4xl font-bold tracking-tight text-[#f0e6d2]">
+                            Thank You!
+                        </h1>
+                        <p class="mt-3 text-base text-[#9b9484]">
+                            We hope you enjoyed your meal.
+                        </p>
+                    </div>
+                    <p class="text-sm text-[#7a776f]">
+                        Returning to the welcome screen…
+                    </p>
+                </div>
             </div>
 
             <!-- ── Main In-Session Layout ──────────────────────────────────────── -->
-            <div v-else class="flex h-screen flex-col overflow-hidden bg-gray-50">
-                <!-- ── Session Header Bar ────────────────────────────────────────── -->
-                <header class="flex items-center justify-between bg-white px-6 py-3 shadow-sm">
-                    <!-- Table + Guest info -->
-                    <div class="flex items-center gap-4">
-                        <div class="text-sm text-gray-500">
-                            Table
-                        </div>
-                        <div class="text-lg font-semibold text-gray-900">
-                            {{ tableName }}
-                        </div>
-                        <div class="flex items-center gap-1 text-sm text-gray-500">
-                            <Users class="h-4 w-4" />
-                            <span>{{ guestCount }}</span>
-                        </div>
-                    </div>
-
-                    <!-- Server-authoritative countdown timer -->
-                    <div
-                        class="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
-                        :class="isTimerCritical ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'"
-                    >
-                        <Clock class="h-4 w-4" :class="isTimerCritical && 'animate-pulse'" />
-                        {{ timeRemaining }}
-                    </div>
-                </header>
-
-                <!-- ── Main Content ───────────────────────────────────────────────── -->
-                <main class="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-                    <!-- Order Status Card -->
-                    <section class="rounded-2xl bg-white p-5 shadow-sm">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p v-if="orderNumber" class="text-xs font-medium uppercase tracking-wider text-gray-500">
-                                    Order #{{ orderNumber }}
-                                </p>
-                                <p v-else class="text-xs font-medium uppercase tracking-wider text-gray-400">
-                                    Processing…
-                                </p>
-                            </div>
-                            <span
-                                class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-                                :class="statusColor"
-                            >
-                                {{ statusLabel }}
-                            </span>
-                        </div>
-
-                        <!-- Status progress bar -->
-                        <div class="mt-4 flex gap-1">
-                            <div
-                                v-for="step in ['pending','confirmed','ready']"
-                                :key="step"
-                                class="h-1.5 flex-1 rounded-full transition-colors duration-500"
-                                :class="['pending','confirmed','ready','completed'].indexOf(orderStatus) >= ['pending','confirmed','ready'].indexOf(step)
-                                    ? 'bg-orange-500'
-                                    : 'bg-gray-200'"
-                            />
-                        </div>
-
-                        <!-- Submitted items summary -->
-                        <ul v-if="submittedItems.length" class="mt-4 divide-y divide-gray-50 text-sm text-gray-700">
-                            <li
-                                v-for="item in submittedItems"
-                                :key="item.id"
-                                class="flex justify-between py-1.5"
-                            >
-                                <span>{{ item.name }} <span v-if="item.quantity > 1" class="text-gray-400">×{{ item.quantity }}</span></span>
-                                <span class="text-gray-500">₱{{ (Number(item.price) * Number(item.quantity)).toFixed(2) }}</span>
-                            </li>
-                        </ul>
-                    </section>
-
-                    <!-- Refill History -->
-                    <section v-if="refillHistory.length" class="rounded-2xl bg-white p-5 shadow-sm">
-                        <h2 class="mb-3 text-sm font-semibold text-gray-700">
-                            Refill History
-                        </h2>
-                        <ul class="divide-y divide-gray-50 text-sm">
-                            <li
-                                v-for="(refill, i) in refillHistory"
-                                :key="i"
-                                class="flex items-center justify-between py-2"
-                            >
-                                <span class="text-gray-700">Refill #{{ i + 1 }} — Order {{ refill.orderNumber }}</span>
-                                <span
-                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="STATUS_COLORS[refill.status] ?? 'bg-gray-100 text-gray-500'"
-                                >{{ STATUS_LABELS[refill.status] ?? refill.status }}</span>
-                            </li>
-                        </ul>
-                    </section>
-                </main>
-
-                <!-- ── Primary Action Row ─────────────────────────────────────────── -->
-                <footer class="bg-white border-t border-gray-100 px-6 py-4">
-                    <div class="flex gap-3">
-                        <!-- Add More Items (Refill) -->
+            <div v-else class="session-root">
+                <!-- ══ LEFT COLUMN — Order Stream ════════════════════════════════ -->
+                <div class="session-left">
+                    <!-- Header -->
+                    <header class="flex flex-shrink-0 items-center justify-between border-b border-white/5 px-6 py-4">
                         <button
-                            class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 active:scale-95"
+                            class="session-ghost-btn"
                             @click="goToRefill"
                         >
                             <ShoppingBag class="h-4 w-4" />
                             Add More Items
                         </button>
+                        <div class="flex flex-col items-center gap-0.5">
+                            <h1 class="text-sm font-semibold uppercase tracking-widest text-[#9b9484]">
+                                {{ orderRound }}
+                            </h1>
+                            <span class="text-xs text-[#6b6760]">
+                                {{ currentTime }}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2 rounded-full border border-[#4ade80]/30 bg-[#4ade80]/10 px-3 py-1">
+                            <span class="live-dot" />
+                            <span class="text-xs font-medium text-[#4ade80]">Live Session</span>
+                        </div>
+                    </header>
 
-                        <!-- Request Service -->
+                    <!-- Order meta row -->
+                    <div class="flex flex-shrink-0 items-center gap-4 border-b border-white/5 px-6 py-3">
+                        <span class="text-xs text-[#7a776f]">
+                            {{ orderNumber ? `#${orderNumber}` : 'Processing…' }}
+                        </span>
+                        <div
+                            class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                            :style="getStatusDarkStyle(orderStatus)"
+                        >
+                            <span class="h-1.5 w-1.5 rounded-full" :style="getStatusDotStyle(orderStatus)" />
+                            {{ statusLabel }}
+                        </div>
+                        <div
+                            class="ml-auto flex items-center gap-1.5 text-xs"
+                            :class="isTimerCritical ? 'text-red-400' : 'text-[#8a8578]'"
+                        >
+                            <Clock class="h-3.5 w-3.5" :class="isTimerCritical && 'animate-pulse'" />
+                            {{ timeRemaining }}
+                        </div>
+                    </div>
+
+                    <!-- Scrollable item stream -->
+                    <div class="session-scroll flex-1 space-y-2 px-6 py-4">
+                        <div
+                            v-for="item in submittedItems"
+                            :key="item.id"
+                            class="session-item-card"
+                        >
+                            <!-- Emoji icon cell -->
+                            <div class="item-icon-cell flex-shrink-0">
+                                <span class="text-xl leading-none">{{ itemEmoji(item) }}</span>
+                            </div>
+
+                            <!-- Item details -->
+                            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="truncate text-sm font-medium text-[#f0e6d2]">{{ item.name }}</span>
+                                    <span
+                                        v-if="item.is_unlimited"
+                                        class="flex-shrink-0 rounded border border-[#e9d3aa]/30 bg-[#e9d3aa]/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#e9d3aa]"
+                                    >∞</span>
+                                </div>
+                                <span class="text-xs text-[#7a776f]">
+                                    ₱{{ Number(item.price ?? item.unit_price ?? 0).toFixed(2) }} each
+                                </span>
+                            </div>
+
+                            <!-- Quantity badge -->
+                            <div class="flex flex-shrink-0 items-center">
+                                <span class="rounded-lg bg-[#1e1a16] px-3 py-1 text-sm font-semibold tabular-nums text-[#e8e2d4]">
+                                    ×{{ item.quantity }}
+                                </span>
+                            </div>
+
+                            <!-- Line total -->
+                            <div class="w-20 flex-shrink-0 text-right">
+                                <span class="text-sm font-semibold text-[#e9d3aa]">
+                                    ₱{{ (Number(item.price ?? item.unit_price ?? 0) * Number(item.quantity)).toFixed(2) }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <p
+                            v-if="!submittedItems.length"
+                            class="py-8 text-center text-sm text-[#7a776f]"
+                        >
+                            No items submitted yet.
+                        </p>
+
+                        <!-- Refill history -->
+                        <div
+                            v-if="refillHistory.length"
+                            class="mt-4 space-y-2 border-t border-white/5 pt-4"
+                        >
+                            <p class="mb-3 text-xs font-medium uppercase tracking-widest text-[#7a776f]">
+                                Refill History
+                            </p>
+                            <div
+                                v-for="(refill, i) in refillHistory"
+                                :key="i"
+                                class="flex items-center justify-between rounded-lg bg-[#141210] px-4 py-2.5"
+                            >
+                                <span class="text-sm text-[#8a8578]">
+                                    Refill #{{ i + 1 }} — Order {{ refill.orderNumber }}
+                                </span>
+                                <div
+                                    class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                                    :style="getStatusDarkStyle(refill.status)"
+                                >
+                                    <span class="h-1.5 w-1.5 rounded-full" :style="getStatusDotStyle(refill.status)" />
+                                    {{ STATUS_LABELS[refill.status] ?? refill.status }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ══ RIGHT COLUMN — Billing Terminal ══════════════════════════ -->
+                <aside class="session-right">
+                    <!-- SUMMARY label -->
+                    <div class="flex-shrink-0 border-b border-white/5 px-6 py-4">
+                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#7a776f]">
+                            Summary
+                        </p>
+                    </div>
+
+                    <!-- Table / timer / clock mini-header -->
+                    <div class="flex flex-shrink-0 items-center justify-between border-b border-white/5 px-6 py-3">
+                        <span class="text-sm font-semibold text-[#f0e6d2]">{{ tableName }}</span>
+                        <div class="flex flex-col items-end gap-0.5">
+                            <div
+                                class="flex items-center gap-1.5 text-xs"
+                                :class="isTimerCritical ? 'text-red-400' : 'text-[#8a8578]'"
+                            >
+                                <Clock class="h-3 w-3" />
+                                {{ timeRemaining }}
+                            </div>
+                            <span class="text-[11px] text-[#6b6760]">{{ currentTime }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Order detail rows -->
+                    <div class="flex-shrink-0 space-y-3 border-b border-white/5 px-6 py-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-[#8a8578]">Order ID</span>
+                            <span class="text-sm font-semibold tabular-nums text-[#e8e2d4]">
+                                {{ orderId ?? '—' }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-[#8a8578]">
+                                <Users class="h-3.5 w-3.5" />
+                                <span class="text-xs">Guests</span>
+                            </div>
+                            <span class="text-sm font-semibold text-[#e8e2d4]">{{ guestCount }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-[#8a8578]">Package</span>
+                            <span class="max-w-[140px] truncate text-right text-sm font-semibold text-[#e8e2d4]">
+                                {{ packageName }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-[#8a8578]">Items Ordered</span>
+                            <span class="text-sm font-semibold text-[#e8e2d4]">{{ totalItemsOrdered }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Total block -->
+                    <div class="flex-shrink-0 border-b border-white/5 px-6 py-5">
+                        <div class="flex items-end justify-between">
+                            <span class="text-xs font-medium uppercase tracking-wider text-[#7a776f]">Total</span>
+                            <span class="text-2xl font-bold text-[#e9d3aa]">
+                                ₱{{ displayTotal.toFixed(2) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Status pill -->
+                    <div class="flex-shrink-0 px-6 py-4">
+                        <div
+                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold"
+                            :style="getStatusDarkStyle(orderStatus)"
+                        >
+                            <span class="h-2 w-2 rounded-full" :style="getStatusDotStyle(orderStatus)" />
+                            {{ statusLabel }}
+                        </div>
+                    </div>
+
+                    <!-- Spacer -->
+                    <div class="flex-1" />
+
+                    <!-- Action buttons -->
+                    <div class="flex-shrink-0 space-y-3 border-t border-white/5 px-6 py-5">
                         <button
-                            class="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
-                            @click="showServiceModal = true"
+                            class="session-action-ghost w-full opacity-40 cursor-not-allowed"
+                            disabled
+                            title="Coming soon"
                         >
                             <Bell class="h-4 w-4" />
                             Call Staff
                         </button>
-
-                        <!-- View My Order -->
                         <button
-                            class="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
-                            @click="showOrderDrawer = true"
+                            class="session-action-ghost w-full"
+                            @click="goToRefill"
                         >
-                            <ChevronRight class="h-4 w-4" />
-                            My Order
+                            <ShoppingBag class="h-4 w-4" />
+                            Add More Items
+                        </button>
+                        <button
+                            class="session-action-gold w-full opacity-40 cursor-not-allowed"
+                            disabled
+                            title="Coming soon"
+                        >
+                            Request Bill
                         </button>
                     </div>
-                </footer>
+                </aside>
             </div>
 
             <!-- ── Service Request Modal ──────────────────────────────────────── -->
@@ -373,8 +532,9 @@ definePageMeta({ middleware: ["order-guard"] })
                 title="Call for Staff"
                 width="360px"
                 align-center
+                class="session-dialog"
             >
-                <p class="text-sm text-gray-600 mb-5">
+                <p class="mb-5 text-sm text-[#9b9484]">
                     What do you need help with?
                 </p>
                 <div class="flex flex-col gap-3">
@@ -408,33 +568,6 @@ definePageMeta({ middleware: ["order-guard"] })
                 </template>
             </ElDialog>
 
-            <!-- ── My Order Drawer (slide-over) ──────────────────────────────── -->
-            <ElDialog
-                v-model="showOrderDrawer"
-                title="My Order"
-                width="400px"
-                align-center
-            >
-                <ul v-if="submittedItems.length" class="divide-y text-sm text-gray-700">
-                    <li
-                        v-for="item in submittedItems"
-                        :key="item.id"
-                        class="flex justify-between py-2"
-                    >
-                        <span>{{ item.name }} <span v-if="item.quantity > 1" class="text-gray-400">×{{ item.quantity }}</span></span>
-                        <span>₱{{ (Number(item.price) * Number(item.quantity)).toFixed(2) }}</span>
-                    </li>
-                </ul>
-                <p v-else class="text-sm text-gray-400">
-                    No items found.
-                </p>
-                <template #footer>
-                    <ElButton @click="showOrderDrawer = false">
-                        Close
-                    </ElButton>
-                </template>
-            </ElDialog>
-
             <!-- ── Idle Warning Modal ─────────────────────────────────────────── -->
             <ElDialog
                 v-model="showIdleWarning"
@@ -443,8 +576,9 @@ definePageMeta({ middleware: ["order-guard"] })
                 align-center
                 :close-on-click-modal="false"
                 :show-close="false"
+                class="session-dialog"
             >
-                <p class="text-sm text-gray-600 text-center">
+                <p class="text-center text-sm text-[#9b9484]">
                     Your session will end automatically due to inactivity.
                 </p>
                 <template #footer>
@@ -457,23 +591,23 @@ definePageMeta({ middleware: ["order-guard"] })
 
         <!-- ── Error boundary fallback ──────────────────────────────────────── -->
         <template #error="{ error, clearError }">
-            <div class="flex h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-                <UtensilsCrossed class="h-12 w-12 text-gray-300" />
-                <p class="text-lg font-medium text-gray-700">
+            <div class="flex h-screen flex-col items-center justify-center gap-4 bg-[#080706] p-8 text-center">
+                <UtensilsCrossed class="h-12 w-12 text-[#7a776f]" />
+                <p class="text-lg font-medium text-[#f0e6d2]">
                     Something went wrong
                 </p>
-                <p class="text-sm text-gray-500">
+                <p class="text-sm text-[#9b9484]">
                     {{ (error as any)?.message ?? 'An unexpected error occurred.' }}
                 </p>
-                <div class="flex gap-3 mt-2">
+                <div class="mt-2 flex gap-3">
                     <button
-                        class="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                        class="session-action-gold"
                         @click="clearError()"
                     >
                         Try Again
                     </button>
                     <button
-                        class="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        class="session-action-ghost"
                         @click="navigateTo('/')"
                     >
                         Return Home
@@ -483,3 +617,196 @@ definePageMeta({ middleware: ["order-guard"] })
         </template>
     </NuxtErrorBoundary>
 </template>
+
+<style scoped>
+/* ── Root layout ─────────────────────────────────────────────────────────── */
+.session-root {
+    display: flex;
+    height: 100dvh;
+    overflow: hidden;
+    background: #080706;
+}
+
+/* ── Left column — order stream ──────────────────────────────────────────── */
+.session-left {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── Right column — billing terminal ─────────────────────────────────────── */
+.session-right {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #0f0e0c;
+}
+
+/* ── Scrollable item stream ───────────────────────────────────────────────── */
+.session-scroll {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #2b241c transparent;
+}
+.session-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.session-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.session-scroll::-webkit-scrollbar-thumb {
+    background: #2b241c;
+    border-radius: 2px;
+}
+
+/* ── Live dot pulse ───────────────────────────────────────────────────────── */
+.live-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse-live 2s ease-in-out infinite;
+}
+
+@keyframes pulse-live {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ── Item card ────────────────────────────────────────────────────────────── */
+.session-item-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 12px;
+    background: #141210;
+    border: 1px solid transparent;
+    padding: 12px 14px;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.session-item-card:hover {
+    background: #1e1a16;
+    border-color: rgba(233, 211, 170, 0.1);
+}
+
+/* ── Item icon cell ───────────────────────────────────────────────────────── */
+.item-icon-cell {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: #1e1a16;
+    flex-shrink: 0;
+}
+
+/* ── Ghost button (header + sidebar) ─────────────────────────────────────── */
+.session-ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    padding: 8px 14px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #9b9484;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.session-ghost-btn:hover {
+    border-color: rgba(233, 211, 170, 0.3);
+    color: #e9d3aa;
+    background: rgba(233, 211, 170, 0.05);
+}
+
+/* ── Sidebar ghost action ─────────────────────────────────────────────────── */
+.session-action-ghost {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    padding: 12px 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #9b9484;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.session-action-ghost:hover {
+    border-color: rgba(233, 211, 170, 0.25);
+    color: #e8e2d4;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Gold CTA ─────────────────────────────────────────────────────────────── */
+.session-action-gold {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, #e9d3aa 0%, #d1b883 100%);
+    padding: 14px 16px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #0f0e0c;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+
+.session-action-gold:hover {
+    opacity: 0.92;
+}
+
+.session-action-gold:active {
+    transform: scale(0.98);
+}
+
+/* ── Element Plus dialog dark overrides ──────────────────────────────────── */
+:deep(.session-dialog .el-dialog) {
+    background: #141210 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+}
+
+:deep(.session-dialog .el-dialog__header) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding: 20px 24px 16px !important;
+}
+
+:deep(.session-dialog .el-dialog__title) {
+    color: #f0e6d2 !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+}
+
+:deep(.session-dialog .el-dialog__headerbtn .el-dialog__close) {
+    color: #7a776f !important;
+}
+
+:deep(.session-dialog .el-dialog__body) {
+    color: #9b9484 !important;
+    padding: 20px 24px !important;
+}
+
+:deep(.session-dialog .el-dialog__footer) {
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding: 16px 24px 20px !important;
+}
+</style>

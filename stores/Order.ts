@@ -655,7 +655,12 @@ export const useOrderStore = defineStore("order", () => {
         }
         state.isSubmitting = true
         try {
-            const invalidRefillItem = state.refillItems.find(i => i.category !== "meats" && i.category !== "sides")
+            const invalidRefillItem = state.refillItems.find((i) => {
+                const cat = (i.category ?? "").toLowerCase()
+                const isMeat = cat === "meats" || cat === "meat" || cat.includes("meat")
+                const isSide = cat === "sides" || cat === "side" || cat.includes("side")
+                return !isMeat && !isSide
+            })
             if (invalidRefillItem) {
                 throw new Error("Refill validation failed: only meats and sides are allowed")
             }
@@ -722,6 +727,18 @@ export const useOrderStore = defineStore("order", () => {
                     handleOrderError("Refill response missing body")
                     throw new Error("Refill response missing body")
                 }
+                // Update submittedItems to reflect the current refill round so the
+                // in-session left column always shows the LAST submitted batch of items.
+                state.submittedItems = state.refillItems.map(item => ({
+                    id: item.id,
+                    menu_id: item.id,
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    img_url: item.img_url || null,
+                    category: item.category || null,
+                    isUnlimited: item.isUnlimited,
+                }))
                 state.refillItems = []
                 state.isRefillMode = false
                 state.history = [...state.history, { ...responseData, type: "refill" }]
@@ -886,10 +903,10 @@ export const useOrderStore = defineStore("order", () => {
                         // ignore
                     }
 
-                    // Stop polling on any terminal status and end the session.
-                    // completed = order paid; voided = order voided; cancelled = order cancelled.
-                    // All three reset the guest session and navigate home.
-                    if (status === "completed" || status === "voided" || status === "cancelled") {
+                    // Stop polling on any non-live status and end the session.
+                    // Live statuses are pending and confirmed only; everything else
+                    // (preparing, ready, served, completed, voided, cancelled, etc.) ends the guest session.
+                    if (status !== "pending" && status !== "confirmed") {
                         logger.info("[Polling] Terminal status observed", { orderId, status })
                         stopPolling()
 
@@ -974,7 +991,8 @@ export const useOrderStore = defineStore("order", () => {
         logger.debug("🔁 initializeFromSession called:", {
             sessionOrderId: sessionStore.getOrderId(),
             stateHasPlacedOrder: state.hasPlacedOrder,
-            stateCurrentOrder: !!state.currentOrder
+            stateCurrentOrder: !!state.currentOrder,
+            sessionIsActive: sessionStore.getIsActive()
         })
 
         // If no orderId in session, attempt server-side active-order recovery first.
@@ -992,10 +1010,18 @@ export const useOrderStore = defineStore("order", () => {
                 state.submittedItems.length > 0
             )
 
+            // Guard: If session is active (user is actively building an order) and no order placed yet,
+            // DON'T reset transactional state. This prevents wiping guest count / package selection
+            // during normal menu browsing. Only reset if session has expired/is inactive.
+            const isActiveSession = sessionStore.getIsActive()
+            const shouldSkipResetDueToActiveSession = isActiveSession && !state.hasPlacedOrder
+
             if (!deviceStore.getToken()) {
-                if (hasStaleTransactionalState) {
+                if (hasStaleTransactionalState && !shouldSkipResetDueToActiveSession) {
                     logger.info("🔁 No token + no session.orderId: clearing stale transactional order state")
                     resetTransactionalState()
+                } else if (shouldSkipResetDueToActiveSession) {
+                    logger.debug("🔁 Session active & no order placed yet: preserving transactional state (menu browsing)")
                 }
                 logger.debug("🔁 Skipping active-order lookup until device token is available")
                 return
@@ -1052,7 +1078,7 @@ export const useOrderStore = defineStore("order", () => {
             }
 
             // If still no orderId, reset stale hasPlacedOrder flag after a short grace
-            if (hasStaleTransactionalState) {
+            if (hasStaleTransactionalState && !shouldSkipResetDueToActiveSession) {
                 logger.info("🔁 No session.orderId found, resetting stale order state (with grace)")
                 // Apply a short grace period to avoid clearing during quick transitions
                 await new Promise(resolve => setTimeout(resolve, 1500))
@@ -1063,6 +1089,8 @@ export const useOrderStore = defineStore("order", () => {
                 } else {
                     logger.debug("initializeFromSession: session.orderId appeared during grace, skipping clear")
                 }
+            } else if (shouldSkipResetDueToActiveSession && hasStaleTransactionalState) {
+                logger.debug("🔁 Grace period skipped: session active & no order placed yet (preserving transactional state)")
             }
             return
         }

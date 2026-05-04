@@ -254,19 +254,16 @@ export const useBroadcasts = () => {
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(order.status)
-            // If this is a terminal status, stop the polling fallback
-            if (order.status === "completed" || order.status === "cancelled" || order.status === "voided") {
+            // Stop polling and end session for any status that is no longer live
+            if (order.status !== "pending" && order.status !== "confirmed") {
                 try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
 
-                // End session and navigate to home on completed
-                if (order.status === "completed") {
-                    logger.info("✅ Order completed via broadcast - ending session in 2s")
-                    if (orderCompletionTimeoutId) { window.clearTimeout(orderCompletionTimeoutId) }
-                    orderCompletionTimeoutId = window.setTimeout(async () => {
-                        sessionStore.end()
-                        await router.replace("/")
-                    }, 2000)
-                }
+                logger.info("[Broadcasts] Non-live order status via broadcast — ending session in 2s", { status: order.status })
+                if (orderCompletionTimeoutId) { window.clearTimeout(orderCompletionTimeoutId) }
+                orderCompletionTimeoutId = window.setTimeout(async () => {
+                    sessionStore.end()
+                    await router.replace("/")
+                }, 2000)
             }
         }
     }
@@ -317,6 +314,13 @@ export const useBroadcasts = () => {
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
             orderStore.clearOrder()
             try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
+
+            logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session in 2s")
+            if (orderCompletionTimeoutId) { window.clearTimeout(orderCompletionTimeoutId) }
+            orderCompletionTimeoutId = window.setTimeout(async () => {
+                sessionStore.end()
+                await router.replace("/")
+            }, 2000)
         }
     }
 
