@@ -5,6 +5,23 @@ import { logger } from "~/utils/logger"
 
 const TERMINAL_STATUSES = new Set(["completed", "cancelled", "voided"])
 
+export function shouldAttemptActiveOrderRecovery () {
+    const orderStore = useOrderStore()
+    const sessionStore = useSessionStore()
+
+    const currentOrder = orderStore.getCurrentOrder()
+    const orderObj = ((currentOrder?.order || currentOrder) as any) || null
+
+    return Boolean(
+        sessionStore.getOrderId() ||
+        orderStore.hasPlacedOrder ||
+        orderStore.isRefillMode ||
+        orderStore.currentOrder ||
+        orderObj?.order_id ||
+        orderObj?.id
+    )
+}
+
 export async function recoverActiveOrderState (source: string = "unknown") {
     const orderStore = useOrderStore()
     const sessionEndStore = useSessionEndStore()

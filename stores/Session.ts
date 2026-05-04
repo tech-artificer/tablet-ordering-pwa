@@ -393,7 +393,6 @@ export const useSessionStore = defineStore("session", () => {
 
             console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
             logger.info("🔚 Session ending - clearing all session and order state")
-            state.timerExpired = false
             await clearInternal() // Call internal version to avoid double-locking
             console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
         })

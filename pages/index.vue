@@ -191,7 +191,6 @@
                             aria-label="Begin your order"
                             @click="start"
                         >
-                            <UtensilsCrossed :size="20" stroke-width="2.5" class="flex-shrink-0" />
                             <span>Begin the Feast</span>
                         </button>
                     </div>
@@ -224,17 +223,15 @@ import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
-import { useSessionStore } from "~/stores/Session"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useMenuStore } from "~/stores/Menu"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
-const session = useSessionStore()
 const deviceStore = useDeviceStore()
 const menuStore = useMenuStore()
 const router = useRouter()
 const route = useRoute()
-const { channelStatus } = useBroadcasts()
+useBroadcasts()
 const { isOnline } = useNetworkStatus()
 
 // On the welcome screen, show real network connectivity — not WebSocket subscription
@@ -310,8 +307,7 @@ const start = () => {
         return
     }
 
-    console.log(`[✅ Device Ready] Starting session at ${timestamp}`)
-    session.start()
+    console.log(`[✅ Device Ready] Navigating to guest counter at ${timestamp}`)
     router.replace("/order/start")
 }
 

@@ -17,7 +17,7 @@ if (import.meta.client) {
 
 <template>
     <div class="min-h-screen min-w-screen flex items-center justify-center bg-app-grid overflow-hidden">
-        <Transition name="slide-left" mode="out-in" appear>
+        <Transition name="fade-up" mode="out-in" appear>
             <div :key="route.path" class="h-screen w-screen z-10 safe-area-top safe-area-bottom">
                 <slot />
             </div>

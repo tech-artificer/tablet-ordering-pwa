@@ -21,6 +21,10 @@ export default defineNuxtRouteMiddleware((to) => {
     if (!deviceStore.token || !orderStore.hasPlacedOrder) { return }
 
     if (PRE_ORDER_ROUTES.has(to.path)) {
+        // /order/review doubles as the refill submission page — allow it when a refill is in progress
+        if (to.path === "/order/review" && orderStore.isRefillMode) {
+            return
+        }
         return navigateTo("/order/in-session", { replace: true })
     }
 })

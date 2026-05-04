@@ -7,7 +7,7 @@ import { useOrderStore } from "../../stores/Order"
 import { useSessionStore } from "../../stores/Session"
 import { useDeviceStore } from "../../stores/Device"
 import { logger } from "../../utils/logger"
-import { recoverActiveOrderState } from "../../composables/useActiveOrderRecovery"
+import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
 
 const menuStore = useMenuStore()
 const router = useRouter()
@@ -20,14 +20,16 @@ onMounted(async () => {
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
 
-    const recovery = await recoverActiveOrderState("package-selection")
-    if (recovery.hasActiveOrder) {
-        console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
-        await router.replace({
-            path: "/menu",
-            query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
-        })
-        return
+    if (shouldAttemptActiveOrderRecovery()) {
+        const recovery = await recoverActiveOrderState("package-selection")
+        if (recovery.hasActiveOrder) {
+            console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
+            await router.replace({
+                path: "/menu",
+                query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
+            })
+            return
+        }
     }
 
     logger.info("[PackageSelection] Loading packages from API...")
