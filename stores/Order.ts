@@ -657,8 +657,8 @@ export const useOrderStore = defineStore("order", () => {
         try {
             const invalidRefillItem = state.refillItems.find((i) => {
                 const cat = (i.category ?? "").toLowerCase()
-                const isMeat = cat === "meats" || cat === "meat" || cat.includes("meat")
-                const isSide = cat === "sides" || cat === "side" || cat.includes("side")
+                const isMeat = /\b(?:meat|meats)\b/.test(cat)
+                const isSide = /\b(?:side|sides)\b/.test(cat)
                 return !isMeat && !isSide
             })
             if (invalidRefillItem) {
@@ -883,6 +883,7 @@ export const useOrderStore = defineStore("order", () => {
                 const orderObj = responseData.order || responseData.data || responseData
                 if (orderObj) {
                     const status = orderObj?.status
+                    const statusNormalized = String(status ?? "").toLowerCase()
                     logger.debug("[Polling] Tick", {
                         orderId,
                         status,
@@ -906,7 +907,7 @@ export const useOrderStore = defineStore("order", () => {
                     // Stop polling on any non-live status and end the session.
                     // Live statuses are pending and confirmed only; everything else
                     // (preparing, ready, served, completed, voided, cancelled, etc.) ends the guest session.
-                    if (status !== "pending" && status !== "confirmed") {
+                    if (statusNormalized !== "pending" && statusNormalized !== "confirmed") {
                         logger.info("[Polling] Terminal status observed", { orderId, status })
                         stopPolling()
 
@@ -918,6 +919,14 @@ export const useOrderStore = defineStore("order", () => {
                                 try {
                                     // Load session store instance and call end
                                     const sessionStore = useSessionStore()
+
+                                    // If in-session.vue has already claimed ownership of the terminal
+                                    // flow (markTerminalHandled was called), skip the redundant
+                                    // teardown and redirect so we don't double-end or skip the 5s flow.
+                                    if (sessionStore.isTerminalHandled()) {
+                                        logger.debug("[Polling] Terminal flow already owned by in-session page — skipping store teardown", { orderId })
+                                        return
+                                    }
 
                                     try {
                                         if (sessionStore.end) {

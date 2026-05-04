@@ -13,9 +13,14 @@ describe("order-lock global middleware refill carve-out", () => {
 
     it("allows /order/review when isRefillMode is true", () => {
         // The middleware must contain the explicit early-return for refill mode
-        // before the redirect-to-in-session statement.
+        // BEFORE the redirect-to-in-session statement.
         expect(source).toMatch(/to\.path\s*===\s*"\/order\/review"\s*&&\s*orderStore\.isRefillMode/)
-        expect(source).toContain("return")
+        const refillIdx = source.indexOf("to.path === \"/order/review\" && orderStore.isRefillMode")
+        const redirectIdx = source.indexOf("navigateTo(\"/order/in-session\"")
+        const returnIdx = source.indexOf("return", refillIdx)
+        expect(refillIdx).toBeGreaterThan(-1)
+        expect(returnIdx).toBeGreaterThan(-1)
+        expect(returnIdx).toBeLessThan(redirectIdx)
     })
 
     it("redirects locked routes to /order/in-session via replace", () => {

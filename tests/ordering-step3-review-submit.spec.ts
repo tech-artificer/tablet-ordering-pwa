@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
-import OrderingStep3ReviewSubmit from "../components/OrderingStep3ReviewSubmit.vue"
+import OrderingStep3ReviewSubmit from "../components/order/OrderingStep3ReviewSubmit.vue"
 import { useOrderStore } from "../stores/Order"
 
 describe("OrderingStep3ReviewSubmit", () => {

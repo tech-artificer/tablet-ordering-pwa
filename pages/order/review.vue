@@ -35,6 +35,7 @@ const handleOrderSubmitted = async () => {
                 timestamp,
                 error: (e as any)?.message,
             })
+            return
         }
     }
 
@@ -61,7 +62,7 @@ const handleOrderSubmitted = async () => {
                     </div>
                 </div>
 
-                <OrderingStep3ReviewSubmit @order-submitted="handleOrderSubmitted" />
+                <OrderOrderingStep3ReviewSubmit @order-submitted="handleOrderSubmitted" />
             </div>
         </div>
         <template #error="{ error, clearError }">

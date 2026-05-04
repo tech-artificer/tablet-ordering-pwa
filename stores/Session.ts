@@ -52,6 +52,7 @@ export const useSessionStore = defineStore("session", () => {
         sessionEndsAt: null as number | null,
         remainingMs: 0,
         timerExpired: false,
+        terminalHandled: false,
     })
 
     const SESSION_DURATION_MS = 4 * 60 * 60 * 1000 // 4 hours — matches server session_duration_seconds: 14400
@@ -344,6 +345,7 @@ export const useSessionStore = defineStore("session", () => {
             // set are not wiped out.
             const orderStore = useOrderStore()
             if (!state.isActive) {
+                state.terminalHandled = false
                 const preserveSelection = Boolean(options?.preserveSelection)
                 const preservedGuestCount = Number(orderStore.guestCount || 2)
                 // Save only the id so we can re-resolve the package from the freshly loaded
@@ -408,6 +410,7 @@ export const useSessionStore = defineStore("session", () => {
         state.sessionStartedAt = null
         state.sessionEndsAt = null
         state.remainingMs = 0
+        state.terminalHandled = false
         stopTimerInterval()
         stopSyncResyncTimer()
         _unregisterVisibilitySync()
@@ -542,6 +545,9 @@ export const useSessionStore = defineStore("session", () => {
     function getIsActive (): boolean { return state.isActive }
     function getSessionId (): number | null { return state.sessionId }
 
+    function markTerminalHandled () { state.terminalHandled = true }
+    function isTerminalHandled (): boolean { return state.terminalHandled }
+
     return {
         ...toRefs(state),
         fetchLatestSession,
@@ -559,6 +565,8 @@ export const useSessionStore = defineStore("session", () => {
         getOrderId,
         getIsActive,
         getSessionId,
+        markTerminalHandled,
+        isTerminalHandled,
     }
 }, {
     persist: {

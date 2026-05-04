@@ -141,6 +141,8 @@ let endRedirectTimer: ReturnType<typeof setTimeout> | null = null
 
 const handleSessionEnd = () => {
     if (showEndScreen.value) { return }
+    // Claim ownership of the terminal flow so Order.ts polling does not double-end.
+    sessionStore.markTerminalHandled()
     showEndScreen.value = true
     logger.info("[in-session] Session ended — showing thank-you screen")
     if (sessionStore.isActive) {
@@ -162,7 +164,7 @@ watch(orderStatus, (status) => {
         logger.info("[in-session] Order status changed to non-live — ending session", { status })
         handleSessionEnd()
     }
-})
+}, { immediate: true })
 
 // ── Idle lock ─────────────────────────────────────────────────────────────────
 const showIdleWarning = ref(false)
@@ -294,13 +296,13 @@ definePageMeta({ middleware: ["order-guard"] })
             </div>
 
             <!-- ── Main In-Session Layout ──────────────────────────────────────── -->
-            <div v-else class="session-root">
+            <div v-else class="flex h-dvh overflow-hidden bg-[#080706]">
                 <!-- ══ LEFT COLUMN — Order Stream ════════════════════════════════ -->
-                <div class="session-left">
+                <div class="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-white/5">
                     <!-- Header -->
                     <header class="flex flex-shrink-0 items-center justify-between border-b border-white/5 px-6 py-4">
                         <button
-                            class="session-ghost-btn"
+                            class="inline-flex items-center gap-1.5 rounded-[10px] border border-white/[0.12] bg-transparent px-[14px] py-2 text-[0.8125rem] font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.3)] hover:text-[#e9d3aa] hover:bg-[rgba(233,211,170,0.05)]"
                             @click="goToRefill"
                         >
                             <ShoppingBag class="h-4 w-4" />
@@ -315,7 +317,7 @@ definePageMeta({ middleware: ["order-guard"] })
                             </span>
                         </div>
                         <div class="flex items-center gap-2 rounded-full border border-[#4ade80]/30 bg-[#4ade80]/10 px-3 py-1">
-                            <span class="live-dot" />
+                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse-live" />
                             <span class="text-xs font-medium text-[#4ade80]">Live Session</span>
                         </div>
                     </header>
@@ -342,14 +344,14 @@ definePageMeta({ middleware: ["order-guard"] })
                     </div>
 
                     <!-- Scrollable item stream -->
-                    <div class="session-scroll flex-1 space-y-2 px-6 py-4">
+                    <div class="scrollbar-warm flex-1 overflow-y-auto space-y-2 px-6 py-4">
                         <div
                             v-for="item in submittedItems"
                             :key="item.id"
-                            class="session-item-card"
+                            class="flex items-center gap-3 rounded-xl bg-[#141210] border border-transparent p-[12px_14px] transition-[border-color,background] duration-150 hover:bg-[#1e1a16] hover:border-[rgba(233,211,170,0.1)]"
                         >
                             <!-- Emoji icon cell -->
-                            <div class="item-icon-cell flex-shrink-0">
+                            <div class="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-[10px] bg-[#1e1a16]">
                                 <span class="text-xl leading-none">{{ itemEmoji(item) }}</span>
                             </div>
 
@@ -418,7 +420,7 @@ definePageMeta({ middleware: ["order-guard"] })
                 </div>
 
                 <!-- ══ RIGHT COLUMN — Billing Terminal ══════════════════════════ -->
-                <aside class="session-right">
+                <aside class="w-[300px] flex-shrink-0 flex flex-col bg-[#0f0e0c]">
                     <!-- SUMMARY label -->
                     <div class="flex-shrink-0 border-b border-white/5 px-6 py-4">
                         <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#7a776f]">
@@ -495,7 +497,7 @@ definePageMeta({ middleware: ["order-guard"] })
                     <!-- Action buttons -->
                     <div class="flex-shrink-0 space-y-3 border-t border-white/5 px-6 py-5">
                         <button
-                            class="session-action-ghost w-full opacity-40 cursor-not-allowed"
+                            class="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.25)] hover:text-[#e8e2d4] hover:bg-white/[0.03] w-full opacity-40 cursor-not-allowed"
                             disabled
                             title="Coming soon"
                         >
@@ -503,14 +505,14 @@ definePageMeta({ middleware: ["order-guard"] })
                             Call Staff
                         </button>
                         <button
-                            class="session-action-ghost w-full"
+                            class="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.25)] hover:text-[#e8e2d4] hover:bg-white/[0.03] w-full"
                             @click="goToRefill"
                         >
                             <ShoppingBag class="h-4 w-4" />
                             Add More Items
                         </button>
                         <button
-                            class="session-action-gold w-full opacity-40 cursor-not-allowed"
+                            class="flex items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-br from-[#e9d3aa] to-[#d1b883] px-4 py-[14px] text-sm font-bold text-[#0f0e0c] cursor-pointer transition-[opacity,transform] duration-150 hover:opacity-[0.92] active:scale-[0.98] w-full opacity-40 cursor-not-allowed"
                             disabled
                             title="Coming soon"
                         >
@@ -595,13 +597,13 @@ definePageMeta({ middleware: ["order-guard"] })
                 </p>
                 <div class="mt-2 flex gap-3">
                     <button
-                        class="session-action-gold"
+                        class="flex items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-br from-[#e9d3aa] to-[#d1b883] px-4 py-[14px] text-sm font-bold text-[#0f0e0c] cursor-pointer transition-[opacity,transform] duration-150 hover:opacity-[0.92] active:scale-[0.98]"
                         @click="clearError()"
                     >
                         Try Again
                     </button>
                     <button
-                        class="session-action-ghost"
+                        class="inline-flex items-center gap-1.5 rounded-[10px] border border-white/[0.12] bg-transparent px-[14px] py-2 text-[0.8125rem] font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.3)] hover:text-[#e9d3aa] hover:bg-[rgba(233,211,170,0.05)]"
                         @click="navigateTo('/')"
                     >
                         Return Home
@@ -611,196 +613,3 @@ definePageMeta({ middleware: ["order-guard"] })
         </template>
     </NuxtErrorBoundary>
 </template>
-
-<style scoped>
-/* ── Root layout ─────────────────────────────────────────────────────────── */
-.session-root {
-    display: flex;
-    height: 100dvh;
-    overflow: hidden;
-    background: #080706;
-}
-
-/* ── Left column — order stream ──────────────────────────────────────────── */
-.session-left {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* ── Right column — billing terminal ─────────────────────────────────────── */
-.session-right {
-    width: 300px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background: #0f0e0c;
-}
-
-/* ── Scrollable item stream ───────────────────────────────────────────────── */
-.session-scroll {
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #2b241c transparent;
-}
-.session-scroll::-webkit-scrollbar {
-    width: 4px;
-}
-.session-scroll::-webkit-scrollbar-track {
-    background: transparent;
-}
-.session-scroll::-webkit-scrollbar-thumb {
-    background: #2b241c;
-    border-radius: 2px;
-}
-
-/* ── Live dot pulse ───────────────────────────────────────────────────────── */
-.live-dot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #4ade80;
-    animation: pulse-live 2s ease-in-out infinite;
-}
-
-@keyframes pulse-live {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-}
-
-/* ── Item card ────────────────────────────────────────────────────────────── */
-.session-item-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border-radius: 12px;
-    background: #141210;
-    border: 1px solid transparent;
-    padding: 12px 14px;
-    transition: border-color 0.15s, background 0.15s;
-}
-
-.session-item-card:hover {
-    background: #1e1a16;
-    border-color: rgba(233, 211, 170, 0.1);
-}
-
-/* ── Item icon cell ───────────────────────────────────────────────────────── */
-.item-icon-cell {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 10px;
-    background: #1e1a16;
-    flex-shrink: 0;
-}
-
-/* ── Ghost button (header + sidebar) ─────────────────────────────────────── */
-.session-ghost-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: transparent;
-    padding: 8px 14px;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: #9b9484;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-
-.session-ghost-btn:hover {
-    border-color: rgba(233, 211, 170, 0.3);
-    color: #e9d3aa;
-    background: rgba(233, 211, 170, 0.05);
-}
-
-/* ── Sidebar ghost action ─────────────────────────────────────────────────── */
-.session-action-ghost {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: transparent;
-    padding: 12px 16px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #9b9484;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-
-.session-action-ghost:hover {
-    border-color: rgba(233, 211, 170, 0.25);
-    color: #e8e2d4;
-    background: rgba(255, 255, 255, 0.03);
-}
-
-/* ── Gold CTA ─────────────────────────────────────────────────────────────── */
-.session-action-gold {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border-radius: 12px;
-    border: none;
-    background: linear-gradient(135deg, #e9d3aa 0%, #d1b883 100%);
-    padding: 14px 16px;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #0f0e0c;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-}
-
-.session-action-gold:hover {
-    opacity: 0.92;
-}
-
-.session-action-gold:active {
-    transform: scale(0.98);
-}
-
-/* ── Element Plus dialog dark overrides ──────────────────────────────────── */
-:deep(.session-dialog .el-dialog) {
-    background: #141210 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
-}
-
-:deep(.session-dialog .el-dialog__header) {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
-    padding: 20px 24px 16px !important;
-}
-
-:deep(.session-dialog .el-dialog__title) {
-    color: #f0e6d2 !important;
-    font-size: 1rem !important;
-    font-weight: 600 !important;
-}
-
-:deep(.session-dialog .el-dialog__headerbtn .el-dialog__close) {
-    color: #7a776f !important;
-}
-
-:deep(.session-dialog .el-dialog__body) {
-    color: #9b9484 !important;
-    padding: 20px 24px !important;
-}
-
-:deep(.session-dialog .el-dialog__footer) {
-    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
-    padding: 16px 24px 20px !important;
-}
-</style>

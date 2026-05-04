@@ -16,6 +16,7 @@ const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const route = useRoute()
 const router = useRouter()
+const nuxtApp = useNuxtApp()
 
 onMounted(async () => {
     if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
@@ -544,7 +545,7 @@ const categoryError = computed(() => {
                                 <div class="flex items-center gap-2">
                                     <button
                                         class="flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success transition hover:bg-success/20 active:scale-95"
-                                        @click="navigateTo('/order/in-session')"
+                                        @click="nuxtApp.$router.push('/order/in-session')"
                                     >
                                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -636,7 +637,7 @@ const categoryError = computed(() => {
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="() => navigateTo('/order/review')"
+                @submit-order="() => nuxtApp.$router.push('/order/review')"
                 @toggle-refill-mode="toggleRefillMode"
             />
         </div>

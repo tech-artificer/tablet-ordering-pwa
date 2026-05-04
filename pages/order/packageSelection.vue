@@ -9,8 +9,9 @@ import { useDeviceStore } from "../../stores/Device"
 import { logger } from "../../utils/logger"
 import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
 
-const menuStore = useMenuStore()
+const nuxtApp = useNuxtApp()
 const router = useRouter()
+const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const deviceStore = useDeviceStore()
@@ -21,14 +22,18 @@ onMounted(async () => {
     console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
 
     if (shouldAttemptActiveOrderRecovery()) {
-        const recovery = await recoverActiveOrderState("package-selection")
-        if (recovery.hasActiveOrder) {
-            console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
-            await router.replace({
-                path: "/menu",
-                query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
-            })
-            return
+        try {
+            const recovery = await recoverActiveOrderState("package-selection")
+            if (recovery.hasActiveOrder) {
+                console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
+                await nuxtApp.$router.replace({
+                    path: "/menu",
+                    query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
+                })
+                return
+            }
+        } catch (recoveryError: unknown) {
+            logger.error("[PackageSelection] Active order recovery failed — continuing with normal mount", recoveryError)
         }
     }
 

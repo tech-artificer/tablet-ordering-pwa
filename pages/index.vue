@@ -230,6 +230,7 @@ import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
 const deviceStore = useDeviceStore()
 const menuStore = useMenuStore()
 const router = useRouter()
+const nuxtApp = useNuxtApp()
 const route = useRoute()
 useBroadcasts()
 const { isOnline } = useNetworkStatus()
@@ -308,7 +309,7 @@ const start = () => {
     }
 
     console.log(`[✅ Device Ready] Navigating to guest counter at ${timestamp}`)
-    router.replace("/order/start")
+    void nuxtApp.$router.replace("/order/start")
 }
 
 const openSettings = (noticeOrEvent?: string | PointerEvent) => {
