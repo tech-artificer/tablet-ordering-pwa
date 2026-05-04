@@ -40,13 +40,24 @@ afterEach(() => {
 // path leaks in asset URLs. It is only meaningful on Windows CI runners.
 describe.skipIf(process.platform !== "win32")("nuxt dev runtime html", () => {
     it("does not expose absolute Windows filesystem paths in _nuxt entry URLs", async () => {
+        const childEnvRaw: NodeJS.ProcessEnv = {
+            ...process.env,
+            NODE_ENV: "development",
+            NUXT_DEVTOOLS: "false",
+            NUXT_TELEMETRY_DISABLED: "1",
+        }
+
+        // Vitest/Nuxt can leak incompatible vite-node IPC options into child env on Windows.
+        // Let the child Nuxt process configure its own socket path.
+        delete childEnvRaw.NUXT_VITE_NODE_OPTIONS
+
+        const childEnv: NodeJS.ProcessEnv = Object.fromEntries(
+            Object.entries(childEnvRaw).filter(([, value]) => typeof value === "string")
+        ) as NodeJS.ProcessEnv
+
         devServer = spawn(process.execPath, [NUXT_CLI_PATH, "dev", "--host", "127.0.0.1", "--port", String(DEV_SERVER_PORT)], {
             cwd: process.cwd(),
-            env: {
-                ...process.env,
-                NODE_ENV: "development",
-                NUXT_DEVTOOLS: "false",
-            },
+            env: childEnv,
             stdio: "pipe",
         })
 
