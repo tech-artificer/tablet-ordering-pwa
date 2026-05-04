@@ -1015,9 +1015,10 @@ export const useOrderStore = defineStore("order", () => {
             // during normal menu browsing. Only reset if session has expired/is inactive.
             const isActiveSession = sessionStore.getIsActive()
             const shouldSkipResetDueToActiveSession = isActiveSession && !state.hasPlacedOrder
+            const shouldClearStaleState = hasStaleTransactionalState && !shouldSkipResetDueToActiveSession
 
             if (!deviceStore.getToken()) {
-                if (hasStaleTransactionalState && !shouldSkipResetDueToActiveSession) {
+                if (shouldClearStaleState) {
                     logger.info("🔁 No token + no session.orderId: clearing stale transactional order state")
                     resetTransactionalState()
                 } else if (shouldSkipResetDueToActiveSession) {
@@ -1078,7 +1079,7 @@ export const useOrderStore = defineStore("order", () => {
             }
 
             // If still no orderId, reset stale hasPlacedOrder flag after a short grace
-            if (hasStaleTransactionalState && !shouldSkipResetDueToActiveSession) {
+            if (shouldClearStaleState) {
                 logger.info("🔁 No session.orderId found, resetting stale order state (with grace)")
                 // Apply a short grace period to avoid clearing during quick transitions
                 await new Promise(resolve => setTimeout(resolve, 1500))

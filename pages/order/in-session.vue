@@ -126,18 +126,6 @@ function updateCurrentTime () {
 
 let clockIntervalId: ReturnType<typeof setInterval> | null = null
 
-onMounted(() => {
-    updateCurrentTime()
-    clockIntervalId = setInterval(updateCurrentTime, 1000)
-})
-
-onUnmounted(() => {
-    if (clockIntervalId) {
-        clearInterval(clockIntervalId)
-        clockIntervalId = null
-    }
-})
-
 // ── Order round label (Initial Order / Refill #N) ─────────────────────────────
 const orderRound = computed<string>(() => {
     const h = (unref(orderStore.history) ?? []) as any[]
@@ -195,7 +183,7 @@ watch(idleWarning, (v) => {
     if (!v) { showIdleWarning.value = false }
 })
 
-// ── Navigation guards ─────────────────────────────────────────────────────────
+// ── Navigation guards + lifecycle ─────────────────────────────────────────────
 onMounted(() => {
     if (!sessionStore.isActive) {
         logger.warn("[in-session] No active session — redirecting to home")
@@ -207,11 +195,17 @@ onMounted(() => {
         navigateTo("/menu")
         return
     }
+    updateCurrentTime()
+    clockIntervalId = setInterval(updateCurrentTime, 1000)
     startIdleDetector()
 })
 
 onUnmounted(() => {
     stopIdleDetector()
+    if (clockIntervalId) {
+        clearInterval(clockIntervalId)
+        clockIntervalId = null
+    }
     if (endRedirectTimer) {
         clearTimeout(endRedirectTimer)
         endRedirectTimer = null
