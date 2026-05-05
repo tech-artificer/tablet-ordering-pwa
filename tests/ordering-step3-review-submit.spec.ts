@@ -25,7 +25,7 @@ describe("OrderingStep3ReviewSubmit", () => {
         const wrapper = mount(OrderingStep3ReviewSubmit)
         const button = wrapper.find("button")
 
-        expect(button.text()).toContain("Place Order")
+        expect(button.text()).toContain("Confirm & Send to Kitchen")
         expect(button.attributes("disabled")).toBeUndefined()
 
         await button.trigger("click")

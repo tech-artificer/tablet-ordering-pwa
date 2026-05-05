@@ -19,6 +19,11 @@ const triggerCelebration = () => {
     })
 }
 
+const handleGoBack = () => {
+    logger.info("[Order Review] Going back to menu")
+    router.push("/menu")
+}
+
 const handleOrderSubmitted = async () => {
     const timestamp = new Date().toISOString()
     logger.info("[Order Review] Order confirmation received", { timestamp })
@@ -68,7 +73,7 @@ const handleOrderSubmitted = async () => {
                             type="button"
                             class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center text-white/75 hover:text-white hover:bg-white/15 transition"
                             aria-label="Go back"
-                            @click="router.back()"
+                            @click="handleGoBack()"
                         >
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />

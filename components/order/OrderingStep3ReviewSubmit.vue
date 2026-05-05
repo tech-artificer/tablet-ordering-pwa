@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, unref, watch } from "vue"
+import { computed, ref, unref, watch, onMounted } from "vue"
 import { useOrderStore } from "~/stores/Order"
+import { useDeviceStore } from "~/stores/Device"
 import { logger } from "~/utils/logger"
 
 const emit = defineEmits<{
@@ -8,6 +9,7 @@ const emit = defineEmits<{
 }>()
 
 const orderStore = useOrderStore()
+const deviceStore = useDeviceStore()
 const submitError = ref<string | null>(null)
 
 type ReviewItem = {
@@ -15,12 +17,26 @@ type ReviewItem = {
     name: string
     quantity: number
     category: string | null
+    price?: number
+    img_url?: string | null
+    description?: string | null
 }
 
 const activeCart = computed<any[]>(() => (unref(orderStore.activeCart) as any[]) || [])
 
 const currentOrderSnapshot = computed<any>(() => {
     return (unref(orderStore.currentOrder) as any)?.order || unref(orderStore.currentOrder) || null
+})
+
+onMounted(() => {
+    logger.debug("[OrderingStep3ReviewSubmit] Store state on mount:", {
+        hasPlacedOrder: orderStore.hasPlacedOrder,
+        isRefillMode: orderStore.isRefillMode,
+        cartItemsCount: unref((orderStore.cartItems as any))?.length || 0,
+        refillItemsCount: unref((orderStore.refillItems as any))?.length || 0,
+        activeCartCount: activeCart.value?.length || 0,
+        packageId: (orderStore.package as any)?.id,
+    })
 })
 
 const fallbackServerItems = computed<ReviewItem[]>(() => {
@@ -38,29 +54,32 @@ const fallbackServerItems = computed<ReviewItem[]>(() => {
         if (isPackage && packageModifiers.length > 0) {
             packageModifiers.forEach((modifier: any, modifierIndex: number) => {
                 normalized.push({
-                    id: Number(modifier?.menu_id || modifier?.id || `${index}${modifierIndex}`),
+                    id: Number(modifier?.menu_id ?? modifier?.id ?? -(index * 1000 + modifierIndex + 1)),
                     name: String(modifier?.name || modifier?.receipt_name || `Inclusion ${modifierIndex + 1}`),
                     quantity: Number(modifier?.quantity || 1),
                     category: String(modifier?.category || "meats"),
+                    price: Number(modifier?.price || 0),
+                    img_url: modifier?.img_url || null,
+                    description: modifier?.description || null,
                 })
             })
             return
         }
 
         normalized.push({
-            id: Number(item?.menu_id || item?.id || index + 1),
+            id: Number(item?.menu_id ?? item?.id ?? -(index + 1)),
             name: String(item?.name || item?.receipt_name || `Item ${index + 1}`),
             quantity: Number(item?.quantity || 1),
             category: String(item?.category || (isPackage ? "meats" : "side")),
+            price: Number(item?.price || 0),
+            img_url: item?.img_url || null,
+            description: item?.description || null,
         })
     })
 
     return normalized
 })
 
-// When the order is already placed (Continue to Session), activeCart is empty
-// because setOrderCreated() clears cartItems. Use submittedItems for display
-// so the breakdown reflects what was actually ordered.
 const displayItems = computed<any[]>(() => {
     if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
         const submitted = (unref(orderStore.submittedItems) as any[]) || []
@@ -73,19 +92,6 @@ const displayItems = computed<any[]>(() => {
 
     return activeCart.value
 })
-
-const orderedMeats = computed(() =>
-    displayItems.value.filter((item: any) => {
-        const cat = String(item?.category || "").toLowerCase()
-        return cat === "meats" || cat === "meat" || cat.includes("meat")
-    })
-)
-const orderedAddOns = computed(() =>
-    displayItems.value.filter((item: any) => {
-        const cat = String(item?.category || "").toLowerCase()
-        return !(cat === "meats" || cat === "meat" || cat.includes("meat"))
-    })
-)
 
 function itemEmoji (item: any): string {
     const cat = String(item?.category ?? "").toLowerCase()
@@ -129,17 +135,45 @@ const packageNameDisplay = computed(() => {
     return String(packageLineItem?.name || "")
 })
 
-const orderStatusDisplay = computed(() => {
-    const status = String(currentOrderSnapshot.value?.status || "")
-    if (!status) {
-        return "Pending"
-    }
-    return status.replace(/_/g, " ")
+const packageDurationMinutes = computed(() => {
+    const pkg = orderStore.package as any
+    const candidate = pkg?.duration_minutes ?? pkg?.dining_minutes ?? pkg?.time_limit_minutes ?? null
+    return candidate ? Number(candidate) : null
 })
 
 const itemCountDisplay = computed(() =>
     displayItems.value.reduce((sum: number, item: any) => sum + Number(item?.quantity ?? 0), 0)
 )
+
+const tableLabel = computed(() => {
+    const tbl = (deviceStore.table as any) || {}
+    const name = tbl?.name ? String(tbl.name) : ""
+    const id = tbl?.id ? `Table ${tbl.id}` : ""
+    if (name && id) { return `${id} · ${name}` }
+    return name || id || "Table"
+})
+
+const subtotalDisplay = computed(() => Number((orderStore as any).addOnsTotal ?? unref((orderStore as any).addOnsTotal) ?? 0))
+const packagePriceDisplay = computed(() => Number((orderStore as any).packageTotal ?? unref((orderStore as any).packageTotal) ?? 0))
+const taxDisplay = computed(() => Number((orderStore as any).taxAmount ?? unref((orderStore as any).taxAmount) ?? 0))
+const totalDisplay = computed(() => Number((orderStore as any).grandTotal ?? unref((orderStore as any).grandTotal) ?? 0))
+const taxRateDisplay = computed(() => {
+    const rate = Number((orderStore.package as any)?.tax?.percentage || 0)
+    return rate > 0 ? `${rate}%` : ""
+})
+
+function formatPeso (value: number): string {
+    if (!Number.isFinite(value) || value === 0) { return "₱0" }
+    return `₱${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function itemPriceLabel (item: any): { text: string; isFree: boolean } {
+    const price = Number(item?.price ?? 0) * Number(item?.quantity ?? 1)
+    if (!Number.isFinite(price) || price <= 0) {
+        return { text: "FREE", isFree: true }
+    }
+    return { text: formatPeso(price), isFree: false }
+}
 
 const submitBlockers = computed(() => {
     const blockers: string[] = []
@@ -192,7 +226,7 @@ const buttonLabel = computed(() => {
     if (orderStore.isRefillMode) {
         return "Submit Refill"
     }
-    return "Place Order"
+    return "Confirm & Send to Kitchen"
 })
 
 async function submit (): Promise<void> {
@@ -225,115 +259,138 @@ async function submit (): Promise<void> {
 </script>
 
 <template>
-    <div class="rounded-3xl border border-white/10 bg-black/35 backdrop-blur-sm p-5 md:p-6 space-y-5">
-        <div class="flex items-end justify-between gap-4">
-            <div class="space-y-1">
-                <h2 class="text-xl font-extrabold text-white tracking-tight">
-                    Review &amp; Send to Kitchen
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 lg:gap-6">
+        <!-- LEFT: Your Order -->
+        <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
+            <div class="flex items-baseline gap-2 mb-4">
+                <h2 class="text-lg md:text-xl font-extrabold font-raleway text-white tracking-tight">
+                    Your Order
                 </h2>
-                <p class="text-sm text-white/60">
-                    Confirm your selections before final submission.
-                </p>
+                <span class="text-sm text-text-muted">({{ itemCountDisplay }} {{ itemCountDisplay === 1 ? 'item' : 'items' }})</span>
             </div>
-            <span class="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] uppercase tracking-[0.14em] font-bold text-primary">
-                Step 04
-            </span>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div class="lg:col-span-2 space-y-4">
-                <div v-if="orderedMeats.length > 0" class="space-y-2">
-                    <p class="text-xs font-semibold uppercase tracking-widest text-white/40">
-                        🔥 Meats
-                    </p>
-                    <div class="rounded-2xl border border-white/10 bg-white/5 divide-y divide-white/5 overflow-hidden">
-                        <div
-                            v-for="item in orderedMeats"
-                            :key="`meat-${item.id}`"
-                            class="flex items-center justify-between px-4 py-3 text-sm"
-                        >
-                            <span class="text-white/85 truncate">{{ item.name }}</span>
-                            <span class="text-white font-semibold ml-4 flex-shrink-0">×{{ item.quantity }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="orderedAddOns.length > 0" class="space-y-2">
-                    <p class="text-xs font-semibold uppercase tracking-widest text-white/40">
-                        🍽️ Add-ons
-                    </p>
-                    <div class="rounded-2xl border border-white/10 bg-white/5 divide-y divide-white/5 overflow-hidden">
-                        <div
-                            v-for="item in orderedAddOns"
-                            :key="`addon-${item.id}`"
-                            class="flex items-center justify-between px-4 py-3 text-sm"
-                        >
-                            <span class="flex items-center gap-2 text-white/85 truncate">
-                                <span>{{ itemEmoji(item) }}</span>
-                                {{ item.name }}
-                            </span>
-                            <span class="text-white font-semibold ml-4 flex-shrink-0">×{{ item.quantity }}</span>
-                        </div>
-                    </div>
-                </div>
-
+            <div v-if="displayItems.length > 0" class="space-y-3">
                 <div
-                    v-if="displayItems.length === 0"
-                    class="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center"
+                    v-for="(item, index) in displayItems"
+                    :key="`item-${item?.id ?? index}`"
+                    class="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3"
                 >
-                    <p class="text-white/75 font-semibold mb-1">
-                        No item details available yet
-                    </p>
-                    <p class="text-xs text-white/50">
-                        Your order is still safe. If this is your first order, go back and add items.
-                    </p>
-                </div>
+                    <div class="w-12 h-12 rounded-lg bg-accent-warm/60 border border-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        <img
+                            v-if="item?.img_url"
+                            :src="item.img_url"
+                            :alt="item?.name || 'Item'"
+                            class="w-full h-full object-cover"
+                        >
+                        <span v-else class="text-xl">{{ itemEmoji(item) }}</span>
+                    </div>
 
-                <p v-if="!orderStore.hasPlacedOrder && !orderStore.isRefillMode && activeCart.length === 0" class="text-xs text-white/40 text-center py-1">
-                    No items in cart yet. Go back to add items.
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm md:text-base font-bold text-white truncate">
+                            {{ item?.name }}
+                        </p>
+                        <p v-if="item?.description" class="text-xs text-text-muted truncate">
+                            {{ item.description }}
+                        </p>
+                    </div>
+
+                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-black/40 border border-white/10 text-xs font-bold text-white/85 flex-shrink-0">
+                        ×{{ item?.quantity }}
+                    </span>
+
+                    <span
+                        :class="[
+                            'text-sm font-bold flex-shrink-0 ml-1',
+                            itemPriceLabel(item).isFree ? 'text-success' : 'text-white'
+                        ]"
+                    >
+                        {{ itemPriceLabel(item).text }}
+                    </span>
+                </div>
+            </div>
+
+            <div v-else class="rounded-xl border border-white/10 bg-white/[0.03] p-6 text-center">
+                <p class="text-white/75 font-semibold mb-1">
+                    No item details available yet
+                </p>
+                <p class="text-xs text-text-hint">
+                    {{ orderStore.hasPlacedOrder
+                        ? 'Your order is on the way to the kitchen.'
+                        : 'Go back and add items to begin.' }}
+                </p>
+            </div>
+        </section>
+
+        <!-- RIGHT: Summary rail -->
+        <aside class="space-y-4">
+            <!-- Package card -->
+            <div class="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-accent-warm/40 to-secondary p-5">
+                <p class="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
+                    Package
+                </p>
+                <h3 class="text-xl md:text-2xl font-extrabold font-raleway text-white tracking-tight leading-tight">
+                    {{ packageNameDisplay || 'No package selected' }}
+                </h3>
+                <p class="mt-1.5 text-xs text-text-muted">
+                    {{ guestCountDisplay }} {{ guestCountDisplay === 1 ? 'guest' : 'guests' }}<span v-if="packageDurationMinutes"> · {{ packageDurationMinutes }} min dining</span>
                 </p>
             </div>
 
-            <div class="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 h-fit">
+            <!-- Pricing card -->
+            <div class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 space-y-2.5">
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-white/60">Guests</span>
-                    <span class="text-white font-semibold">{{ guestCountDisplay }}</span>
+                    <span class="text-text-muted">Subtotal</span>
+                    <span class="text-white/90 font-semibold">{{ formatPeso(subtotalDisplay) }}</span>
                 </div>
-
-                <div v-if="packageNameDisplay" class="flex items-center justify-between text-sm gap-3">
-                    <span class="text-white/60">Package</span>
-                    <span class="text-white font-semibold text-right truncate max-w-[170px]">{{ packageNameDisplay }}</span>
-                </div>
-
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-white/60">{{ orderStore.isRefillMode ? 'Refill items' : 'Items selected' }}</span>
-                    <span class="text-white font-semibold">{{ itemCountDisplay }}</span>
+                    <span class="text-text-muted">Package</span>
+                    <span class="text-white/90 font-semibold">{{ formatPeso(packagePriceDisplay) }}</span>
                 </div>
-
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-white/60">Status</span>
-                    <span class="text-success font-semibold capitalize">{{ orderStatusDisplay }}</span>
+                    <span class="text-text-muted">Tax<span v-if="taxRateDisplay"> ({{ taxRateDisplay }})</span></span>
+                    <span class="text-white/90 font-semibold">{{ formatPeso(taxDisplay) }}</span>
                 </div>
-
-                <div class="pt-1">
-                    <p v-if="submitError" class="text-sm text-red-400 mb-3">
-                        {{ submitError }}
-                    </p>
-
-                    <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-yellow-300 mb-3">
-                        {{ submitBlockers[0] }}
-                    </p>
-
-                    <button
-                        type="button"
-                        class="w-full py-3 rounded-xl font-bold transition disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary-dark text-secondary"
-                        :disabled="isButtonDisabled"
-                        @click="submit"
-                    >
-                        {{ orderStore.isSubmitting ? 'Submitting…' : buttonLabel }}
-                    </button>
+                <div class="border-t border-white/10 pt-2.5 mt-1 flex items-center justify-between">
+                    <span class="text-base font-bold text-white">Total</span>
+                    <span class="text-2xl font-extrabold font-raleway text-primary">
+                        {{ formatPeso(totalDisplay) }}
+                    </span>
                 </div>
             </div>
-        </div>
+
+            <!-- Table card -->
+            <div class="rounded-2xl border border-success/30 bg-success/10 p-4 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center flex-shrink-0 text-base">
+                    🪑
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-bold text-white truncate">
+                        {{ tableLabel }}
+                    </p>
+                    <p class="text-xs text-text-muted truncate">
+                        Order will be sent to grill station
+                    </p>
+                </div>
+            </div>
+
+            <!-- Errors / blockers -->
+            <p v-if="submitError" class="text-sm text-error font-semibold">
+                {{ submitError }}
+            </p>
+            <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
+                {{ submitBlockers[0] }}
+            </p>
+
+            <!-- CTA -->
+            <button
+                type="button"
+                class="w-full py-4 rounded-2xl font-extrabold font-raleway text-base tracking-tight transition disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary-dark text-secondary shadow-glow hover:shadow-glow active:scale-[0.99]"
+                :disabled="isButtonDisabled"
+                @click="submit"
+            >
+                <span v-if="orderStore.isSubmitting">Submitting…</span>
+                <span v-else>{{ buttonLabel }} →</span>
+            </button>
+        </aside>
     </div>
 </template>
