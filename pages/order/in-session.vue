@@ -7,6 +7,7 @@ import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
 import { useApi } from "~/composables/useApi"
 import { useIdleDetector } from "~/composables/useIdleDetector"
+import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 import { logger } from "~/utils/logger"
 
 // ── Stores ───────────────────────────────────────────────────────────────────
@@ -135,34 +136,27 @@ const orderRound = computed<string>(() => {
     return `Refill #${refillCount}`
 })
 
-// ── Session-end screen ────────────────────────────────────────────────────────
-const showEndScreen = ref(false)
-let endRedirectTimer: ReturnType<typeof setTimeout> | null = null
-
-const handleSessionEnd = () => {
-    if (showEndScreen.value) { return }
-    // Claim ownership of the terminal flow so Order.ts polling does not double-end.
-    sessionStore.markTerminalHandled()
-    showEndScreen.value = true
-    logger.info("[in-session] Session ended — showing thank-you screen")
-    if (sessionStore.isActive) {
-        void sessionStore.end().catch((e: unknown) => logger.warn("[in-session] sessionStore.end() failed", e))
-    }
-    endRedirectTimer = setTimeout(() => {
-        navigateTo("/")
-    }, 5000)
-}
+// ── Session-end ──────────────────────────────────────────────────────────────
+const { triggerSessionEnd } = useSessionEndFlow()
 
 watch(
     () => sessionStore.timerExpired,
-    (expired) => { if (expired) { handleSessionEnd() } },
+    (expired) => {
+        if (expired) {
+            logger.info("[in-session] Session timer expired — ending session")
+            triggerSessionEnd("unknown", { source: "timer" })
+        }
+    },
     { immediate: true }
 )
 
 watch(orderStatus, (status) => {
-    if (status !== "pending" && status !== "confirmed") {
-        logger.info("[in-session] Order status changed to non-live — ending session", { status })
-        handleSessionEnd()
+    if (["completed", "voided", "cancelled"].includes(status)) {
+        logger.info("[in-session] Terminal order status — ending session", { status })
+        triggerSessionEnd(status as "completed" | "voided" | "cancelled", {
+            source: "in-session",
+            orderNumber: orderNumber.value ?? undefined,
+        })
     }
 }, { immediate: true })
 
@@ -176,8 +170,7 @@ const { isWarning: idleWarning, start: startIdleDetector, stop: stopIdleDetector
     onExpire () {
         showIdleWarning.value = false
         logger.warn("[in-session] Idle timeout — ending session")
-        sessionStore.endSession()
-        navigateTo("/")
+        triggerSessionEnd("unknown", { source: "in-session" })
     },
 })
 
@@ -207,10 +200,6 @@ onUnmounted(() => {
     if (clockIntervalId) {
         clearInterval(clockIntervalId)
         clockIntervalId = null
-    }
-    if (endRedirectTimer) {
-        clearTimeout(endRedirectTimer)
-        endRedirectTimer = null
     }
 })
 
@@ -272,31 +261,8 @@ definePageMeta({ middleware: ["order-guard"] })
         @error="(err: unknown) => logger.error('[in-session] Page error boundary caught', err)"
     >
         <template #default>
-            <!-- ── Session-end Thank-You Screen ────────────────────────────────── -->
-            <div
-                v-if="showEndScreen"
-                class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#080706]"
-            >
-                <div class="flex flex-col items-center gap-6">
-                    <div class="flex h-24 w-24 items-center justify-center rounded-full border border-[#e9d3aa]/20 bg-[#1e1a16]">
-                        <UtensilsCrossed class="h-10 w-10 text-[#e9d3aa]" />
-                    </div>
-                    <div class="text-center">
-                        <h1 class="text-4xl font-bold tracking-tight text-[#f0e6d2]">
-                            Thank You!
-                        </h1>
-                        <p class="mt-3 text-base text-[#9b9484]">
-                            We hope you enjoyed your meal.
-                        </p>
-                    </div>
-                    <p class="text-sm text-[#7a776f]">
-                        Returning to the welcome screen…
-                    </p>
-                </div>
-            </div>
-
             <!-- ── Main In-Session Layout ──────────────────────────────────────── -->
-            <div v-else class="flex h-dvh overflow-hidden bg-[#080706]">
+            <div class="flex h-dvh overflow-hidden bg-[#080706]">
                 <!-- ══ LEFT COLUMN — Order Stream ════════════════════════════════ -->
                 <div class="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-white/5">
                     <!-- Header -->

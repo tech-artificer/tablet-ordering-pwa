@@ -223,7 +223,6 @@ import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
-import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useMenuStore } from "~/stores/Menu"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
@@ -232,7 +231,6 @@ const menuStore = useMenuStore()
 const router = useRouter()
 const nuxtApp = useNuxtApp()
 const route = useRoute()
-useBroadcasts()
 const { isOnline } = useNetworkStatus()
 
 // On the welcome screen, show real network connectivity — not WebSocket subscription

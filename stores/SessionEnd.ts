@@ -2,7 +2,7 @@ import { defineStore } from "pinia"
 import { reactive, toRefs } from "vue"
 
 export type SessionEndReason = "completed" | "voided" | "cancelled" | "unknown"
-export type SessionEndSource = "broadcast" | "polling" | "watcher" | "in-session"
+export type SessionEndSource = "broadcast" | "polling" | "watcher" | "in-session" | "timer"
 
 interface SessionEndState {
   active: boolean
@@ -46,10 +46,10 @@ export const useSessionEndStore = defineStore("session-end", () => {
         return ["completed", "voided", "cancelled", "unknown"].includes(reason)
     }
 
-    return ({
+    return {
         ...toRefs(state),
         startTransition,
         clearTransition,
         isTerminalReason,
-    } as unknown) as any
+    }
 })

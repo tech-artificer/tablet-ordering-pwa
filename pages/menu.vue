@@ -5,6 +5,7 @@ import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
 import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../composables/useActiveOrderRecovery"
 import { useSessionStore } from "../stores/Session"
+import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
 import { notifyWarning, notifyInfo } from "../composables/useNotifier"
 import { useDeviceStore } from "../stores/Device"
@@ -158,15 +159,15 @@ watch(() => orderStore.package, (storePackage) => {
 })
 
 // Watch for order completion status changes and redirect when completed
+const { triggerSessionEnd } = useSessionEndFlow()
 watch(
     () => orderStore.getCurrentOrderStatus(),
     (newStatus) => {
         if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
-            setTimeout(() => {
-                sessionStore.end()
-                router.replace("/")
-            }, 2000)
+            triggerSessionEnd(newStatus as "completed" | "cancelled" | "voided", {
+                source: "watcher",
+            })
         }
     }
 )

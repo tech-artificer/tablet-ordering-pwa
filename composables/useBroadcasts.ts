@@ -1,11 +1,11 @@
-import { ref } from "vue"
-import { useRouter } from "vue-router"
+import { ref, watch } from "vue"
 import { ElNotification, ElMessage } from "element-plus"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
 import { extractOrderId } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
+import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 
 // ─── WebSocket event interfaces ────────────────────────────────────────────
 // Shapes MUST stay in sync with woosoo-nexus broadcast events.
@@ -124,10 +124,10 @@ interface DeviceControlEvent {
 }
 
 export const useBroadcasts = () => {
-    const router = useRouter()
     const deviceStore = useDeviceStore()
     const orderStore = useOrderStore()
     const sessionStore = useSessionStore()
+    const { triggerSessionEnd } = useSessionEndFlow()
 
     const getCurrentOrderId = (): string | number | null => extractOrderId(orderStore.getCurrentOrder())
     const getEventOrderId = (payload: { order?: Record<string, any> }): string | number | null => extractOrderId(payload?.order ?? payload)
@@ -136,7 +136,9 @@ export const useBroadcasts = () => {
     let orderChannel: any = null
     let serviceRequestChannel: any = null
     let deviceControlChannel: any = null
-    let orderCompletionTimeoutId: number | null = null
+    let sessionChannel: any = null
+    let subscribedSessionId: number | string | null = null
+    let stopSessionIdWatcher: (() => void) | null = null
     let reloadTimeoutId: number | null = null
 
     // BUG-7 Fix: Exponential backoff for WebSocket reconnection
@@ -254,16 +256,14 @@ export const useBroadcasts = () => {
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(order.status)
-            // Stop polling and end session for any status that is no longer live
-            if (order.status !== "pending" && order.status !== "confirmed") {
+            // End session only on genuine terminal statuses — in_progress, ready, served are intermediate
+            if (["completed", "voided", "cancelled"].includes(order.status)) {
                 try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
-
-                logger.info("[Broadcasts] Non-live order status via broadcast — ending session in 2s", { status: order.status })
-                if (orderCompletionTimeoutId) { window.clearTimeout(orderCompletionTimeoutId) }
-                orderCompletionTimeoutId = window.setTimeout(async () => {
-                    sessionStore.end()
-                    await router.replace("/")
-                }, 2000)
+                logger.info("[Broadcasts] Terminal order status via broadcast — ending session", { status: order.status })
+                triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", {
+                    source: "broadcast",
+                    orderNumber: order.order_number,
+                })
             }
         }
     }
@@ -287,14 +287,11 @@ export const useBroadcasts = () => {
         if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
             orderStore.completeOrder()
             try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
-
-            // End session and navigate to home after a short delay
-            logger.info("✅ Order completed via broadcast - ending session in 2s")
-            if (orderCompletionTimeoutId) { window.clearTimeout(orderCompletionTimeoutId) }
-            orderCompletionTimeoutId = window.setTimeout(async () => {
-                sessionStore.end()
-                await router.replace("/")
-            }, 2000)
+            logger.info("✅ Order completed via broadcast — ending session")
+            triggerSessionEnd("completed", {
+                source: "broadcast",
+                orderNumber: event.order.order_number,
+            })
         }
     }
 
@@ -314,13 +311,11 @@ export const useBroadcasts = () => {
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
             orderStore.clearOrder()
             try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
-
-            logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session in 2s")
-            if (orderCompletionTimeoutId) { window.clearTimeout(orderCompletionTimeoutId) }
-            orderCompletionTimeoutId = window.setTimeout(async () => {
-                sessionStore.end()
-                await router.replace("/")
-            }, 2000)
+            logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session")
+            triggerSessionEnd(event.order.status, {
+                source: "broadcast",
+                orderNumber: event.order.order_number,
+            })
         }
     }
 
@@ -513,11 +508,59 @@ export const useBroadcasts = () => {
         }
     }
 
+    const subscribeToSessionChannel = (sessionId: number | string) => {
+        if (!sessionId || !(window as any).Echo) { return }
+        unsubscribeFromSessionChannel()
+        logger.debug("[Echo] Subscribing to session." + sessionId)
+        sessionChannel = (window as any).Echo.channel(`session.${sessionId}`)
+            .listen(".session.reset", (_event: { session_id: number; version: number }) => {
+                logger.info("[Broadcasts] session.reset received — ending session", { session_id: _event.session_id })
+                triggerSessionEnd("unknown", { source: "broadcast" })
+            })
+        subscribedSessionId = sessionId
+        logger.debug(`✅ Subscribed to session.${sessionId}`)
+    }
+
+    const unsubscribeFromSessionChannel = () => {
+        if (sessionChannel && subscribedSessionId) {
+            const canLeave = typeof (window as any).Echo?.leave === "function"
+            if (canLeave) {
+                ;(window as any).Echo.leave(`session.${subscribedSessionId}`)
+            }
+        }
+        sessionChannel = null
+        subscribedSessionId = null
+    }
+
+    const ensureSessionChannelAutoSubscription = () => {
+        if (stopSessionIdWatcher) { return }
+
+        // Own session.{id} subscription from the long-lived app bootstrap closure.
+        // This prevents page-scoped closures from registering listeners that cleanup()
+        // can never reach.
+        stopSessionIdWatcher = watch(
+            () => sessionStore.getSessionId(),
+            (sessionId) => {
+                if (!sessionId) {
+                    unsubscribeFromSessionChannel()
+                    return
+                }
+                if (String(subscribedSessionId) === String(sessionId)) { return }
+                subscribeToSessionChannel(sessionId)
+            },
+            { immediate: true }
+        )
+    }
+
     const resubscribeChannels = () => {
         subscribeToDeviceChannel()
         const currentOrderId = sessionStore.getOrderId()
         if (currentOrderId) {
             subscribeToOrderChannel(String(currentOrderId))
+        }
+        const currentSessionId = sessionStore.getSessionId()
+        if (currentSessionId) {
+            subscribeToSessionChannel(currentSessionId)
         }
     }
 
@@ -592,16 +635,15 @@ export const useBroadcasts = () => {
             subscribeToOrderChannel(currentOrderId.toString())
         }
 
+        // Keep session.{id} subscription in sync with session lifecycle.
+        ensureSessionChannelAutoSubscription()
+
         bindConnectionStateHandler()
     }
 
     // Cleanup on unmount
     const cleanup = () => {
     // Clear any pending timeouts to prevent memory leaks in kitchen environment
-        if (orderCompletionTimeoutId) {
-            try { window.clearTimeout(orderCompletionTimeoutId) } catch (e) { logger.debug("[Broadcasts] cleanup clearTimeout failed", e) }
-            orderCompletionTimeoutId = null
-        }
         if (reloadTimeoutId) {
             try { window.clearTimeout(reloadTimeoutId) } catch (e) { logger.debug("[Broadcasts] cleanup clearTimeout failed", e) }
             reloadTimeoutId = null
@@ -614,6 +656,11 @@ export const useBroadcasts = () => {
         reconnectAttempts = 0
 
         unsubscribeFromOrderChannel()
+        unsubscribeFromSessionChannel()
+        if (stopSessionIdWatcher) {
+            stopSessionIdWatcher()
+            stopSessionIdWatcher = null
+        }
         unsubscribeDeviceChannels()
         unbindConnectionStateHandler()
         resetChannelStatus()
@@ -623,6 +670,7 @@ export const useBroadcasts = () => {
         initializeBroadcasts,
         subscribeToOrderChannel,
         unsubscribeFromOrderChannel,
+        subscribeToSessionChannel,
         cleanup,
         channelStatus
     }

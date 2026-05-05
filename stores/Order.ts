@@ -1,14 +1,16 @@
 import { defineStore } from "pinia"
 import { reactive, computed, toRefs, onScopeDispose } from "vue"
 import { useApi } from "../composables/useApi"
+import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { useOfflineOrderQueue } from "../composables/useOfflineOrderQueue"
 import { logger } from "../utils/logger"
-import { extractOrderId, extractOrderNumber } from "../utils/orderHelpers"
+import { extractOrderId } from "../utils/orderHelpers"
 import { notifyBlockedAction } from "../composables/useNotifier"
 import type { CartItem, Package, MenuItem, SubmittedItem, OrderApiResponse, OrderPayload, OrderPayloadItem } from "../types"
 import { API_ENDPOINTS } from "../config/api"
 import { useDeviceStore } from "./Device"
 import { useSessionStore } from "./Session"
+import type { SessionEndReason } from "./SessionEnd"
 
 // Module-level constant — cap on how many unlimited items can be added.
 const UNLIMITED_ITEM_CAP = 5
@@ -39,7 +41,6 @@ export const useOrderStore = defineStore("order", () => {
     })
 
     let pollIntervalId: ReturnType<typeof setInterval> | null = null
-    let completionTimeoutId: number | null = null
     let pollStartTime: number | null = null
     const maxPollingRuntimeMs = 15 * 60 * 1000
 
@@ -47,16 +48,6 @@ export const useOrderStore = defineStore("order", () => {
         state.error = message
         state.isSubmitting = false
         logger.error("[Order Store Error]", message)
-    }
-
-    function clearCompletionTimeout () {
-        if (!completionTimeoutId) { return }
-        try {
-            clearTimeout(completionTimeoutId)
-        } catch (e) {
-            logger.debug("clearCompletionTimeout failed", e)
-        }
-        completionTimeoutId = null
     }
 
     function resetTransactionalState (options?: { clearHistory?: boolean }) {
@@ -820,7 +811,6 @@ export const useOrderStore = defineStore("order", () => {
         state.pollInflight = false
         state.pollingOrderId = null
         pollStartTime = null
-        clearCompletionTimeout()
         logger.debug("✅ Order polling stopped")
     }
 
@@ -904,63 +894,21 @@ export const useOrderStore = defineStore("order", () => {
                         // ignore
                     }
 
-                    // Stop polling on any non-live status and end the session.
-                    // Live statuses are pending and confirmed only; everything else
-                    // (preparing, ready, served, completed, voided, cancelled, etc.) ends the guest session.
-                    if (statusNormalized !== "pending" && statusNormalized !== "confirmed") {
+                    // Stop polling and end session only on genuine terminal statuses.
+                    // Intermediate statuses (in_progress, ready, served) are valid kitchen workflow
+                    // states — the session must stay alive until the order truly ends.
+                    if (["completed", "voided", "cancelled"].includes(statusNormalized)) {
                         logger.info("[Polling] Terminal status observed", { orderId, status })
                         stopPolling()
 
                         try {
-                            // Small delay to allow any final UI updates. Await session end
-                            // and clear order state immediately to avoid a refill UI loop.
-                            clearCompletionTimeout()
-                            completionTimeoutId = window.setTimeout(async () => {
-                                try {
-                                    // Load session store instance and call end
-                                    const sessionStore = useSessionStore()
-
-                                    // If in-session.vue has already claimed ownership of the terminal
-                                    // flow (markTerminalHandled was called), skip the redundant
-                                    // teardown and redirect so we don't double-end or skip the 5s flow.
-                                    if (sessionStore.isTerminalHandled()) {
-                                        logger.debug("[Polling] Terminal flow already owned by in-session page — skipping store teardown", { orderId })
-                                        return
-                                    }
-
-                                    try {
-                                        if (sessionStore.end) {
-                                            const res = sessionStore.end()
-                                            if (res && typeof (res as any).then === "function") { await res }
-                                        }
-                                    } catch (e) {
-                                        logger.warn("sessionStore.end() threw:", e)
-                                    }
-
-                                    // Immediately clear local order state to prevent UI flicker/loop
-                                    try {
-                                        state.cartItems = []
-                                        state.refillItems = []
-                                        state.submittedItems = []
-                                        state.package = null
-                                        state.currentOrder = null
-                                        state.hasPlacedOrder = false
-                                        state.isRefillMode = false
-                                    } catch (e) {
-                                        logger.warn("Failed to clear order state after terminal status:", e)
-                                    }
-
-                                    // Navigate to home page without reload to preserve fullscreen
-                                    const nuxtApp = useNuxtApp()
-                                    await nuxtApp.$router.replace("/")
-                                } catch (e) {
-                                    logger.warn("Failed to end session on terminal order status:", e)
-                                } finally {
-                                    completionTimeoutId = null
-                                }
-                            }, 2000)
+                            const { triggerSessionEnd } = useSessionEndFlow()
+                            await triggerSessionEnd(statusNormalized as SessionEndReason, {
+                                source: "polling",
+                                orderNumber: orderObj?.order_number ?? null,
+                            })
                         } catch (e) {
-                            logger.warn("Failed to end session on terminal order status:", e)
+                            logger.warn("[Polling] terminal session-end handling failed", e)
                         }
                     }
                 }
@@ -1195,7 +1143,6 @@ export const useOrderStore = defineStore("order", () => {
 
     onScopeDispose(() => {
         stopPolling()
-        clearCompletionTimeout()
     })
 
     return {

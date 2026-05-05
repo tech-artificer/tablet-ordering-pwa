@@ -1,31 +1,27 @@
-import { computed, defineComponent, nextTick, ref, watch } from "vue"
+import { computed, defineComponent, nextTick, watch } from "vue"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
+import { useSessionEndStore } from "~/stores/SessionEnd"
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+const TERMINAL_STATUSES = ["completed", "voided", "cancelled"] as const
+
 /**
- * Minimal harness that replicates only the orderStatus watcher + handleSessionEnd
- * from in-session.vue, using the REAL pinia stores.
+ * Minimal harness that replicates only the orderStatus watcher from in-session.vue,
+ * using the REAL pinia stores and the same terminal-status condition as the live code.
  *
- * This lets us test reactive behaviour (watcher fires, terminal handled flag set)
- * without mounting the full Nuxt SFC, which requires mocking ~20 Nuxt composables.
+ * Idempotency is guarded by sessionEndStore.active (matching the live useSessionEndStore pattern).
  */
 function makeWatcherHarness () {
     const sessionStore = useSessionStore()
     const orderStore = useOrderStore()
-    const showEndScreen = ref(false)
-
-    function handleSessionEnd () {
-        if (showEndScreen.value) { return }
-        sessionStore.markTerminalHandled()
-        showEndScreen.value = true
-    }
+    const sessionEndStore = useSessionEndStore()
 
     // Mirror the exact computed chain from in-session.vue
     const currentOrder = computed(() => {
@@ -38,16 +34,18 @@ function makeWatcherHarness () {
     const Harness = defineComponent({
         setup () {
             watch(orderStatus, (status) => {
-                if (status !== "pending" && status !== "confirmed") {
-                    handleSessionEnd()
+                if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
+                    if (!sessionEndStore.active) {
+                        sessionEndStore.startTransition({ reason: status as any, orderNumber: null, source: "in-session" })
+                    }
                 }
             }, { immediate: true })
-            return { showEndScreen }
+            return {}
         },
         template: "<div />",
     })
 
-    return { Harness, sessionStore, orderStore, showEndScreen }
+    return { Harness, sessionStore, orderStore, sessionEndStore }
 }
 
 // ---------------------------------------------------------------------------
@@ -65,73 +63,87 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
     })
 
     it("fires immediately (immediate: true) and ends session when initial status is terminal", async () => {
-        const { Harness, sessionStore, orderStore } = makeWatcherHarness()
+        const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "completed" } } as any)
         mount(Harness)
         await nextTick()
-        expect(sessionStore.isTerminalHandled()).toBe(true)
+        expect(sessionEndStore.active).toBe(true)
     })
 
     it("does NOT end session when initial status is pending", async () => {
-        const { Harness, sessionStore, orderStore } = makeWatcherHarness()
+        const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
         mount(Harness)
         await nextTick()
-        expect(sessionStore.isTerminalHandled()).toBe(false)
+        expect(sessionEndStore.active).toBe(false)
     })
 
     it("does NOT end session when initial status is confirmed", async () => {
-        const { Harness, sessionStore, orderStore } = makeWatcherHarness()
+        const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "confirmed" } } as any)
         mount(Harness)
         await nextTick()
-        expect(sessionStore.isTerminalHandled()).toBe(false)
+        expect(sessionEndStore.active).toBe(false)
     })
 
     it("ends session when status transitions from live to completed", async () => {
-        const { Harness, sessionStore, orderStore } = makeWatcherHarness()
+        const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
         mount(Harness)
         await nextTick()
-        expect(sessionStore.isTerminalHandled()).toBe(false)
+        expect(sessionEndStore.active).toBe(false)
 
         orderStore.updateOrderStatus("completed")
         await nextTick()
-        expect(sessionStore.isTerminalHandled()).toBe(true)
+        expect(sessionEndStore.active).toBe(true)
     })
 
-    it.each(["preparing", "ready", "voided", "cancelled"])(
-        "ends session for terminal status %s — regression: any non-live status, not just 'completed'",
+    it.each(["completed", "voided", "cancelled"])(
+        "ends session for terminal status %s",
         async (terminalStatus) => {
             setActivePinia(createPinia())
             vi.stubGlobal("navigateTo", vi.fn())
-            const { Harness, sessionStore, orderStore } = makeWatcherHarness()
+            const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
             orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
             mount(Harness)
             await nextTick()
 
             orderStore.updateOrderStatus(terminalStatus)
             await nextTick()
-            expect(sessionStore.isTerminalHandled()).toBe(true)
+            expect(sessionEndStore.active).toBe(true)
         }
     )
 
-    it("handleSessionEnd is idempotent — second terminal status does not re-fire", async () => {
-        const { Harness, sessionStore, orderStore, showEndScreen } = makeWatcherHarness()
+    it.each(["in_progress", "preparing", "ready", "served"])(
+        "does NOT end session for non-terminal intermediate status %s",
+        async (nonTerminalStatus) => {
+            setActivePinia(createPinia())
+            vi.stubGlobal("navigateTo", vi.fn())
+            const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
+            orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
+            mount(Harness)
+            await nextTick()
+
+            orderStore.updateOrderStatus(nonTerminalStatus)
+            await nextTick()
+            expect(sessionEndStore.active).toBe(false)
+        }
+    )
+
+    it("startTransition is idempotent — second terminal status does not re-claim", async () => {
+        const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
         mount(Harness)
         await nextTick()
 
         orderStore.updateOrderStatus("completed")
         await nextTick()
-        expect(showEndScreen.value).toBe(true)
-        expect(sessionStore.isTerminalHandled()).toBe(true)
+        expect(sessionEndStore.active).toBe(true)
 
-        // A second terminal status must not double-fire (showEndScreen guard)
+        // A second terminal status must not re-fire startTransition
         orderStore.updateOrderStatus("voided")
         await nextTick()
-        // State unchanged — handleSessionEnd returned early
-        expect(showEndScreen.value).toBe(true)
-        expect(sessionStore.isTerminalHandled()).toBe(true)
+        // active remains true — already claimed
+        expect(sessionEndStore.active).toBe(true)
     })
 })
