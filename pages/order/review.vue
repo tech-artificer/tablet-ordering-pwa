@@ -46,19 +46,34 @@ const handleOrderSubmitted = async () => {
 
 <template>
     <NuxtErrorBoundary>
-        <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-4 md:p-8">
-            <div class="max-w-4xl mx-auto">
-                <div class="flex items-center gap-3 mb-8">
-                    <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                        3
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold font-raleway text-white">
-                            Review & Confirm
-                        </h1>
-                        <p class="text-sm text-white/50">
-                            Double-check your order before submitting
-                        </p>
+        <div class="min-h-screen bg-app-grid text-white px-4 py-5 md:px-6 md:py-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-sm px-4 py-3 md:px-5 md:py-4 mb-5 md:mb-6">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center text-primary font-bold">
+                                4
+                            </div>
+                            <div>
+                                <p class="text-primary/90 text-[11px] uppercase tracking-[0.16em] font-bold leading-none mb-1">
+                                    Step 04 • Confirm Order
+                                </p>
+                                <h1 class="text-xl md:text-2xl font-extrabold font-raleway text-white tracking-tight">
+                                    Review &amp; Send to Kitchen
+                                </h1>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center text-white/75 hover:text-white hover:bg-white/15 transition"
+                            aria-label="Go back"
+                            @click="router.back()"
+                        >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 

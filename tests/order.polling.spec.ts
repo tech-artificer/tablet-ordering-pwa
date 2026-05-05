@@ -76,8 +76,9 @@ describe("order polling fallback", () => {
         await Promise.resolve()
         await Promise.resolve()
 
-        // The canonical order should be updated to completed and polling stopped
-        expect(order.getCurrentOrder()?.order?.status).toBe("completed")
+        // Terminal polling now routes through useSessionEndFlow("polling"),
+        // which ends the session and clears transactional order state.
+        expect(order.getCurrentOrder()).toBeNull()
         expect(order.getIsPolling()).toBe(false)
         expect(order.getPollTimerId()).toBeNull()
     })

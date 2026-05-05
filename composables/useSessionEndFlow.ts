@@ -1,7 +1,40 @@
+import { useRouter } from "vue-router"
 import { useSessionEndStore, type SessionEndReason, type SessionEndSource } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
 import { logger } from "~/utils/logger"
+
+type RouterLike = {
+    replace: (to: unknown) => Promise<unknown> | unknown
+}
+
+function resolveRouter (): RouterLike {
+    const maybeUseNuxtApp = (globalThis as any)?.useNuxtApp
+    if (typeof maybeUseNuxtApp === "function") {
+        const nuxtApp = maybeUseNuxtApp()
+        const nuxtRouter = nuxtApp?.$router
+        if (nuxtRouter && typeof nuxtRouter.replace === "function") {
+            return nuxtRouter as RouterLike
+        }
+    }
+
+    // Test fallback (Vitest unit tests mock useRouter from vue-router).
+    // In non-component contexts without a mock, useRouter() may throw or return
+    // an unusable value — fall back to a noop router to keep terminal cleanup
+    // deterministic during unit tests.
+    try {
+        const router = useRouter() as unknown as RouterLike
+        if (router && typeof router.replace === "function") {
+            return router
+        }
+    } catch (_) {
+        // ignore and use noop router below
+    }
+
+    return {
+        replace: async () => undefined,
+    }
+}
 
 export function useSessionEndFlow () {
     const sessionEndStore = useSessionEndStore()
@@ -42,7 +75,7 @@ export function useSessionEndFlow () {
         const query: Record<string, string> = { reason }
         if (options.orderNumber) { query.order = options.orderNumber }
 
-        const router = useNuxtApp().$router
+        const router = resolveRouter()
         try {
             await router.replace({ path: "/order/session-ended", query })
         } catch (e) {
@@ -53,7 +86,7 @@ export function useSessionEndFlow () {
 
     function finalizeAndReturnHome () {
         sessionEndStore.clearTransition()
-        useNuxtApp().$router.replace("/")
+        resolveRouter().replace("/")
     }
 
     return { triggerSessionEnd, finalizeAndReturnHome }

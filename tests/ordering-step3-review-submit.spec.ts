@@ -68,4 +68,30 @@ describe("OrderingStep3ReviewSubmit", () => {
         await button.trigger("click")
         expect(wrapper.text()).toContain("Select at least one meat")
     })
+
+    it("renders fallback items from currentOrder when submittedItems are empty", () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(true)
+        order.setIsRefillMode(false)
+        order.setSubmittedItems([])
+        order.setCurrentOrder({
+            order: {
+                status: "pending",
+                items: [
+                    {
+                        id: 100,
+                        is_package: true,
+                        modifiers: [
+                            { menu_id: 201, name: "Korean Chili Samgyupsal", quantity: 2 },
+                        ],
+                    },
+                ],
+            },
+        } as any)
+
+        const wrapper = mount(OrderingStep3ReviewSubmit)
+
+        expect(wrapper.text()).toContain("Korean Chili Samgyupsal")
+        expect(wrapper.text()).toContain("×2")
+    })
 })
