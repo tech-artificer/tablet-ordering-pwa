@@ -24,34 +24,6 @@
             <div class="absolute inset-0" style="background: radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, rgba(0,0,0,0.45) 100%)" />
         </div>
 
-        <!-- Subtle Branded Accent (bottom, decorative) -->
-        <div class="absolute bottom-0 left-0 right-0 z-0 pointer-events-none flex justify-center" aria-hidden="true">
-            <svg
-                width="320"
-                height="64"
-                viewBox="0 0 320 64"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-[80vw] max-w-xl h-16 opacity-20"
-            >
-                <ellipse cx="160" cy="32" rx="150" ry="20" fill="url(#accentGradient)" />
-                <defs>
-                    <linearGradient
-                        id="accentGradient"
-                        x1="0"
-                        y1="32"
-                        x2="320"
-                        y2="32"
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <stop stop-color="#F6B56D" stop-opacity="0.5" />
-                        <stop offset="0.5" stop-color="#F6B56D" stop-opacity="0.2" />
-                        <stop offset="1" stop-color="#F6B56D" stop-opacity="0.5" />
-                    </linearGradient>
-                </defs>
-            </svg>
-        </div>
-
         <!-- Content Layer -->
         <div class="relative z-10 flex flex-col h-full items-center justify-center px-6">
             <!-- PIN modal -->

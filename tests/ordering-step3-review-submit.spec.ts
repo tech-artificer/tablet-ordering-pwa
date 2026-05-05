@@ -94,4 +94,31 @@ describe("OrderingStep3ReviewSubmit", () => {
         expect(wrapper.text()).toContain("Korean Chili Samgyupsal")
         expect(wrapper.text()).toContain("×2")
     })
+
+    it("renders fallback items from order_items even before hasPlacedOrder flips true", () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(false)
+        order.setIsRefillMode(false)
+        order.setSubmittedItems([])
+        order.setCartItems([])
+        order.setCurrentOrder({
+            order: {
+                status: "pending",
+                order_items: [
+                    {
+                        id: 301,
+                        name: "Cheese Corn",
+                        quantity: 1,
+                        category: "side",
+                        price: 0,
+                    },
+                ],
+            },
+        } as any)
+
+        const wrapper = mount(OrderingStep3ReviewSubmit)
+
+        expect(wrapper.text()).toContain("Cheese Corn")
+        expect(wrapper.text()).toContain("×1")
+    })
 })

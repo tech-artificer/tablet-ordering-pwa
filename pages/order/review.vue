@@ -82,6 +82,10 @@ const handleOrderSubmitted = async () => {
                     </div>
                 </div>
 
+                <!-- TEMP TEST: remove after diagnosis -->
+                <div style="background:red;color:white;padding:20px;font-size:18px;">
+                    TEST: If you see this, rendering works
+                </div>
                 <OrderOrderingStep3ReviewSubmit @order-submitted="handleOrderSubmitted" />
             </div>
         </div>

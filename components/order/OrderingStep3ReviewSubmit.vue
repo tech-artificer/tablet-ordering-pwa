@@ -29,21 +29,52 @@ const currentOrderSnapshot = computed<any>(() => {
 })
 
 onMounted(() => {
+    const displayItemsSnapshot = displayItems.value
+    const mountedOrderSnapshot = currentOrderSnapshot.value
+
     logger.debug("[OrderingStep3ReviewSubmit] Store state on mount:", {
         hasPlacedOrder: orderStore.hasPlacedOrder,
         isRefillMode: orderStore.isRefillMode,
         cartItemsCount: unref((orderStore.cartItems as any))?.length || 0,
         refillItemsCount: unref((orderStore.refillItems as any))?.length || 0,
         activeCartCount: activeCart.value?.length || 0,
+        submittedItemsCount: unref((orderStore.submittedItems as any))?.length || 0,
         packageId: (orderStore.package as any)?.id,
+        displayItemsCount: displayItemsSnapshot?.length || 0,
+        fallbackItemsCount: fallbackServerItems.value?.length || 0,
+        currentOrderHasItems: !!(mountedOrderSnapshot?.items || mountedOrderSnapshot?.order_items),
+        currentOrderItemsCount: (mountedOrderSnapshot?.items?.length || mountedOrderSnapshot?.order_items?.length || 0),
     })
+
+    // Debug: Log which path we're using
+    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
+        const submitted = (unref(orderStore.submittedItems) as any[]) || []
+        if (submitted.length > 0) {
+            logger.info("[OrderingStep3ReviewSubmit] Using submittedItems path (count: " + submitted.length + ")")
+        } else if (fallbackServerItems.value.length > 0) {
+            logger.info("[OrderingStep3ReviewSubmit] Using fallbackServerItems path (count: " + fallbackServerItems.value.length + ")")
+        } else {
+            logger.warn("[OrderingStep3ReviewSubmit] No items available from either path!", {
+                submittedItemsCount: submitted.length,
+                fallbackItemsCount: fallbackServerItems.value.length,
+                currentOrderSnapshot: mountedOrderSnapshot,
+            })
+        }
+    }
 })
 
 const fallbackServerItems = computed<ReviewItem[]>(() => {
-    const rawItems = currentOrderSnapshot.value?.items
+    const rawItems = currentOrderSnapshot.value?.items ?? currentOrderSnapshot.value?.order_items
     if (!Array.isArray(rawItems) || rawItems.length === 0) {
+        logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: No items available", {
+            hasItems: !!rawItems,
+            isArray: Array.isArray(rawItems),
+            length: rawItems?.length || 0,
+        })
         return []
     }
+
+    logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: Processing " + rawItems.length + " items")
 
     const normalized: ReviewItem[] = []
 
@@ -77,19 +108,26 @@ const fallbackServerItems = computed<ReviewItem[]>(() => {
         })
     })
 
+    logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: Normalized " + normalized.length + " items")
     return normalized
 })
 
 const displayItems = computed<any[]>(() => {
-    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
+    if (!orderStore.isRefillMode) {
         const submitted = (unref(orderStore.submittedItems) as any[]) || []
         if (submitted.length > 0) {
+            logger.debug("[OrderingStep3ReviewSubmit] displayItems: Using submittedItems (" + submitted.length + " items)")
             return submitted
         }
 
-        return fallbackServerItems.value
+        const fallback = fallbackServerItems.value
+        if (fallback.length > 0) {
+            logger.debug("[OrderingStep3ReviewSubmit] displayItems: submittedItems empty, using fallback (" + fallback.length + " items)")
+            return fallback
+        }
     }
 
+    logger.debug("[OrderingStep3ReviewSubmit] displayItems: Using activeCart (" + activeCart.value.length + " items)")
     return activeCart.value
 })
 
@@ -128,8 +166,9 @@ const packageNameDisplay = computed(() => {
         return packageFromOrder
     }
 
-    const packageLineItem = (Array.isArray(currentOrderSnapshot.value?.items)
-        ? currentOrderSnapshot.value.items.find((item: any) => item?.is_package)
+    const orderItems = currentOrderSnapshot.value?.items ?? currentOrderSnapshot.value?.order_items
+    const packageLineItem = (Array.isArray(orderItems)
+        ? orderItems.find((item: any) => item?.is_package)
         : null) as any
 
     return String(packageLineItem?.name || "")
@@ -259,6 +298,20 @@ async function submit (): Promise<void> {
 </script>
 
 <template>
+    <!-- DEBUG PANEL: remove after diagnosis -->
+    <div class="mb-4 rounded-xl border border-yellow-400/50 bg-yellow-400/10 p-3 text-xs text-yellow-300 font-mono space-y-1">
+        <p class="font-bold text-yellow-200 uppercase tracking-wider">
+            Debug State
+        </p>
+        <p>cartItems: {{ (orderStore.cartItems as any[])?.length ?? 0 }}</p>
+        <p>submittedItems: {{ (orderStore.submittedItems as any[])?.length ?? 0 }}</p>
+        <p>activeCart: {{ activeCart.length }}</p>
+        <p>displayItems: {{ displayItems.length }}</p>
+        <p>hasPlacedOrder: {{ orderStore.hasPlacedOrder }}</p>
+        <p>isRefillMode: {{ orderStore.isRefillMode }}</p>
+        <p>fallbackItems: {{ fallbackServerItems.length }}</p>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 lg:gap-6">
         <!-- LEFT: Your Order -->
         <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
