@@ -2,7 +2,6 @@ import { defineStore } from "pinia"
 import { reactive, computed, toRefs, onScopeDispose } from "vue"
 import { useApi } from "../composables/useApi"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
-import { useOfflineOrderQueue } from "../composables/useOfflineOrderQueue"
 import { logger } from "../utils/logger"
 import { extractOrderId } from "../utils/orderHelpers"
 import { notifyBlockedAction } from "../composables/useNotifier"
@@ -12,13 +11,25 @@ import { useDeviceStore } from "./Device"
 import { useSessionStore } from "./Session"
 import type { SessionEndReason } from "./SessionEnd"
 
-// Module-level constant — cap on how many unlimited items can be added.
+// Module-level constant: cap on how many unlimited items can be added.
 const UNLIMITED_ITEM_CAP = 5
 
 const toMoney = (value: unknown): number => {
     const numeric = Number(value || 0)
     if (!Number.isFinite(numeric)) { return 0 }
     return Math.round((numeric + Number.EPSILON) * 100) / 100
+}
+
+const normalizeCartCategory = (category?: string | null): string | null => {
+    const normalized = String(category ?? "").trim().toLowerCase()
+    if (!normalized) { return null }
+    if (normalized === "meat") { return "meats" }
+    if (normalized === "side") { return "sides" }
+    return normalized
+}
+
+type SubmitOrderOptions = {
+    headers?: Record<string, string>
 }
 
 export const useOrderStore = defineStore("order", () => {
@@ -140,11 +151,11 @@ export const useOrderStore = defineStore("order", () => {
 
     const packageTotal = computed(() => toMoney(Number(state.package?.price || 0) * Number(state.guestCount || 1)))
 
-    // Add-ons total excludes meat items — meats are modifiers nested under the package,
+    // Add-ons total excludes meat items: meats are modifiers nested under the package,
     // not standalone items, so their price must not appear in the add-ons subtotal.
     const addOnsTotal = computed(() =>
         toMoney(state.cartItems
-            .filter(it => it.category !== "meats")
+            .filter(it => normalizeCartCategory(it.category) !== "meats")
             .reduce((sum, it) => sum + toMoney(Number(it.price) * Number(it.quantity)), 0))
     )
 
@@ -178,11 +189,13 @@ export const useOrderStore = defineStore("order", () => {
 
         const targetCart = state.isRefillMode ? state.refillItems : state.cartItems
         const existing = targetCart.find(i => i.id === item.id)
+        const category = normalizeCartCategory(opts?.category ?? (item as any)?.category)
 
         if (existing) {
             const isUnlimited = Boolean(existing.isUnlimited || opts?.isUnlimited)
             const max = isUnlimited ? UNLIMITED_ITEM_CAP : 99
             existing.quantity = Math.min(Number(existing.quantity) + 1, max)
+            existing.category = normalizeCartCategory(existing.category ?? category)
         } else {
             const newItem: CartItem = {
                 id: Number(item.id),
@@ -191,7 +204,7 @@ export const useOrderStore = defineStore("order", () => {
                 price: Number(item.price || 0),
                 quantity: 1,
                 isUnlimited: Boolean(opts?.isUnlimited),
-                category: opts?.category ?? null
+                category
             }
 
             if (state.isRefillMode) {
@@ -263,8 +276,12 @@ export const useOrderStore = defineStore("order", () => {
 
     function buildPayload (): OrderPayload {
     // Separate package item with nested modifiers from add-ons
-        const meatItems = state.cartItems.filter(i => i.category === "meats")
-        const addOnItems = state.cartItems.filter(i => i.category !== "meats")
+        const normalizedCartItems = state.cartItems.map(item => ({
+            ...item,
+            category: normalizeCartCategory(item.category)
+        }))
+        const meatItems = normalizedCartItems.filter(i => i.category === "meats")
+        const addOnItems = normalizedCartItems.filter(i => i.category !== "meats")
 
         const items: OrderPayloadItem[] = []
 
@@ -327,7 +344,7 @@ export const useOrderStore = defineStore("order", () => {
         }
 
         // Validate payload structure
-        logger.debug("🔍 Validating payload structure...")
+        logger.debug("Validating payload structure...")
 
         if (!payload.guest_count || payload.guest_count < 1) {
             throw new Error("Invalid guest_count: must be at least 1")
@@ -387,7 +404,7 @@ export const useOrderStore = defineStore("order", () => {
             }
         })
 
-        logger.debug("✅ Payload validation passed")
+        logger.debug("Payload validation passed")
         return payload
     }
 
@@ -402,7 +419,7 @@ export const useOrderStore = defineStore("order", () => {
         }
     }
 
-    async function submitOrder (payload?: OrderPayload) {
+    async function submitOrder (payload?: OrderPayload, options?: SubmitOrderOptions) {
         if (state.hasPlacedOrder && !state.isRefillMode) {
             throw new Error("An initial order has already been placed for this session. Use refill instead.")
         }
@@ -411,10 +428,10 @@ export const useOrderStore = defineStore("order", () => {
         }
         state.isSubmitting = true
         try {
-        // 🔒 VALIDATION: Ensure everything is set before submitting
+        // Validate everything is set before submitting.
             const deviceStore = useDeviceStore()
 
-            logger.debug("🔍 Pre-submission validation:", {
+            logger.debug("Pre-submission validation:", {
                 hasPackage: !!state.package?.id,
                 packageId: state.package?.id,
                 guestCount: state.guestCount,
@@ -422,7 +439,7 @@ export const useOrderStore = defineStore("order", () => {
                 isAuthenticated: deviceStore.isAuthenticated
             })
 
-            // ❌ Validation checks
+            // Validation checks
             if (!deviceStore.getToken()) {
                 try {
                     await deviceStore.authenticate()
@@ -431,15 +448,15 @@ export const useOrderStore = defineStore("order", () => {
                 }
                 if (!deviceStore.getToken()) {
                     state.isSubmitting = false
-                    throw new Error("❌ Device not authenticated - missing token. Please register device first.")
+                    throw new Error("Device not authenticated - missing token. Please register device first.")
                 }
             }
 
-            // Pinia stores auto-unwrap refs — deviceStore.table is always the plain object value.
+            // Pinia stores auto-unwrap refs; deviceStore.table is always the plain object value.
             const tableId = deviceStore.getTableId()
             const tableName = deviceStore.getTableName()
 
-            logger.debug("🔍 Table validation:", { tableId, tableName })
+            logger.debug("Table validation:", { tableId, tableName })
 
             if (tableId == null) {
                 try {
@@ -453,23 +470,23 @@ export const useOrderStore = defineStore("order", () => {
             const refreshedTableName = deviceStore.getTableName()
 
             if (refreshedTableId == null) {
-                logger.error("❌ Table validation failed - no table ID found", { tableName: refreshedTableName })
+                logger.error("Table validation failed - no table ID found", { tableName: refreshedTableName })
                 state.isSubmitting = false
-                throw new Error("❌ No table assigned to this device. Please contact staff.")
+                throw new Error("No table assigned to this device. Please contact staff.")
             }
-            logger.debug("✅ Table validated:", refreshedTableName)
+            logger.debug("Table validated:", refreshedTableName)
 
             if (!state.package?.id) {
                 state.isSubmitting = false
-                throw new Error("❌ No package selected. Please select a package first.")
+                throw new Error("No package selected. Please select a package first.")
             }
 
             if (state.guestCount < 1) {
                 state.isSubmitting = false
-                throw new Error("❌ Guest count must be at least 1.")
+                throw new Error("Guest count must be at least 1.")
             }
 
-            logger.debug("✅ All validations passed - proceeding with order submission")
+            logger.debug("All validations passed - proceeding with order submission")
 
             const api = useApi()
             let body = payload ?? buildPayload()
@@ -482,37 +499,15 @@ export const useOrderStore = defineStore("order", () => {
                 }
             }
 
-            logger.debug("📦 Order Payload:", body)
+            logger.debug("Order Payload:", body)
 
-            // ── Offline queue ────────────────────────────────────────────────────
-            // If the device is offline, queue the order locally instead of failing.
-            // The queue will be drained when connectivity is restored.
-            if (typeof navigator !== "undefined" && !navigator.onLine) {
-                const { queueOrder } = useOfflineOrderQueue()
-                // Generate / reuse the idempotency key even in the offline path so the
-                // drain attempt sends the same key (avoids duplicates when both the queue
-                // drain and a manual retry fire).
-                const IDEM_KEY_STORAGE = "woosoo_order_idem_key"
-                let offlineIdemKey = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
-                if (!offlineIdemKey) {
-                    offlineIdemKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                        ? crypto.randomUUID()
-                        : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-                    if (typeof sessionStorage !== "undefined") {
-                        try { sessionStorage.setItem(IDEM_KEY_STORAGE, offlineIdemKey) } catch (e) { /* ignore */ }
-                    }
-                }
-                queueOrder(body, offlineIdemKey)
-                throw new Error("📶 No internet connection. Your order has been queued and will be sent automatically when you're back online.")
-            }
-
-            // ── Idempotency key: persist across retries ──────────────────────────
+            // Idempotency key: persist across retries.
             // The header is always sent. The key is generated ONCE and stored in
             // sessionStorage so retries reuse the same key (preventing server-side
             // duplicates). The key is cleared on success; on failure it survives so
             // the next retry reuses it. Session.ts clear() also removes it.
             const IDEM_KEY_STORAGE = "woosoo_order_idem_key"
-            let idempotencyKey = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
+            let idempotencyKey = options?.headers?.["X-Idempotency-Key"] ?? (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(IDEM_KEY_STORAGE) : null)
             if (!idempotencyKey) {
                 idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
                     ? crypto.randomUUID()
@@ -523,22 +518,24 @@ export const useOrderStore = defineStore("order", () => {
             }
 
             try {
-                const resp = await api.post(API_ENDPOINTS.DEVICE_CREATE_ORDER, body, { headers: { "X-Idempotency-Key": idempotencyKey } })
+                const resp = await api.post(API_ENDPOINTS.DEVICE_CREATE_ORDER, body, {
+                    headers: {
+                        ...options?.headers,
+                        "X-Idempotency-Key": idempotencyKey
+                    }
+                })
                 const responseData = resp?.data ?? null
-                logger.info("✅ Order submission SUCCESS")
-                logger.debug("📥 Response:", responseData)
+                logger.info("Order submission SUCCESS")
+                logger.debug("Response:", responseData)
 
                 if (!responseData) {
                     handleOrderError("Order creation response missing body")
                     throw new Error("Order creation response missing body")
                 }
 
-                // Update session with order ID from response
-                const sessionStore = useSessionStore()
-
                 // Check for success flag first
                 if (!responseData.success) {
-                    logger.error("❌ Server returned success=false:", responseData)
+                    logger.error("Server returned success=false:", responseData)
                     throw new Error(responseData.message || "Order processing failed on server")
                 }
 
@@ -546,44 +543,44 @@ export const useOrderStore = defineStore("order", () => {
                 const orderNumber = responseData.order?.order_number
                 const orderId = responseData.order?.id
 
-                logger.debug("🔍 Order created:", { orderNumber, orderId })
+                logger.debug("Order created:", { orderNumber, orderId })
 
                 if (orderNumber || orderId) {
                 // Centralize marking order created
                     await setOrderCreated(responseData)
-                    // Clear persisted idempotency key — next order gets a fresh key
+                    // Clear persisted idempotency key; next order gets a fresh key.
                     if (typeof sessionStorage !== "undefined") {
                         try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { /* ignore */ }
                     }
                 } else {
-                    logger.error("❌ Missing order identifiers in response:", responseData)
+                    logger.error("Missing order identifiers in response:", responseData)
                     throw new Error("Order confirmation failed: No order ID received from server")
                 }
 
                 return responseData
             } catch (error: any) {
-                logger.error("❌ Order submission failed:", error.message)
+                logger.error("Order submission failed:", error.message)
                 const errorResponse = extractErrorResponse(error)
 
                 // Handle authentication errors specifically
                 if (error.response?.status === 401 || errorResponse?.exception === "authentication") {
-                    logger.error("🔐 Authentication error - token invalid or expired")
-                    throw new Error("❌ Your session has expired. Please re-register this device in Settings.")
+                    logger.error("Authentication error - token invalid or expired")
+                    throw new Error("Your session has expired. Please re-register this device in Settings.")
                 }
 
                 // Handle validation errors
                 if (error.response?.status === 422) {
                     const validationErrors = errorResponse?.errors
-                    logger.error("📋 Validation errors:", validationErrors)
+                    logger.error("Validation errors:", validationErrors)
                     const errorMessages = Object.values(validationErrors || {}).flat().join(", ")
-                    throw new Error(`❌ Validation failed: ${errorMessages}`)
+                    throw new Error(`Validation failed: ${errorMessages}`)
                 }
 
                 // Handle active-order conflicts by resuming the existing order
                 if (error.response?.status === 409) {
                     const existingOrder = errorResponse?.order
                     if (existingOrder) {
-                        logger.warn("↩️ Active order already exists for this device/session. Resuming existing order instead of creating a new one.", {
+                        logger.warn("Active order already exists for this device/session. Resuming existing order instead of creating a new one.", {
                             orderId: existingOrder?.order_id ?? existingOrder?.id,
                             status: existingOrder?.status,
                         })
@@ -603,17 +600,17 @@ export const useOrderStore = defineStore("order", () => {
                 }
 
                 if (error.response?.status === 503 && errorResponse?.code === "SESSION_NOT_FOUND") {
-                    throw new Error("❌ No active POS terminal session found. Please ask staff to open a POS session, then try again.")
+                    throw new Error("No active POS terminal session found. Please ask staff to open a POS session, then try again.")
                 }
 
                 // Handle server errors with debugging guidance
                 if (error.response?.status === 500) {
                     const serverMessage = errorResponse?.message || "Internal server error"
-                    logger.error("🔴 SERVER ERROR (500) - Backend crashed")
+                    logger.error("SERVER ERROR (500) - Backend crashed")
 
                     throw new Error(
-                        `❌ ${serverMessage}\n\n` +
-          "🔧 Backend debugging needed:\n" +
+                        `${serverMessage}\n\n` +
+          "Backend debugging needed:\n" +
           "1. Check Laravel logs (storage/logs/laravel.log)\n" +
           "2. Enable APP_DEBUG=true in .env\n" +
           "3. Verify database schema and OrderService\n\n" +
@@ -627,7 +624,7 @@ export const useOrderStore = defineStore("order", () => {
 
                 // Handle network errors
                 if (!error.response) {
-                    throw new Error("❌ Network error: Cannot reach backend server. Check if Laravel is running.")
+                    throw new Error("Network error: Cannot reach backend server. Check if Laravel is running.")
                 }
 
                 throw error
@@ -639,7 +636,7 @@ export const useOrderStore = defineStore("order", () => {
 
     async function submitRefill (payload?: any) {
         if (!state.currentOrder && !state.hasPlacedOrder) {
-            throw new Error("No existing order found — cannot submit a refill.")
+            throw new Error("No existing order found - cannot submit a refill.")
         }
         if (state.isSubmitting) {
             throw new Error("Order submission already in progress. Please wait.")
@@ -779,12 +776,12 @@ export const useOrderStore = defineStore("order", () => {
         state.cartItems = []
         state.history = [...state.history, respData]
 
-        logger.info("✅ Order marked created:", { orderId: sessionStore.orderId, orderNumber, submittedItemsCount: state.submittedItems.length })
+        logger.info("Order marked created:", { orderId: sessionStore.orderId, orderNumber, submittedItemsCount: state.submittedItems.length })
         // Start polling fallback by order_id (only triggered when order is created)
         try {
             // Use order_id (business ID like 19561), not the database id
             const resolvedOrderId = respData?.order?.order_id || respData?.order_id || respData?.order?.id || respData?.id || sessionStore.getOrderId()
-            logger.debug("🔄 Starting polling with order_id:", resolvedOrderId)
+            logger.debug("Starting polling with order_id:", resolvedOrderId)
             if (resolvedOrderId) {
                 // Start a lightweight poller that fetches canonical order by order_id every 5s
                 // This is used as a fallback in case realtime broadcasts are delayed/unavailable
@@ -811,7 +808,7 @@ export const useOrderStore = defineStore("order", () => {
         state.pollInflight = false
         state.pollingOrderId = null
         pollStartTime = null
-        logger.debug("✅ Order polling stopped")
+        logger.debug("Order polling stopped")
     }
 
     function startPolling (orderIdentifier: number | string) {
@@ -832,7 +829,7 @@ export const useOrderStore = defineStore("order", () => {
 
         // Only poll when online
         if (typeof navigator !== "undefined" && !navigator.onLine) {
-            logger.warn("startPolling: offline — skipping start")
+            logger.warn("startPolling: offline - skipping start")
             return
         }
 
@@ -854,7 +851,7 @@ export const useOrderStore = defineStore("order", () => {
             try {
                 const api = useApi()
                 if (!api || typeof api.get !== "function") {
-                    logger.warn("startPolling: api client unavailable — stopping order polling")
+                    logger.warn("startPolling: api client unavailable - stopping order polling")
                     stopPolling()
                     return
                 }
@@ -896,17 +893,22 @@ export const useOrderStore = defineStore("order", () => {
 
                     // Stop polling and end session only on genuine terminal statuses.
                     // Intermediate statuses (in_progress, ready, served) are valid kitchen workflow
-                    // states — the session must stay alive until the order truly ends.
+                    // states; the session must stay alive until the order truly ends.
                     if (["completed", "voided", "cancelled"].includes(statusNormalized)) {
                         logger.info("[Polling] Terminal status observed", { orderId, status })
                         stopPolling()
 
                         try {
-                            const { triggerSessionEnd } = useSessionEndFlow()
-                            await triggerSessionEnd(statusNormalized as SessionEndReason, {
-                                source: "polling",
-                                orderNumber: orderObj?.order_number ?? null,
-                            })
+                            const sessionStore = useSessionStore()
+                            if (sessionStore.isActive) {
+                                const { triggerSessionEnd } = useSessionEndFlow()
+                                await triggerSessionEnd(statusNormalized as SessionEndReason, {
+                                    source: "polling",
+                                    orderNumber: orderObj?.order_number ?? null,
+                                })
+                            } else {
+                                logger.warn("[Polling] Terminal status observed before session activation; skipping session-end handoff", { orderId, status })
+                            }
                         } catch (e) {
                             logger.warn("[Polling] terminal session-end handling failed", e)
                         }
@@ -925,11 +927,9 @@ export const useOrderStore = defineStore("order", () => {
             }
         }
 
-        // Run immediately, then every 5s
         logger.info("[Polling] Started", { orderId, intervalMs: 5000 })
-        tick().catch(() => {})
         pollIntervalId = setInterval(() => tick().catch(() => {}), 5000)
-        logger.info("✅ Order polling started for", orderId)
+        logger.info("Order polling started for", orderId)
     }
 
     // Backward compatibility aliases for existing callers/tests.
@@ -945,7 +945,7 @@ export const useOrderStore = defineStore("order", () => {
         const sessionStore = useSessionStore()
         const deviceStore = useDeviceStore()
 
-        logger.debug("🔁 initializeFromSession called:", {
+        logger.debug("initializeFromSession called:", {
             sessionOrderId: sessionStore.getOrderId(),
             stateHasPlacedOrder: state.hasPlacedOrder,
             stateCurrentOrder: !!state.currentOrder,
@@ -976,12 +976,12 @@ export const useOrderStore = defineStore("order", () => {
 
             if (!deviceStore.getToken()) {
                 if (shouldClearStaleState) {
-                    logger.info("🔁 No token + no session.orderId: clearing stale transactional order state")
+                    logger.info("No token + no session.orderId: clearing stale transactional order state")
                     resetTransactionalState()
                 } else if (shouldSkipResetDueToActiveSession) {
-                    logger.debug("🔁 Session active & no order placed yet: preserving transactional state (menu browsing)")
+                    logger.debug("Session active & no order placed yet: preserving transactional state (menu browsing)")
                 }
-                logger.debug("🔁 Skipping active-order lookup until device token is available")
+                logger.debug("Skipping active-order lookup until device token is available")
                 return
             }
 
@@ -1007,7 +1007,7 @@ export const useOrderStore = defineStore("order", () => {
                         ? new Date(activeOrder.created_at).getTime()
                         : null
                     if (sessionStartedAt && orderCreatedAt && orderCreatedAt < sessionStartedAt - 60_000) {
-                        logger.info("🔁 Recovered order pre-dates current session — skipping to avoid cross-session contamination", {
+                        logger.info("Recovered order pre-dates current session - skipping to avoid cross-session contamination", {
                             orderId: activeOrderId,
                             orderCreatedAt: new Date(orderCreatedAt).toISOString(),
                             sessionStartedAt: new Date(sessionStartedAt).toISOString(),
@@ -1023,7 +1023,7 @@ export const useOrderStore = defineStore("order", () => {
 
                     state.hasPlacedOrder = true
                     state.currentOrder = { order: activeOrder }
-                    logger.info("🔁 Recovered active order from active order endpoint:", {
+                    logger.info("Recovered active order from active order endpoint:", {
                         orderId: activeOrderId,
                         status: activeStatus,
                     })
@@ -1032,12 +1032,12 @@ export const useOrderStore = defineStore("order", () => {
                     return
                 }
             } catch (err) {
-                logger.warn("🔁 Active order lookup failed; continuing local-state fallback", err)
+                logger.warn("Active order lookup failed; continuing local-state fallback", err)
             }
 
             // If still no orderId, reset stale hasPlacedOrder flag after a short grace
             if (shouldClearStaleState) {
-                logger.info("🔁 No session.orderId found, resetting stale order state (with grace)")
+                logger.info("No session.orderId found, resetting stale order state (with grace)")
                 // Apply a short grace period to avoid clearing during quick transitions
                 await new Promise(resolve => setTimeout(resolve, 1500))
                 // Re-check the session store in case orderId was set during grace
@@ -1048,7 +1048,7 @@ export const useOrderStore = defineStore("order", () => {
                     logger.debug("initializeFromSession: session.orderId appeared during grace, skipping clear")
                 }
             } else if (shouldSkipResetDueToActiveSession && hasStaleTransactionalState) {
-                logger.debug("🔁 Grace period skipped: session active & no order placed yet (preserving transactional state)")
+                logger.debug("Grace period skipped: session active & no order placed yet (preserving transactional state)")
             }
             return
         }
@@ -1058,7 +1058,7 @@ export const useOrderStore = defineStore("order", () => {
 
         if (!deviceStore.getToken()) {
             state.currentOrder = { order: { order_id: sessionStore.getOrderId() } }
-            logger.debug("🔁 Deferred canonical order fetch until device token is available")
+            logger.debug("Deferred canonical order fetch until device token is available")
             return
         }
 
@@ -1070,23 +1070,23 @@ export const useOrderStore = defineStore("order", () => {
                 const orderObj = resp.data?.order || resp.data
                 if (orderObj) {
                     state.currentOrder = { order: orderObj }
-                    logger.debug("🔁 Fetched order from server for session.orderId:", orderIdStr)
+                    logger.debug("Fetched order from server for session.orderId:", orderIdStr)
 
                     // Start polling for this order
                     startPolling(orderIdStr)
                 } else {
                     state.currentOrder = { order: { order_id: sessionStore.getOrderId() } }
-                    logger.warn("🔁 No order payload returned; initialized minimal order_id:", sessionStore.getOrderId())
+                    logger.warn("No order payload returned; initialized minimal order_id:", sessionStore.getOrderId())
                 }
             } else {
                 state.currentOrder = { order: { order_id: sessionStore.getOrderId() } }
-                logger.warn("🔁 session.orderId is invalid; initialized minimal order_id:", sessionStore.getOrderId())
+                logger.warn("session.orderId is invalid; initialized minimal order_id:", sessionStore.getOrderId())
             }
         } catch (err) {
             state.currentOrder = { order: { order_id: sessionStore.getOrderId() } }
-            logger.warn("🔁 Failed to fetch order during initializeFromSession:", err)
+            logger.warn("Failed to fetch order during initializeFromSession:", err)
         }
-        logger.debug("🔁 Initialized order state from session.orderId:", sessionStore.getOrderId())
+        logger.debug("Initialized order state from session.orderId:", sessionStore.getOrderId())
     }
 
     // Broadcast event handlers
@@ -1109,7 +1109,7 @@ export const useOrderStore = defineStore("order", () => {
         state.submittedItems = []
     }
 
-    // Typed cross-store mutation helpers — avoids TypeScript Ref<T> false-positives
+    // Typed cross-store mutation helpers avoid TypeScript Ref<T> false-positives
     // when Pinia 3 + Vue 3.5 fails to unwrap setup store return types.
     function clearCart () { state.cartItems = [] }
     function clearRefillItems () { state.refillItems = [] }
@@ -1127,7 +1127,7 @@ export const useOrderStore = defineStore("order", () => {
     function setSubmittedItems (items: SubmittedItem[]) { state.submittedItems = items }
     function setCurrentOrder (order: OrderApiResponse | null) { state.currentOrder = order }
 
-    // Typed read accessor — returns the nested order status without Ref<T> confusion
+    // Typed read accessor returns the nested order status without Ref<T> confusion
     function getCurrentOrderStatus (): string | undefined { return state.currentOrder?.order?.status }
     // Returns the current order response object (typed, no Ref<T> wrapper)
     function getCurrentOrder (): OrderApiResponse | null { return state.currentOrder }

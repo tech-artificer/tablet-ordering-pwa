@@ -8,6 +8,21 @@ type RouterLike = {
     replace: (to: unknown) => Promise<unknown> | unknown
 }
 
+function toNavigationUrl (to: unknown): string {
+    if (typeof to === "string") { return to }
+    const target = to as { path?: string; query?: Record<string, unknown> } | null
+    const path = target?.path || "/order/session-ended"
+    const query = target?.query ?? null
+    if (!query) { return path }
+    const params = new URLSearchParams()
+    Object.entries(query).forEach(([key, value]) => {
+        if (value === null || value === undefined) { return }
+        params.set(key, String(value))
+    })
+    const qs = params.toString()
+    return qs ? `${path}?${qs}` : path
+}
+
 function resolveRouter (): RouterLike {
     const maybeUseNuxtApp = (globalThis as any)?.useNuxtApp
     if (typeof maybeUseNuxtApp === "function") {
@@ -32,7 +47,14 @@ function resolveRouter (): RouterLike {
     }
 
     return {
-        replace: async () => undefined,
+        replace: (to: unknown) => {
+            const target = toNavigationUrl(to)
+            logger.error("[SessionEndFlow] Router unavailable; falling back to hard navigation", { target })
+            if (typeof window !== "undefined") {
+                window.location.assign(target)
+            }
+            return undefined
+        },
     }
 }
 

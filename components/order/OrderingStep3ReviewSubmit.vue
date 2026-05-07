@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, unref, watch, onMounted } from "vue"
+import { computed, ref, unref, watch } from "vue"
 import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
+import { useOrderSubmit } from "~/composables/useOrderSubmit"
 import { logger } from "~/utils/logger"
 
 const emit = defineEmits<{
@@ -10,6 +11,7 @@ const emit = defineEmits<{
 
 const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
+const { submitOrder: submitInitialOrder } = useOrderSubmit()
 const submitError = ref<string | null>(null)
 
 type ReviewItem = {
@@ -26,41 +28,6 @@ const activeCart = computed<any[]>(() => (unref(orderStore.activeCart) as any[])
 
 const currentOrderSnapshot = computed<any>(() => {
     return (unref(orderStore.currentOrder) as any)?.order || unref(orderStore.currentOrder) || null
-})
-
-onMounted(() => {
-    const displayItemsSnapshot = displayItems.value
-    const mountedOrderSnapshot = currentOrderSnapshot.value
-
-    logger.debug("[OrderingStep3ReviewSubmit] Store state on mount:", {
-        hasPlacedOrder: orderStore.hasPlacedOrder,
-        isRefillMode: orderStore.isRefillMode,
-        cartItemsCount: unref((orderStore.cartItems as any))?.length || 0,
-        refillItemsCount: unref((orderStore.refillItems as any))?.length || 0,
-        activeCartCount: activeCart.value?.length || 0,
-        submittedItemsCount: unref((orderStore.submittedItems as any))?.length || 0,
-        packageId: (orderStore.package as any)?.id,
-        displayItemsCount: displayItemsSnapshot?.length || 0,
-        fallbackItemsCount: fallbackServerItems.value?.length || 0,
-        currentOrderHasItems: !!(mountedOrderSnapshot?.items || mountedOrderSnapshot?.order_items),
-        currentOrderItemsCount: (mountedOrderSnapshot?.items?.length || mountedOrderSnapshot?.order_items?.length || 0),
-    })
-
-    // Debug: Log which path we're using
-    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
-        const submitted = (unref(orderStore.submittedItems) as any[]) || []
-        if (submitted.length > 0) {
-            logger.info("[OrderingStep3ReviewSubmit] Using submittedItems path (count: " + submitted.length + ")")
-        } else if (fallbackServerItems.value.length > 0) {
-            logger.info("[OrderingStep3ReviewSubmit] Using fallbackServerItems path (count: " + fallbackServerItems.value.length + ")")
-        } else {
-            logger.warn("[OrderingStep3ReviewSubmit] No items available from either path!", {
-                submittedItemsCount: submitted.length,
-                fallbackItemsCount: fallbackServerItems.value.length,
-                currentOrderSnapshot: mountedOrderSnapshot,
-            })
-        }
-    }
 })
 
 const fallbackServerItems = computed<ReviewItem[]>(() => {
@@ -285,7 +252,11 @@ async function submit (): Promise<void> {
             await orderStore.submitRefill()
         } else {
             const payload = orderStore.buildPayload()
-            await orderStore.submitOrder(payload)
+            const result = await submitInitialOrder(payload as unknown as Record<string, unknown>)
+            if (result.queued) {
+                submitError.value = "No internet connection. Your order has been queued and will send automatically when the tablet is back online."
+                return
+            }
         }
         emit("order-submitted")
     } catch (error: any) {
@@ -298,20 +269,6 @@ async function submit (): Promise<void> {
 </script>
 
 <template>
-    <!-- DEBUG PANEL: remove after diagnosis -->
-    <div class="mb-4 rounded-xl border border-yellow-400/50 bg-yellow-400/10 p-3 text-xs text-yellow-300 font-mono space-y-1">
-        <p class="font-bold text-yellow-200 uppercase tracking-wider">
-            Debug State
-        </p>
-        <p>cartItems: {{ (orderStore.cartItems as any[])?.length ?? 0 }}</p>
-        <p>submittedItems: {{ (orderStore.submittedItems as any[])?.length ?? 0 }}</p>
-        <p>activeCart: {{ activeCart.length }}</p>
-        <p>displayItems: {{ displayItems.length }}</p>
-        <p>hasPlacedOrder: {{ orderStore.hasPlacedOrder }}</p>
-        <p>isRefillMode: {{ orderStore.isRefillMode }}</p>
-        <p>fallbackItems: {{ fallbackServerItems.length }}</p>
-    </div>
-
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 lg:gap-6">
         <!-- LEFT: Your Order -->
         <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">

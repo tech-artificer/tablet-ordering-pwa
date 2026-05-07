@@ -41,6 +41,11 @@ class AsyncMutex {
     }
 }
 
+type SessionStartOptions = {
+    preserveSelection?: boolean
+    preserveSubmittedOrder?: boolean
+}
+
 export const useSessionStore = defineStore("session", () => {
     const sessionMutex = new AsyncMutex()
 
@@ -273,7 +278,7 @@ export const useSessionStore = defineStore("session", () => {
         }
     }
 
-    async function start (options?: { preserveSelection?: boolean }): Promise<boolean> {
+    async function start (options?: SessionStartOptions): Promise<boolean> {
     // BUG-13 Fix: Serialize session operations to prevent race conditions
         return sessionMutex.runExclusive(async () => {
             const timestamp = new Date().toISOString()
@@ -347,19 +352,22 @@ export const useSessionStore = defineStore("session", () => {
             if (!state.isActive) {
                 state.terminalHandled = false
                 const preserveSelection = Boolean(options?.preserveSelection)
+                const preserveSubmittedOrder = Boolean(options?.preserveSubmittedOrder)
                 const preservedGuestCount = Number(orderStore.guestCount || 2)
                 // Save only the id so we can re-resolve the package from the freshly loaded
                 // menu data after the reset — avoids restoring a stale price/tax/modifier snapshot.
                 const preservedPackageId = unref(orderStore.package)?.id ?? null
 
-                orderStore.resetTransactionalState()
+                if (!preserveSubmittedOrder) {
+                    orderStore.resetTransactionalState()
 
-                if (preserveSelection) {
-                    orderStore.setGuestCount(preservedGuestCount)
-                    if (preservedPackageId !== null) {
-                        const freshPackage = menuStore.packages.find(p => p.id === preservedPackageId) ?? null
-                        if (freshPackage) {
-                            orderStore.setPackage(freshPackage)
+                    if (preserveSelection) {
+                        orderStore.setGuestCount(preservedGuestCount)
+                        if (preservedPackageId !== null) {
+                            const freshPackage = menuStore.packages.find(p => p.id === preservedPackageId) ?? null
+                            if (freshPackage) {
+                                orderStore.setPackage(freshPackage)
+                            }
                         }
                     }
                 }
@@ -436,19 +444,6 @@ export const useSessionStore = defineStore("session", () => {
                     isActive: false
                 }))
 
-                // Also persist cleared order store (matching its pick config)
-                window.localStorage.setItem("order-store", JSON.stringify({
-                    guestCount: 2,
-                    package: null,
-                    hasPlacedOrder: false,
-                    currentOrder: null,
-                    submittedItems: [],
-                    isRefillMode: false,
-                    history: orderStore.getHistory(), // Keep history
-                    cartItems: [],
-                    refillItems: [],
-                }))
-
                 logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
                 logger.debug("✅ Session and order stores cleared and persisted")
             } catch (e) {
@@ -510,19 +505,6 @@ export const useSessionStore = defineStore("session", () => {
                         sessionId: null,
                         orderId: null,
                         isActive: false
-                    }))
-
-                    // Also persist cleared order store (full reset clears history too)
-                    window.localStorage.setItem("order-store", JSON.stringify({
-                        guestCount: 2,
-                        package: null,
-                        hasPlacedOrder: false,
-                        currentOrder: null,
-                        submittedItems: [],
-                        isRefillMode: false,
-                        history: [],
-                        cartItems: [],
-                        refillItems: [],
                     }))
 
                     logger.debug("✅ Session and order stores fully reset and persisted")

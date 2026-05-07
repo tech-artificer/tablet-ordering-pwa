@@ -39,7 +39,7 @@ function makeWatcherHarness () {
                         sessionEndStore.startTransition({ reason: status as any, orderNumber: null, source: "in-session" })
                     }
                 }
-            }, { immediate: true })
+            })
             return {}
         },
         template: "<div />",
@@ -62,12 +62,12 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
         vi.unstubAllGlobals()
     })
 
-    it("fires immediately (immediate: true) and ends session when initial status is terminal", async () => {
+    it("does not fire immediately for an already-terminal initial status", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "completed" } } as any)
         mount(Harness)
         await nextTick()
-        expect(sessionEndStore.active).toBe(true)
+        expect(sessionEndStore.active).toBe(false)
     })
 
     it("does NOT end session when initial status is pending", async () => {

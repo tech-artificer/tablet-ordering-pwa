@@ -278,7 +278,6 @@ const addOnsTotal = computed(() => orderStore.addOnsTotal)
 const taxAmount = computed(() => orderStore.taxAmount)
 const grandTotal = computed(() => orderStore.grandTotal)
 
-logger.debug(selectedPackage)
 const setCategory = (category: MenuCategory) => {
     activeCategory.value = category;
     // If user navigates to a category and data is empty, attempt to fetch it on-demand

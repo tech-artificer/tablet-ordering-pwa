@@ -135,6 +135,22 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         expect(((store.refillItems as any)?.value ?? store.refillItems).length).toBe(2)
     })
 
+    it("normalizes singular meat categories into package modifiers", () => {
+        const store = useOrderStore()
+
+        store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
+        store.setGuestCount(2)
+        store.addToCart({
+            id: 10,
+            name: "Beef Brisket",
+            price: 150,
+            category: "meat"
+        } as any, { category: "meat" })
+
+        const payload = (store as any).buildPayload()
+        expect(payload.items[0].modifiers).toEqual([{ menu_id: 10, quantity: 1 }])
+    })
+
     it("should reject invalid order payload (empty items)", () => {
         const store = useOrderStore()
 

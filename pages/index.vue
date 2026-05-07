@@ -37,7 +37,7 @@
                             Settings
                         </h3>
                         <p class="text-sm text-white/60 mt-2">
-                            Enter your PIN
+                            {{ pinPrompt }}
                         </p>
                         <p v-if="pinNotice" class="text-xs text-primary/80 mt-2">
                             {{ pinNotice }}
@@ -87,8 +87,8 @@
                         <FlameButton variant="secondary" size="md" class="flex-1" @click="closePinModal">
                             Cancel
                         </FlameButton>
-                        <FlameButton variant="primary" size="md" class="flex-1" @click="verifyPin">
-                            Verify
+                        <FlameButton variant="primary" size="md" class="flex-1" @click="submitPin">
+                            {{ pinActionLabel }}
                         </FlameButton>
                     </div>
                 </div>
@@ -228,7 +228,9 @@ const PIN_STORAGE_KEY = "settings.pin"
 const SETTINGS_PIN_AUTH_KEY = "settings.pin.auth_until"
 const SETTINGS_PIN_AUTH_WINDOW_MS = 5 * 60 * 1000
 const storedPin = ref<string | null>(null)
-const DEFAULT_PIN = "0711"
+const isPinSetupMode = ref(false)
+const pendingPin = ref("")
+const pinSetupStep = ref<"create" | "confirm">("create")
 
 onMounted(async () => {
     const recovery = await recoverActiveOrderState("index")
@@ -285,7 +287,13 @@ const start = () => {
 const openSettings = (noticeOrEvent?: string | PointerEvent) => {
     pinNotice.value = typeof noticeOrEvent === "string" ? noticeOrEvent : ""
     pinError.value = ""
-    storedPin.value = (typeof localStorage !== "undefined" && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+    storedPin.value = typeof localStorage !== "undefined" ? localStorage.getItem(PIN_STORAGE_KEY) : null
+    isPinSetupMode.value = !storedPin.value
+    pendingPin.value = ""
+    pinSetupStep.value = "create"
+    if (isPinSetupMode.value && !pinNotice.value) {
+        pinNotice.value = "Create a settings PIN before opening tablet settings."
+    }
     showPinModal.value = true
 }
 
@@ -294,24 +302,84 @@ const closePinModal = () => {
     pinInput.value = ""
     pinError.value = ""
     pinNotice.value = ""
+    pendingPin.value = ""
+    pinSetupStep.value = "create"
+    isPinSetupMode.value = false
+}
+
+const grantSettingsAccess = () => {
+    if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(SETTINGS_PIN_AUTH_KEY, String(Date.now() + SETTINGS_PIN_AUTH_WINDOW_MS))
+    }
+    closePinModal()
+    router.push("/settings")
+}
+
+const setupPin = () => {
+    pinError.value = ""
+    if (pinInput.value.length < 4) {
+        pinError.value = "PIN must be at least 4 digits"
+        return
+    }
+
+    if (pinSetupStep.value === "create") {
+        pendingPin.value = pinInput.value
+        pinInput.value = ""
+        pinSetupStep.value = "confirm"
+        pinNotice.value = "Re-enter the same PIN to confirm."
+        return
+    }
+
+    if (pinInput.value !== pendingPin.value) {
+        pinInput.value = ""
+        pinSetupStep.value = "create"
+        pendingPin.value = ""
+        pinNotice.value = "Create a settings PIN before opening tablet settings."
+        pinError.value = "PINs did not match. Try again."
+        return
+    }
+
+    if (typeof localStorage !== "undefined") {
+        localStorage.setItem(PIN_STORAGE_KEY, pendingPin.value)
+    }
+    storedPin.value = pendingPin.value
+    grantSettingsAccess()
 }
 
 const verifyPin = () => {
     pinError.value = ""
-    storedPin.value = (typeof localStorage !== "undefined" && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+    storedPin.value = typeof localStorage !== "undefined" ? localStorage.getItem(PIN_STORAGE_KEY) : null
+
+    if (!storedPin.value) {
+        isPinSetupMode.value = true
+        setupPin()
+        return
+    }
 
     if (pinInput.value === storedPin.value) {
-        if (typeof sessionStorage !== "undefined") {
-            sessionStorage.setItem(SETTINGS_PIN_AUTH_KEY, String(Date.now() + SETTINGS_PIN_AUTH_WINDOW_MS))
-        }
-        closePinModal()
-        router.push("/settings")
+        grantSettingsAccess()
         return
     }
     pinError.value = "Incorrect PIN"
 }
 
+const submitPin = () => {
+    if (isPinSetupMode.value) {
+        setupPin()
+        return
+    }
+    verifyPin()
+}
+
 const maskedPin = computed(() => "•".repeat(pinInput.value.length))
+const pinPrompt = computed(() => {
+    if (!isPinSetupMode.value) { return "Enter your PIN" }
+    return pinSetupStep.value === "confirm" ? "Confirm your new PIN" : "Create a new PIN"
+})
+const pinActionLabel = computed(() => {
+    if (!isPinSetupMode.value) { return "Verify" }
+    return pinSetupStep.value === "confirm" ? "Save" : "Next"
+})
 const MAX_PIN_LENGTH = 6
 const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 const appendDigit = (d: string) => {

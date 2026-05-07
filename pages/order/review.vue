@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import confetti from "canvas-confetti"
+import { ref } from "vue"
 import { useSessionStore } from "../../stores/Session"
+import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
 import { logger } from "~/utils/logger"
 
 definePageMeta({ middleware: ["order-guard"] })
 
 const router = useRouter()
 const sessionStore = useSessionStore()
+const sessionStartError = ref<string | null>(null)
 
 const triggerCelebration = () => {
     const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
@@ -27,19 +30,26 @@ const handleGoBack = () => {
 const handleOrderSubmitted = async () => {
     const timestamp = new Date().toISOString()
     logger.info("[Order Review] Order confirmation received", { timestamp })
+    sessionStartError.value = null
 
     triggerCelebration()
 
     if (!sessionStore.isActive) {
         try {
             logger.info("[Order Review] Marking session active", { timestamp })
-            await sessionStore.start()
+            const started = await sessionStore.start({ preserveSubmittedOrder: true })
+            if (!started) {
+                sessionStartError.value = "Your order was sent to the kitchen, but this tablet could not start the dining session. Please ask staff to reopen the session screen."
+                logger.error("[Order Review] Session start returned false after order submission", { timestamp })
+                return
+            }
             logger.info("[Session Flow] Order submitted, session active, ready for refill or completion")
         } catch (e) {
             logger.error("[Order Review] Failed to start session store", {
                 timestamp,
                 error: (e as any)?.message,
             })
+            sessionStartError.value = "Your order was sent to the kitchen, but this tablet could not start the dining session. Please ask staff to reopen the session screen."
             return
         }
     }
@@ -82,11 +92,14 @@ const handleOrderSubmitted = async () => {
                     </div>
                 </div>
 
-                <!-- TEMP TEST: remove after diagnosis -->
-                <div style="background:red;color:white;padding:20px;font-size:18px;">
-                    TEST: If you see this, rendering works
+                <div
+                    v-if="sessionStartError"
+                    role="alert"
+                    class="mb-5 rounded-xl border border-error/40 bg-error/15 px-4 py-3 text-sm font-semibold text-error"
+                >
+                    {{ sessionStartError }}
                 </div>
-                <OrderOrderingStep3ReviewSubmit @order-submitted="handleOrderSubmitted" />
+                <OrderingStep3ReviewSubmit @order-submitted="handleOrderSubmitted" />
             </div>
         </div>
         <template #error="{ error, clearError }">
