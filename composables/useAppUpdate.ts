@@ -1,22 +1,182 @@
-import { readonly } from "vue"
+import { computed, ref, toValue, watch } from "vue"
+import type { MaybeRefOrGetter } from "vue"
 import { logger } from "~/utils/logger"
 
-type EchoChannel = {
-  listen: (event: string, callback: (payload: unknown) => void) => EchoChannel
-  stopListening?: (event: string) => void
+const SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING" as const
+const UPDATE_AVAILABLE_MESSAGE_TYPES = ["UPDATE_AVAILABLE", "APP_UPDATE_AVAILABLE", "SW_UPDATE_AVAILABLE"] as const
+
+type UseAppUpdateOptions = {
+    isUpdateApplyBlocked?: MaybeRefOrGetter<boolean>
 }
 
-type EchoLike = {
-  channel: (name: string) => EchoChannel
-  leave?: (name: string) => void
+type WorkerMessageData = {
+    type?: string
 }
 
-type EchoWindow = Window & {
-<<<<<<< fix/pwa-update-runtime-config
+const hasServiceWorkerSupport = (): boolean =>
+    typeof window !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.serviceWorker)
+
+export function useAppUpdate (options?: UseAppUpdateOptions) {
+    const showUpdateBanner = ref(false)
+    const isApplyingUpdate = ref(false)
+    const updateError = ref<string | null>(null)
+
+    const isUpdateApplyBlocked = computed(() => {
+        return Boolean(toValue(options?.isUpdateApplyBlocked ?? false))
+    })
+
+    const canApplyUpdate = computed(() =>
+        showUpdateBanner.value &&
+        !isApplyingUpdate.value &&
+        !isUpdateApplyBlocked.value
+    )
+
+    let initialized = false
+    let serviceWorkerRegistration: ServiceWorkerRegistration | null = null
+    let hasReloaded = false
+    let reloadPending = false
+    let removeControllerChangeListener: (() => void) | null = null
+    let removeServiceWorkerMessageListener: (() => void) | null = null
+    let removeUpdateFoundListener: (() => void) | null = null
+    let stopBlockedWatcher: (() => void) | null = null
+
+    const reloadIfSafe = () => {
+        if (hasReloaded || isUpdateApplyBlocked.value) {
+            reloadPending = isUpdateApplyBlocked.value
+            return
+        }
+        hasReloaded = true
+        window.location.reload()
+    }
+
+    const bindControllerChangeReload = () => {
+        if (!hasServiceWorkerSupport() || removeControllerChangeListener) {
+            return
+        }
+        const onControllerChange = () => {
+            reloadIfSafe()
+        }
+        navigator.serviceWorker.addEventListener("controllerchange", onControllerChange)
+        removeControllerChangeListener = () => {
+            navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange)
+            removeControllerChangeListener = null
+        }
+    }
+
+    const updateBannerVisibility = () => {
+        showUpdateBanner.value = Boolean(serviceWorkerRegistration?.waiting)
+    }
+
+    const attachUpdateFoundListener = () => {
+        if (!serviceWorkerRegistration || removeUpdateFoundListener) {
+            return
+        }
+        const onUpdateFound = () => {
+            const installing = serviceWorkerRegistration?.installing
+            if (!installing) {
+                return
+            }
+            installing.addEventListener("statechange", () => {
+                if (installing.state === "installed" && navigator.serviceWorker.controller) {
+                    updateBannerVisibility()
+                }
+            })
+        }
+        serviceWorkerRegistration.addEventListener("updatefound", onUpdateFound)
+        removeUpdateFoundListener = () => {
+            serviceWorkerRegistration?.removeEventListener("updatefound", onUpdateFound)
+            removeUpdateFoundListener = null
+        }
+    }
+
+    const attachServiceWorkerMessageListener = () => {
+        if (!hasServiceWorkerSupport() || removeServiceWorkerMessageListener) {
+            return
+        }
+        const onMessage = (event: MessageEvent<WorkerMessageData>) => {
+            const messageType = event?.data?.type
+            if (messageType && UPDATE_AVAILABLE_MESSAGE_TYPES.includes(messageType as (typeof UPDATE_AVAILABLE_MESSAGE_TYPES)[number])) {
+                showUpdateBanner.value = true
+            }
+        }
+        navigator.serviceWorker.addEventListener("message", onMessage)
+        removeServiceWorkerMessageListener = () => {
+            navigator.serviceWorker.removeEventListener("message", onMessage)
+            removeServiceWorkerMessageListener = null
+        }
+    }
+
+    const initializeAppUpdate = async () => {
+        if (initialized) {
+            return
+        }
+        initialized = true
+
+        if (!hasServiceWorkerSupport()) {
+            return
+        }
+
+        bindControllerChangeReload()
+        attachServiceWorkerMessageListener()
+
+        stopBlockedWatcher = watch(isUpdateApplyBlocked, (blocked) => {
+            if (!blocked && reloadPending) {
+                reloadPending = false
+                reloadIfSafe()
+            }
+        })
+
+        try {
+            serviceWorkerRegistration = await navigator.serviceWorker.ready
+            attachUpdateFoundListener()
+            updateBannerVisibility()
+            await serviceWorkerRegistration.update().catch(() => {})
+            updateBannerVisibility()
+        } catch (error) {
+            logger.warn("[PWA] Unable to initialize update watcher", error)
+        }
+    }
+
+    const applyUpdate = () => {
+        if (!canApplyUpdate.value) {
+            return
+        }
+        if (!serviceWorkerRegistration || !serviceWorkerRegistration.waiting) {
+            return
+        }
+
+        isApplyingUpdate.value = true
+        updateError.value = null
+        bindControllerChangeReload()
+
+        try {
+            serviceWorkerRegistration.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
+        } catch (error) {
+            isApplyingUpdate.value = false
+            updateError.value = "Failed to apply update. Please try again."
+            logger.error("[PWA] Failed to apply update", error)
+        }
+    }
+
+    const disposeAppUpdate = () => {
+        removeControllerChangeListener?.()
+        removeServiceWorkerMessageListener?.()
+        removeUpdateFoundListener?.()
+        stopBlockedWatcher?.()
+        isApplyingUpdate.value = false
+    }
+
+    return {
+        showUpdateBanner,
+        canApplyUpdate,
+        isApplyingUpdate,
+        updateError,
+        initializeAppUpdate,
+        applyUpdate,
+        disposeAppUpdate,
   Echo?: EchoLike
-=======
-    Echo?: EchoLike
->>>>>>> staging
 }
 
 const MAX_ECHO_SUBSCRIBE_ATTEMPTS = 10
@@ -28,15 +188,10 @@ export const useAppUpdate = () => {
     const registration = ref<ServiceWorkerRegistration | null>(null)
     let updateInterval: ReturnType<typeof setInterval> | null = null
     let swStateListener: ((event: Event) => void) | null = null
-<<<<<<< fix/pwa-update-runtime-config
     let controllerChangeListener: (() => void) | null = null
     let echoChannel: EchoChannel | null = null
     let echoRetryTimer: ReturnType<typeof setTimeout> | null = null
     let refreshing = false
-=======
-    let echoChannel: EchoChannel | null = null
-    let echoRetryTimer: ReturnType<typeof setTimeout> | null = null
->>>>>>> staging
 
     const getEcho = (): EchoLike | null => {
         if (typeof window === "undefined") {
@@ -51,15 +206,7 @@ export const useAppUpdate = () => {
     }
 
     const attachWaitingWorkerListener = () => {
-<<<<<<< fix/pwa-update-runtime-config
         const installingWorker = registration.value?.installing
-=======
-        if (!registration.value?.installing) {
-            return
-        }
-
-        const installingWorker = registration.value.installing
->>>>>>> staging
         if (!installingWorker) {
             return
         }
@@ -73,7 +220,6 @@ export const useAppUpdate = () => {
         installingWorker.addEventListener("statechange", swStateListener)
     }
 
-<<<<<<< fix/pwa-update-runtime-config
     const setupControllerChangeReload = () => {
         if (typeof window === "undefined" || !("serviceWorker" in navigator) || controllerChangeListener) {
             return
@@ -91,18 +237,13 @@ export const useAppUpdate = () => {
         navigator.serviceWorker.addEventListener("controllerchange", controllerChangeListener)
     }
 
-=======
->>>>>>> staging
     const setupServiceWorkerWatcher = async () => {
         if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
             return
         }
 
-<<<<<<< fix/pwa-update-runtime-config
         setupControllerChangeReload()
 
-=======
->>>>>>> staging
         try {
             registration.value = await navigator.serviceWorker.getRegistration()
             refreshWaitingState()
@@ -144,7 +285,6 @@ export const useAppUpdate = () => {
 
         try {
             echoChannel = echo.channel("app.updates")
-<<<<<<< fix/pwa-update-runtime-config
             echoChannel.listen(".AppUpdated", async () => {
                 updateAvailable.value = true
 
@@ -154,21 +294,13 @@ export const useAppUpdate = () => {
                 } catch (error) {
                     logger.warn("[PWA] Failed to refresh service worker after app update signal", error)
                 }
-=======
-            echoChannel.listen(".AppUpdated", () => {
-                updateAvailable.value = true
->>>>>>> staging
             })
         } catch (error) {
             logger.warn("[PWA] Failed to subscribe app update channel", error)
         }
     }
 
-<<<<<<< fix/pwa-update-runtime-config
     const applyUpdate = async () => {
-=======
-    const applyUpdate = () => {
->>>>>>> staging
         if (updating.value || typeof window === "undefined") {
             return
         }
@@ -176,7 +308,6 @@ export const useAppUpdate = () => {
         updating.value = true
 
         try {
-<<<<<<< fix/pwa-update-runtime-config
             if (!registration.value) {
                 registration.value = await navigator.serviceWorker.getRegistration()
             }
@@ -190,13 +321,6 @@ export const useAppUpdate = () => {
             registration.value.waiting.postMessage({ type: "SKIP_WAITING" })
         } catch (error) {
             logger.warn("[PWA] Failed to apply service worker update", error)
-=======
-            if (registration.value?.waiting) {
-                registration.value.waiting.postMessage({ type: "SKIP_WAITING" })
-            }
-
-            window.location.reload()
->>>>>>> staging
         } finally {
             updating.value = false
         }
@@ -222,13 +346,10 @@ export const useAppUpdate = () => {
             registration.value.removeEventListener("updatefound", attachWaitingWorkerListener)
         }
 
-<<<<<<< fix/pwa-update-runtime-config
         if (controllerChangeListener && typeof navigator !== "undefined" && "serviceWorker" in navigator) {
             navigator.serviceWorker.removeEventListener("controllerchange", controllerChangeListener)
         }
 
-=======
->>>>>>> staging
         if (echoChannel?.stopListening) {
             echoChannel.stopListening(".AppUpdated")
         }
@@ -241,10 +362,7 @@ export const useAppUpdate = () => {
         echoChannel = null
         registration.value = null
         swStateListener = null
-<<<<<<< fix/pwa-update-runtime-config
         controllerChangeListener = null
-=======
->>>>>>> staging
     }
 
     return {

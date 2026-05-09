@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useDeviceStore } from "~/stores/Device"
+import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
+import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
@@ -12,17 +14,23 @@ const router = useRouter()
 const route = useRoute()
 const nuxtApp = useNuxtApp()
 const deviceStore = useDeviceStore()
+const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { registerOnlineListener } = useOfflineOrderQueue()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
+const isUpdateApplyBlocked = computed(() =>
+    Boolean(sessionStore.isActive) || Boolean(orderStore.hasPlacedOrder) || Boolean(orderStore.isSubmitting)
+)
 const {
-    updateAvailable,
-    updating,
-    initialize: initializeAppUpdate,
+    showUpdateBanner,
+    canApplyUpdate,
+    isApplyingUpdate,
+    updateError,
+    initializeAppUpdate,
     applyUpdate,
-    dispose: disposeAppUpdate,
-} = useAppUpdate()
+    disposeAppUpdate
+} = useAppUpdate({ isUpdateApplyBlocked })
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 let gestureListenersAttached = false
@@ -182,6 +190,7 @@ function handleVisibilityChange (): void {
 }
 
 onMounted(async () => {
+    initializeAppUpdate()
     attachListener()
     registerGestureFullscreenRecovery()
     await initializeAppUpdate()
@@ -209,6 +218,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+    disposeAppUpdate()
+
     if (broadcastTimer) {
         clearTimeout(broadcastTimer)
     }
@@ -226,6 +237,13 @@ onUnmounted(() => {
 <template>
     <div class="contents">
         <SplashScreen :visible="isLoading" />
+        <UpdateBanner
+            :visible="showUpdateBanner"
+            :disabled="!canApplyUpdate"
+            :is-applying="isApplyingUpdate"
+            :error-message="updateError"
+            @apply="applyUpdate"
+        />
 
         <NuxtLayout name="kiosk">
             <NetworkStatus />
