@@ -7,7 +7,6 @@ import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
-import { useAppUpdate } from "~/composables/useAppUpdate"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
