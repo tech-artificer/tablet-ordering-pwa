@@ -1,5 +1,6 @@
 import axios from "axios"
 import type { InternalAxiosRequestConfig } from "axios"
+import { useRuntimeConfigOverride } from "../composables/useRuntimeConfigOverride"
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
 import { isDeviceAuthPath, normalizeApiRequestUrl } from "../utils/apiRequest"
@@ -11,11 +12,13 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
+    const runtime = useRuntimeConfigOverride()
+    const apiBaseUrl = String(runtime.apiBaseUrl || config.public.apiBaseUrl || "/api")
 
     const api = axios.create({
     // Ensure baseURL always ends with a single trailing slash so relative paths
     // passed to axios (like 'api/menus/...') concatenate correctly.
-        baseURL: (String(config.public.apiBaseUrl || "")).replace(/\/+$/, "") + "/",
+        baseURL: apiBaseUrl.replace(/\/+$/, "") + "/",
         timeout: 15000
     })
 

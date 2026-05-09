@@ -1,6 +1,7 @@
 import Echo from "laravel-echo"
 import Pusher from "pusher-js"
 import { defineNuxtPlugin, useRuntimeConfig } from "#app"
+import { useRuntimeConfigOverride } from "../composables/useRuntimeConfigOverride"
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
 import { resolveReverbSocketConfig } from "../utils/reverbSocketConfig"
@@ -189,7 +190,8 @@ function normalizeBroadcastConfig (raw: any): EchoConfig | null {
 
 export default defineNuxtPlugin((nuxtApp: any) => {
     const config = useRuntimeConfig()
-    const mainApi = config.public.apiBaseUrl
+    const runtime = useRuntimeConfigOverride()
+    const mainApi = runtime.apiBaseUrl
 
     if (!mainApi) { return }
 
@@ -257,16 +259,16 @@ export default defineNuxtPlugin((nuxtApp: any) => {
         if (normalizeBroadcastConfig(persisted)) {
             logger.info("[Echo] Using persisted server-provided broadcast config")
             createEcho(nuxtApp, normalizeBroadcastConfig(persisted)!, String(mainApi), token)
-        } else if (config.public.reverb?.appKey) {
+        } else if (runtime.reverb?.appKey) {
             // Fallback to runtimeConfig (env vars)
             logger.info("[Echo] Using runtimeConfig fallback (no server config cached yet)")
-            const rawFallbackPort = Number(config.public.reverb.port ?? 0)
+            const rawFallbackPort = Number(runtime.reverb.port ?? 0)
             createEcho(nuxtApp, {
-                key: config.public.reverb.appKey,
-                host: config.public.reverb.host || "",
+                key: runtime.reverb.appKey,
+                host: runtime.reverb.host || "",
                 port: (rawFallbackPort === 8080 || rawFallbackPort === 6001) ? 0 : rawFallbackPort,
-                scheme: config.public.reverb.scheme || "http",
-                path: normalizeWsPath(config.public.reverb.path || ""),
+                scheme: runtime.reverb.scheme || "http",
+                path: normalizeWsPath(runtime.reverb.path || ""),
             }, String(mainApi), token)
 
             void initializeFromApiConfig()
