@@ -20,6 +20,7 @@ import { useNuxtApp } from "#app"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useOfflineSyncStore } from "~/stores/OfflineSync"
+import { useSubmitState } from "~/composables/useSubmitState"
 import { logger } from "~/utils/logger"
 import type { OfflineOrderRecord } from "~/types/offline-order"
 
@@ -56,6 +57,7 @@ export function useOrderSubmit () {
         const orderStore = useOrderStore()
         const deviceStore = useDeviceStore()
         const offlineSyncStore = useOfflineSyncStore()
+        const submitState = useSubmitState()
         const { $offlineOutbox } = useNuxtApp()
         const deviceToken = typeof deviceStore.token === "string"
             ? deviceStore.token
@@ -68,6 +70,8 @@ export function useOrderSubmit () {
             },
         }
 
+        submitState.setSubmitting()
+
         // -----------------------------------------------------------------------
         // Submit via existing orderStore (handles validation + API call).
         // If device is offline the fetch fails immediately; BackgroundSyncPlugin
@@ -75,6 +79,10 @@ export function useOrderSubmit () {
         // -----------------------------------------------------------------------
         try {
             const result = await (orderStore.submitOrder as any)(payload, submitOptions)
+            submitState.setConfirmed(
+                result?.order?.order_number ?? result?.order_number ?? null,
+                result?.order?.order_id ?? result?.order_id ?? null
+            )
             return { queued: false, data: result }
         } catch (err: any) {
             const status: number | undefined = err?.response?.status
@@ -83,6 +91,10 @@ export function useOrderSubmit () {
             // by calling setOrderCreated internally — treat result as success
             if (status === 409) {
                 logger.info("[OrderSubmit] 409 — existing order resumed")
+                submitState.setConfirmed(
+                    err?.response?.data?.order?.order_number ?? null,
+                    err?.response?.data?.order?.order_id ?? null
+                )
                 return { queued: false, data: err?.response?.data }
             }
 
@@ -106,12 +118,14 @@ export function useOrderSubmit () {
                     await ($offlineOutbox as any).enqueue(record)
                 }
                 await offlineSyncStore.refreshPendingCount()
+                submitState.setQueued(offlineSyncStore.pendingCount)
                 return { queued: true }
             }
 
             // 401 after Axios retry chain exhausted: token expired, cannot auto-retry
             if (status === 401) {
                 logger.error("[OrderSubmit] 401 auth error — marking outbox auth_error")
+                submitState.setFailed("Authentication failed. Please re-register this device.")
                 if ($offlineOutbox) {
                     const errorMsg = "auth_error: 401 — device token expired"
                     const record: OfflineOrderRecord = {
@@ -133,6 +147,7 @@ export function useOrderSubmit () {
             }
 
             // Re-throw all other errors (422 validation, 500, etc.) for the caller
+            submitState.setFailed(err?.message || "Order submission failed")
             throw err
         }
     }

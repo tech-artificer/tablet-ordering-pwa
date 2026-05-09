@@ -14,6 +14,7 @@ import { useNuxtApp } from "#app"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useOfflineSyncStore } from "~/stores/OfflineSync"
+import { useSubmitState } from "~/composables/useSubmitState"
 import { logger } from "~/utils/logger"
 import type { OfflineOrderRecord } from "~/types/offline-order"
 
@@ -47,12 +48,15 @@ export function useRefillSubmit () {
         const orderStore = useOrderStore()
         const deviceStore = useDeviceStore()
         const offlineSyncStore = useOfflineSyncStore()
+        const submitState = useSubmitState()
         const { $offlineOutbox } = useNuxtApp()
         const deviceToken = typeof deviceStore.token === "string"
             ? deviceStore.token
             : deviceStore.token?.value ?? null
 
         const idempotencyKey = generateIdempotencyKey()
+
+        submitState.setSubmitting()
 
         // -----------------------------------------------------------------------
         // Submit via existing orderStore.submitRefill (handles validation + API call).
@@ -63,6 +67,10 @@ export function useRefillSubmit () {
             const result = await (orderStore.submitRefill as any)(payload, {
                 idempotencyKey
             })
+            submitState.setConfirmed(
+                result?.order?.order_number ?? result?.order_number ?? null,
+                result?.order?.order_id ?? result?.order_id ?? null
+            )
             return { queued: false, data: result }
         } catch (err: any) {
             const status: number | undefined = err?.response?.status
@@ -80,6 +88,7 @@ export function useRefillSubmit () {
 
                 if (!currentOrderId) {
                     logger.error("[RefillSubmit] Cannot queue refill without order ID")
+                    submitState.setFailed("Refill submission failed: order ID not available")
                     throw new Error("Refill submission failed: order ID not available for offline queueing")
                 }
 
@@ -101,12 +110,14 @@ export function useRefillSubmit () {
                     await ($offlineOutbox as any).enqueue(record)
                 }
                 await offlineSyncStore.refreshPendingCount()
+                submitState.setQueued(offlineSyncStore.pendingCount)
                 return { queued: true }
             }
 
             // 401 after Axios retry chain exhausted: token expired
             if (status === 401) {
                 logger.error("[RefillSubmit] 401 auth error — marking outbox auth_error")
+                submitState.setFailed("Authentication failed. Please re-register this device.")
                 if ($offlineOutbox) {
                     const errorMsg = "auth_error: 401 — device token expired"
                     const currentOrder = orderStore.currentOrder as any
@@ -133,6 +144,7 @@ export function useRefillSubmit () {
             }
 
             // Re-throw all other errors (422, 409, 503, 500, validation) for the caller
+            submitState.setFailed(err?.message || "Refill submission failed")
             throw err
         }
     }
