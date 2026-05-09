@@ -217,8 +217,11 @@ export default defineNuxtConfig({
     runtimeConfig: {
         public: {
             // App Configuration
-            appVersion: process.env.APP_VERSION || "1.0.0",
-            appEnv: process.env.APP_ENV || "production",
+            appVersion: process.env.APP_VERSION || process.env.NUXT_PUBLIC_APP_VERSION || "1.0.0",
+            appEnv: process.env.APP_ENV || process.env.NODE_ENV || "production",
+            buildSha: process.env.BUILD_SHA || "unknown",
+            buildBranch: process.env.BUILD_BRANCH || "unknown",
+            buildTime: process.env.BUILD_TIME || new Date().toISOString(),
 
             // Feature Flags
             offlineOrderSync: process.env.NUXT_PUBLIC_OFFLINE_ORDER_SYNC === "true",
