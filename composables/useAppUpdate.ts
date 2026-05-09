@@ -34,7 +34,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     )
 
     let initialized = false
-    let serviceWorkerRegistration: ServiceWorkerRegistration | null = null
+    const registration = ref<ServiceWorkerRegistration | null>(null)
     let hasReloaded = false
     let reloadPending = false
     let removeControllerChangeListener: (() => void) | null = null
@@ -52,9 +52,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     }
 
     const bindControllerChangeReload = () => {
-        if (!hasServiceWorkerSupport() || removeControllerChangeListener) {
-            return
-        }
+        if (!hasServiceWorkerSupport() || removeControllerChangeListener) { return }
         const onControllerChange = () => {
             reloadIfSafe()
         }
@@ -66,15 +64,15 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     }
 
     const updateBannerVisibility = () => {
-        showUpdateBanner.value = Boolean(serviceWorkerRegistration?.waiting)
+        showUpdateBanner.value = Boolean(registration.value?.waiting)
     }
 
     const attachUpdateFoundListener = () => {
-        if (!serviceWorkerRegistration || removeUpdateFoundListener) {
+        if (!registration.value || removeUpdateFoundListener) {
             return
         }
         const onUpdateFound = () => {
-            const installing = serviceWorkerRegistration?.installing
+            const installing = registration.value?.installing
             if (!installing) {
                 return
             }
@@ -84,9 +82,9 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
                 }
             })
         }
-        serviceWorkerRegistration.addEventListener("updatefound", onUpdateFound)
+        registration.value.addEventListener("updatefound", onUpdateFound)
         removeUpdateFoundListener = () => {
-            serviceWorkerRegistration?.removeEventListener("updatefound", onUpdateFound)
+            registration.value?.removeEventListener("updatefound", onUpdateFound)
             removeUpdateFoundListener = null
         }
     }
@@ -129,10 +127,10 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         })
 
         try {
-            serviceWorkerRegistration = await navigator.serviceWorker.ready
+            registration.value = await navigator.serviceWorker.ready
             attachUpdateFoundListener()
             updateBannerVisibility()
-            await serviceWorkerRegistration.update().catch(() => {})
+            await registration.value?.update().catch(() => {})
             updateBannerVisibility()
         } catch (error) {
             logger.warn("[PWA] Unable to initialize update watcher", error)
@@ -143,7 +141,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         if (!canApplyUpdate.value) {
             return
         }
-        if (!serviceWorkerRegistration || !serviceWorkerRegistration.waiting) {
+        if (!registration.value || !registration.value.waiting) {
             return
         }
 
@@ -152,7 +150,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         bindControllerChangeReload()
 
         try {
-            serviceWorkerRegistration.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
+            registration.value.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
         } catch (error) {
             isApplyingUpdate.value = false
             updateError.value = "Failed to apply update. Please try again."

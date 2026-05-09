@@ -191,9 +191,7 @@ const submitOrder = () => {
 </script>
 
 <template>
-    <div
-        class="w-80 flex-shrink-0 text-white bg-[#111111] border-l border-white/[0.07] flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.5)] relative z-20"
-    >
+    <div class="h-full text-white bg-[#111111] flex flex-col">
         <!-- ─── Summary Header ──────────────────────────────────── -->
         <div class="px-5 pt-5 pb-3 border-b border-white/[0.07]">
             <!-- Label -->

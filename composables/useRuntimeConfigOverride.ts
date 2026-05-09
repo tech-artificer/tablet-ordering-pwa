@@ -1,3 +1,5 @@
+import { useRuntimeConfig } from "#app"
+
 type RuntimeConfigWindow = Window & {
     __APP_CONFIG__?: {
         apiBaseUrl?: string
