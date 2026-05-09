@@ -5,6 +5,11 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionEndStore } from "~/stores/SessionEnd"
+import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
+
+const mockReplace = vi.fn()
+vi.mock("vue-router", () => ({ useRouter: () => ({ replace: mockReplace }) }))
+vi.mock("~/composables/useApi", () => ({ useApi: () => ({ get: vi.fn(), post: vi.fn() }) }))
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -22,6 +27,7 @@ function makeWatcherHarness () {
     const sessionStore = useSessionStore()
     const orderStore = useOrderStore()
     const sessionEndStore = useSessionEndStore()
+    const { triggerSessionEnd } = useSessionEndFlow()
 
     // Mirror the exact computed chain from in-session.vue
     const currentOrder = computed(() => {
@@ -36,7 +42,7 @@ function makeWatcherHarness () {
             watch(orderStatus, (status) => {
                 if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
                     if (!sessionEndStore.active) {
-                        sessionEndStore.startTransition({ reason: status as any, orderNumber: null, source: "in-session" })
+                        void triggerSessionEnd(status as any, { source: "in-session" })
                     }
                 }
             })
@@ -55,6 +61,7 @@ function makeWatcherHarness () {
 describe("in-session status watcher — POS Payment Sync spec", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        mockReplace.mockReset().mockResolvedValue(undefined)
         vi.stubGlobal("navigateTo", vi.fn())
     })
 

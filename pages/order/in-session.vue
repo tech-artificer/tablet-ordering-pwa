@@ -52,12 +52,15 @@ const totalItemsOrdered = computed(() =>
     submittedItems.value.reduce((s: number, i: any) => s + Number(i?.quantity ?? 0), 0)
 )
 
-const displayTotal = computed(() =>
-    submittedItems.value.reduce(
-        (s: number, i: any) => s + Number(i?.price ?? i?.unit_price ?? 0) * Number(i?.quantity ?? 0),
-        0
-    )
-)
+// Use server/order-adapter total when available so billing matches authoritative
+// order calculation (package, multipliers, taxes, and backend adjustments).
+const displayTotal = computed<number>(() => {
+    const totalFromOrder = Number(currentOrder.value?.total_amount)
+    if (Number.isFinite(totalFromOrder)) { return totalFromOrder }
+    const fallbackTotal = Number(unref(orderStore.grandTotal) ?? 0)
+    return Number.isFinite(fallbackTotal) ? fallbackTotal : 0
+})
+const formattedDisplayTotal = computed<string>(() => displayTotal.value.toFixed(2))
 
 function getStatusDarkStyle (status: string): string {
     const m: Record<string, string> = {
@@ -326,7 +329,7 @@ definePageMeta({ middleware: ["order-guard"] })
                                 <div class="flex items-center gap-2">
                                     <span class="truncate text-sm font-medium text-[#f0e6d2]">{{ item.name }}</span>
                                     <span
-                                        v-if="item.is_unlimited"
+                                        v-if="item.isUnlimited || item.is_unlimited"
                                         class="flex-shrink-0 rounded border border-[#e9d3aa]/30 bg-[#e9d3aa]/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#e9d3aa]"
                                     >∞</span>
                                 </div>
@@ -441,7 +444,7 @@ definePageMeta({ middleware: ["order-guard"] })
                         <div class="flex items-end justify-between">
                             <span class="text-xs font-medium uppercase tracking-wider text-[#7a776f]">Total</span>
                             <span class="text-2xl font-bold text-[#e9d3aa]">
-                                ₱{{ displayTotal.toFixed(2) }}
+                                ₱{{ formattedDisplayTotal }}
                             </span>
                         </div>
                     </div>
