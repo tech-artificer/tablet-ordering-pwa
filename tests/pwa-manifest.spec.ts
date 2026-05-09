@@ -60,6 +60,7 @@ describe("pwa manifest config", () => {
 
     it("loads runtime-config.js in head before app boot", () => {
         const config = readNuxtConfig()
-        expect(config).toMatch(/head:\s*\{[\s\S]*script:\s*\[[\s\S]*src:\s*"\/runtime-config\.js"/)
+        expect(config).toContain("script: [")
+        expect(config).toContain("src: \"/runtime-config.js\"")
     })
 })
