@@ -21,7 +21,6 @@ const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const route = useRoute()
 const router = useRouter()
-const nuxtApp = useNuxtApp()
 
 const hasLiveOrderReference = (): boolean => {
     const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
@@ -474,14 +473,14 @@ const categoryError = computed(() => {
 
                 <!-- Category Filter Tabs -->
                 <div class="sticky top-0 z-10">
-                    <div class="max-w-7xl mx-auto">
+                    <div>
                         <!-- Refill Mode Indicator -->
                         <refill-mode-banner
                             v-if="orderStore.isRefillMode"
                             :has-placed-order="hasConfirmedInitialOrder"
                             :is-refill-mode="orderStore.isRefillMode"
                             @toggle-refill-mode="toggleRefillMode"
-                            @back-to-session="nuxtApp.$router.push('/order/in-session')"
+                            @back-to-session="router.push('/order/in-session')"
                         />
 
                         <menu-category-tabs
@@ -496,7 +495,7 @@ const categoryError = computed(() => {
 
                 <!-- Content Area -->
                 <div class="flex-1 overflow-y-auto p-6">
-                    <div class="max-w-7xl mx-auto">
+                    <div>
                         <!-- Loading State -->
                         <div v-if="isLoading" class="space-y-6">
                             <SkeletonCard v-for="i in 3" :key="`skeleton-${i}`" />
@@ -547,10 +546,10 @@ const categoryError = computed(() => {
             </div>
         </div>
 
-        <!-- ─── Order Summary Drawer (customer right = screen left) ─── -->
+        <!-- ─── Order Summary Drawer (slides in from right) ─── -->
         <el-drawer
             v-model="cartDrawerOpen"
-            direction="ltr"
+            direction="rtl"
             :with-header="false"
             :size="'min(460px, 33.333vw)'"
             :modal="true"
@@ -571,10 +570,32 @@ const categoryError = computed(() => {
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="() => { cartDrawerOpen = false; nuxtApp.$router.push('/order/review') }"
+                @submit-order="() => { cartDrawerOpen = false; router.push('/order/review') }"
                 @toggle-refill-mode="toggleRefillMode"
             />
         </el-drawer>
+
+        <!-- Floating cart FAB — stays visible while scrolling -->
+        <button
+            class="fixed bottom-36 right-5 z-40 flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-secondary shadow-glow hover:opacity-90 active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label="Open order summary"
+            @click="cartDrawerOpen = true"
+        >
+            <svg
+                class="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+            >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span
+                v-if="unref(orderStore.activeCart).length > 0"
+                class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-secondary text-primary text-[10px] font-black flex items-center justify-center tabular-nums leading-none border-2 border-primary"
+            >{{ unref(orderStore.activeCart).length }}</span>
+        </button>
 
         <!-- Support FAB -->
         <support-fab @request-support="handleSupportRequest" />

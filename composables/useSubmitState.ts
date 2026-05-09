@@ -86,6 +86,15 @@ export const useSubmitState = () => {
         logger.debug("[SubmitState] Transitioning to idle")
     }
 
+    const reset = () => {
+        stateContext.state = "idle"
+        stateContext.lastError = null
+        stateContext.pendingCount = 0
+        stateContext.lastSyncAttempt = null
+        stateContext.confirmedOrderNumber = null
+        stateContext.confirmedOrderId = null
+    }
+
     const updateSyncAttempt = () => {
         stateContext.lastSyncAttempt = Date.now()
     }
@@ -154,6 +163,7 @@ export const useSubmitState = () => {
         setConfirmed,
         setFailed,
         setIdle,
+        reset,
         updateSyncAttempt,
         updatePendingCount,
         resetForNextTransaction,

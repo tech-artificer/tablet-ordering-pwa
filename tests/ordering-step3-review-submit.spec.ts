@@ -9,9 +9,7 @@ describe("OrderingStep3ReviewSubmit", () => {
     beforeEach(() => {
         const pinia = createPinia()
         setActivePinia(pinia)
-        // Reset submit state to idle for each test
-        const submitState = useSubmitState()
-        submitState.setIdle()
+        useSubmitState().reset()
     })
 
     it("submits initial order and emits order-submitted", async () => {
