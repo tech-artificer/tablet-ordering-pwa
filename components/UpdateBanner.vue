@@ -36,7 +36,7 @@ function onApply () {
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p class="text-sm font-semibold">
-                        A new app update is available.
+                        New version available - tap to apply.
                     </p>
                     <p v-if="disabled" class="mt-1 text-xs">
                         {{ disabledMessage }}

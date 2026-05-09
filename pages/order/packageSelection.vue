@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref } from "vue"
 import { ArrowLeft, Inbox } from "lucide-vue-next"
 import type { Package } from "../../types"
 import { useMenuStore } from "../../stores/Menu"
@@ -19,6 +19,11 @@ const deviceStore = useDeviceStore()
 
 // Load packages on mount
 onMounted(async () => {
+    if (typeof window !== "undefined") {
+        window.addEventListener("resize", onResize)
+        document.addEventListener("keydown", handleKeydown)
+    }
+
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
 
@@ -55,6 +60,40 @@ onMounted(async () => {
 const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages)
 const guestCount = computed(() => Number(orderStore.guestCount))
+
+// Responsive layout
+type PackageRowMode = "three" | "peek" | "portrait"
+const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1280)
+const packageRowMode = computed<PackageRowMode>(() => {
+    if (viewportWidth.value >= 1200) { return "three" }
+    if (viewportWidth.value >= 900) { return "peek" }
+    return "portrait"
+})
+function onResize () {
+    viewportWidth.value = window.innerWidth
+}
+
+// Card focus and modifier inspector
+const focusedPackageId = ref<number | null>(null)
+const activeInspectorPackage = ref<Package | null>(null)
+
+function handleCardFocus (pkg: Package) {
+    focusedPackageId.value = pkg.id
+}
+
+function openModifierInspector (pkg: Package) {
+    activeInspectorPackage.value = pkg
+}
+
+function closeInspector () {
+    activeInspectorPackage.value = null
+}
+
+function handleKeydown (event: KeyboardEvent) {
+    if (event.key === "Escape") {
+        closeInspector()
+    }
+}
 const phpCurrencyFormatter = new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP"
@@ -137,6 +176,13 @@ const handlePackageSelection = async (packageData: Package) => {
 }
 
 // Cards handle inline preview directly
+
+onUnmounted(() => {
+    if (typeof window !== "undefined") {
+        window.removeEventListener("resize", onResize)
+        document.removeEventListener("keydown", handleKeydown)
+    }
+})
 
 const goBack = () => {
     console.log(`[↩️ Package Selection Cancelled] User returned to guest counter at ${new Date().toISOString()}`)
@@ -273,16 +319,20 @@ function handleTouchEnd () {
                     </div>
                 </div>
 
-                <!-- Package Row Display (single horizontal row, scrolls horizontally if narrow) -->
+                <!-- Package Row Display -->
                 <div
                     v-else
                     class="flex-1 min-h-0 overflow-x-auto overflow-y-visible pt-3 pkg-row-scroll"
                 >
-                    <div class="flex h-full min-w-min snap-x snap-mandatory items-stretch gap-5 xl:gap-6 pb-2">
+                    <!-- Three-up grid mode (≥1200px) -->
+                    <div
+                        v-if="packageRowMode === 'three'"
+                        class="grid grid-cols-3 gap-5 xl:gap-6 h-full pb-2"
+                    >
                         <div
                             v-for="pkg in packages"
                             :key="pkg.id"
-                            class="flex h-full min-w-[340px] max-w-[460px] flex-1 snap-start"
+                            class="flex h-full min-w-[330px] flex-1"
                         >
                             <PackageCard
                                 :pkg="pkg"
@@ -290,7 +340,67 @@ function handleTouchEnd () {
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
                             />
+                        </div>
+                    </div>
+
+                    <!-- Peek mode (≥900px) -->
+                    <div
+                        v-else-if="packageRowMode === 'peek'"
+                        class="flex h-full snap-x snap-mandatory items-stretch gap-5 pb-2"
+                    >
+                        <div
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-[36%] flex-[0_0_36%] snap-start"
+                        >
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
+                                @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Portrait / narrow mode -->
+                    <div
+                        v-else
+                        class="flex h-full snap-x snap-mandatory items-stretch gap-4 pb-2"
+                    >
+                        <div
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-[330px] flex-1 snap-start"
+                        >
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
+                                @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modifier inspector overlay -->
+                <div v-if="activeInspectorPackage" class="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeInspector">
+                    <div class="max-w-lg w-full mx-4 bg-[#1a1a1a] rounded-2xl p-6 border border-white/10">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-white">
+                                {{ activeInspectorPackage.name }}
+                            </h3>
+                            <button class="text-white/50 hover:text-white transition" @click="closeInspector">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </div>
                     </div>
                 </div>

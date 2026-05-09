@@ -511,6 +511,25 @@ const saveTableOverride = async () => {
     }
 }
 
+// Force refresh app — clears service worker caches without a browser hard refresh
+const isForceRefreshing = ref(false)
+const forceRefreshApp = async () => {
+    isForceRefreshing.value = true
+    try {
+        if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations()
+            await Promise.all(registrations.map(r => r.unregister()))
+        }
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+        window.location.reload()
+    } catch (e) {
+        logger.warn("[Settings] forceRefreshApp failed", e)
+    } finally {
+        isForceRefreshing.value = false
+    }
+}
+
 // Test backend order creation
 const testBackendOrder = async () => {
     if (!deviceStore.token) {
@@ -1175,6 +1194,25 @@ onMounted(async () => {
                         </ul>
                     </div>
                 </div>
+            </div>
+
+            <!-- Force Refresh App -->
+            <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    🔄 App Maintenance
+                </h2>
+                <p class="text-white/60 text-sm mb-4">
+                    Clear all cached data and service workers to force a fresh reload.
+                </p>
+                <button
+                    :disabled="isForceRefreshing"
+                    class="w-full px-6 py-3 min-h-[48px] rounded-lg bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30 active:scale-95 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    @click="forceRefreshApp"
+                >
+                    <span v-if="isForceRefreshing" class="animate-spin">⏳</span>
+                    <span v-else>🔄</span>
+                    {{ isForceRefreshing ? 'Refreshing...' : 'Force Refresh App' }}
+                </button>
             </div>
 
             <!-- Back Button was moved to header -->

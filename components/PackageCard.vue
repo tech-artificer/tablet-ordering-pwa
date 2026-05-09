@@ -39,6 +39,12 @@ const packageDuration = computed(() => {
     return normalized
 })
 
+const previewLimit = 6
+const previewOverflow = computed<number>(() => {
+    const total = (props.pkg?.modifiers || []).length
+    return Math.max(0, total - previewLimit)
+})
+
 type ModifierGroup = { label: string; items: Modifier[] }
 
 const PRIORITY_ORDER = ["PORK", "BEEF", "CHICKEN", "SEAFOOD", "OTHER"]
@@ -205,10 +211,11 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
             <button
                 type="button"
                 class="mx-auto mt-5 flex items-center gap-3 font-kanit text-base font-bold text-[#ffad63] transition group-hover:gap-4 group-hover:text-[#ffc58a] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                @click="emit('select', pkg)"
+                @click.stop="emit('select', pkg)"
             >
-                Select Package
+                View cuts
                 <ChevronRight :size="20" />
+                <span v-if="previewOverflow > 0" class="text-xs font-semibold text-white/50">+{{ previewOverflow }}</span>
             </button>
         </footer>
     </article>
