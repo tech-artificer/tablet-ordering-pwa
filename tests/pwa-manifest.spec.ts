@@ -62,5 +62,7 @@ describe("pwa manifest config", () => {
         const config = readNuxtConfig()
         expect(config).toContain("script: [")
         expect(config).toContain("src: \"/runtime-config.js\"")
+        expect(config).toContain("async: false")
+        expect(config).toContain("defer: false")
     })
 })
