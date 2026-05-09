@@ -3,11 +3,15 @@ import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import OrderingStep3ReviewSubmit from "../components/order/OrderingStep3ReviewSubmit.vue"
 import { useOrderStore } from "../stores/Order"
+import { useSubmitState } from "../composables/useSubmitState"
 
 describe("OrderingStep3ReviewSubmit", () => {
     beforeEach(() => {
         const pinia = createPinia()
         setActivePinia(pinia)
+        // Reset submit state to idle for each test
+        const submitState = useSubmitState()
+        submitState.setIdle()
     })
 
     it("submits initial order and emits order-submitted", async () => {
