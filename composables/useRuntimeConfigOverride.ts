@@ -31,5 +31,8 @@ export function useRuntimeConfigOverride () {
         broadcastConnection: config.public.broadcastConnection,
         appVersion: config.public.appVersion,
         appEnv: config.public.appEnv,
+        buildSha: config.public.buildSha,
+        buildBranch: config.public.buildBranch,
+        buildTime: config.public.buildTime,
     }
 }
