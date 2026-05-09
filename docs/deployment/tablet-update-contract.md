@@ -78,7 +78,7 @@ Deployment MUST NOT proceed (or must auto-fail health verification) when any of 
 3. Any required runtime file in Section 3 is missing/unreachable.
 4. Cache headers violate Section 4 for HTML, `/runtime-config.js`, or `/sw.js`.
 5. Required visible debug values in Section 5 are not available.
-6. This same contract (or an equivalent mirror) is not present in `woosoo-nexus`.
+6. This same contract (or an equivalent mirror) is not present in `woosoo-nexus` (see **Cross-repo sync requirement** below).
 
 ---
 
