@@ -3,19 +3,6 @@ import "dotenv/config"
 import { readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
-// Fail explicitly at build/start time rather than shipping hardcoded dev IPs.
-// Set these variables in the .env file for every environment.
-function requireEnv (name: string): string {
-    const value = process.env[name]
-    if (!value) {
-        throw new Error(
-            `[nuxt.config] Required environment variable "${name}" is not set. ` +
-      "Add it to your .env file or deployment environment before starting the app."
-        )
-    }
-    return value
-}
-
 function readBooleanEnv (name: string, defaultValue = false): boolean {
     const value = process.env[name]
 
@@ -196,10 +183,7 @@ export default defineNuxtConfig({
     app: {
         head: {
             script: [
-                {
-                    src: "/runtime-config.js",
-                    tagPosition: "head",
-                },
+                { src: "/runtime-config.js", async: false, defer: false },
             ],
             meta: [
                 {
@@ -216,9 +200,6 @@ export default defineNuxtConfig({
                 { rel: "manifest", href: "/manifest.webmanifest" },
                 { rel: "icon", href: "/favicon.ico", sizes: "any" },
                 { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
-            ],
-            script: [
-                { src: "/runtime-config.js", async: false, defer: false },
             ],
         },
     },

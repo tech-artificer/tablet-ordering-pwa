@@ -290,7 +290,7 @@ export const useSessionStore = defineStore("session", () => {
                 const ok = await deviceStore.authenticate()
                 if (!ok) {
                     // Authentication failed; caller should handle registration UI
-                    console.log(`[❌ Device Auth Failed] Cannot start session without token at ${timestamp}`)
+                    logger.warn("[Device Auth Failed] Cannot start session without token")
                     return false
                 }
             }
@@ -316,14 +316,14 @@ export const useSessionStore = defineStore("session", () => {
 
             if (!expiresAt || now >= (expiresAt - refreshBuffer)) {
                 // Token is missing/expired/near expiry — try refreshing
-                console.log(`[🔄 Token Refresh] Token expired or missing, refreshing at ${timestamp}`)
+                logger.info("[Token Refresh] Token expired or missing, refreshing")
                 const refreshed = await deviceStore.refresh()
                 if (!refreshed) {
                     // Refresh failed — require re-registration
-                    console.log(`[❌ Token Refresh Failed] Cannot refresh token at ${timestamp}`)
+                    logger.warn("[Token Refresh Failed] Cannot refresh token")
                     return false
                 }
-                console.log(`[✅ Token Refreshed] Valid token obtained at ${timestamp}`)
+                logger.info("[Token Refreshed] Valid token obtained")
             }
 
             // Fetch latest session id from server to keep local state in-sync
@@ -337,9 +337,9 @@ export const useSessionStore = defineStore("session", () => {
             // Preload menu data so customers don't wait when ordering
             const menuStore = useMenuStore()
             try {
-                console.log(`[📦 Menu Preload] Loading menus for quick response at ${timestamp}`)
+                logger.info("[Menu Preload] Loading menus for quick response")
                 await menuStore.loadAllMenus()
-                console.log(`[✅ Menu Preloaded] Ready for ordering at ${timestamp}`)
+                logger.info("[Menu Preloaded] Ready for ordering")
             } catch (e) {
                 logger.warn("[SessionStore] preload menus failed:", e)
             }
@@ -385,7 +385,7 @@ export const useSessionStore = defineStore("session", () => {
                 try { window.localStorage.setItem("session_active", "1") } catch (e) { logger.warn("[SessionStore] failed to set session_active", e) }
             }
 
-            console.log(`[✅ Session Started] Ready for guest ordering flow at ${timestamp}`)
+            logger.info("[Session Started] Ready for guest ordering flow")
             logger.info("[SessionStore] Session started")
 
             return true
@@ -401,10 +401,10 @@ export const useSessionStore = defineStore("session", () => {
             const currentOrderId = state.orderId
             const finalStatus = orderStore.getCurrentOrderStatus() || "unknown"
 
-            console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
+            logger.info(`[Session Ending] order_id=${currentOrderId} final_status=${finalStatus}`)
             logger.info("🔚 Session ending - clearing all session and order state")
             await clearInternal() // Call internal version to avoid double-locking
-            console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
+            logger.info("[Session Cleared] Ready for next guest")
         })
     }
 

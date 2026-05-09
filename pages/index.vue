@@ -190,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { Settings, UtensilsCrossed } from "lucide-vue-next"
+import { Settings } from "lucide-vue-next"
 import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
@@ -249,7 +249,6 @@ onMounted(async () => {
         }
 
         if (!canResumeActiveOrder || !unref(deviceStore.isAuthenticated)) {
-            console.warn("[⚠️ Resume Blocked] Active order found but device is not authenticated; staying on welcome page")
             return
         }
 
@@ -271,16 +270,11 @@ onMounted(async () => {
 })
 
 const start = () => {
-    const timestamp = new Date().toISOString()
-    console.log(`[🎬 Session START] Welcome screen → Start button clicked at ${timestamp}`)
-
     if (!unref(deviceStore.isAuthenticated)) {
-        console.log(`[⚠️ Device Auth Failed] Prompting PIN for Settings at ${timestamp}`)
         openSettings()
         return
     }
 
-    console.log(`[✅ Device Ready] Navigating to guest counter at ${timestamp}`)
     void nuxtApp.$router.replace("/order/start")
 }
 

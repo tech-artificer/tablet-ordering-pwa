@@ -189,7 +189,6 @@ function handleVisibilityChange (): void {
 }
 
 onMounted(async () => {
-    initializeAppUpdate()
     attachListener()
     registerGestureFullscreenRecovery()
     await initializeAppUpdate()
@@ -217,8 +216,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-    disposeAppUpdate()
-
     if (broadcastTimer) {
         clearTimeout(broadcastTimer)
     }
@@ -247,14 +244,6 @@ onUnmounted(() => {
         <NuxtLayout name="kiosk">
             <NetworkStatus />
             <FullscreenRecovery />
-
-            <UpdateBanner
-                :visible="updateAvailable"
-                :updating="updating"
-                :disabled="sessionStore.isActive"
-                disabled-message="Apply after this session ends."
-                @apply="applyUpdate"
-            />
 
             <Transition name="page-fade" mode="out-in">
                 <NuxtPage :key="route.path" />

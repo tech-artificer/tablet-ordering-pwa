@@ -105,7 +105,7 @@ function createEcho (
 
     logger.info(`[Echo] Connecting to Reverb: ${forceTLS ? "wss" : "ws"}://${normalizedHost}:${wsPort}${wsPath}`)
 
-    console.log("[Echo Init] Config:", {
+    logger.debug("[Echo Init] Config:", {
         key: cfg.key?.substring(0, 8) + "...",
         host: normalizedHost,
         wsPort,
@@ -148,18 +148,18 @@ function createEcho (
     // Monitor connection state
     if (echo && (echo as any).connector) {
         const connector = (echo as any).connector
-        console.log("[Echo Init] Instantiated, broadcaster=" + (echo as any).broadcaster)
+        logger.debug("[Echo Init] Instantiated, broadcaster=" + (echo as any).broadcaster)
 
         try {
             if (typeof connector.socket?.on === "function") {
                 connector.socket.on("connect", () => {
-                    console.log("[Echo Connected] WebSocket connected at", new Date().toISOString())
+                    logger.info("[Echo Connected] WebSocket connected")
                 })
                 connector.socket.on("disconnect", () => {
-                    console.log("[Echo Disconnected] WebSocket disconnected at", new Date().toISOString())
+                    logger.info("[Echo Disconnected] WebSocket disconnected")
                 })
                 connector.socket.on("error", (err: any) => {
-                    console.error("[Echo Error]", err?.message || err, "at", new Date().toISOString())
+                    logger.error("[Echo Error]", err?.message || err)
                 })
             }
         } catch (e) {
@@ -288,10 +288,10 @@ export default defineNuxtPlugin((nuxtApp: any) => {
                     ;(window as any).Echo.connector.options.auth.headers = (window as any).Echo.connector.options.auth.headers || {}
                     if (bearer) { (window as any).Echo.connector.options.auth.headers.Authorization = bearer } else { delete (window as any).Echo.connector.options.auth.headers.Authorization }
                 }
-                console.log("[Echo Auth Updated] Bearer token", newToken ? "SET" : "CLEARED", "at", new Date().toISOString())
+                logger.debug("[Echo Auth Updated] Bearer token", newToken ? "SET" : "CLEARED")
             } catch (e) {
                 logger.warn("[Echo] updateEchoAuth failed", e)
-                console.error("[Echo Auth Update Failed]", e)
+                logger.error("[Echo Auth Update Failed]", e)
             }
         }
     } catch (err) {

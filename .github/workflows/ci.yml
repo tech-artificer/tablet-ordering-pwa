@@ -3,6 +3,8 @@ name: PWA CI - Lint, Type Check, Tests, Build
 on:
   push:
     branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop, staging ]
 
 jobs:
   pwa-ci:
@@ -41,6 +43,9 @@ jobs:
         run: npm run build --if-present
         env:
           NITRO_PRESET: node-server
+
+      - name: Generate static PWA
+        run: npm run generate --if-present
 
       - name: Verify build output
         run: test -d .output && echo "Build successful" || (echo "Build output missing" && exit 1)
