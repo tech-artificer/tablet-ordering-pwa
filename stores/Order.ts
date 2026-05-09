@@ -107,19 +107,46 @@ export const useOrderStore = defineStore("order", () => {
         return null
     }
 
+    function getCurrentOrderResource (): any | null {
+        return (state.currentOrder as any)?.order ?? state.currentOrder ?? null
+    }
+
+    function getServerOrderId (): number | null {
+        const currentOrderId = extractOrderId(getCurrentOrderResource())
+        if (currentOrderId !== null && currentOrderId !== undefined) {
+            return Number(currentOrderId)
+        }
+
+        const sessionStore = useSessionStore()
+        const sessionOrderId = sessionStore.getOrderId()
+        if (sessionOrderId !== null && sessionOrderId !== undefined) {
+            return Number(sessionOrderId)
+        }
+
+        return null
+    }
+
+    function hasServerBackedOrder (): boolean {
+        return getServerOrderId() !== null
+    }
+
+    function hasConfirmedInitialOrder (): boolean {
+        return Boolean(state.hasPlacedOrder && hasServerBackedOrder())
+    }
+
     const validateOrderState = (source: string) => {
         const issues: string[] = []
 
-        if (state.isRefillMode && !state.hasPlacedOrder) {
+        if (state.isRefillMode && !hasConfirmedInitialOrder()) {
             state.isRefillMode = false
             state.refillItems = []
             issues.push("refillModeWithoutOrder")
         }
 
-        if (state.hasPlacedOrder && !state.currentOrder) {
+        if (state.hasPlacedOrder && !hasServerBackedOrder()) {
             state.hasPlacedOrder = false
             state.submittedItems = []
-            issues.push("hasPlacedOrderWithoutCurrentOrder")
+            issues.push("hasPlacedOrderWithoutServerReference")
         }
 
         if (state.isPolling && !pollIntervalId) {
@@ -181,7 +208,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     function addToCart (item: MenuItem, opts?: { isUnlimited?: boolean; category?: string }) {
-        if (state.hasPlacedOrder && !state.isRefillMode) {
+        if (hasConfirmedInitialOrder() && !state.isRefillMode) {
             logger.warn("addToCart blocked: initial order already placed; use refill mode to add items")
             notifyBlockedAction()
             return
@@ -221,7 +248,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     function updateQuantity (id: number, quantity: number) {
-        if (state.hasPlacedOrder && !state.isRefillMode) {
+        if (hasConfirmedInitialOrder() && !state.isRefillMode) {
             logger.warn("updateQuantity blocked: initial order already placed; use refill mode to modify items")
             notifyBlockedAction()
             return
@@ -243,7 +270,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     function remove (id: number) {
-        if (state.hasPlacedOrder && !state.isRefillMode) {
+        if (hasConfirmedInitialOrder() && !state.isRefillMode) {
             logger.warn("remove blocked: initial order already placed; use refill mode to remove items")
             notifyBlockedAction()
             return
@@ -267,7 +294,7 @@ export const useOrderStore = defineStore("order", () => {
 
     function toggleRefillMode (enabled: boolean) {
     // Prevent entering refill mode if no initial order placed
-        if (enabled && !state.hasPlacedOrder) {
+        if (enabled && !hasConfirmedInitialOrder()) {
             logger.warn("toggleRefillMode blocked: cannot enter refill mode before placing initial order")
             notifyBlockedAction("Cannot enter Refill mode until initial order is placed")
             return
@@ -279,77 +306,33 @@ export const useOrderStore = defineStore("order", () => {
         }
     }
 
-    function buildPayload (): OrderPayload {
-    // Separate package item with nested modifiers from add-ons
-        const normalizedCartItems = state.cartItems.map(item => ({
-            ...item,
-            category: normalizeCartCategory(item.category)
-        }))
-        const meatItems = normalizedCartItems.filter(i => i.category === "meats")
-        const addOnItems = normalizedCartItems.filter(i => i.category !== "meats")
+    function normalizePayloadItems (items: CartItem[]): OrderPayloadItem[] {
+        const grouped = new Map<number, number>()
 
-        const items: OrderPayloadItem[] = []
-
-        // 1. Package item with meat modifiers (parent-child structure)
-        if (state.package?.id) {
-            const packageQuantity = Number(state.guestCount)
-            const packageUnitPrice = Number(state.package.price || 0)
-            const packageSubtotal = toMoney(packageUnitPrice * packageQuantity)
-
-            items.push({
-                menu_id: Number(state.package.id),
-                name: String(state.package.name || "Package"),
-                quantity: packageQuantity,
-                price: toMoney(packageUnitPrice),
-                subtotal: packageSubtotal,
-                tax: 0,
-                discount: 0,
-                note: null,
-                is_package: true,
-                modifiers: meatItems.map(meat => ({
-                    menu_id: Number(meat.id),
-                    quantity: Number(meat.quantity)
-                }))
-            })
-        }
-
-        // 2. Add-on items (sides, drinks, desserts) as separate top-level items
-        addOnItems.forEach((item) => {
+        items.forEach((item) => {
+            const menuId = Number(item.id)
             const quantity = Number(item.quantity)
-            const unitPrice = Number(item.price || 0)
-            const subtotal = toMoney(unitPrice * quantity)
-
-            items.push({
-                menu_id: Number(item.id),
-                name: String(item.name || "Item"),
-                quantity,
-                price: toMoney(unitPrice),
-                subtotal,
-                tax: 0,
-                discount: 0,
-                note: item.note ?? null,
-                is_package: false,
-                modifiers: []
-            })
+            if (!Number.isFinite(menuId) || menuId <= 0) { return }
+            if (!Number.isFinite(quantity) || quantity < 1) { return }
+            grouped.set(menuId, (grouped.get(menuId) ?? 0) + quantity)
         })
 
-        const subtotal = toMoney(Number(packageTotal.value || 0) + Number(addOnsTotal.value || 0))
-        const tax = toMoney(Number(taxAmount.value || 0))
-        const discount = 0
-        const totalAmount = toMoney(Number(grandTotal.value || 0))
+        return Array.from(grouped.entries()).map(([menuId, quantity]) => ({ menu_id: menuId, quantity }))
+    }
 
-        const payload = {
-            table_id: null, // Will be populated from deviceStore in submitOrder
-            guest_count: Number(state.guestCount),
-            subtotal,
-            tax,
-            discount,
-            total_amount: totalAmount,
-            items
+    function buildPayload (): OrderPayload {
+        logger.debug("Validating payload structure...")
+
+        const packageId = Number(state.package?.id)
+        if (!Number.isFinite(packageId) || packageId <= 0) {
+            throw new Error("Invalid package_id: package must be selected")
         }
 
-        // Validate payload structure
-        logger.debug("Validating payload structure...")
+        const payload = {
+            guest_count: Number(state.guestCount),
+            package_id: packageId,
+            items: normalizePayloadItems(state.cartItems),
+        }
 
         if (!payload.guest_count || payload.guest_count < 1) {
             throw new Error("Invalid guest_count: must be at least 1")
@@ -359,53 +342,12 @@ export const useOrderStore = defineStore("order", () => {
             throw new Error("Invalid items: must be a non-empty array")
         }
 
-        if (typeof payload.subtotal !== "number" || payload.subtotal < 0) {
-            throw new Error("Invalid subtotal: must be a non-negative number")
-        }
-
-        if (typeof payload.tax !== "number" || payload.tax < 0) {
-            throw new Error("Invalid tax: must be a non-negative number")
-        }
-
-        if (typeof payload.discount !== "number" || payload.discount < 0) {
-            throw new Error("Invalid discount: must be a non-negative number")
-        }
-
-        if (typeof payload.total_amount !== "number" || payload.total_amount < 0) {
-            throw new Error("Invalid total_amount: must be a non-negative number")
-        }
-
         payload.items.forEach((item, index) => {
             if (!item.menu_id || typeof item.menu_id !== "number") {
                 throw new Error(`Invalid item[${index}].menu_id: must be a number`)
             }
-            if (!item.name || typeof item.name !== "string") {
-                throw new Error(`Invalid item[${index}].name: must be a string`)
-            }
             if (!item.quantity || item.quantity < 1) {
                 throw new Error(`Invalid item[${index}].quantity: must be at least 1`)
-            }
-            if (typeof item.price !== "number" || item.price < 0) {
-                throw new Error(`Invalid item[${index}].price: must be a non-negative number`)
-            }
-            if (typeof item.subtotal !== "number" || item.subtotal < 0) {
-                throw new Error(`Invalid item[${index}].subtotal: must be a non-negative number`)
-            }
-            if (typeof item.is_package !== "boolean") {
-                throw new TypeError(`Invalid item[${index}].is_package: must be a boolean`)
-            }
-            if (item.is_package && (!Array.isArray(item.modifiers) || item.modifiers.length === 0)) {
-                throw new Error(`Invalid item[${index}].modifiers: package items must have at least one modifier`)
-            }
-            if (item.is_package && item.modifiers) {
-                item.modifiers.forEach((mod, modIndex: number) => {
-                    if (!mod.menu_id || typeof mod.menu_id !== "number") {
-                        throw new Error(`Invalid item[${index}].modifiers[${modIndex}].menu_id: must be a number`)
-                    }
-                    if (!mod.quantity || mod.quantity < 1) {
-                        throw new Error(`Invalid item[${index}].modifiers[${modIndex}].quantity: must be at least 1`)
-                    }
-                })
             }
         })
 
@@ -415,17 +357,13 @@ export const useOrderStore = defineStore("order", () => {
 
     function buildRefillPayload () {
         return {
-            items: state.refillItems.map(item => ({
-                menu_id: Number(item.id),
-                name: String(item.name || ""),
-                quantity: Number(item.quantity),
-                note: item.note ?? "Refill",
-            })),
+            order_id: getServerOrderId(),
+            items: normalizePayloadItems(state.refillItems),
         }
     }
 
     async function submitOrder (payload?: OrderPayload, options?: SubmitOrderOptions) {
-        if (state.hasPlacedOrder && !state.isRefillMode) {
+        if (hasConfirmedInitialOrder() && !state.isRefillMode) {
             throw new Error("An initial order has already been placed for this session. Use refill instead.")
         }
         if (state.isSubmitting) {
@@ -494,15 +432,7 @@ export const useOrderStore = defineStore("order", () => {
             logger.debug("All validations passed - proceeding with order submission")
 
             const api = useApi()
-            let body = payload ?? buildPayload()
-
-            // Inject table_id from deviceStore if not already set
-            if (!body.table_id) {
-                body = {
-                    ...body,
-                    table_id: refreshedTableId
-                }
-            }
+            const body = payload ?? buildPayload()
 
             logger.debug("Order Payload:", body)
 
@@ -640,7 +570,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     async function submitRefill (payload?: any, options?: SubmitRefillOptions) {
-        if (!state.currentOrder && !state.hasPlacedOrder) {
+        if (!hasServerBackedOrder()) {
             throw new Error("No existing order found - cannot submit a refill.")
         }
         if (state.isSubmitting) {
@@ -1199,6 +1129,9 @@ export const useOrderStore = defineStore("order", () => {
         getIsPolling,
         getPollTimerId,
         getPollingOrderId,
+        getServerOrderId,
+        hasServerBackedOrder,
+        hasConfirmedInitialOrder,
         // Polling controls
         startPolling,
         stopPolling,

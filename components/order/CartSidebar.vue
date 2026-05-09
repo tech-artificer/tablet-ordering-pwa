@@ -40,6 +40,11 @@ const hasPackage = computed(() => Boolean(
     (props.selectedPackage && (props.selectedPackage as any).id) ||
   ((orderStore.package as any)?.id)
 ))
+const hasLiveOrderReference = computed(() => {
+    const currentOrder = (orderStore.getCurrentOrder() as any)?.order || orderStore.getCurrentOrder()
+    return Boolean(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id)
+})
+const hasSubmittedOrder = computed(() => Boolean(props.hasPlacedOrder && hasLiveOrderReference.value))
 const hasCartItems = computed(() => Array.isArray(props.cartItems) && props.cartItems.length > 0 && props.cartItems.some((i: any) => Number(i.quantity) > 0))
 const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => {
     const category = String(i?.category || "").toLowerCase()
@@ -55,7 +60,7 @@ const submitBlockers = computed(() => {
         return blockers
     }
 
-    if (orderStore.hasPlacedOrder && !props.isRefillMode) {
+    if (hasSubmittedOrder.value && !props.isRefillMode) {
         blockers.push("Initial order already placed")
         return blockers
     }
@@ -154,7 +159,7 @@ const orderGuestCount = computed(() => {
 })
 
 const displayedGuestCount = computed(() => {
-    return orderStore.hasPlacedOrder ? orderGuestCount.value : Number(props.guestCount)
+    return hasSubmittedOrder.value ? orderGuestCount.value : Number(props.guestCount)
 })
 
 const displayOrderId = computed(() => {
@@ -223,7 +228,7 @@ const submitOrder = () => {
         <!-- Content Area -->
         <div class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
             <!-- POST-ORDER: Show ordered items (read-only) -->
-            <template v-if="orderStore.hasPlacedOrder && !isRefillMode">
+            <template v-if="hasSubmittedOrder && !isRefillMode">
                 <!-- Order Status Badge -->
                 <div
                     :class="['rounded-xl border px-3 py-2.5 mb-1 flex items-center justify-between gap-2', statusConfig.bgColor]"
@@ -388,7 +393,7 @@ const submitOrder = () => {
             <!-- Price Breakdown (only in normal mode) -->
             <div v-if="!isRefillMode" class="space-y-1 text-white text-sm">
                 <!-- After order placed: use server response values -->
-                <template v-if="orderStore.hasPlacedOrder && orderTotal > 0">
+                <template v-if="hasSubmittedOrder && orderTotal > 0">
                     <div class="flex justify-between text-white/60">
                         <span>Subtotal</span>
                         <span>{{ formatCurrency(orderSubtotal) }}</span>
@@ -439,7 +444,7 @@ const submitOrder = () => {
             <!-- Action Buttons -->
             <div class="space-y-2">
                 <p
-                    v-if="!canSubmit && !orderStore.hasPlacedOrder"
+                    v-if="!canSubmit && !hasSubmittedOrder"
                     class="text-[11px] text-warning font-medium px-1"
                     role="status"
                     aria-live="polite"
@@ -450,7 +455,7 @@ const submitOrder = () => {
                 <!-- Inline countdown widget — replaces Place Order button while counting down -->
                 <Transition name="count-swap" mode="out-in">
                     <div
-                        v-if="isCountingDown && !orderStore.hasPlacedOrder"
+                        v-if="isCountingDown && !hasSubmittedOrder"
                         key="countdown"
                         class="w-full rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3"
                     >
@@ -479,7 +484,7 @@ const submitOrder = () => {
 
                     <!-- Place Order Button (before order placed, not counting down) -->
                     <button
-                        v-else-if="!orderStore.hasPlacedOrder"
+                        v-else-if="!hasSubmittedOrder"
                         key="place-order"
                         :disabled="!canSubmit"
                         :title="!canSubmit ? blockedSubmitReason : ''"

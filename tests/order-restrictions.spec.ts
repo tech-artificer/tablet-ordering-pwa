@@ -61,6 +61,13 @@ describe("Order Restrictions (Frontend)", () => {
 
             // Now place an order
             store.hasPlacedOrder = true
+            store.setCurrentOrder({
+                order: {
+                    id: 1,
+                    order_id: 1001,
+                    status: "confirmed",
+                },
+            })
 
             // Now toggle should work
             store.toggleRefillMode(true)
@@ -83,6 +90,13 @@ describe("Order Restrictions (Frontend)", () => {
 
             // Switch to refill mode
             store.hasPlacedOrder = true
+            store.setCurrentOrder({
+                order: {
+                    id: 1,
+                    order_id: 1001,
+                    status: "confirmed",
+                },
+            })
             store.toggleRefillMode(true)
 
             // Regular cart should be cleared (or at least not shown)
@@ -104,6 +118,13 @@ describe("Order Restrictions (Frontend)", () => {
 
             // Switch to refill mode
             store.hasPlacedOrder = true
+            store.setCurrentOrder({
+                order: {
+                    id: 1,
+                    order_id: 1001,
+                    status: "confirmed",
+                },
+            })
             store.toggleRefillMode(true)
 
             // Add refill item

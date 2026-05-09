@@ -42,6 +42,14 @@ describe("OrderingStep3ReviewSubmit", () => {
         const order = useOrderStore()
         order.setHasPlacedOrder(true)
         order.setIsRefillMode(false)
+        order.setCurrentOrder({
+            order: {
+                id: 9001,
+                order_id: 9001,
+                status: "pending",
+                items: [],
+            },
+        } as any)
 
         const submitOrderSpy = vi.spyOn(order, "submitOrder")
 

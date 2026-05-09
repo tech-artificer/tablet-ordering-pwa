@@ -23,6 +23,18 @@ const route = useRoute()
 const router = useRouter()
 const nuxtApp = useNuxtApp()
 
+const hasLiveOrderReference = (): boolean => {
+    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
+    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
+}
+
+const hasConfirmedInitialOrder = computed(() => {
+    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
+        return orderStore.hasConfirmedInitialOrder()
+    }
+    return Boolean(unref(orderStore.hasPlacedOrder) && hasLiveOrderReference())
+})
+
 onMounted(async () => {
     if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
         try {
@@ -54,7 +66,7 @@ onMounted(async () => {
     // This must happen regardless of whether a package is known — the order is already
     // placed, so the user should be building a refill, not a new initial order.
     // Guard with !orderStore.isRefillMode to avoid clearing in-progress refill items.
-    if (recovery.hasActiveOrder && orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
+    if (recovery.hasActiveOrder && hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
         orderStore.toggleRefillMode(true)
         if (!allowMenuAccess) {
             notifyInfo("Active order recovered. Refill mode enabled.")
@@ -108,7 +120,7 @@ onMounted(async () => {
     if (
         !recovery.hasActiveOrder &&
         sessionStore.isActive &&
-        orderStore.hasPlacedOrder &&
+        hasConfirmedInitialOrder.value &&
         !orderStore.isRefillMode &&
         orderStore.getCartItems().length === 0 &&
         orderStore.getSubmittedItems().length === 0
@@ -190,19 +202,13 @@ const categories = [
 
 // Check if refills are available (order placed AND we have a valid order ID)
 const canRequestRefill = computed(() => {
-    const hasOrder = Boolean(unref(orderStore.hasPlacedOrder)) && !!unref(sessionStore.orderId)
-    return hasOrder
+    return hasConfirmedInitialOrder.value
 })
-
-const hasLiveOrderReference = (): boolean => {
-    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
-    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
-}
 
 const isBackButtonDisabled = (): boolean => {
     // Back is blocked only when an active order exists (placed/recovered/live ref)
     return Boolean(
-        unref(orderStore.hasPlacedOrder) ||
+        hasConfirmedInitialOrder.value ||
         hasLiveOrderReference()
     )
 }
@@ -395,7 +401,7 @@ const getServiceTypeId = (type: string): number => {
 // Refill mode toggle
 const toggleRefillMode = () => {
     // Check if order has been placed AND confirmed by server
-    if (!orderStore.hasPlacedOrder) {
+    if (!hasConfirmedInitialOrder.value) {
         notifyWarning("Please place and confirm your order first before requesting refills")
         return
     }
@@ -459,7 +465,7 @@ const categoryError = computed(() => {
                 <menu-header
                     :selected-package="selectedPackage"
                     :table-name="(deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill'"
-                    :has-placed-order="orderStore.hasPlacedOrder"
+                    :has-placed-order="hasConfirmedInitialOrder"
                     :is-back-disabled="isBackButtonDisabled()"
                     :cart-count="unref(orderStore.activeCart).length"
                     @back="handleBackButtonClick"
@@ -472,7 +478,7 @@ const categoryError = computed(() => {
                         <!-- Refill Mode Indicator -->
                         <refill-mode-banner
                             v-if="orderStore.isRefillMode"
-                            :has-placed-order="orderStore.hasPlacedOrder"
+                            :has-placed-order="hasConfirmedInitialOrder"
                             :is-refill-mode="orderStore.isRefillMode"
                             @toggle-refill-mode="toggleRefillMode"
                             @back-to-session="nuxtApp.$router.push('/order/in-session')"
@@ -561,7 +567,7 @@ const categoryError = computed(() => {
                 :grand-total="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal"
                 :unlimited-item-cap="UNLIMITED_ITEM_CAP"
                 :is-refill-mode="orderStore.isRefillMode"
-                :has-placed-order="orderStore.hasPlacedOrder"
+                :has-placed-order="hasConfirmedInitialOrder"
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"

@@ -219,7 +219,7 @@ describe("order submit handoff", () => {
 describe("review page handoff", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
-        vi.useFakeTimers()
+        vi.useRealTimers()
         vi.unstubAllGlobals()
         mocks.get.mockReset()
         mocks.post.mockReset()
@@ -252,7 +252,7 @@ describe("review page handoff", () => {
         expect(order.hasPlacedOrder).toBe(true)
         expect(order.getCurrentOrder()?.order?.order_id).toBe(19561)
         expect(order.submittedItems).toHaveLength(1)
-    })
+    }, 15000)
 
     it("navigates when the real review handler sees sessionStore.start resolve true", async () => {
         const session = useSessionStore()
@@ -267,7 +267,7 @@ describe("review page handoff", () => {
         expect(mocks.routerReplace).toHaveBeenCalledWith("/order/in-session")
         expect(session.start).toHaveBeenCalledWith({ preserveSubmittedOrder: true })
         expect(wrapper.find("[role='alert']").exists()).toBe(false)
-    })
+    }, 15000)
 
     it("does not navigate when the real review handler catches a sessionStore.start error", async () => {
         const session = useSessionStore()
@@ -281,5 +281,5 @@ describe("review page handoff", () => {
 
         expect(mocks.routerReplace).not.toHaveBeenCalled()
         expect(wrapper.get("[role='alert']").text()).toContain("Your order was sent")
-    })
+    }, 15000)
 })

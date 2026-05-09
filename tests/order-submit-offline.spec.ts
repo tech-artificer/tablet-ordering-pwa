@@ -59,9 +59,9 @@ vi.mock("~/utils/logger", () => ({
 }))
 
 const samplePayload = {
-    table_id: 1,
     guest_count: 2,
-    items: [{ menu_id: 10, quantity: 1, is_package: false, modifiers: [] }],
+    package_id: 50,
+    items: [{ menu_id: 10, quantity: 1 }],
 }
 
 describe("composables/useOrderSubmit", () => {

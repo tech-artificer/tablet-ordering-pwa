@@ -44,7 +44,7 @@ vi.mock("~/utils/logger", () => ({
     logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
-const samplePayload = { table_id: 1, guest_count: 2, items: [] }
+const samplePayload = { guest_count: 2, package_id: 50, items: [{ menu_id: 10, quantity: 1 }] }
 
 describe("order auth replay context", () => {
     beforeEach(() => {

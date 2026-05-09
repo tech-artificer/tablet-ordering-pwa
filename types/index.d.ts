@@ -412,31 +412,14 @@ export interface OrderApiResponse {
   total_amount?: number;
 }
 
-export interface OrderModifier {
-  menu_id: number;
-  quantity: number;
-}
-
 export interface OrderPayloadItem {
   menu_id: number;
-  name: string;
   quantity: number;
-  price: number;
-  subtotal: number;
-  tax: number;
-  discount: number;
-  note: string | null;
-  is_package: boolean;
-  modifiers: OrderModifier[];
 }
 
 export interface OrderPayload {
-  table_id: number | null;
   guest_count: number;
-  subtotal: number;
-  tax: number;
-  discount: number;
-  total_amount: number;
+  package_id: number;
   items: OrderPayloadItem[];
 }
 

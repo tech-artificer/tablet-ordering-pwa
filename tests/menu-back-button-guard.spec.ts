@@ -15,7 +15,7 @@ describe("menu page back button guard", () => {
         const liveOrderBody = liveOrderMatch?.[1] ?? ""
 
         expect(source).toContain("const isBackButtonDisabled =")
-        expect(guardBody).toContain("orderStore.hasPlacedOrder")
+        expect(guardBody).toContain("hasConfirmedInitialOrder.value")
         expect(guardBody).toContain("hasLiveOrderReference()")
         expect(guardBody).not.toContain("sessionStore.isActive")
         expect(liveOrderBody).toContain("sessionStore.orderId")

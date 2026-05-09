@@ -43,6 +43,14 @@ const currentOrderSnapshot = computed<any>(() => {
     return (unref(orderStore.currentOrder) as any)?.order || unref(orderStore.currentOrder) || null
 })
 
+const hasConfirmedInitialOrder = computed(() => {
+    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
+        return orderStore.hasConfirmedInitialOrder()
+    }
+    const liveOrderId = currentOrderSnapshot.value?.order_id ?? currentOrderSnapshot.value?.id
+    return Boolean(orderStore.hasPlacedOrder && liveOrderId)
+})
+
 const fallbackServerItems = computed<ReviewItem[]>(() => {
     const rawItems = currentOrderSnapshot.value?.items ?? currentOrderSnapshot.value?.order_items
     if (!Array.isArray(rawItems) || rawItems.length === 0) {
@@ -202,7 +210,7 @@ const submitBlockers = computed(() => {
         return blockers
     }
 
-    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
+    if (hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
         return blockers
     }
 
@@ -235,11 +243,11 @@ watch(submitBlockers, () => {
 
 const canSubmit = computed(() => submitBlockers.value.length === 0)
 const isButtonDisabled = computed(() =>
-    !canSubmit.value && !(orderStore.hasPlacedOrder && !orderStore.isRefillMode) || submitState.shouldDisableSubmit.value
+    (!canSubmit.value && !(hasConfirmedInitialOrder.value && !orderStore.isRefillMode)) || submitState.shouldDisableSubmit.value
 )
 
 const buttonLabel = computed(() => {
-    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
+    if (hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
         return "Continue to Session"
     }
     if (orderStore.isRefillMode) {
@@ -249,8 +257,8 @@ const buttonLabel = computed(() => {
 })
 
 async function submit (): Promise<void> {
-    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
-        submitState.resetForNextTransaction()  // Ready for refill
+    if (hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
+        submitState.resetForNextTransaction() // Ready for refill
         emit("order-submitted")
         return
     }
@@ -267,10 +275,10 @@ async function submit (): Promise<void> {
             const result = await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
             if (result.queued) {
                 submitError.value = "No internet connection. Your refill has been queued and will send automatically when the tablet is back online."
-                submitState.resetForNextTransaction()  // Allow retry even if queued
+                submitState.resetForNextTransaction() // Allow retry even if queued
                 return
             }
-            submitState.resetForNextTransaction()  // Ready for next refill
+            submitState.resetForNextTransaction() // Ready for next refill
         } else {
             const payload = orderStore.buildPayload()
             const result = await submitInitialOrder(payload as unknown as Record<string, unknown>)
@@ -282,7 +290,7 @@ async function submit (): Promise<void> {
         emit("order-submitted")
     } catch (error: any) {
         submitError.value = error?.message || "Order submission failed"
-        submitState.resetForNextTransaction()  // Allow retry on error
+        submitState.resetForNextTransaction() // Allow retry on error
         logger.error("[OrderingStep3ReviewSubmit] Submission failed", {
             error: error?.message || error,
         })
@@ -297,138 +305,138 @@ async function submit (): Promise<void> {
 
         <!-- Order Review Grid -->
         <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6">
-        <!-- LEFT: Your Order -->
-        <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
-            <div class="flex items-baseline gap-2 mb-4">
-                <h2 class="text-lg md:text-xl font-extrabold font-raleway text-white tracking-tight">
-                    Your Order
-                </h2>
-                <span class="text-sm text-text-muted">({{ itemCountDisplay }} {{ itemCountDisplay === 1 ? 'item' : 'items' }})</span>
-            </div>
+            <!-- LEFT: Your Order -->
+            <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
+                <div class="flex items-baseline gap-2 mb-4">
+                    <h2 class="text-lg md:text-xl font-extrabold font-raleway text-white tracking-tight">
+                        Your Order
+                    </h2>
+                    <span class="text-sm text-text-muted">({{ itemCountDisplay }} {{ itemCountDisplay === 1 ? 'item' : 'items' }})</span>
+                </div>
 
-            <div v-if="displayItems.length > 0" class="space-y-3">
-                <div
-                    v-for="(item, index) in displayItems"
-                    :key="`item-${item?.id ?? index}`"
-                    class="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3"
-                >
-                    <div class="w-12 h-12 rounded-lg bg-accent-warm/60 border border-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        <img
-                            v-if="item?.img_url"
-                            :src="item.img_url"
-                            :alt="item?.name || 'Item'"
-                            class="w-full h-full object-cover"
-                        >
-                        <span v-else class="text-xl">{{ itemEmoji(item) }}</span>
-                    </div>
-
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm md:text-base font-bold text-white truncate">
-                            {{ item?.name }}
-                        </p>
-                        <p v-if="item?.description" class="text-xs text-text-muted truncate">
-                            {{ item.description }}
-                        </p>
-                    </div>
-
-                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-black/40 border border-white/10 text-xs font-bold text-white/85 flex-shrink-0">
-                        ×{{ item?.quantity }}
-                    </span>
-
-                    <span
-                        :class="[
-                            'text-sm font-bold flex-shrink-0 ml-1',
-                            itemPriceLabel(item).isFree ? 'text-success' : 'text-white'
-                        ]"
+                <div v-if="displayItems.length > 0" class="space-y-3">
+                    <div
+                        v-for="(item, index) in displayItems"
+                        :key="`item-${item?.id ?? index}`"
+                        class="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3"
                     >
-                        {{ itemPriceLabel(item).text }}
-                    </span>
-                </div>
-            </div>
+                        <div class="w-12 h-12 rounded-lg bg-accent-warm/60 border border-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            <img
+                                v-if="item?.img_url"
+                                :src="item.img_url"
+                                :alt="item?.name || 'Item'"
+                                class="w-full h-full object-cover"
+                            >
+                            <span v-else class="text-xl">{{ itemEmoji(item) }}</span>
+                        </div>
 
-            <div v-else class="rounded-xl border border-white/10 bg-white/[0.03] p-6 text-center">
-                <p class="text-white/75 font-semibold mb-1">
-                    No item details available yet
-                </p>
-                <p class="text-xs text-text-hint">
-                    {{ orderStore.hasPlacedOrder
-                        ? 'Your order is on the way to the kitchen.'
-                        : 'Go back and add items to begin.' }}
-                </p>
-            </div>
-        </section>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm md:text-base font-bold text-white truncate">
+                                {{ item?.name }}
+                            </p>
+                            <p v-if="item?.description" class="text-xs text-text-muted truncate">
+                                {{ item.description }}
+                            </p>
+                        </div>
 
-        <!-- RIGHT: Summary rail -->
-        <aside class="space-y-4">
-            <!-- Package card -->
-            <div class="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-accent-warm/40 to-secondary p-5">
-                <p class="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
-                    Package
-                </p>
-                <h3 class="text-xl md:text-2xl font-extrabold font-raleway text-white tracking-tight leading-tight">
-                    {{ packageNameDisplay || 'No package selected' }}
-                </h3>
-                <p class="mt-1.5 text-xs text-text-muted">
-                    {{ guestCountDisplay }} {{ guestCountDisplay === 1 ? 'guest' : 'guests' }}<span v-if="packageDurationMinutes"> · {{ packageDurationMinutes }} min dining</span>
-                </p>
-            </div>
+                        <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-black/40 border border-white/10 text-xs font-bold text-white/85 flex-shrink-0">
+                            ×{{ item?.quantity }}
+                        </span>
 
-            <!-- Pricing card -->
-            <div class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 space-y-2.5">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-text-muted">Subtotal</span>
-                    <span class="text-white/90 font-semibold">{{ formatPeso(subtotalDisplay) }}</span>
+                        <span
+                            :class="[
+                                'text-sm font-bold flex-shrink-0 ml-1',
+                                itemPriceLabel(item).isFree ? 'text-success' : 'text-white'
+                            ]"
+                        >
+                            {{ itemPriceLabel(item).text }}
+                        </span>
+                    </div>
                 </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-text-muted">Package</span>
-                    <span class="text-white/90 font-semibold">{{ formatPeso(packagePriceDisplay) }}</span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-text-muted">Tax<span v-if="taxRateDisplay"> ({{ taxRateDisplay }})</span></span>
-                    <span class="text-white/90 font-semibold">{{ formatPeso(taxDisplay) }}</span>
-                </div>
-                <div class="border-t border-white/10 pt-2.5 mt-1 flex items-center justify-between">
-                    <span class="text-base font-bold text-white">Total</span>
-                    <span class="text-2xl font-extrabold font-raleway text-primary">
-                        {{ formatPeso(totalDisplay) }}
-                    </span>
-                </div>
-            </div>
 
-            <!-- Table card -->
-            <div class="rounded-2xl border border-success/30 bg-success/10 p-4 flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center flex-shrink-0 text-base">
-                    🪑
-                </div>
-                <div class="min-w-0">
-                    <p class="text-sm font-bold text-white truncate">
-                        {{ tableLabel }}
+                <div v-else class="rounded-xl border border-white/10 bg-white/[0.03] p-6 text-center">
+                    <p class="text-white/75 font-semibold mb-1">
+                        No item details available yet
                     </p>
-                    <p class="text-xs text-text-muted truncate">
-                        Order will be sent to grill station
+                    <p class="text-xs text-text-hint">
+                        {{ hasConfirmedInitialOrder
+                            ? 'Your order is on the way to the kitchen.'
+                            : 'Go back and add items to begin.' }}
                     </p>
                 </div>
-            </div>
+            </section>
 
-            <!-- Errors / blockers -->
-            <p v-if="submitError" class="text-sm text-error font-semibold">
-                {{ submitError }}
-            </p>
-            <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
-                {{ submitBlockers[0] }}
-            </p>
+            <!-- RIGHT: Summary rail -->
+            <aside class="space-y-4">
+                <!-- Package card -->
+                <div class="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-accent-warm/40 to-secondary p-5">
+                    <p class="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
+                        Package
+                    </p>
+                    <h3 class="text-xl md:text-2xl font-extrabold font-raleway text-white tracking-tight leading-tight">
+                        {{ packageNameDisplay || 'No package selected' }}
+                    </h3>
+                    <p class="mt-1.5 text-xs text-text-muted">
+                        {{ guestCountDisplay }} {{ guestCountDisplay === 1 ? 'guest' : 'guests' }}<span v-if="packageDurationMinutes"> · {{ packageDurationMinutes }} min dining</span>
+                    </p>
+                </div>
 
-            <!-- CTA -->
-            <button
-                type="button"
-                class="w-full py-4 rounded-2xl font-extrabold font-raleway text-base tracking-tight transition disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary-dark text-secondary shadow-glow hover:shadow-glow active:scale-[0.99]"
-                :disabled="isButtonDisabled"
-                @click="submit"
-            >
-                <span v-if="orderStore.isSubmitting">Submitting…</span>
-                <span v-else>{{ buttonLabel }} →</span>
-            </button>
-        </aside>
+                <!-- Pricing card -->
+                <div class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 space-y-2.5">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-text-muted">Subtotal</span>
+                        <span class="text-white/90 font-semibold">{{ formatPeso(subtotalDisplay) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-text-muted">Package</span>
+                        <span class="text-white/90 font-semibold">{{ formatPeso(packagePriceDisplay) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-text-muted">Tax<span v-if="taxRateDisplay"> ({{ taxRateDisplay }})</span></span>
+                        <span class="text-white/90 font-semibold">{{ formatPeso(taxDisplay) }}</span>
+                    </div>
+                    <div class="border-t border-white/10 pt-2.5 mt-1 flex items-center justify-between">
+                        <span class="text-base font-bold text-white">Total</span>
+                        <span class="text-2xl font-extrabold font-raleway text-primary">
+                            {{ formatPeso(totalDisplay) }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Table card -->
+                <div class="rounded-2xl border border-success/30 bg-success/10 p-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center flex-shrink-0 text-base">
+                        🪑
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-white truncate">
+                            {{ tableLabel }}
+                        </p>
+                        <p class="text-xs text-text-muted truncate">
+                            Order will be sent to grill station
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Errors / blockers -->
+                <p v-if="submitError" class="text-sm text-error font-semibold">
+                    {{ submitError }}
+                </p>
+                <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
+                    {{ submitBlockers[0] }}
+                </p>
+
+                <!-- CTA -->
+                <button
+                    type="button"
+                    class="w-full py-4 rounded-2xl font-extrabold font-raleway text-base tracking-tight transition disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary-dark text-secondary shadow-glow hover:shadow-glow active:scale-[0.99]"
+                    :disabled="isButtonDisabled"
+                    @click="submit"
+                >
+                    <span v-if="orderStore.isSubmitting">Submitting…</span>
+                    <span v-else>{{ buttonLabel }} →</span>
+                </button>
+            </aside>
         </div>
     </div>
 </template>

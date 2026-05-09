@@ -27,7 +27,7 @@ describe("order-lock global middleware refill carve-out", () => {
         expect(source).toMatch(/navigateTo\("\/order\/in-session",\s*\{\s*replace:\s*true\s*\}\)/)
     })
 
-    it("requires both device token and hasPlacedOrder before enforcing the lock", () => {
-        expect(source).toMatch(/if\s*\(\s*!deviceStore\.token\s*\|\|\s*!orderStore\.hasPlacedOrder\s*\)\s*\{\s*return\s*\}/)
+    it("requires both device token and a confirmed initial order before enforcing the lock", () => {
+        expect(source).toMatch(/if\s*\(\s*!deviceStore\.token\s*\|\|\s*!hasConfirmedInitialOrder\s*\)\s*\{\s*return\s*\}/)
     })
 })

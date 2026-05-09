@@ -30,9 +30,18 @@ describe("CartSidebar UI", () => {
 
     it("hides Place Order button after initial order is placed", () => {
         const order = useOrderStore()
+        const session = useSessionStore()
         // Set up order state to simulate an already-placed order
         order.setHasPlacedOrder(true)
         order.setIsRefillMode(false)
+        session.setOrderId(19561)
+        order.setCurrentOrder({
+            order: {
+                order_id: 19561,
+                order_number: "ORD-19561",
+                status: "confirmed",
+            },
+        } as any)
 
         const wrapper = mount(CartSidebar, {
             global: {

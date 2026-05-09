@@ -16,9 +16,12 @@ export default defineNuxtRouteMiddleware((to) => {
 
     const deviceStore = useDeviceStore()
     const orderStore = useOrderStore()
+    const hasConfirmedInitialOrder = typeof orderStore.hasConfirmedInitialOrder === "function"
+        ? orderStore.hasConfirmedInitialOrder()
+        : Boolean(orderStore.hasPlacedOrder)
 
     // Only enforce when the device is authenticated and an order is live
-    if (!deviceStore.token || !orderStore.hasPlacedOrder) { return }
+    if (!deviceStore.token || !hasConfirmedInitialOrder) { return }
 
     if (PRE_ORDER_ROUTES.has(to.path)) {
         // /order/review doubles as the refill submission page — allow it when a refill is in progress
