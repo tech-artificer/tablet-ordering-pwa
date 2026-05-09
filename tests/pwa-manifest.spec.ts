@@ -57,4 +57,9 @@ describe("pwa manifest config", () => {
         expect(config).toContain("offlineOrderSync")
         expect(config).toContain("NUXT_PUBLIC_OFFLINE_ORDER_SYNC")
     })
+
+    it("loads runtime-config.js in head before app boot", () => {
+        const config = readNuxtConfig()
+        expect(config).toMatch(/head:\s*\{[\s\S]*script:\s*\[[\s\S]*src:\s*"\/runtime-config\.js"/)
+    })
 })
