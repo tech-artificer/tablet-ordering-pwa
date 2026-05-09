@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from "vitest"
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
 
 import { useSessionEndStore } from "../stores/SessionEnd"
@@ -6,8 +6,18 @@ import { useSessionStore } from "../stores/Session"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 
 // Mock vue-router
-const mockReplace = vi.fn()
-vi.mock("vue-router", () => ({ useRouter: () => ({ replace: mockReplace }) }))
+const routerMock = vi.hoisted(() => ({
+    replace: vi.fn(),
+    shouldThrow: false,
+}))
+vi.mock("vue-router", () => ({
+    useRouter: () => {
+        if (routerMock.shouldThrow) {
+            throw new Error("router unavailable")
+        }
+        return { replace: routerMock.replace }
+    },
+}))
 
 // Mock useApi (required by stores)
 vi.mock("../composables/useApi", () => ({ useApi: () => ({ get: vi.fn(), post: vi.fn() }) }))
@@ -15,8 +25,13 @@ vi.mock("../composables/useApi", () => ({ useApi: () => ({ get: vi.fn(), post: v
 describe("useSessionEndFlow", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
-        mockReplace.mockReset()
-        mockReplace.mockResolvedValue(undefined)
+        routerMock.replace.mockReset()
+        routerMock.replace.mockResolvedValue(undefined)
+        routerMock.shouldThrow = false
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
     })
 
     it("triggerSessionEnd sets SessionEnd store and navigates to transition page", async () => {
@@ -30,7 +45,7 @@ describe("useSessionEndFlow", () => {
         expect(sessionEndStore.orderNumber).toBe("ORD-042")
         expect(sessionEndStore.source).toBe("broadcast")
 
-        expect(mockReplace).toHaveBeenCalledWith({
+        expect(routerMock.replace).toHaveBeenCalledWith({
             path: "/order/session-ended",
             query: { reason: "completed", order: "ORD-042" },
         })
@@ -45,7 +60,7 @@ describe("useSessionEndFlow", () => {
             triggerSessionEnd("completed", { source: "polling" }),
         ])
 
-        expect(mockReplace).toHaveBeenCalledTimes(1)
+        expect(routerMock.replace).toHaveBeenCalledTimes(1)
     })
 
     it("sessionStore.end() is called exactly once", async () => {
@@ -63,7 +78,7 @@ describe("useSessionEndFlow", () => {
 
         await triggerSessionEnd("cancelled", { source: "polling" })
 
-        expect(mockReplace).toHaveBeenCalledWith({
+        expect(routerMock.replace).toHaveBeenCalledWith({
             path: "/order/session-ended",
             query: { reason: "cancelled" },
         })
@@ -78,7 +93,7 @@ describe("useSessionEndFlow", () => {
         await triggerSessionEnd("voided", { source: "watcher" })
 
         expect(endSpy).toHaveBeenCalledTimes(1)
-        expect(mockReplace).toHaveBeenCalledTimes(1)
+        expect(routerMock.replace).toHaveBeenCalledTimes(1)
     })
 
     it("finalizeAndReturnHome clears store and navigates home", () => {
@@ -92,6 +107,20 @@ describe("useSessionEndFlow", () => {
         finalizeAndReturnHome()
 
         expect(sessionEndStore.active).toBe(false)
-        expect(mockReplace).toHaveBeenCalledWith("/")
+        expect(routerMock.replace).toHaveBeenCalledWith("/")
+    })
+
+    it("hard-navigates with query when no router is available", async () => {
+        const assign = vi.fn()
+        routerMock.shouldThrow = true
+        vi.stubGlobal("window", {
+            location: { assign },
+        })
+
+        const { triggerSessionEnd } = useSessionEndFlow()
+
+        await triggerSessionEnd("completed", { source: "polling", orderNumber: "ORD-042" })
+
+        expect(assign).toHaveBeenCalledWith("/order/session-ended?reason=completed&order=ORD-042")
     })
 })

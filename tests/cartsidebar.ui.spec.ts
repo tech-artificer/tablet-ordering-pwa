@@ -3,13 +3,12 @@ import { mount } from "@vue/test-utils"
 import { setActivePinia, createPinia } from "pinia"
 import CartSidebar from "../components/order/CartSidebar.vue"
 import { useOrderStore } from "../stores/Order"
-// device store not required for this test; avoid importing to prevent helper type errors
-import { useDeviceStore } from "../stores/Device"
 import { useSessionStore } from "../stores/Session"
 
 // Minimal stubs for child components used in CartSidebar
 const globalStubs = {
     "cart-item-card": true,
+    NuxtImg: true,
     "el-badge": true,
     "el-empty": true,
     RefreshCw: true,
@@ -29,7 +28,7 @@ describe("CartSidebar UI", () => {
         ss.setOrderId(null)
     })
 
-    it("hides Place Order button after initial order is placed", async () => {
+    it("hides Place Order button after initial order is placed", () => {
         const order = useOrderStore()
         // Set up order state to simulate an already-placed order
         order.setHasPlacedOrder(true)
@@ -63,14 +62,12 @@ describe("CartSidebar UI", () => {
         expect(hasRefill).toBe(true)
     })
 
-    it("keeps Place Order enabled when package exists in order store and at least one meat is selected", async () => {
+    it("keeps Place Order enabled when package exists in order store and at least one meat is selected", () => {
         const order = useOrderStore()
-        const device = useDeviceStore()
 
         order.setPackage({ id: 5, name: "Store Package", price: 249 } as any)
         order.setHasPlacedOrder(false)
         order.setIsRefillMode(false)
-        device.setTable({ id: 1, name: "T1", status: "active", is_available: true, is_locked: false } as any)
 
         const wrapper = mount(CartSidebar, {
             global: {
@@ -85,6 +82,98 @@ describe("CartSidebar UI", () => {
                 addOnsTotal: 0,
                 taxAmount: 0,
                 grandTotal: 249,
+                isRefillMode: false,
+                hasPlacedOrder: false
+            }
+        })
+
+        const placeOrderButton = wrapper.findAll("button").find(b => b.text().toLowerCase().includes("place order"))
+        expect(placeOrderButton).toBeTruthy()
+        expect(placeOrderButton!.attributes("disabled")).toBeUndefined()
+    })
+
+    it("does not block Place Order due to table assignment at UI layer", () => {
+        const order = useOrderStore()
+
+        order.setPackage({ id: 9, name: "UI Package", price: 199 } as any)
+        order.setHasPlacedOrder(false)
+        order.setIsRefillMode(false)
+
+        const wrapper = mount(CartSidebar, {
+            global: {
+                plugins: [pinia],
+                stubs: globalStubs
+            },
+            props: {
+                selectedPackage: null,
+                guestCount: 2,
+                cartItems: [{ id: 22, name: "Pork Belly", price: 95, quantity: 1, category: "meats" } as any],
+                packageTotal: 199,
+                addOnsTotal: 0,
+                taxAmount: 0,
+                grandTotal: 199,
+                isRefillMode: false,
+                hasPlacedOrder: false
+            }
+        })
+
+        const placeOrderButton = wrapper.findAll("button").find(b => b.text().toLowerCase().includes("place order"))
+        expect(placeOrderButton).toBeTruthy()
+        expect(placeOrderButton!.attributes("disabled")).toBeUndefined()
+    })
+
+    it("shows first submit blocker reason as button title", () => {
+        const order = useOrderStore()
+
+        order.setPackage({ id: 5, name: "Store Package", price: 249 } as any)
+        order.setHasPlacedOrder(false)
+        order.setIsRefillMode(false)
+
+        const wrapper = mount(CartSidebar, {
+            global: {
+                plugins: [pinia],
+                stubs: globalStubs
+            },
+            props: {
+                selectedPackage: null,
+                guestCount: 2,
+                cartItems: [],
+                packageTotal: 249,
+                addOnsTotal: 0,
+                taxAmount: 0,
+                grandTotal: 249,
+                isRefillMode: false,
+                hasPlacedOrder: false
+            }
+        })
+
+        const placeOrderButton = wrapper.findAll("button").find(b => b.text().toLowerCase().includes("place order"))
+        expect(placeOrderButton).toBeTruthy()
+        expect(placeOrderButton!.attributes("disabled")).toBeDefined()
+        expect(placeOrderButton!.attributes("title")).toBe("Select at least one meat")
+        expect(wrapper.text()).toContain("Select at least one meat")
+    })
+
+    it("treats singular meat category as valid for submit", () => {
+        const order = useOrderStore()
+
+        order.setPackage({ id: 8, name: "Package", price: 199 } as any)
+        order.setHasPlacedOrder(false)
+        order.setIsRefillMode(false)
+
+        const wrapper = mount(CartSidebar, {
+            global: {
+                plugins: [pinia],
+                stubs: globalStubs
+            },
+            props: {
+                selectedPackage: null,
+                guestCount: 2,
+                cartItems: [{ id: 99, name: "Beef", price: 100, quantity: 1, category: "meat" } as any],
+                packageTotal: 199,
+                addOnsTotal: 0,
+                taxAmount: 0,
+                grandTotal: 199,
                 isRefillMode: false,
                 hasPlacedOrder: false
             }

@@ -1,5 +1,15 @@
 # Split Layout Implementation Guide
 
+> [!WARNING]
+> **Deprecated document (do not use as primary spec).**
+>
+> This document is superseded by:
+> - `docs/PACKAGE_SELECTION_RESPONSIVE_SPEC.md` (**authoritative**)
+>
+> Reason: this split-layout/carousel-first approach conflicts with the current package comparison direction for SM-X110 landscape primary UX.
+>
+> Legacy content is retained below for historical reference and narrow/portrait fallback ideas only.
+
 ## Changes Required
 
 ### 1. pages/order/packageSelection.vue

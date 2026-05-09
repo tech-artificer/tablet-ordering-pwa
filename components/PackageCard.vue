@@ -1,142 +1,217 @@
 <script setup lang="ts">
-import type { Package, Modifier } from '../types'
+import { computed } from "vue"
+import { Clock, ChevronRight, Star, UtensilsCrossed } from "lucide-vue-next"
+import type { Package, Modifier } from "../types"
 
-const props = defineProps<{ pkg: Package }>()
-// Smart categorization: group modifiers by keywords in name or group field
-const categorizedModifiers = computed(() => {
-  const mods = (props.pkg?.modifiers || []) as Modifier[]
-  if (!mods.length) return {}
+const props = defineProps<{
+  pkg: Package
+  guestCount: number
+  formatCurrency:(value: number | string) => string
+}>()
 
-  const categories: Record<string, Modifier[]> = {}
+const emit = defineEmits<{
+  select: [pkg: Package]
+}>()
 
-  mods.forEach(mod => {
-    const name = (mod.name || '').toLowerCase()
-    const group = (mod.group || '').toLowerCase()
-    const searchText = `${name} ${group}`
+const packageDuration = computed(() => {
+    const pkg = props.pkg as any
 
-    let category = 'other'
-    if (/pork|bacon|ham|lechon|liempo|sisig/i.test(searchText)) category = 'pork'
-    else if (/beef|wagyu|steak|bulalo|tapa|caldereta/i.test(searchText)) category = 'beef'
-    else if (/chicken|manok|wings|inasal|tinola/i.test(searchText)) category = 'chicken'
-    else if (/shrimp|prawn|crab|lobster|squid|pusit|hipon|alimango/i.test(searchText)) category = 'seafood'
-    else if (/fish|bangus|tilapia|salmon|tuna|lapu/i.test(searchText)) category = 'fish'
-    else if (/veggie|vegetable|salad|kangkong|pechay|sitaw/i.test(searchText)) category = 'vegetable'
-    else if (/rice|side|soup|sauce|dip/i.test(searchText)) category = 'side'
+    const rawDuration =
+    pkg.duration ||
+    pkg.time_limit ||
+    pkg.minutes ||
+    pkg.limit_minutes ||
+    pkg.duration_minutes ||
+    null
 
-    if (!categories[category]) categories[category] = []
-    categories[category].push(mod)
-  })
+    if (!rawDuration) { return null }
 
-  return categories
+    if (typeof rawDuration === "number") {
+        return `${rawDuration} minutes`
+    }
+
+    const normalized = String(rawDuration).trim()
+
+    if (/^\d+$/.test(normalized)) {
+        return `${normalized} minutes`
+    }
+
+    return normalized
 })
 
-// Order categories for consistent display
-const orderedCategories = computed(() => {
-  const order = ['beef', 'pork', 'chicken', 'seafood', 'fish', 'vegetable', 'side', 'other']
-  return order.filter(cat => categorizedModifiers.value[cat]?.length)
+type ModifierGroup = { label: string; items: Modifier[] }
+
+const PRIORITY_ORDER = ["PORK", "BEEF", "CHICKEN", "SEAFOOD", "OTHER"]
+
+const modifierGroups = computed<ModifierGroup[]>(() => {
+    const mods = (props.pkg?.modifiers || []) as Modifier[]
+    if (!mods.length) { return [] }
+
+    // Mirrors stores/Menu.ts:extractModifierGroups — if any group is the "meat"
+    // umbrella, bucket by name regex; otherwise group by the modifier's own group.
+    const hasMeatUmbrella = mods.some(m => /meat/i.test(String(m.group ?? "")))
+
+    const buckets = new Map<string, Modifier[]>()
+
+    if (hasMeatUmbrella) {
+        for (const m of mods) {
+            const name = m.name || ""
+            let label = "OTHER"
+            if (/pork/i.test(name)) { label = "PORK" } else if (/beef/i.test(name)) { label = "BEEF" } else if (/chicken/i.test(name)) { label = "CHICKEN" } else if (/seafood|shrimp|fish|crab|lobster|squid/i.test(name)) { label = "SEAFOOD" }
+            pushTo(buckets, label, m)
+        }
+    } else {
+        for (const m of mods) {
+            const label = (m.group || "OTHER").toString().toUpperCase()
+            pushTo(buckets, label, m)
+        }
+    }
+
+    const ordered: ModifierGroup[] = []
+    const seen = new Set<string>()
+
+    for (const label of PRIORITY_ORDER) {
+        const items = buckets.get(label)
+        if (items?.length) {
+            ordered.push({ label, items })
+            seen.add(label)
+        }
+    }
+    for (const [label, items] of buckets) {
+        if (!seen.has(label) && items.length) {
+            ordered.push({ label, items })
+        }
+    }
+
+    return ordered
 })
 
-const activeCategory = ref<string>('all')
-
-const filteredModifiers = computed(() => {
-  if (activeCategory.value === 'all') {
-    return orderedCategories.value.flatMap(category => categorizedModifiers.value[category] || [])
-  }
-  return categorizedModifiers.value[activeCategory.value] || []
-})
-
-const activeCategoryLabel = computed(() => {
-  if (activeCategory.value === 'all') return 'All'
-  return activeCategory.value.charAt(0).toUpperCase() + activeCategory.value.slice(1)
-})
-
-
+function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
+    const existing = map.get(key)
+    if (existing) { existing.push(value) } else { map.set(key, [value]) }
+}
 </script>
 
 <template>
-  <div class="relative bg-[#131316] rounded-2xl overflow-hidden shadow-2xl border border-white/10 h-full flex flex-col">
-    <div class="p-5 md:p-6 flex flex-col h-full">
-      <!-- <div class="flex items-start justify-between gap-4">
-        <div>
-          <h3 class="text-white text-2xl font-extrabold tracking-tight">Starter Tray</h3>
-          <p class="text-white/60 text-sm mt-1">View meats included in the selected package.</p>
+    <article
+        class="group relative flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#151517] shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-[border-color,transform,box-shadow] duration-300 hover:-translate-y-1 hover:border-[#f6b56d]/40 hover:shadow-[0_24px_80px_rgba(0,0,0,0.6)]"
+    >
+        <div
+            v-if="pkg.is_popular"
+            class="absolute -top-3 left-6 z-10 flex items-center gap-1.5 rounded-full bg-[#f6b56d] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-black shadow-[0_12px_28px_rgba(246,181,109,0.18)]"
+        >
+            <Star :size="11" stroke-width="0" fill="currentColor" />
+            Most Popular
         </div>
-        <div class="text-primary/90 text-xs font-bold tracking-[0.18em] uppercase">{{ props.pkg.name }}</div>
-      </div> -->
 
-      <!-- <div class="h-px bg-white/10 my-4"></div> -->
+        <!-- Header -->
+        <header class="flex-none px-6 pt-7">
+            <h2 class="font-raleway text-2xl font-extrabold tracking-tight text-white">
+                {{ pkg.name }}
+            </h2>
 
-      <div class="flex flex-wrap items-center gap-1.5 mb-3">
-        <span class="text-white/50 text-[10px] tracking-[0.2em] uppercase mr-1">Filter</span>
-        <button
-          @click="activeCategory = 'all'"
-          :class="[
-            'px-2.5 py-1 rounded-full text-[11px] leading-none font-semibold tracking-[0.08em] uppercase border transition-colors',
-            activeCategory === 'all'
-              ? 'bg-primary text-black border-primary'
-              : 'bg-white/5 text-white/70 border-white/15 hover:bg-white/10'
-          ]"
+            <p
+                v-if="pkg.description"
+                class="mt-2 line-clamp-2 text-sm leading-snug text-white/45"
+            >
+                {{ pkg.description }}
+            </p>
+
+            <div class="mt-3 flex items-end gap-2">
+                <div class="font-kanit text-[2.25rem] font-extrabold leading-none text-[#ffad63]">
+                    {{ formatCurrency(pkg.price) }}
+                </div>
+                <div class="pb-1 font-kanit text-sm text-white/65">
+                    per person
+                </div>
+            </div>
+
+            <p class="mt-1.5 text-xs text-white/35">
+                × {{ guestCount }} {{ guestCount === 1 ? 'guest' : 'guests' }}
+                <span class="text-white/55">
+                    = {{ formatCurrency(Number(pkg.price) * guestCount) }}
+                </span>
+            </p>
+
+            <div
+                v-if="packageDuration"
+                class="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-bold text-white"
+            >
+                <Clock :size="14" class="text-[#f6b56d]" />
+                {{ packageDuration }}
+            </div>
+        </header>
+
+        <!-- Modifier groups (image tiles, horizontally scrollable) -->
+        <section
+            v-if="modifierGroups.length"
+            class="mt-5 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6"
         >
-          All
-        </button>
-        <button
-          v-for="category in orderedCategories"
-          :key="category"
-          @click="activeCategory = category"
-          :class="[
-            'px-2.5 py-1 rounded-full text-[11px] leading-none font-semibold tracking-[0.08em] uppercase border transition-colors',
-            activeCategory === category
-              ? 'bg-primary text-black border-primary'
-              : 'bg-white/5 text-white/70 border-white/15 hover:bg-white/10'
-          ]"
-        >
-          {{ category }}
-        </button>
-      </div>
-
-      <!-- <div class="mb-3 text-white text-2xl font-extrabold capitalize">{{ activeCategoryLabel }}</div> -->
-
-      <div class="flex-1 overflow-y-auto pr-1">
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 md:gap-3">
-          <div
-            v-for="(mod, index) in filteredModifiers"
-            :key="mod.id"
-            class="relative text-left rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 transition-colors overflow-hidden"
-          >
-            <div class="relative h-24 md:h-28 bg-black/20 flex items-center justify-center overflow-hidden">
-              <img
-                v-if="mod.img_url"
-                :src="mod.img_url"
-                :alt="mod.name"
-                class="w-full h-full object-cover"
-              />
-              <div
-                v-else
-                class="w-full h-full flex items-center justify-center text-4xl font-bold text-white/50 bg-white/5"
-              >
-                {{ mod.name?.substring(0, 1) }}
-              </div>
-
-              <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/15 border border-white/30 text-white text-[10px] font-extrabold tracking-[0.15em] uppercase">
-                {{ mod.receipt_name || `M${index + 1}` }}
-              </span>
-              <span class="absolute top-3 right-3 px-3 py-1 rounded-full bg-primary text-black text-[10px] font-extrabold tracking-[0.15em] uppercase">
+            <div class="text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">
                 Included
-              </span>
             </div>
 
-            <div class="p-2.5">
-              <div class="text-center text-white font-bold text-sm md:text-base leading-tight line-clamp-2">{{ mod.name }}</div>
-            </div>
-          </div>
-        </div>
+            <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pkg-groups-scroll">
+                <div
+                    v-for="group in modifierGroups"
+                    :key="group.label"
+                    class="flex flex-col gap-1.5"
+                >
+                    <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider">
+                        <span class="text-[#f6b56d]">{{ group.label }}</span>
+                        <span class="text-white/35">{{ group.items.length }}</span>
+                    </div>
 
-        <div v-if="filteredModifiers.length === 0" class="text-center text-white/50 py-10 text-sm">
-          No inclusions found for this filter.
-        </div>
-      </div>
-    </div>
-  </div>
+                    <div
+                        class="flex gap-2 overflow-x-auto snap-x snap-mandatory pkg-modifier-row"
+                    >
+                        <div
+                            v-for="item in group.items"
+                            :key="item.id"
+                            class="flex w-[78px] flex-none snap-start flex-col gap-1.5"
+                        >
+                            <div class="h-[64px] w-[78px] overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br from-gray-800 to-gray-900">
+                                <NuxtImg
+                                    v-if="item.img_url"
+                                    :src="item.img_url"
+                                    :alt="item.name || 'Modifier'"
+                                    class="h-full w-full object-cover"
+                                    loading="lazy"
+                                    sizes="80px"
+                                    format="webp"
+                                />
+                                <div
+                                    v-else
+                                    class="flex h-full w-full items-center justify-center text-white/40"
+                                >
+                                    <UtensilsCrossed :size="22" :stroke-width="1.5" />
+                                </div>
+                            </div>
+                            <p
+                                class="line-clamp-2 text-center font-kanit text-[11px] leading-tight text-white/85"
+                                :title="item.name"
+                            >
+                                {{ item.name }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer / CTA -->
+        <footer class="mt-auto flex-none px-6 pb-6 pt-5">
+            <div class="h-px w-full bg-white/[0.08]" />
+            <button
+                type="button"
+                class="mx-auto mt-5 flex items-center gap-3 font-kanit text-base font-bold text-[#ffad63] transition group-hover:gap-4 group-hover:text-[#ffc58a] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                @click="emit('select', pkg)"
+            >
+                Select Package
+                <ChevronRight :size="20" />
+            </button>
+        </footer>
+    </article>
 </template>
 
 <style scoped>
@@ -146,5 +221,25 @@ const activeCategoryLabel = computed(() => {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.pkg-modifier-row {
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+.pkg-modifier-row::-webkit-scrollbar {
+  display: none;
+}
+
+.pkg-groups-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(246, 181, 109, 0.3) transparent;
+}
+.pkg-groups-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.pkg-groups-scroll::-webkit-scrollbar-thumb {
+  background: rgba(246, 181, 109, 0.3);
+  border-radius: 999px;
 }
 </style>

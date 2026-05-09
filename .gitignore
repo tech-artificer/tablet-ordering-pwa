@@ -18,6 +18,11 @@ logs
 .fleet
 .idea/
 .vscode/
+.claude/
+
+# Test artifacts
+*.test.html
+.nuxt-dev-test.html
 
 # Local env files
 .env

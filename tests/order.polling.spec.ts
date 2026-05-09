@@ -54,17 +54,17 @@ describe("order polling fallback", () => {
     it("starts polling after setOrderCreated and stops when order becomes completed", async () => {
         const order = useOrderStore()
 
-        // Arrange: first tick remains non-terminal, second tick transitions terminal
+        // Arrange: first interval tick remains live (confirmed), second tick transitions to terminal.
         mockGet
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "preparing" } } })
+            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "confirmed" } } })
             .mockResolvedValueOnce({ data: { order: { id: 19561, status: "completed" } } })
 
         // Act: simulate order creation response
         await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561" } })
 
-        // After the await, the immediate tick has already run (preparing) — polling still active
+        // Polling starts without an immediate tick so review handoff can activate the session first.
         expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBe("preparing")
+        expect(order.getCurrentOrder()?.order?.status).toBeUndefined()
 
         // Advance past the 5 s interval to fire the second tick (completed)
         vi.advanceTimersByTime(6000)
@@ -74,8 +74,19 @@ describe("order polling fallback", () => {
         await Promise.resolve()
         await Promise.resolve()
 
-        // The canonical order should be updated to completed and polling stopped
-        expect(order.getCurrentOrder()?.order?.status).toBe("completed")
+        expect(order.getIsPolling()).toBe(true)
+        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
+
+        // Advance past the next interval to fire the terminal tick.
+        vi.advanceTimersByTime(6000)
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+
+        // Terminal polling now routes through useSessionEndFlow("polling"),
+        // which ends the session and clears transactional order state.
+        expect(order.getCurrentOrder()).toBeNull()
         expect(order.getIsPolling()).toBe(false)
         expect(order.getPollTimerId()).toBeNull()
     })
@@ -131,8 +142,10 @@ describe("order polling fallback", () => {
     it("does not crash when polling receives an empty response body", async () => {
         const order = useOrderStore()
 
+        // Use "confirmed" (live status) for first tick so polling continues;
+        // "preparing" is now terminal per POS Payment Sync spec.
         mockGet
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "preparing" } } })
+            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "confirmed" } } })
             .mockResolvedValueOnce(undefined as any)
 
         await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561" } })
@@ -144,6 +157,6 @@ describe("order polling fallback", () => {
         await Promise.resolve()
 
         expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBe("preparing")
+        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
     })
 })

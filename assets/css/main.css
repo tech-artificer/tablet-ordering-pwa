@@ -468,3 +468,58 @@ body {
   background-color: rgba(0, 0, 0, 0.7) !important;
 }
 
+/* ============================================
+   WARM SCROLLBAR — in-session order stream
+   ============================================ */
+.scrollbar-warm {
+  scrollbar-width: thin;
+  scrollbar-color: #2b241c transparent;
+}
+.scrollbar-warm::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-warm::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-warm::-webkit-scrollbar-thumb {
+  background: #2b241c;
+  border-radius: 2px;
+}
+
+/* ============================================
+   SESSION DIALOG — Element Plus dark overrides
+   Used on the in-session service-request and idle-warning modals.
+   Applied to .session-dialog wrapper class (non-scoped).
+   ============================================ */
+.session-dialog .el-dialog {
+  background: #141210 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+}
+
+.session-dialog .el-dialog__header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 20px 24px 16px !important;
+}
+
+.session-dialog .el-dialog__title {
+  color: #f0e6d2 !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
+
+.session-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: #7a776f !important;
+}
+
+.session-dialog .el-dialog__body {
+  color: #9b9484 !important;
+  padding: 20px 24px !important;
+}
+
+.session-dialog .el-dialog__footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 16px 24px 20px !important;
+}
+

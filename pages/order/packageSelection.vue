@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
-import { ArrowLeft, ChevronLeft, ChevronRight, Star, Inbox } from "lucide-vue-next"
+import { ArrowLeft, Inbox } from "lucide-vue-next"
 import type { Package } from "../../types"
 import { useMenuStore } from "../../stores/Menu"
 import { useOrderStore } from "../../stores/Order"
 import { useSessionStore } from "../../stores/Session"
 import { useDeviceStore } from "../../stores/Device"
 import { logger } from "../../utils/logger"
-import { recoverActiveOrderState } from "../../composables/useActiveOrderRecovery"
+import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
+import PackageCard from "../../components/PackageCard.vue"
 
-const menuStore = useMenuStore()
+const nuxtApp = useNuxtApp()
 const router = useRouter()
+const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const deviceStore = useDeviceStore()
@@ -20,14 +22,20 @@ onMounted(async () => {
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
 
-    const recovery = await recoverActiveOrderState("package-selection")
-    if (recovery.hasActiveOrder) {
-        console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
-        await router.replace({
-            path: "/menu",
-            query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
-        })
-        return
+    if (shouldAttemptActiveOrderRecovery()) {
+        try {
+            const recovery = await recoverActiveOrderState("package-selection")
+            if (recovery.hasActiveOrder) {
+                console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
+                await nuxtApp.$router.replace({
+                    path: "/menu",
+                    query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
+                })
+                return
+            }
+        } catch (recoveryError: unknown) {
+            logger.error("[PackageSelection] Active order recovery failed — continuing with normal mount", recoveryError)
+        }
     }
 
     logger.info("[PackageSelection] Loading packages from API...")
@@ -37,13 +45,13 @@ onMounted(async () => {
         await menuStore.loadAllMenus(false)
         console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
         logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
-    } catch (error) {
+    } catch (error: any) {
         console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
         logger.error("[PackageSelection] Failed to load packages:", error)
     }
 })
 
-// Carousel state - force carousel mode for all screen sizes
+// Carousel state retained intentionally so existing script behavior is preserved.
 const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages)
 const guestCount = computed(() => Number(orderStore.guestCount))
@@ -98,24 +106,10 @@ const handlePackageSelection = async (packageData: Package) => {
         } else {
             console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
         }
-    } catch (err) {
+    } catch (err: any) {
         console.error(`[❌ Session Start Error] ${err?.message} at ${timestamp}`)
         logger.warn("Session store start failed or unavailable", err)
     }
-
-    // No modal to clear
-
-    // Show a brief toast so the user sees immediate feedback
-    // try {
-    //   // Element Plus `ElMessage` is used elsewhere in the project (no import needed)
-    //   // 1200ms gives a short visible confirmation before navigation
-    //   ElMessage.success({
-    //     message: 'Package selected — opening menu',
-    //     duration: 1200
-    //   })
-    // } catch (err) {
-    //   // ignore if ElMessage is not available
-    // }
 
     // Navigate to the menu page with package ID in query for downstream flows
     try {
@@ -127,7 +121,7 @@ const handlePackageSelection = async (packageData: Package) => {
             path: "/menu",
             query: { packageId: packageData.id }
         })
-    } catch (navErr) {
+    } catch (navErr: any) {
     // Prevent uncaught promise rejections from bubbling to the global handler
         console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
         logger.error("Navigation to /menu failed:", navErr)
@@ -159,7 +153,7 @@ function prevPackage () {
     currentIndex.value = (currentIndex.value - 1 + packages.value.length) % packages.value.length
 }
 
-// Swipe support for carousel - only in safe zones (not buttons or scrollable areas)
+// Swipe support for carousel - retained intentionally so existing script behavior is preserved.
 const touchStartX = ref<number | null>(null)
 const touchStartY = ref<number | null>(null)
 const touchDeltaX = ref(0)
@@ -219,7 +213,7 @@ function handleTouchEnd () {
 </script>
 
 <template>
-    <div class="min-h-dvh w-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
+    <div class="min-h-dvh w-full bg-[#0a0a0a] overflow-hidden">
         <div class="relative z-10 h-dvh p-3 sm:p-4 md:p-5 pkg-safe-shell">
             <div class="w-full max-w-7xl mx-auto h-full flex flex-col gap-4">
                 <!-- Header row -->
@@ -239,41 +233,25 @@ function handleTouchEnd () {
                             Package Selection
                         </p>
                         <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold text-white font-raleway leading-tight text-balance">
-                            Choose Your <span class="text-primary">Package</span>
+                            Choose Your <span class="text-[#f6b56d]">Package</span>
                         </h1>
                         <p class="text-xs tracking-widest uppercase text-white/55 mt-2 text-pretty">
-                            {{ guestCount }} {{ guestCount === 1 ? 'Guest' : 'Guests' }} &middot; View Included Meats
+                            {{ guestCount }} {{ guestCount === 1 ? 'Guest' : 'Guests' }} &middot; Select Dining Package
                         </p>
                     </div>
 
-                    <!-- Package navigation -->
-                    <div class="flex items-center gap-2">
-                        <button
-                            :disabled="packages.length <= 1"
-                            class="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-primary/20 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,border-color,color,transform] duration-200 border border-white/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                            aria-label="Previous package"
-                            @click="prevPackage"
-                        >
-                            <ChevronLeft :size="22" class="text-white" aria-hidden="true" />
-                        </button>
-                        <div class="px-3 py-2 bg-white/10 rounded-lg min-w-[64px] text-center">
-                            <span class="text-white font-bold text-sm">{{ currentIndex + 1 }}/{{ packages.length }}</span>
-                        </div>
-                        <button
-                            :disabled="packages.length <= 1"
-                            class="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-primary/20 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-[background-color,border-color,color,transform] duration-200 border border-white/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                            aria-label="Next package"
-                            @click="nextPackage"
-                        >
-                            <ChevronRight :size="22" class="text-white" aria-hidden="true" />
-                        </button>
+                    <!-- Package count -->
+                    <div class="hidden sm:flex items-center justify-center px-4 h-12 bg-white/10 rounded-xl border border-white/10">
+                        <span class="text-white/70 font-bold text-sm whitespace-nowrap">
+                            {{ packages.length }} Packages
+                        </span>
                     </div>
                 </div>
 
                 <!-- Loading State -->
                 <div v-if="menuStore.isLoadingPackages" aria-live="polite" role="status" class="flex-1 min-h-0 flex items-center justify-center">
                     <div class="text-center space-y-4">
-                        <div class="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
+                        <div class="w-16 h-16 border-4 border-[#f6b56d]/20 border-t-[#f6b56d] rounded-full animate-spin mx-auto" />
                         <p class="text-white/80 font-kanit">
                             Loading packages…
                         </p>
@@ -295,125 +273,26 @@ function handleTouchEnd () {
                     </div>
                 </div>
 
-                <!-- Package Card (Premium Display) -->
+                <!-- Package Row Display (single horizontal row, scrolls horizontally if narrow) -->
                 <div
                     v-else
-                    class="flex-1 min-h-0 flex flex-col pkg-touch-region"
-                    @touchstart="handleTouchStart"
-                    @touchmove="handleTouchMove"
-                    @touchend="handleTouchEnd"
+                    class="flex-1 min-h-0 overflow-x-auto overflow-y-visible pt-3 pkg-row-scroll"
                 >
-                    <!-- Package Card: centered hero layout -->
-                    <transition name="pkg-card" mode="out-in">
+                    <div class="flex h-full min-w-min snap-x snap-mandatory items-stretch gap-5 xl:gap-6 pb-2">
                         <div
-                            v-if="packages[currentIndex]"
-                            :key="packages[currentIndex].id"
-                            class="flex-1 min-h-0 rounded-2xl ring-1 ring-primary/25 overflow-hidden flex flex-col pkg-card-surface"
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-[340px] max-w-[460px] flex-1 snap-start"
                         >
-                            <!-- HERO ZONE: identity + price -->
-                            <div class="flex-1 overflow-y-auto scrollbar-none flex flex-col items-center justify-center text-center px-8 py-6 gap-4">
-                                <!-- Popular badge -->
-                                <div
-                                    v-if="packages[currentIndex].is_popular"
-                                    class="flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary/15 ring-1 ring-primary/30"
-                                >
-                                    <Star :size="11" stroke-width="0" fill="currentColor" class="text-primary" />
-                                    <span class="text-primary text-[10px] font-bold uppercase tracking-[0.18em]">Most Popular</span>
-                                </div>
-
-                                <!-- Package name -->
-                                <h2 class="text-3xl font-bold text-white font-raleway leading-tight tracking-tight">
-                                    {{ packages[currentIndex].name }}
-                                </h2>
-
-                                <!-- Description (compact, 2-line max) -->
-                                <p
-                                    v-if="packages[currentIndex].description"
-                                    class="text-white/45 text-sm max-w-xs leading-relaxed pkg-line-clamp"
-                                >
-                                    {{ packages[currentIndex].description }}
-                                </p>
-
-                                <!-- Price hero -->
-                                <div class="py-2 space-y-1">
-                                    <div class="flex items-baseline justify-center gap-1.5">
-                                        <span class="text-5xl font-black text-primary leading-none tabular-nums tracking-tight">
-                                            {{ formatCurrency(packages[currentIndex].price) }}
-                                        </span>
-                                        <span class="text-white/35 text-sm font-medium">/person</span>
-                                    </div>
-                                    <p class="text-white/25 text-xs font-kanit">
-                                        × {{ guestCount }} {{ guestCount === 1 ? 'guest' : 'guests' }}
-                                        <span class="text-white/40 ml-1">= {{ formatCurrency(Number(packages[currentIndex].price) * guestCount) }}</span>
-                                    </p>
-                                </div>
-
-                                <!-- Feature tag row -->
-                                <div class="flex flex-wrap items-center justify-center gap-2 mt-1">
-                                    <span
-                                        v-if="packages[currentIndex].modifiers?.length"
-                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/60 text-xs font-semibold"
-                                    >
-                                        <span class="h-1.5 w-1.5 rounded-full bg-primary/80" aria-hidden="true" />
-                                        {{ packages[currentIndex].modifiers.length }} Premium Cuts
-                                    </span>
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/60 text-xs font-semibold">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-white/40" aria-hidden="true" />
-                                        Unlimited Rounds
-                                    </span>
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/60 text-xs font-semibold">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-white/40" aria-hidden="true" />
-                                        Sides &amp; Desserts
-                                    </span>
-                                </div>
-                            </div>
-
-                            <!-- BOTTOM PANEL: horizontal meat chips + CTA -->
-                            <div class="border-t border-white/[0.07] px-5 py-4 space-y-3 pkg-bottom-panel">
-                                <!-- Horizontal scrollable meat name chips (no images, clean) -->
-                                <div
-                                    v-if="packages[currentIndex].modifiers?.length"
-                                    class="overflow-x-auto scrollbar-none -mx-1 px-1"
-                                    aria-label="Included meats"
-                                >
-                                    <div class="flex gap-1.5 pb-0.5 pkg-chips-row">
-                                        <span
-                                            v-for="meat in packages[currentIndex].modifiers.slice(0, 14)"
-                                            :key="meat.id"
-                                            class="flex-shrink-0 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-primary/75 text-[11px] font-medium font-kanit whitespace-nowrap"
-                                        >
-                                            {{ meat.name }}
-                                        </span>
-                                        <span
-                                            v-if="packages[currentIndex].modifiers.length > 14"
-                                            class="flex-shrink-0 px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.08] text-white/35 text-[11px] font-medium whitespace-nowrap"
-                                        >
-                                            +{{ packages[currentIndex].modifiers.length - 14 }} more
-                                        </span>
-                                    </div>
-                                </div>
-                                <p v-else class="text-white/25 text-xs text-center font-kanit">
-                                    All meats included with package
-                                </p>
-
-                                <!-- Call to Action: full-width, properly sized -->
-                                <button
-                                    class="w-full flex items-center justify-center gap-2 rounded-xl font-bold text-[15px] tracking-wide transition-[box-shadow,filter,transform] duration-200
-                       bg-gradient-to-br from-primary via-primary to-primary-dark text-secondary
-                       shadow-[0_2px_16px_rgba(246,181,109,0.28)]
-                       hover:shadow-[0_4px_24px_rgba(246,181,109,0.48)] hover:brightness-105
-                       active:scale-[0.985] active:shadow-none
-                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
-                       min-h-[52px]"
-                                    aria-label="Select this package and proceed to menu"
-                                    @click="handlePackageSelection(packages[currentIndex])"
-                                >
-                                    Select Package
-                                    <ChevronRight :size="17" stroke-width="2.5" aria-hidden="true" />
-                                </button>
-                            </div>
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
+                                @select="handlePackageSelection"
+                            />
                         </div>
-                    </transition>
+                    </div>
                 </div>
             </div>
         </div>
@@ -421,28 +300,6 @@ function handleTouchEnd () {
 </template>
 
 <style scoped>
-/* Package card gradient surface */
-.pkg-card-surface {
-  background: linear-gradient(
-    150deg,
-    rgba(246, 181, 109, 0.10) 0%,
-    rgba(12, 12, 12, 0.97) 45%,
-    rgba(246, 181, 109, 0.05) 100%
-  );
-}
-
-/* Bottom panel subtle dark overlay */
-.pkg-bottom-panel {
-  background: rgba(0, 0, 0, 0.30);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-/* Meat chips row — parent is overflow-x-auto, must be wider than flex parent */
-.pkg-chips-row {
-  width: max-content;
-}
-
 .pkg-safe-shell {
     padding-top: max(0.75rem, env(safe-area-inset-top));
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
@@ -453,37 +310,27 @@ function handleTouchEnd () {
     overscroll-behavior: contain;
 }
 
-/* 2-line clamp for description */
-.pkg-line-clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.pkg-row-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(246, 181, 109, 0.45) rgba(255, 255, 255, 0.06);
+    padding-bottom: 0.25rem;
 }
 
-/* Package card swap transition — directional slide with depth */
-.pkg-card-enter-active {
-  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+.pkg-row-scroll::-webkit-scrollbar {
+    height: 6px;
 }
-.pkg-card-leave-active {
-  transition: opacity 160ms cubic-bezier(0.4, 0, 0.6, 1), transform 160ms cubic-bezier(0.4, 0, 0.6, 1);
+
+.pkg-row-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
 }
-.pkg-card-enter-from {
-  opacity: 0;
-  transform: translateX(36px) scale(0.97);
-}
-.pkg-card-leave-to {
-  opacity: 0;
-  transform: translateX(-24px) scale(0.98);
+
+.pkg-row-scroll::-webkit-scrollbar-thumb {
+    background: rgba(246, 181, 109, 0.45);
+    border-radius: 999px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .pkg-card-enter-active,
-    .pkg-card-leave-active {
-        transition: none;
-    }
-
     .animate-spin {
         animation: none;
     }

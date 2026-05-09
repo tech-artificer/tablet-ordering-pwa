@@ -1,0 +1,30 @@
+services:
+  nuxt-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    command: ["npm", "run", "dev"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.nuxt
+      - /app/.output
+    mem_limit: 2g
+    mem_reservation: 1g
+    environment:
+      NODE_ENV: development
+      HOST: "0.0.0.0"
+      PORT: "3000"
+      NUXT_DEV_HMR_HOST: 192.168.1.100
+      NUXT_DEV_HMR_PORT: "3000"
+      NUXT_PUBLIC_BROADCAST_CONNECTION: reverb
+      NUXT_PUBLIC_REVERB_APP_ID: woosoo
+      NUXT_PUBLIC_REVERB_APP_KEY: 5j7k3m9n2p4q8r1t
+      NUXT_PUBLIC_REVERB_HOST: 192.168.100.7
+      NUXT_PUBLIC_REVERB_PORT: "443"
+      NUXT_PUBLIC_REVERB_SCHEME: https
+      NUXT_PUBLIC_REVERB_PATH: /app
+      NUXT_PUBLIC_API_BASE_URL: http://192.168.1.100/api

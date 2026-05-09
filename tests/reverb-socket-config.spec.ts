@@ -40,6 +40,42 @@ describe("resolveReverbSocketConfig", () => {
         expect(resolved.forceTLS).toBe(true)
     })
 
+    it("falls back to the browser hostname when configured host is a bare Docker service name", () => {
+        const resolved = resolveReverbSocketConfig(
+            {
+                host: "reverb",
+                port: 443,
+                scheme: "https",
+            },
+            {
+                hostname: "192.168.100.7",
+                port: "",
+                protocol: "https:",
+            }
+        )
+
+        expect(resolved.host).toBe("192.168.100.7")
+        expect(resolved.port).toBe(443)
+        expect(resolved.forceTLS).toBe(true)
+    })
+
+    it("keeps localhost as a valid configured host", () => {
+        const resolved = resolveReverbSocketConfig(
+            {
+                host: "localhost",
+                port: 8080,
+                scheme: "http",
+            },
+            {
+                hostname: "192.168.100.7",
+                port: "",
+                protocol: "http:",
+            }
+        )
+
+        expect(resolved.host).toBe("localhost")
+    })
+
     it("preserves an explicit non-default Reverb port", () => {
         const resolved = resolveReverbSocketConfig(
             {

@@ -28,6 +28,12 @@ export default defineEventHandler((event) => {
     const connectSrc = extraOrigins ? `'self' ${extraOrigins}` : "'self'"
     const imgSrc = apiOrigin ? `'self' data: ${apiOrigin}` : "'self' data:"
 
+    // Ensure service worker is never cached by HTTP cache so updates activate immediately
+    if (event.node.req.url === "/sw.js") {
+        setHeader(event, "Cache-Control", "no-store, no-cache, must-revalidate")
+        setHeader(event, "Pragma", "no-cache")
+    }
+
     // Set security headers
     setHeader(event, "Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
     setHeader(event, "Content-Security-Policy",

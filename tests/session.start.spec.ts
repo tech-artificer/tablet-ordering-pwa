@@ -113,4 +113,36 @@ describe("session start flow", () => {
         // Cart items are transactional state and must be cleared regardless of preserveSelection
         expect(order.getCartItems()).toHaveLength(0)
     })
+
+    it("preserves submitted order state during post-submit handoff", async () => {
+        const session = useSessionStore()
+        const order = useOrderStore()
+        const device = useDeviceStore()
+
+        device.setToken("test-device-token")
+        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+
+        session.setOrderId(19561)
+        order.setHasPlacedOrder(true)
+        order.setCurrentOrder({
+            success: true,
+            order: {
+                id: 1,
+                order_id: 19561,
+                order_number: "ORD-19561",
+                status: "confirmed",
+            },
+        } as any)
+        order.setSubmittedItems([
+            { id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, category: "meats" } as any,
+        ])
+
+        const started = await session.start({ preserveSubmittedOrder: true })
+
+        expect(started).toBe(true)
+        expect(order.hasPlacedOrder).toBe(true)
+        expect(order.getCurrentOrder()?.order?.order_id).toBe(19561)
+        expect(order.submittedItems).toHaveLength(1)
+        expect(session.orderId).toBe(19561)
+    })
 })
