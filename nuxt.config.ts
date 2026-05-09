@@ -195,6 +195,12 @@ export default defineNuxtConfig({
 
     app: {
         head: {
+            script: [
+                {
+                    src: "/runtime-config.js",
+                    tagPosition: "head",
+                },
+            ],
             meta: [
                 {
                     name: "viewport",
