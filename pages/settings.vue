@@ -102,6 +102,12 @@ const displayDeviceCode = computed(() => displayDevice.value?.security_code ?? d
 const displayIpAddress = computed(() => displayDevice.value?.ip_address ?? localIpAddress.value ?? "—")
 const displayTableName = computed(() => displayTable.value?.name ?? deviceStore.tableName ?? "")
 const displayIsAdmin = computed(() => !!(displayDevice.value && displayDevice.value.is_admin))
+const buildTime = computed(() => String(config.public.buildTime || "unknown"))
+const buildTimeDisplay = computed(() => {
+    const timestamp = Date.parse(buildTime.value)
+    if (Number.isNaN(timestamp)) { return buildTime.value }
+    return new Date(timestamp).toISOString()
+})
 
 // Collapsible sections state (persisted to localStorage)
 const STORAGE_KEY = "settings.collapsed"
@@ -110,6 +116,7 @@ const collapsed = reactive({
     deviceInfo: false,
     authentication: false,
     apiConfig: false,
+    buildInfo: false,
     display: false,
     diagnostics: false
 })
@@ -978,6 +985,70 @@ onMounted(async () => {
                         >
                             🔄 Reset
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Build & Runtime Information -->
+            <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
+                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2 justify-between">
+                    <div class="flex items-center gap-2">
+                        <span>🧾</span>
+                        <span>Build & Runtime Information</span>
+                    </div>
+                    <button class="text-sm text-white/60" aria-label="Toggle Build & Runtime Information" @click.prevent="toggle('buildInfo')">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="w-4 h-4 transition-transform duration-150"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            :style="{ transform: collapsed.buildInfo ? 'rotate(0deg)' : 'rotate(90deg)' }"
+                        >
+                            <path fill-rule="evenodd" d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </h2>
+
+                <div v-show="!collapsed.buildInfo" class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">App Version</label>
+                        <span class="font-mono text-sm">{{ config.public.appVersion || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">App Environment</label>
+                        <span class="font-mono text-sm">{{ config.public.appEnv || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Build SHA</label>
+                        <span class="font-mono text-sm break-all text-right">{{ config.public.buildSha || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Build Branch</label>
+                        <span class="font-mono text-sm">{{ config.public.buildBranch || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Build Time</label>
+                        <span class="font-mono text-sm">{{ buildTimeDisplay }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">API Base URL</label>
+                        <span class="font-mono text-sm break-all text-right">{{ config.public.apiBaseUrl || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Host</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.host || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Port</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.port || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Scheme</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.scheme || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Path</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.path || "unknown" }}</span>
                     </div>
                 </div>
             </div>
