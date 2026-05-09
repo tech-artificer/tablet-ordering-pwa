@@ -631,8 +631,6 @@ export const useOrderStore = defineStore("order", () => {
                 throw new Error("Unable to verify current order status. Please try again in a moment.")
             }
 
-            // Build payload matching POST /api/order/{orderId}/refill spec
-            // RefillOrderRequest requires: items.*.name (required), items.*.menu_id, items.*.quantity
             const refillPayload = buildRefillPayload()
 
             logger.debug("[Refill] Submitting refill payload", {
@@ -641,9 +639,17 @@ export const useOrderStore = defineStore("order", () => {
             })
 
             try {
-                const idempotencyKey = options?.idempotencyKey ?? (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                    ? crypto.randomUUID()
-                    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+                const REFILL_IDEM_KEY_STORAGE = "woosoo_refill_idem_key"
+                let idempotencyKey = options?.idempotencyKey ??
+                    (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(REFILL_IDEM_KEY_STORAGE) : null)
+                if (!idempotencyKey) {
+                    idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                        ? crypto.randomUUID()
+                        : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+                    if (typeof sessionStorage !== "undefined") {
+                        try { sessionStorage.setItem(REFILL_IDEM_KEY_STORAGE, idempotencyKey) } catch (e) { logger.debug("Failed to persist refill idempotency key", e) }
+                    }
+                }
                 const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey } })
                 const responseData = extractResponseData(resp)
                 if (!responseData) {
@@ -665,6 +671,9 @@ export const useOrderStore = defineStore("order", () => {
                 state.refillItems = []
                 state.isRefillMode = false
                 state.history = [...state.history, { ...responseData, type: "refill" }]
+                if (typeof sessionStorage !== "undefined") {
+                    try { sessionStorage.removeItem("woosoo_refill_idem_key") } catch (e) { /* ignore */ }
+                }
                 logger.info("[Refill] Success")
                 return responseData
             } catch (error: any) {
