@@ -22,4 +22,13 @@ describe("service worker navigation fallback", () => {
         expect(source).toContain("/^\\/ca\\.der$/")
         expect(source).toContain("/^\\/ca\\.pem$/")
     })
+
+    it("handles explicit skip waiting messages", () => {
+        const source = readServiceWorkerSource()
+
+        expect(source).toContain("self.addEventListener('message'")
+        expect(source).toContain("event.data?.type === 'SKIP_WAITING'")
+        expect(source).toContain("self.skipWaiting()")
+        expect(source).not.toContain("self.addEventListener('install'")
+    })
 })
