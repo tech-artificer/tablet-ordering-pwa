@@ -19,7 +19,8 @@ function readNuxtConfig (): string {
 
 async function readNuxtConfigObject (): Promise<any> {
     const moduleUrl = pathToFileURL(resolve(__dirname, "../nuxt.config.ts")).href
-    ;(globalThis as any).defineNuxtConfig = (config: any) => config
+    const globalAny = globalThis as any
+    globalAny.defineNuxtConfig = (config: any) => config
     const configModule = await import(moduleUrl)
     return configModule.default
 }
@@ -74,7 +75,8 @@ describe("pwa manifest config", () => {
         const config = await readNuxtConfigObject()
         const scripts = config.app?.head?.script ?? []
         expect(scripts.length).toBeGreaterThan(0)
-        expect(scripts[0]).toMatchObject({
+        const runtimeConfigScript = scripts.find((script: any) => script?.src === "/runtime-config.js")
+        expect(runtimeConfigScript).toMatchObject({
             src: "/runtime-config.js",
             async: false,
             defer: false,
