@@ -1,16 +1,12 @@
 <script setup lang="ts">
-// Smooth page transitions are handled by CSS in main.css
-const route = useRoute()
 </script>
 
 <template>
     <div class="min-h-screen min-w-screen flex items-center justify-center overflow-hidden bg-with-overlay">
         <NetworkIndicator />
-        <Transition name="fade-up" mode="out-in" appear>
-            <div :key="route.path" class="h-screen w-screen z-10 overflow-hidden relative bg-gray-950/80 backdrop-blur-sm safe-area-top safe-area-bottom">
-                <slot />
-            </div>
-        </Transition>
+        <div class="h-screen w-screen z-10 overflow-hidden relative bg-gray-950/80 backdrop-blur-sm safe-area-top safe-area-bottom">
+            <slot />
+        </div>
     </div>
 </template>
 

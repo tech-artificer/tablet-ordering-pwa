@@ -10,6 +10,10 @@ import { logger } from "../../utils/logger"
 import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
 import PackageCard from "../../components/PackageCard.vue"
 
+definePageMeta({
+    layout: "kiosk"
+})
+
 const nuxtApp = useNuxtApp()
 const router = useRouter()
 const menuStore = useMenuStore()

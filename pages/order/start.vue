@@ -5,6 +5,10 @@ import { useOrderStore } from "~/stores/Order"
 import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "~/composables/useActiveOrderRecovery"
 import { logger } from "~/utils/logger"
 
+definePageMeta({
+    layout: "kiosk"
+})
+
 const router = useRouter()
 const orderStore = useOrderStore()
 

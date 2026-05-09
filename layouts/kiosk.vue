@@ -2,7 +2,6 @@
 import { useMenuStore } from "~/stores/Menu"
 import { logger } from "~/utils/logger"
 const menuStore = useMenuStore()
-const route = useRoute()
 
 // Listen for online/offline events
 if (import.meta.client) {
@@ -17,11 +16,11 @@ if (import.meta.client) {
 
 <template>
     <div class="min-h-screen min-w-screen flex items-center justify-center bg-app-grid overflow-hidden">
-        <Transition name="fade-up" mode="out-in" appear>
-            <div :key="route.path" class="h-screen w-screen z-10 safe-area-top safe-area-bottom">
-                <slot />
-            </div>
-        </Transition>
+        <NetworkStatus />
+        <FullscreenRecovery />
+        <div class="h-screen w-screen z-10 safe-area-top safe-area-bottom">
+            <slot />
+        </div>
     </div>
 </template>
 

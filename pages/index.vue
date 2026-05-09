@@ -195,6 +195,11 @@ import { useDeviceStore } from "~/stores/Device"
 import { useMenuStore } from "~/stores/Menu"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
+
+definePageMeta({
+    layout: "kiosk"
+})
+
 const deviceStore = useDeviceStore()
 const menuStore = useMenuStore()
 const router = useRouter()

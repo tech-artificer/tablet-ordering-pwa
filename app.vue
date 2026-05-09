@@ -10,7 +10,6 @@ import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
-const route = useRoute()
 const nuxtApp = useNuxtApp()
 const deviceStore = useDeviceStore()
 const orderStore = useOrderStore()
@@ -241,13 +240,8 @@ onUnmounted(() => {
             @apply="applyUpdate"
         />
 
-        <NuxtLayout name="kiosk">
-            <NetworkStatus />
-            <FullscreenRecovery />
-
-            <Transition name="page-fade" mode="out-in">
-                <NuxtPage :key="route.path" />
-            </Transition>
+        <NuxtLayout>
+            <NuxtPage />
         </NuxtLayout>
     </div>
 </template>

@@ -5,7 +5,7 @@ import { useSessionStore } from "../../stores/Session"
 import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
 import { logger } from "~/utils/logger"
 
-definePageMeta({ middleware: ["order-guard"] })
+definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
 
 const router = useRouter()
 const sessionStore = useSessionStore()
