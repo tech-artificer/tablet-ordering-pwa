@@ -32,6 +32,11 @@ type SubmitOrderOptions = {
     headers?: Record<string, string>
 }
 
+type SubmitRefillOptions = {
+    headers?: Record<string, string>
+    idempotencyKey?: string
+}
+
 export const useOrderStore = defineStore("order", () => {
     const state = reactive({
         cartItems: [] as CartItem[],
@@ -634,7 +639,7 @@ export const useOrderStore = defineStore("order", () => {
         }
     }
 
-    async function submitRefill (payload?: any) {
+    async function submitRefill (payload?: any, options?: SubmitRefillOptions) {
         if (!state.currentOrder && !state.hasPlacedOrder) {
             throw new Error("No existing order found - cannot submit a refill.")
         }
@@ -706,10 +711,10 @@ export const useOrderStore = defineStore("order", () => {
             })
 
             try {
-                const idempotencyKey = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                const idempotencyKey = options?.idempotencyKey ?? (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
                     ? crypto.randomUUID()
-                    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { "X-Idempotency-Key": idempotencyKey } })
+                    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey } })
                 const responseData = extractResponseData(resp)
                 if (!responseData) {
                     handleOrderError("Refill response missing body")

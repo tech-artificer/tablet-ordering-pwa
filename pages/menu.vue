@@ -12,6 +12,10 @@ import { useDeviceStore } from "../stores/Device"
 import { useMenuStore } from "../stores/Menu"
 import { useOrderStore } from "../stores/Order"
 
+definePageMeta({
+    layout: "kiosk"
+})
+
 const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()

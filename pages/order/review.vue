@@ -5,7 +5,7 @@ import { useSessionStore } from "../../stores/Session"
 import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
 import { logger } from "~/utils/logger"
 
-definePageMeta({ middleware: ["order-guard"] })
+definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
 
 const router = useRouter()
 const sessionStore = useSessionStore()
@@ -61,7 +61,7 @@ const handleOrderSubmitted = async () => {
 
 <template>
     <NuxtErrorBoundary>
-        <div class="min-h-screen bg-app-grid text-white px-4 py-5 md:px-6 md:py-6">
+        <div class="min-h-screen bg-app-grid text-white px-4 py-5 md:px-6 md:py-6 overflow-y-auto">
             <div class="max-w-6xl mx-auto">
                 <div class="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-sm px-4 py-3 md:px-5 md:py-4 mb-5 md:mb-6">
                     <div class="flex items-center justify-between gap-4">
