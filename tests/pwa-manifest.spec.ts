@@ -5,7 +5,7 @@
 import { readFileSync } from "fs"
 import { resolve } from "path"
 import { pathToFileURL } from "url"
-import { describe, it, expect } from "vitest"
+import { afterAll, describe, it, expect } from "vitest"
 
 // ---------------------------------------------------------------------------
 // Read nuxt.config.ts as text and extract the manifest object from it.
@@ -23,6 +23,10 @@ async function readNuxtConfigObject (): Promise<any> {
     const configModule = await import(moduleUrl)
     return configModule.default
 }
+
+afterAll(() => {
+    delete (globalThis as any).defineNuxtConfig
+})
 
 describe("pwa manifest config", () => {
     it("display is \"fullscreen\" — must NOT be changed to \"standalone\"", () => {
@@ -69,6 +73,7 @@ describe("pwa manifest config", () => {
     it("loads runtime-config.js in head before app boot", async () => {
         const config = await readNuxtConfigObject()
         const scripts = config.app?.head?.script ?? []
+        expect(scripts.length).toBeGreaterThan(0)
         expect(scripts[0]).toMatchObject({
             src: "/runtime-config.js",
             async: false,
