@@ -4,6 +4,8 @@ import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderSubmit } from "~/composables/useOrderSubmit"
 import { useRefillSubmit } from "~/composables/useRefillSubmit"
+import { useSubmitState } from "~/composables/useSubmitState"
+import SubmitStatusBanner from "~/components/ui/SubmitStatusBanner.vue"
 import { logger } from "~/utils/logger"
 
 const emit = defineEmits<{
@@ -14,6 +16,7 @@ const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
 const { submitOrder: submitInitialOrder } = useOrderSubmit()
 const { submitRefill: submitRefillOrder } = useRefillSubmit()
+const submitState = useSubmitState()
 const submitError = ref<string | null>(null)
 
 type ReviewItem = {
@@ -224,7 +227,7 @@ watch(submitBlockers, () => {
 
 const canSubmit = computed(() => submitBlockers.value.length === 0)
 const isButtonDisabled = computed(() =>
-    !canSubmit.value && !(orderStore.hasPlacedOrder && !orderStore.isRefillMode)
+    !canSubmit.value && !(orderStore.hasPlacedOrder && !orderStore.isRefillMode) || submitState.shouldDisableSubmit.value
 )
 
 const buttonLabel = computed(() => {
@@ -276,7 +279,12 @@ async function submit (): Promise<void> {
 </script>
 
 <template>
-    <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6">
+    <div class="space-y-5 md:space-y-6">
+        <!-- Submit Status Banner -->
+        <SubmitStatusBanner />
+
+        <!-- Order Review Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6">
         <!-- LEFT: Your Order -->
         <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
             <div class="flex items-baseline gap-2 mb-4">
@@ -409,5 +417,6 @@ async function submit (): Promise<void> {
                 <span v-else>{{ buttonLabel }} →</span>
             </button>
         </aside>
+        </div>
     </div>
 </template>
