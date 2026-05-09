@@ -2,6 +2,9 @@ import { computed, ref, toValue, watch } from "vue"
 import type { MaybeRefOrGetter } from "vue"
 import { logger } from "~/utils/logger"
 
+const SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING" as const
+const UPDATE_AVAILABLE_MESSAGE_TYPES = ["UPDATE_AVAILABLE", "APP_UPDATE_AVAILABLE", "SW_UPDATE_AVAILABLE"] as const
+
 type UseAppUpdateOptions = {
     isUpdateApplyBlocked?: MaybeRefOrGetter<boolean>
 }
@@ -9,6 +12,11 @@ type UseAppUpdateOptions = {
 type WorkerMessageData = {
     type?: string
 }
+
+const hasServiceWorkerSupport = (): boolean =>
+    typeof window !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.serviceWorker)
 
 export function useAppUpdate (options?: UseAppUpdateOptions) {
     const showUpdateBanner = ref(false)
@@ -44,7 +52,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     }
 
     const bindControllerChangeReload = () => {
-        if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.serviceWorker || removeControllerChangeListener) {
+        if (!hasServiceWorkerSupport() || removeControllerChangeListener) {
             return
         }
         const onControllerChange = () => {
@@ -84,12 +92,12 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     }
 
     const attachServiceWorkerMessageListener = () => {
-        if (typeof navigator === "undefined" || !navigator.serviceWorker || removeServiceWorkerMessageListener) {
+        if (!hasServiceWorkerSupport() || removeServiceWorkerMessageListener) {
             return
         }
         const onMessage = (event: MessageEvent<WorkerMessageData>) => {
             const messageType = event?.data?.type
-            if (messageType === "SW_UPDATE_AVAILABLE" || messageType === "APP_UPDATE_AVAILABLE" || messageType === "UPDATE_AVAILABLE") {
+            if (messageType && UPDATE_AVAILABLE_MESSAGE_TYPES.includes(messageType as (typeof UPDATE_AVAILABLE_MESSAGE_TYPES)[number])) {
                 showUpdateBanner.value = true
             }
         }
@@ -106,7 +114,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         }
         initialized = true
 
-        if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.serviceWorker) {
+        if (!hasServiceWorkerSupport()) {
             return
         }
 
@@ -144,7 +152,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         bindControllerChangeReload()
 
         try {
-            serviceWorkerRegistration.waiting.postMessage({ type: "SKIP_WAITING" })
+            serviceWorkerRegistration.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
         } catch (error) {
             isApplyingUpdate.value = false
             updateError.value = "Failed to apply update. Please try again."
