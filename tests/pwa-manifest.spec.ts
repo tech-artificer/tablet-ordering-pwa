@@ -4,7 +4,8 @@
 
 import { readFileSync } from "fs"
 import { resolve } from "path"
-import { describe, it, expect } from "vitest"
+import { pathToFileURL } from "url"
+import { afterAll, describe, it, expect } from "vitest"
 
 // ---------------------------------------------------------------------------
 // Read nuxt.config.ts as text and extract the manifest object from it.
@@ -15,6 +16,18 @@ import { describe, it, expect } from "vitest"
 function readNuxtConfig (): string {
     return readFileSync(resolve(__dirname, "../nuxt.config.ts"), "utf-8")
 }
+
+async function readNuxtConfigObject (): Promise<any> {
+    const moduleUrl = pathToFileURL(resolve(__dirname, "../nuxt.config.ts")).href
+    const globalAny = globalThis as any
+    globalAny.defineNuxtConfig = (config: any) => config
+    const configModule = await import(moduleUrl)
+    return configModule.default
+}
+
+afterAll(() => {
+    delete (globalThis as any).defineNuxtConfig
+})
 
 describe("pwa manifest config", () => {
     it("display is \"fullscreen\" — must NOT be changed to \"standalone\"", () => {
@@ -56,5 +69,17 @@ describe("pwa manifest config", () => {
         const config = readNuxtConfig()
         expect(config).toContain("offlineOrderSync")
         expect(config).toContain("NUXT_PUBLIC_OFFLINE_ORDER_SYNC")
+    })
+
+    it("loads runtime-config.js in head before app boot", async () => {
+        const config = await readNuxtConfigObject()
+        const scripts = config.app?.head?.script ?? []
+        expect(scripts.length).toBeGreaterThan(0)
+        const runtimeConfigScript = scripts.find((script: any) => script?.src === "/runtime-config.js")
+        expect(runtimeConfigScript).toMatchObject({
+            src: "/runtime-config.js",
+            async: false,
+            defer: false,
+        })
     })
 })

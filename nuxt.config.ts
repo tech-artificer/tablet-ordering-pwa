@@ -217,6 +217,9 @@ export default defineNuxtConfig({
                 { rel: "icon", href: "/favicon.ico", sizes: "any" },
                 { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
             ],
+            script: [
+                { src: "/runtime-config.js", async: false, defer: false },
+            ],
         },
     },
 
