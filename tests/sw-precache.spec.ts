@@ -26,9 +26,9 @@ describe("service worker navigation fallback", () => {
     it("handles explicit skip waiting messages", () => {
         const source = readServiceWorkerSource()
 
-        expect(source).toContain("self.addEventListener('message'")
-        expect(source).toContain("event.data?.type === 'SKIP_WAITING'")
-        expect(source).toContain("self.skipWaiting()")
-        expect(source).not.toContain("self.addEventListener('install'")
+        expect(source).toMatch(/self\.addEventListener\(['"]message['"]/)
+        expect(source).toMatch(/event\.data\?\.type\s*===\s*['"]SKIP_WAITING['"]/)
+        expect(source).toMatch(/self\.skipWaiting\(\)/)
+        expect(source).not.toMatch(/self\.addEventListener\(['"]install['"]/)
     })
 })
