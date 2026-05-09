@@ -171,3 +171,12 @@ registerRoute(
   }),
   'POST',
 )
+
+registerRoute(
+  ({ url, request }: { url: URL; request: Request }) =>
+    /\/api\/order\/\d+\/refill$/.test(url.pathname) && request.method === 'POST',
+  new NetworkOnly({
+    plugins: [bgSyncPlugin],
+  }),
+  'POST',
+)

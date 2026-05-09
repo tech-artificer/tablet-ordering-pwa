@@ -250,6 +250,7 @@ const buttonLabel = computed(() => {
 
 async function submit (): Promise<void> {
     if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
+        submitState.resetForNextTransaction()  // Ready for refill
         emit("order-submitted")
         return
     }
@@ -266,8 +267,10 @@ async function submit (): Promise<void> {
             const result = await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
             if (result.queued) {
                 submitError.value = "No internet connection. Your refill has been queued and will send automatically when the tablet is back online."
+                submitState.resetForNextTransaction()  // Allow retry even if queued
                 return
             }
+            submitState.resetForNextTransaction()  // Ready for next refill
         } else {
             const payload = orderStore.buildPayload()
             const result = await submitInitialOrder(payload as unknown as Record<string, unknown>)
@@ -279,6 +282,7 @@ async function submit (): Promise<void> {
         emit("order-submitted")
     } catch (error: any) {
         submitError.value = error?.message || "Order submission failed"
+        submitState.resetForNextTransaction()  // Allow retry on error
         logger.error("[OrderingStep3ReviewSubmit] Submission failed", {
             error: error?.message || error,
         })
