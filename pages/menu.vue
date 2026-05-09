@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch } from "vue"
-import { Beef, UtensilsCrossed, CakeSlice, Wine, Paintbrush, Droplets, CreditCard, RefreshCw } from "lucide-vue-next"
+import { Beef, UtensilsCrossed, CakeSlice, Wine } from "lucide-vue-next"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
 import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../composables/useActiveOrderRecovery"
@@ -184,14 +184,6 @@ const categories = [
     { id: "beverages", label: "Beverages", icon: Wine }
 ] as const
 
-// Support request buttons
-const supportRequests = [
-    { id: "clean", label: "Clean Table", icon: Paintbrush, type: "warning" },
-    { id: "water", label: "Water", icon: Droplets, type: "primary" },
-    { id: "billing", label: "Request Bill", icon: CreditCard, type: "success" },
-    { id: "refill", label: "Order Refill", icon: RefreshCw, type: "info" }
-]
-
 // Check if refills are available (order placed AND we have a valid order ID)
 const canRequestRefill = computed(() => {
     const hasOrder = Boolean(unref(orderStore.hasPlacedOrder)) && !!unref(sessionStore.orderId)
@@ -344,8 +336,7 @@ const updateQuantity = (itemId: number, quantity: number) => {
     orderStore.updateQuantity(Number(itemId), Number(quantity))
 }
 
-// Assistance drawer state and sender
-const assistanceDrawerVisible = ref(false)
+const cartDrawerOpen = ref(false)
 const isSendingSupport = ref(false)
 const api = useApi()
 const deviceStore = useDeviceStore()
@@ -459,112 +450,35 @@ const categoryError = computed(() => {
     <NuxtErrorBoundary @error="(e: Error) => { logger.error('[Menu] Uncaught page error:', e) }">
         <div class="flex h-screen bg-app-grid text-white">
             <!-- Main Content Area -->
-            <div class="flex-1 flex flex-col overflow-hidden">
+            <div class="flex flex-col overflow-hidden w-full">
                 <!-- ─── Header Bar ──────────────────────────────────────────── -->
-                <div
-                    class="flex items-center justify-between gap-4 px-4 py-3 border-b border-white/[0.07]"
-                    style="background: rgba(15,15,15,0.95); backdrop-filter: blur(12px);"
-                >
-                    <!-- Left: Back + title -->
-                    <div class="flex items-center gap-3 min-w-0">
-                        <button
-                            :disabled="isBackButtonDisabled()"
-                            :aria-disabled="isBackButtonDisabled()"
-                            class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
-                            :class="isBackButtonDisabled()
-                                ? 'text-white/25 cursor-not-allowed'
-                                : 'text-white/70 hover:text-white hover:bg-white/15 active:scale-95'"
-                            aria-label="Go back"
-                            @click="handleBackButtonClick"
-                        >
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        <div class="min-w-0">
-                            <p class="text-white font-bold text-base leading-tight truncate">
-                                {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill' }}
-                            </p>
-                            <p class="text-white/35 text-[10px] uppercase tracking-[0.15em] font-semibold leading-tight">
-                                {{ selectedPackage ? (selectedPackage as any).description || 'Korean BBQ Selection' : 'Korean BBQ' }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Right: Package pill + status -->
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <!-- Table pill -->
-                        <div class="hidden sm:flex items-center gap-1.5 bg-white/[0.05] rounded-full px-3 py-1 border border-white/[0.07]">
-                            <svg
-                                class="w-3 h-3 text-white/35"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                aria-hidden="true"
-                            ><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg>
-                            <span class="text-white/55 text-[11px] font-medium">
-                                {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'Table' }}
-                            </span>
-                        </div>
-
-                        <!-- Package name pill -->
-                        <div v-if="selectedPackage" class="flex flex-col items-end">
-                            <span class="text-white/30 text-[9px] uppercase tracking-[0.18em] font-bold leading-none mb-0.5">Package</span>
-                            <span class="text-primary font-bold text-sm leading-tight truncate max-w-[130px]">{{ selectedPackage.name }}</span>
-                        </div>
-
-                        <!-- Order placed pill -->
-                        <div
-                            v-if="orderStore.hasPlacedOrder"
-                            class="flex items-center gap-1.5 bg-success/15 border border-success/25 rounded-full px-2.5 py-1"
-                        >
-                            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse flex-shrink-0" />
-                            <span class="text-success text-[10px] font-bold uppercase tracking-wide">Live</span>
-                        </div>
-                    </div>
-                </div>
+                <menu-header
+                    :selected-package="selectedPackage"
+                    :table-name="(deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill'"
+                    :has-placed-order="orderStore.hasPlacedOrder"
+                    :is-back-disabled="isBackButtonDisabled()"
+                    :cart-count="unref(orderStore.activeCart).length"
+                    @back="handleBackButtonClick"
+                    @open-cart="cartDrawerOpen = true"
+                />
 
                 <!-- Category Filter Tabs -->
                 <div class="sticky top-0 z-10">
                     <div class="max-w-7xl mx-auto">
                         <!-- Refill Mode Indicator -->
-                        <div v-if="orderStore.isRefillMode" class="bg-success/20 border-b border-success/30 px-6 py-3">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <RefreshCw :size="24" :stroke-width="2" class="text-success" />
-                                    <div>
-                                        <p class="font-bold text-success">
-                                            Refill Mode Active
-                                        </p>
-                                        <p class="text-sm text-success/80">
-                                            Only unlimited items available (Meats &amp; Sides)
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <button
-                                        class="flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success transition hover:bg-success/20 active:scale-95"
-                                        @click="nuxtApp.$router.push('/order/in-session')"
-                                    >
-                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                                        </svg>
-                                        Back to Session
-                                    </button>
-                                    <refill-button
-                                        :has-placed-order="orderStore.hasPlacedOrder"
-                                        :is-refill-mode="orderStore.isRefillMode"
-                                        @toggle-refill-mode="toggleRefillMode"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <refill-mode-banner
+                            v-if="orderStore.isRefillMode"
+                            :has-placed-order="orderStore.hasPlacedOrder"
+                            :is-refill-mode="orderStore.isRefillMode"
+                            @toggle-refill-mode="toggleRefillMode"
+                            @back-to-session="nuxtApp.$router.push('/order/in-session')"
+                        />
 
                         <menu-category-tabs
                             :categories="categories"
                             :active-category="activeCategory"
                             :sticky="true"
+                            :is-refill-mode="orderStore.isRefillMode"
                             @select="setCategory"
                         />
                     </div>
@@ -621,8 +535,18 @@ const categoryError = computed(() => {
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Order Summary Sidebar -->
+        <!-- ─── Order Summary Drawer (customer right = screen left) ─── -->
+        <el-drawer
+            v-model="cartDrawerOpen"
+            direction="ltr"
+            :with-header="false"
+            :size="'min(460px, 33.333vw)'"
+            :modal="true"
+            :lock-scroll="false"
+            class="cart-drawer"
+        >
             <cart-sidebar
                 :selected-package="selectedPackage"
                 :guest-count="guestCount"
@@ -637,10 +561,10 @@ const categoryError = computed(() => {
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="() => nuxtApp.$router.push('/order/review')"
+                @submit-order="() => { cartDrawerOpen = false; nuxtApp.$router.push('/order/review') }"
                 @toggle-refill-mode="toggleRefillMode"
             />
-        </div>
+        </el-drawer>
 
         <!-- Support FAB -->
         <support-fab @request-support="handleSupportRequest" />
@@ -653,14 +577,6 @@ const categoryError = computed(() => {
                 @toggle-refill-mode="toggleRefillMode"
             />
         </div>
-
-        <!-- Assistance Drawer (legacy - can be removed if not needed) -->
-        <assistance-drawer
-            v-model="assistanceDrawerVisible"
-            :support-requests="supportRequests"
-            :is-sending="isSendingSupport"
-            @send-request="handleSupportRequest"
-        />
 
         <template #error="{ error, clearError }">
             <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
@@ -733,5 +649,18 @@ const categoryError = computed(() => {
 .context-bar {
   background: linear-gradient(to right, rgba(26,26,26,0.95) 0%, rgba(17,17,17,0.98) 100%);
   backdrop-filter: blur(12px);
+}
+
+/* ─── Cart drawer ─────────────────────────────────── */
+:deep(.cart-drawer .el-drawer) {
+  --el-drawer-bg-color: #111111;
+  min-width: 360px;
+  max-width: 460px;
+}
+
+:deep(.cart-drawer .el-drawer__body) {
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 </style>
