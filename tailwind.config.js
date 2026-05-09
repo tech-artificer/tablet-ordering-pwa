@@ -97,11 +97,16 @@ export default {
                     "0%, 100%": { boxShadow: "0 0 12px rgba(246, 181, 109, 0.2)" },
                     "50%": { boxShadow: "0 0 20px rgba(246, 181, 109, 0.4)" },
                 },
+                "pulse-live": {
+                    "0%, 100%": { opacity: "1" },
+                    "50%": { opacity: "0.3" },
+                },
             },
             animation: {
                 "fade-in": "fade-in 0.3s ease-out",
                 "slide-up": "slide-up 0.4s ease-out",
                 "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+                "pulse-live": "pulse-live 2s ease-in-out infinite",
             },
         },
     },

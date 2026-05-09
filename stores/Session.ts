@@ -41,6 +41,11 @@ class AsyncMutex {
     }
 }
 
+type SessionStartOptions = {
+    preserveSelection?: boolean
+    preserveSubmittedOrder?: boolean
+}
+
 export const useSessionStore = defineStore("session", () => {
     const sessionMutex = new AsyncMutex()
 
@@ -52,6 +57,7 @@ export const useSessionStore = defineStore("session", () => {
         sessionEndsAt: null as number | null,
         remainingMs: 0,
         timerExpired: false,
+        terminalHandled: false,
     })
 
     const SESSION_DURATION_MS = 4 * 60 * 60 * 1000 // 4 hours — matches server session_duration_seconds: 14400
@@ -272,7 +278,7 @@ export const useSessionStore = defineStore("session", () => {
         }
     }
 
-    async function start (options?: { preserveSelection?: boolean }): Promise<boolean> {
+    async function start (options?: SessionStartOptions): Promise<boolean> {
     // BUG-13 Fix: Serialize session operations to prevent race conditions
         return sessionMutex.runExclusive(async () => {
             const timestamp = new Date().toISOString()
@@ -344,20 +350,24 @@ export const useSessionStore = defineStore("session", () => {
             // set are not wiped out.
             const orderStore = useOrderStore()
             if (!state.isActive) {
+                state.terminalHandled = false
                 const preserveSelection = Boolean(options?.preserveSelection)
+                const preserveSubmittedOrder = Boolean(options?.preserveSubmittedOrder)
                 const preservedGuestCount = Number(orderStore.guestCount || 2)
                 // Save only the id so we can re-resolve the package from the freshly loaded
                 // menu data after the reset — avoids restoring a stale price/tax/modifier snapshot.
                 const preservedPackageId = unref(orderStore.package)?.id ?? null
 
-                orderStore.resetTransactionalState()
+                if (!preserveSubmittedOrder) {
+                    orderStore.resetTransactionalState()
 
-                if (preserveSelection) {
-                    orderStore.setGuestCount(preservedGuestCount)
-                    if (preservedPackageId !== null) {
-                        const freshPackage = menuStore.packages.find(p => p.id === preservedPackageId) ?? null
-                        if (freshPackage) {
-                            orderStore.setPackage(freshPackage)
+                    if (preserveSelection) {
+                        orderStore.setGuestCount(preservedGuestCount)
+                        if (preservedPackageId !== null) {
+                            const freshPackage = menuStore.packages.find(p => p.id === preservedPackageId) ?? null
+                            if (freshPackage) {
+                                orderStore.setPackage(freshPackage)
+                            }
                         }
                     }
                 }
@@ -393,7 +403,6 @@ export const useSessionStore = defineStore("session", () => {
 
             console.log(`[🔚 Session Ending] order_id=${currentOrderId} final_status=${finalStatus} at ${timestamp}`)
             logger.info("🔚 Session ending - clearing all session and order state")
-            state.timerExpired = false
             await clearInternal() // Call internal version to avoid double-locking
             console.log(`[✅ Session Cleared] Ready for next guest at ${timestamp}`)
         })
@@ -409,6 +418,7 @@ export const useSessionStore = defineStore("session", () => {
         state.sessionStartedAt = null
         state.sessionEndsAt = null
         state.remainingMs = 0
+        state.terminalHandled = false
         stopTimerInterval()
         stopSyncResyncTimer()
         _unregisterVisibilitySync()
@@ -432,19 +442,6 @@ export const useSessionStore = defineStore("session", () => {
                     sessionId: null,
                     orderId: null,
                     isActive: false
-                }))
-
-                // Also persist cleared order store (matching its pick config)
-                window.localStorage.setItem("order-store", JSON.stringify({
-                    guestCount: 2,
-                    package: null,
-                    hasPlacedOrder: false,
-                    currentOrder: null,
-                    submittedItems: [],
-                    isRefillMode: false,
-                    history: orderStore.getHistory(), // Keep history
-                    cartItems: [],
-                    refillItems: [],
                 }))
 
                 logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
@@ -510,19 +507,6 @@ export const useSessionStore = defineStore("session", () => {
                         isActive: false
                     }))
 
-                    // Also persist cleared order store (full reset clears history too)
-                    window.localStorage.setItem("order-store", JSON.stringify({
-                        guestCount: 2,
-                        package: null,
-                        hasPlacedOrder: false,
-                        currentOrder: null,
-                        submittedItems: [],
-                        isRefillMode: false,
-                        history: [],
-                        cartItems: [],
-                        refillItems: [],
-                    }))
-
                     logger.debug("✅ Session and order stores fully reset and persisted")
                 } catch (e) {
                     logger.warn("Failed to persist reset stores:", e)
@@ -543,6 +527,9 @@ export const useSessionStore = defineStore("session", () => {
     function getIsActive (): boolean { return state.isActive }
     function getSessionId (): number | null { return state.sessionId }
 
+    function markTerminalHandled () { state.terminalHandled = true }
+    function isTerminalHandled (): boolean { return state.terminalHandled }
+
     return {
         ...toRefs(state),
         fetchLatestSession,
@@ -560,6 +547,8 @@ export const useSessionStore = defineStore("session", () => {
         getOrderId,
         getIsActive,
         getSessionId,
+        markTerminalHandled,
+        isTerminalHandled,
     }
 }, {
     persist: {

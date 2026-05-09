@@ -4,12 +4,10 @@ import { ElBadge, ElEmpty } from "element-plus"
 import { RefreshCw, Clock, ChefHat, CheckCircle, AlertCircle, Flame, X } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
 import type { Package, CartItem } from "../../types"
-import { useDeviceStore } from "../../stores/Device"
 import { useSessionStore } from "../../stores/Session"
 import { useOrderStore } from "../../stores/Order"
 import { logger } from "../../utils/logger"
 
-const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()
 const orderStore = useOrderStore()
 
@@ -43,25 +41,48 @@ const hasPackage = computed(() => Boolean(
   ((orderStore.package as any)?.id)
 ))
 const hasCartItems = computed(() => Array.isArray(props.cartItems) && props.cartItems.length > 0 && props.cartItems.some((i: any) => Number(i.quantity) > 0))
-const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => i?.category === "meats" && Number(i.quantity) > 0))
+const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => {
+    const category = String(i?.category || "").toLowerCase()
+    return (category === "meats" || category === "meat" || category.includes("meat")) && Number(i.quantity) > 0
+}))
 const hasGuestCount = computed(() => Number(props.guestCount) >= 2)
-const hasTableAssigned = computed(() => {
-    const tableData = deviceStore.table?.value || deviceStore.table
-    return Boolean(
-        tableData &&
-    (
-        (tableData as any).id || (tableData as any).id === 0 ||
-      (tableData as any).name
-    )
-    )
+
+const submitBlockers = computed(() => {
+    const blockers: string[] = []
+
+    if (orderStore.isSubmitting) {
+        blockers.push("Order submission already in progress")
+        return blockers
+    }
+
+    if (orderStore.hasPlacedOrder && !props.isRefillMode) {
+        blockers.push("Initial order already placed")
+        return blockers
+    }
+
+    if (!hasGuestCount.value) {
+        blockers.push("Guest count must be at least 2")
+    }
+
+    if (props.isRefillMode) {
+        if (!hasCartItems.value) {
+            blockers.push("Add at least one refill item")
+        }
+        return blockers
+    }
+
+    if (!hasPackage.value) {
+        blockers.push("Select a package")
+    }
+
+    if (!hasMeatSelection.value) {
+        blockers.push("Select at least one meat")
+    }
+
+    return blockers
 })
 
-const canSubmit = computed(() => {
-    if (orderStore.isSubmitting) { return false }
-    if (orderStore.hasPlacedOrder && !props.isRefillMode) { return false }
-    if (props.isRefillMode) { return hasCartItems.value && hasGuestCount.value && hasTableAssigned.value }
-    return hasPackage.value && hasMeatSelection.value && hasGuestCount.value && hasTableAssigned.value
-})
+const canSubmit = computed(() => submitBlockers.value.length === 0)
 
 // Order status helpers
 const orderStatus = computed(() => {
@@ -150,13 +171,18 @@ const removeItem = (itemId: number) => {
     emit("removeItem", itemId)
 }
 
+const blockedSubmitReason = computed(() => submitBlockers.value[0] || "")
+
 const submitOrder = () => {
     if (orderStore.isSubmitting) {
         logger.warn("CartSidebar submitOrder blocked: submission already in progress")
         return
     }
     if (!canSubmit.value) {
-        logger.warn("CartSidebar submitOrder blocked: cannot submit in current state")
+        logger.warn("CartSidebar submitOrder blocked", {
+            blockers: submitBlockers.value,
+            isRefillMode: Boolean(props.isRefillMode),
+        })
         return
     }
     logger.debug("CartSidebar submitOrder clicked")
@@ -414,6 +440,15 @@ const submitOrder = () => {
 
             <!-- Action Buttons -->
             <div class="space-y-2">
+                <p
+                    v-if="!canSubmit && !orderStore.hasPlacedOrder"
+                    class="text-[11px] text-warning font-medium px-1"
+                    role="status"
+                    aria-live="polite"
+                >
+                    {{ blockedSubmitReason }}
+                </p>
+
                 <!-- Inline countdown widget — replaces Place Order button while counting down -->
                 <Transition name="count-swap" mode="out-in">
                     <div
@@ -449,7 +484,7 @@ const submitOrder = () => {
                         v-else-if="!orderStore.hasPlacedOrder"
                         key="place-order"
                         :disabled="!canSubmit"
-                        :title="!canSubmit ? 'Select package, guests, and items to place order' : ''"
+                        :title="!canSubmit ? blockedSubmitReason : ''"
                         :class="[
                             'w-full py-3.5 rounded-xl font-bold text-base transition-all duration-150 shadow-lg min-h-[52px] flex items-center justify-center gap-2',
                             canSubmit
@@ -468,7 +503,7 @@ const submitOrder = () => {
                         v-else-if="isRefillMode"
                         key="submit-refill"
                         :disabled="!canSubmit"
-                        :title="!canSubmit ? 'Add items and confirm guest count for refill' : ''"
+                        :title="!canSubmit ? blockedSubmitReason : ''"
                         :class="[
                             'w-full py-3.5 rounded-xl font-bold text-base transition-all duration-150 shadow-lg min-h-[52px] flex items-center justify-center gap-2',
                             canSubmit

@@ -7,6 +7,7 @@ import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
+import { useAppUpdate } from "~/composables/useAppUpdate"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
@@ -192,6 +193,7 @@ onMounted(async () => {
     initializeAppUpdate()
     attachListener()
     registerGestureFullscreenRecovery()
+    await initializeAppUpdate()
 
     try {
         const authenticated = await resolveAuthenticationState()
@@ -223,6 +225,7 @@ onUnmounted(() => {
     }
 
     cleanup()
+    disposeAppUpdate()
     unregisterGestureFullscreenRecovery()
 
     if (typeof document !== "undefined") {
@@ -245,6 +248,14 @@ onUnmounted(() => {
         <NuxtLayout name="kiosk">
             <NetworkStatus />
             <FullscreenRecovery />
+
+            <UpdateBanner
+                :visible="updateAvailable"
+                :updating="updating"
+                :disabled="sessionStore.isActive"
+                disabled-message="Apply after this session ends."
+                @apply="applyUpdate"
+            />
 
             <Transition name="page-fade" mode="out-in">
                 <NuxtPage :key="route.path" />

@@ -195,6 +195,12 @@ export default defineNuxtConfig({
 
     app: {
         head: {
+            script: [
+                {
+                    src: "/runtime-config.js",
+                    tagPosition: "head",
+                },
+            ],
             meta: [
                 {
                     name: "viewport",
@@ -210,6 +216,9 @@ export default defineNuxtConfig({
                 { rel: "manifest", href: "/manifest.webmanifest" },
                 { rel: "icon", href: "/favicon.ico", sizes: "any" },
                 { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+            ],
+            script: [
+                { src: "/runtime-config.js", async: false, defer: false },
             ],
         },
     },

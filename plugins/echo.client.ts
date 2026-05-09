@@ -97,6 +97,10 @@ function createEcho (
     const wssPort = wsPort
     const forceTLS = socketConfig.forceTLS
 
+    if (cfg.host && cfg.host !== normalizedHost) {
+        logger.warn(`[Echo] Configured host "${cfg.host}" looks internal; using browser host "${normalizedHost}"`)
+    }
+
     const wsPath = normalizeWsPath(cfg.path)
 
     logger.info(`[Echo] Connecting to Reverb: ${forceTLS ? "wss" : "ws"}://${normalizedHost}:${wsPort}${wsPath}`)
