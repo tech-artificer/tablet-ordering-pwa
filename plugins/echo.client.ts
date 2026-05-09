@@ -1,5 +1,6 @@
 import Echo from "laravel-echo"
 import Pusher from "pusher-js"
+import { defineNuxtPlugin, useRuntimeConfig } from "#app"
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
 import { resolveReverbSocketConfig } from "../utils/reverbSocketConfig"
