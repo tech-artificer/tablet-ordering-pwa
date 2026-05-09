@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, unref, watch } from "vue"
+import { computed, onMounted, onUnmounted, ref, unref, watch } from "vue"
 import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderSubmit } from "~/composables/useOrderSubmit"
@@ -18,6 +18,14 @@ const { submitOrder: submitInitialOrder } = useOrderSubmit()
 const { submitRefill: submitRefillOrder } = useRefillSubmit()
 const submitState = useSubmitState()
 const submitError = ref<string | null>(null)
+
+onMounted(() => {
+    submitState.setIdle()
+})
+
+onUnmounted(() => {
+    submitState.setIdle()
+})
 
 type ReviewItem = {
     id: number
