@@ -4,6 +4,7 @@
 
 import { readFileSync } from "fs"
 import { resolve } from "path"
+import { pathToFileURL } from "url"
 import { describe, it, expect } from "vitest"
 
 // ---------------------------------------------------------------------------
@@ -14,6 +15,13 @@ import { describe, it, expect } from "vitest"
 
 function readNuxtConfig (): string {
     return readFileSync(resolve(__dirname, "../nuxt.config.ts"), "utf-8")
+}
+
+async function readNuxtConfigObject (): Promise<any> {
+    const moduleUrl = pathToFileURL(resolve(__dirname, "../nuxt.config.ts")).href
+    ;(globalThis as any).defineNuxtConfig = (config: any) => config
+    const configModule = await import(moduleUrl)
+    return configModule.default
 }
 
 describe("pwa manifest config", () => {
@@ -58,11 +66,13 @@ describe("pwa manifest config", () => {
         expect(config).toContain("NUXT_PUBLIC_OFFLINE_ORDER_SYNC")
     })
 
-    it("loads runtime-config.js in head before app boot", () => {
-        const config = readNuxtConfig()
-        expect(config).toContain("script: [")
-        expect(config).toContain("src: \"/runtime-config.js\"")
-        expect(config).toContain("async: false")
-        expect(config).toContain("defer: false")
+    it("loads runtime-config.js in head before app boot", async () => {
+        const config = await readNuxtConfigObject()
+        const scripts = config.app?.head?.script ?? []
+        expect(scripts[0]).toMatchObject({
+            src: "/runtime-config.js",
+            async: false,
+            defer: false,
+        })
     })
 })
