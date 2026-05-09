@@ -127,7 +127,18 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         })
 
         try {
-            registration.value = await navigator.serviceWorker.ready
+            const timeoutMs = 4000
+            const readyWithTimeout = Promise.race([
+                navigator.serviceWorker.ready,
+                new Promise<null>(resolve => setTimeout(() => resolve(null), timeoutMs)),
+            ])
+            const resolved = await readyWithTimeout
+            if (resolved === null) {
+                logger.warn("[PWA] serviceWorker.ready timed out — falling back to getRegistration()")
+                registration.value = (await navigator.serviceWorker.getRegistration()) ?? null
+            } else {
+                registration.value = resolved
+            }
             attachUpdateFoundListener()
             updateBannerVisibility()
             await registration.value?.update().catch(() => {})

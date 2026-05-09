@@ -201,7 +201,6 @@ import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
 const deviceStore = useDeviceStore()
 const menuStore = useMenuStore()
 const router = useRouter()
-const nuxtApp = useNuxtApp()
 const route = useRoute()
 const { isOnline } = useNetworkStatus()
 
@@ -275,7 +274,7 @@ const start = () => {
         return
     }
 
-    void nuxtApp.$router.replace("/order/start")
+    router.replace("/order/start").catch(() => {})
 }
 
 const openSettings = (noticeOrEvent?: string | PointerEvent) => {
