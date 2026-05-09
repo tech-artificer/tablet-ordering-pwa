@@ -124,8 +124,19 @@ export const useSubmitState = () => {
     })
 
     const shouldDisableSubmit = computed<boolean>(() => {
-        return stateContext.state !== "idle" && stateContext.state !== "failed"
+        // Allow submission if state is idle, failed, or confirmed.
+        // Confirmed means "last transaction succeeded"; new submission can start fresh transaction.
+        return stateContext.state !== "idle" && stateContext.state !== "failed" && stateContext.state !== "confirmed"
     })
+
+    /**
+     * Reset to idle state, preparing for a new transaction.
+     * Call after refill submission completes (regardless of success/failure).
+     */
+    const resetForNextTransaction = () => {
+        stateContext.state = "idle"
+        stateContext.lastError = null
+    }
 
     return {
         // State
@@ -145,6 +156,7 @@ export const useSubmitState = () => {
         setIdle,
         updateSyncAttempt,
         updatePendingCount,
+        resetForNextTransaction,
 
         // Helpers
         stateLabel,

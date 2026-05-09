@@ -95,7 +95,7 @@ export function useRefillSubmit () {
                 // Queue item includes original idempotency key + refill payload context
                 const record: OfflineOrderRecord = {
                     id: idempotencyKey,
-                    endpoint: `/api/devices/order/${currentOrderId}/refill`,
+                    endpoint: `/api/order/${currentOrderId}/refill`,
                     method: "POST",
                     payload: payload || orderStore.buildRefillPayload(),
                     headersSnapshot: buildHeadersSnapshot(deviceToken),
@@ -127,7 +127,7 @@ export function useRefillSubmit () {
                         currentOrder?.id
                     const record: OfflineOrderRecord = {
                         id: idempotencyKey,
-                        endpoint: currentOrderId ? `/api/devices/order/${currentOrderId}/refill` : "/api/devices/order/refill",
+                        endpoint: currentOrderId ? `/api/order/${currentOrderId}/refill` : "/api/order/refill",
                         method: "POST",
                         payload: payload || orderStore.buildRefillPayload(),
                         headersSnapshot: buildHeadersSnapshot(deviceToken),
