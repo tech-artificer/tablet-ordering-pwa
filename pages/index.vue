@@ -104,9 +104,6 @@
                             isWebSocketConnected ? 'bg-success animate-pulse' : 'bg-error'
                         ]"
                     />
-                    <span class="text-xs font-medium transition-colors" :class="isWebSocketConnected ? 'text-success' : 'text-error'">
-                        {{ isWebSocketConnected ? 'Online' : 'Offline' }}
-                    </span>
                 </div>
 
                 <!-- Settings Button -->

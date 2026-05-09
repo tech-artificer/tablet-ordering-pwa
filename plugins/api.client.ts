@@ -13,12 +13,13 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 export default defineNuxtPlugin(() => {
     const config = useRuntimeConfig()
     const runtime = useRuntimeConfigOverride()
-    const apiBaseUrl = String(runtime.apiBaseUrl || config.public.apiBaseUrl || "/api")
+    // Strip /api suffix from apiBaseUrl since endpoints already contain /api prefix
+    let apiBaseUrl = String(runtime.apiBaseUrl || config.public.apiBaseUrl || "")
+    apiBaseUrl = apiBaseUrl.replace(/\/api\/?$/, "").replace(/\/+$/, "") || ""
 
     const api = axios.create({
-    // Ensure baseURL always ends with a single trailing slash so relative paths
-    // passed to axios (like 'api/menus/...') concatenate correctly.
-        baseURL: apiBaseUrl.replace(/\/+$/, "") + "/",
+    // baseURL is origin only (no /api); endpoints provide full /api/... paths
+        baseURL: apiBaseUrl + "/",
         timeout: 15000
     })
 
