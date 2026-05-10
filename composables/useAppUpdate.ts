@@ -7,6 +7,7 @@ const UPDATE_AVAILABLE_MESSAGE_TYPES = ["UPDATE_AVAILABLE", "APP_UPDATE_AVAILABL
 
 type UseAppUpdateOptions = {
     isUpdateApplyBlocked?: MaybeRefOrGetter<boolean>
+    reload?: () => void
 }
 
 type WorkerMessageData = {
@@ -41,6 +42,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     let removeServiceWorkerMessageListener: (() => void) | null = null
     let removeUpdateFoundListener: (() => void) | null = null
     let stopBlockedWatcher: (() => void) | null = null
+    const reload = options?.reload ?? (() => window.location.reload())
 
     const reloadIfSafe = () => {
         if (hasReloaded || isUpdateApplyBlocked.value) {
@@ -48,7 +50,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
             return
         }
         hasReloaded = true
-        window.location.reload()
+        reload()
     }
 
     const bindControllerChangeReload = () => {
@@ -148,20 +150,31 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         }
     }
 
-    const applyUpdate = () => {
+    const applyUpdate = async () => {
         if (!canApplyUpdate.value) {
-            return
-        }
-        if (!registration.value || !registration.value.waiting) {
             return
         }
 
         isApplyingUpdate.value = true
         updateError.value = null
-        bindControllerChangeReload()
 
         try {
-            registration.value.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
+            // Unregister all service workers so the new version loads clean on reload.
+            if (hasServiceWorkerSupport()) {
+                const registrations = await navigator.serviceWorker.getRegistrations()
+                for (const reg of registrations) {
+                    reg.waiting?.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
+                }
+                await Promise.all(registrations.map(r => r.unregister()))
+            }
+
+            // Clear all caches so the new SW precache takes effect immediately.
+            if ("caches" in window) {
+                const cacheNames = await caches.keys()
+                await Promise.all(cacheNames.map(name => caches.delete(name)))
+            }
+
+            reload()
         } catch (error) {
             isApplyingUpdate.value = false
             updateError.value = "Failed to apply update. Please try again."

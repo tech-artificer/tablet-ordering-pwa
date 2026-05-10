@@ -142,8 +142,15 @@ onMounted(async () => {
     }
 })
 
+const resolveStoredPackageId = (): string | number | null => {
+    const packageFromGetter = (orderStore as any).getPackage
+    const normalizedPackage = packageFromGetter?.value ?? packageFromGetter ?? (orderStore as any).package
+    const packageId = Number(normalizedPackage?.id || 0)
+    return packageId > 0 ? packageId : null
+}
+
 // Get selected package from route or store
-const selectedPackageId = ref(route.query.packageId || orderStore.getPackage?.value?.id || null)
+const selectedPackageId = ref(route.query.packageId || resolveStoredPackageId())
 const selectedPackage = computed(() => {
     if (!selectedPackageId.value) { return null }
     return menuStore.packages.find(pkg => pkg.id === Number(selectedPackageId.value))

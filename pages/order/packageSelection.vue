@@ -64,10 +64,11 @@ const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages)
 const guestCount = computed(() => Number(orderStore.guestCount))
 
-// Responsive layout
-type PackageRowMode = "three" | "peek" | "portrait"
+// Responsive layout - optimized for 4-column grid on tablet
+type PackageRowMode = "four" | "three" | "peek" | "portrait"
 const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1280)
 const packageRowMode = computed<PackageRowMode>(() => {
+    if (viewportWidth.value >= 1400) { return "four" }
     if (viewportWidth.value >= 1200) { return "three" }
     if (viewportWidth.value >= 900) { return "peek" }
     return "portrait"
@@ -327,9 +328,31 @@ function handleTouchEnd () {
                     v-else
                     class="flex-1 min-h-0 overflow-x-auto overflow-y-visible pt-3 pkg-row-scroll"
                 >
+                    <!-- Four-up grid mode (≥1400px) -->
+                    <div
+                        v-if="packageRowMode === 'four'"
+                        class="grid grid-cols-4 gap-4 h-full pb-2"
+                    >
+                        <div
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-[280px] flex-1"
+                        >
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
+                                @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
+                            />
+                        </div>
+                    </div>
+
                     <!-- Three-up grid mode (≥1200px) -->
                     <div
-                        v-if="packageRowMode === 'three'"
+                        v-else-if="packageRowMode === 'three'"
                         class="grid grid-cols-3 gap-5 xl:gap-6 h-full pb-2"
                     >
                         <div

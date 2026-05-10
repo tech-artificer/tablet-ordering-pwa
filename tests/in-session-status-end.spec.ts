@@ -42,10 +42,10 @@ function makeWatcherHarness () {
             watch(orderStatus, (status) => {
                 if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
                     if (!sessionEndStore.active) {
-                        void triggerSessionEnd(status as any, { source: "in-session" })
+                        triggerSessionEnd(status as any, { source: "in-session" }).catch(() => undefined)
                     }
                 }
-            })
+            }, { immediate: true })
             return {}
         },
         template: "<div />",
@@ -69,12 +69,12 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
         vi.unstubAllGlobals()
     })
 
-    it("does not fire immediately for an already-terminal initial status", async () => {
+    it("fires immediately for an already-terminal initial status", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
         orderStore.setCurrentOrder({ order: { status: "completed" } } as any)
         mount(Harness)
         await nextTick()
-        expect(sessionEndStore.active).toBe(false)
+        expect(sessionEndStore.active).toBe(true)
     })
 
     it("does NOT end session when initial status is pending", async () => {

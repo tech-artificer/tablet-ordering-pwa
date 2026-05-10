@@ -375,8 +375,6 @@ const pinActionLabel = computed(() => {
     if (!isPinSetupMode.value) { return "Verify" }
     return pinSetupStep.value === "confirm" ? "Save" : "Next"
 })
-const MAX_PIN_LENGTH = 6
-const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 const appendDigit = (d: string) => {
     if (pinInput.value.length >= 6) { return }
     pinInput.value += d

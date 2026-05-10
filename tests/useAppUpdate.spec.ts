@@ -6,6 +6,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
     const serviceWorkerContainer = new EventTarget() as EventTarget & {
         ready: Promise<ServiceWorkerRegistration>
         controller: Record<string, unknown>
+        getRegistrations: () => Promise<ServiceWorkerRegistration[]>
+        getRegistration: () => Promise<ServiceWorkerRegistration | undefined>
     }
 
     const waiting = {
@@ -20,6 +22,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
 
     serviceWorkerContainer.ready = Promise.resolve(registration)
     serviceWorkerContainer.controller = {}
+    serviceWorkerContainer.getRegistrations = vi.fn().mockResolvedValue([registration])
+    serviceWorkerContainer.getRegistration = vi.fn().mockResolvedValue(registration)
 
     Object.defineProperty(globalThis.navigator, "serviceWorker", {
         configurable: true,
@@ -71,18 +75,42 @@ describe("useAppUpdate", () => {
         update.disposeAppUpdate()
     })
 
-    it("posts SKIP_WAITING to waiting worker when applying update", async () => {
-        const { serviceWorkerContainer, waiting } = createServiceWorkerMocks({ hasWaiting: true })
-        const update = useAppUpdate()
+    it("applyUpdate unregisters all SWs, clears caches, and reloads", async () => {
+        const reload = vi.fn()
+        const unregister = vi.fn().mockResolvedValue(true)
+        const { serviceWorkerContainer, registration } = createServiceWorkerMocks({ hasWaiting: true })
+        ;(registration as any).unregister = unregister
+        vi.spyOn(navigator.serviceWorker, "getRegistrations").mockResolvedValue([registration])
+
+        const cacheDelete = vi.fn().mockResolvedValue(true)
+        vi.stubGlobal("caches", { keys: vi.fn().mockResolvedValue(["v1", "v2"]), delete: cacheDelete })
+
+        const update = useAppUpdate({ reload })
+        await update.initializeAppUpdate()
+        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
+        await nextTick()
+
+        await update.applyUpdate()
+
+        expect(unregister).toHaveBeenCalled()
+        expect(cacheDelete).toHaveBeenCalledWith("v1")
+        expect(cacheDelete).toHaveBeenCalledWith("v2")
+        expect(reload).toHaveBeenCalledOnce()
+        update.disposeAppUpdate()
+    })
+
+    it("applyUpdate does nothing when canApplyUpdate is false", async () => {
+        const reload = vi.fn()
+        const blocked = ref(true)
+        const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
+        const update = useAppUpdate({ isUpdateApplyBlocked: blocked, reload })
 
         await update.initializeAppUpdate()
         serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
         await nextTick()
 
-        update.applyUpdate()
-
-        expect(waiting.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" })
-        expect(update.isApplyingUpdate.value).toBe(true)
+        await update.applyUpdate()
+        expect(reload).not.toHaveBeenCalled()
         update.disposeAppUpdate()
     })
 })

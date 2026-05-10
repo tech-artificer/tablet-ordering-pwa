@@ -100,39 +100,39 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
 
 <template>
     <article
-        class="group relative flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#151517] shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-[border-color,transform,box-shadow] duration-300 hover:-translate-y-1 hover:border-[#f6b56d]/40 hover:shadow-[0_24px_80px_rgba(0,0,0,0.6)]"
+        class="group relative flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#151517] shadow-[0_16px_48px_rgba(0,0,0,0.45)] transition-[border-color,transform,box-shadow] duration-300 hover:-translate-y-1 hover:border-[#f6b56d]/40 hover:shadow-[0_20px_64px_rgba(0,0,0,0.6)]"
     >
         <div
             v-if="pkg.is_popular"
-            class="absolute -top-3 left-6 z-10 flex items-center gap-1.5 rounded-full bg-[#f6b56d] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-black shadow-[0_12px_28px_rgba(246,181,109,0.18)]"
+            class="absolute -top-2.5 left-4 z-10 flex items-center gap-1 rounded-full bg-[#f6b56d] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-black shadow-[0_8px_20px_rgba(246,181,109,0.18)]"
         >
-            <Star :size="11" stroke-width="0" fill="currentColor" />
+            <Star :size="10" stroke-width="0" fill="currentColor" />
             Most Popular
         </div>
 
         <!-- Header -->
-        <header class="flex-none px-6 pt-7">
-            <h2 class="font-raleway text-2xl font-extrabold tracking-tight text-white">
+        <header class="flex-none px-4 pt-5">
+            <h2 class="font-raleway text-lg font-extrabold tracking-tight text-white">
                 {{ pkg.name }}
             </h2>
 
             <p
                 v-if="pkg.description"
-                class="mt-2 line-clamp-2 text-sm leading-snug text-white/45"
+                class="mt-1.5 line-clamp-2 text-xs leading-snug text-white/45"
             >
                 {{ pkg.description }}
             </p>
 
-            <div class="mt-3 flex items-end gap-2">
-                <div class="font-kanit text-[2.25rem] font-extrabold leading-none text-[#ffad63]">
+            <div class="mt-2.5 flex items-end gap-2">
+                <div class="font-kanit text-[1.75rem] font-extrabold leading-none text-[#ffad63]">
                     {{ formatCurrency(pkg.price) }}
                 </div>
-                <div class="pb-1 font-kanit text-sm text-white/65">
+                <div class="pb-0.5 font-kanit text-xs text-white/65">
                     per person
                 </div>
             </div>
 
-            <p class="mt-1.5 text-xs text-white/35">
+            <p class="mt-1 text-[10px] text-white/35">
                 × {{ guestCount }} {{ guestCount === 1 ? 'guest' : 'guests' }}
                 <span class="text-white/55">
                     = {{ formatCurrency(Number(pkg.price) * guestCount) }}
@@ -141,9 +141,9 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
 
             <div
                 v-if="packageDuration"
-                class="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-bold text-white"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-bold text-white"
             >
-                <Clock :size="14" class="text-[#f6b56d]" />
+                <Clock :size="12" class="text-[#f6b56d]" />
                 {{ packageDuration }}
             </div>
         </header>
@@ -151,50 +151,50 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
         <!-- Modifier groups (image tiles, horizontally scrollable) -->
         <section
             v-if="modifierGroups.length"
-            class="mt-5 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6"
+            class="mt-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden px-4"
         >
-            <div class="text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">
+            <div class="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40">
                 Included
             </div>
 
-            <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pkg-groups-scroll">
+            <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pkg-groups-scroll">
                 <div
                     v-for="group in modifierGroups"
                     :key="group.label"
-                    class="flex flex-col gap-1.5"
+                    class="flex flex-col gap-1"
                 >
-                    <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider">
+                    <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
                         <span class="text-[#f6b56d]">{{ group.label }}</span>
                         <span class="text-white/35">{{ group.items.length }}</span>
                     </div>
 
                     <div
-                        class="flex gap-2 overflow-x-auto snap-x snap-mandatory pkg-modifier-row"
+                        class="flex gap-1.5 overflow-x-auto snap-x snap-mandatory pkg-modifier-row"
                     >
                         <div
                             v-for="item in group.items"
                             :key="item.id"
-                            class="flex w-[78px] flex-none snap-start flex-col gap-1.5"
+                            class="flex w-[64px] flex-none snap-start flex-col gap-1"
                         >
-                            <div class="h-[64px] w-[78px] overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br from-gray-800 to-gray-900">
+                            <div class="h-[52px] w-[64px] overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br from-gray-800 to-gray-900">
                                 <NuxtImg
                                     v-if="item.img_url"
                                     :src="item.img_url"
                                     :alt="item.name || 'Modifier'"
                                     class="h-full w-full object-cover"
                                     loading="lazy"
-                                    sizes="80px"
+                                    sizes="65px"
                                     format="webp"
                                 />
                                 <div
                                     v-else
                                     class="flex h-full w-full items-center justify-center text-white/40"
                                 >
-                                    <UtensilsCrossed :size="22" :stroke-width="1.5" />
+                                    <UtensilsCrossed :size="18" :stroke-width="1.5" />
                                 </div>
                             </div>
                             <p
-                                class="line-clamp-2 text-center font-kanit text-[11px] leading-tight text-white/85"
+                                class="line-clamp-2 text-center font-kanit text-[9px] leading-tight text-white/85"
                                 :title="item.name"
                             >
                                 {{ item.name }}
@@ -206,15 +206,15 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
         </section>
 
         <!-- Footer / CTA -->
-        <footer class="mt-auto flex-none px-6 pb-6 pt-5">
+        <footer class="mt-auto flex-none px-4 pb-4 pt-4">
             <div class="h-px w-full bg-white/[0.08]" />
             <button
                 type="button"
-                class="mx-auto mt-5 flex items-center gap-3 font-kanit text-base font-bold text-[#ffad63] transition group-hover:gap-4 group-hover:text-[#ffc58a] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                class="mx-auto mt-4 flex items-center gap-2 font-kanit text-sm font-bold text-[#ffad63] transition group-hover:gap-3 group-hover:text-[#ffc58a] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 @click.stop="emit('select', pkg)"
             >
                 View cuts
-                <ChevronRight :size="20" />
+                <ChevronRight :size="18" />
                 <span v-if="previewOverflow > 0" class="text-xs font-semibold text-white/50">+{{ previewOverflow }}</span>
             </button>
         </footer>
@@ -248,5 +248,43 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
 .pkg-groups-scroll::-webkit-scrollbar-thumb {
   background: rgba(246, 181, 109, 0.3);
   border-radius: 999px;
+}
+
+/* Enhanced hover effects */
+article {
+  transform: translateZ(0);
+  -webkit-tap-highlight-color: transparent;
+}
+
+article:hover {
+  transform: translateY(-2px);
+}
+
+article:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Button hover enhancement */
+footer button {
+  transition: all 0.200s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+footer button:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(246, 181, 109, 0.3);
+}
+
+footer button:active {
+  transform: scale(0.96);
+}
+
+/* Modifier tile hover effects */
+.pkg-modifier-row > div:hover {
+  transform: scale(1.05);
+  transition: transform 0.150s ease-out;
+}
+
+.pkg-modifier-row > div:active {
+  transform: scale(0.95);
 }
 </style>

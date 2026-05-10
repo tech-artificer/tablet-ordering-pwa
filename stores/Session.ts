@@ -515,6 +515,12 @@ export const useSessionStore = defineStore("session", () => {
             }
             if (typeof window !== "undefined" && window.localStorage) {
                 try { window.localStorage.removeItem("session_active") } catch (e) { logger.debug("[SessionStore] failed to remove session_active", e) }
+                // Reset is also a session boundary (e.g., device reset/end-of-day):
+                // clear any stale offline queued orders.
+                try { window.localStorage.removeItem("woosoo_order_queue") } catch (e) { logger.debug("[SessionStore] failed to clear offline order queue on reset", e) }
+            }
+            if (typeof sessionStorage !== "undefined") {
+                try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { logger.debug("[SessionStore] failed to clear idempotency key on reset", e) }
             }
         }) // End mutex.runExclusive
     }

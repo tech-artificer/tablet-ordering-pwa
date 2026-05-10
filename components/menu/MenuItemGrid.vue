@@ -46,13 +46,13 @@ const isAvailable = (item: any) => {
 
 <template>
     <!-- Loading Skeleton -->
-    <div v-if="props.loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div v-for="n in 6" :key="n" class="bg-surface-10 rounded-xl overflow-hidden animate-pulse">
-            <div class="h-40 bg-gray-700" />
-            <div class="p-4 space-y-3">
-                <div class="h-4 bg-gray-700 rounded w-3/4" />
-                <div class="h-3 bg-gray-700 rounded w-full" />
-                <div class="h-3 bg-gray-700 rounded w-2/3" />
+    <div v-if="props.loading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div v-for="n in 8" :key="n" class="bg-surface-10 rounded-xl overflow-hidden animate-pulse">
+            <div class="h-32 bg-gray-700" />
+            <div class="p-3 space-y-2">
+                <div class="h-3 bg-gray-700 rounded w-3/4" />
+                <div class="h-2.5 bg-gray-700 rounded w-full" />
+                <div class="h-2.5 bg-gray-700 rounded w-2/3" />
             </div>
         </div>
     </div>
@@ -62,7 +62,7 @@ const isAvailable = (item: any) => {
         <el-empty description="No items available" />
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div
             v-for="item in items"
             :key="item.id"
@@ -95,15 +95,15 @@ const isAvailable = (item: any) => {
                 </div>
             </div>
 
-            <!-- Image area — taller, with name overlay -->
-            <div class="relative h-44 overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900">
+            <!-- Image area -->
+            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl">
                 <NuxtImg
                     v-if="item.img_url"
                     :src="item.img_url"
                     :alt="item.name || 'Menu item'"
                     class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
-                    sizes="(max-width: 768px) 100vw, 33vw"
+                    sizes="(max-width: 768px) 50vw, 25vw"
                     format="webp"
                     @error="(e: Event) => { const el = e.target as HTMLImageElement; el.style.display = 'none'; el.closest('.img-wrap')?.classList.add('img-error') }"
                 />
@@ -130,7 +130,7 @@ const isAvailable = (item: any) => {
                 </div>
 
                 <!-- Gradient overlay at bottom -->
-                <div class="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                <div class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
 
                 <!-- Unavailable overlay -->
                 <div v-if="!isAvailable(item)" class="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
@@ -144,14 +144,14 @@ const isAvailable = (item: any) => {
             </div>
 
             <!-- Card footer: price + description chip + add button -->
-            <div class="px-3 pt-2 pb-3 bg-gradient-to-b from-[#1e1e1e] to-[#141414]">
+            <div class="px-2.5 pt-1.5 pb-2.5 bg-gradient-to-b from-[#1e1e1e] to-[#141414] rounded-b-2xl">
                 <!-- Item code + category row -->
                 <div class="flex items-center gap-2 mb-1">
-                    <span class="text-white/25 text-[10px] font-bold tracking-wider uppercase">
+                    <span class="text-white/25 text-[9px] font-bold tracking-wider uppercase">
                         M{{ (item as any).id }}
                     </span>
                     <span
-                        class="text-[10px] font-bold uppercase tracking-wider"
+                        class="text-[9px] font-bold uppercase tracking-wider"
                         :class="{
                             'text-primary/60': categoryType === 'meats',
                             'text-success/70': categoryType === 'sides',
@@ -160,25 +160,25 @@ const isAvailable = (item: any) => {
                         }"
                     >{{ isUnlimitedCategory ? 'UNLIMITED' : categoryType }}</span>
                 </div>
-                <!-- Item name — always visible, primary source of truth -->
-                <p class="text-white font-semibold text-sm leading-snug mb-1 truncate">
+                <!-- Item name -->
+                <p class="text-white font-semibold text-xs leading-tight mb-1 line-clamp-2">
                     {{ (item as any).name || (item as any).receipt_name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
                 </p>
                 <!-- Description (if available) -->
                 <p
                     v-if="(item as any).description"
-                    class="text-white/45 text-[11px] leading-snug line-clamp-2 mb-2"
+                    class="text-white/40 text-[10px] leading-tight line-clamp-2 mb-2"
                 >
                     {{ (item as any).description }}
                 </p>
 
-                <div class="flex items-center justify-between gap-2 mt-2">
+                <div class="flex items-center justify-between gap-1.5 mt-2">
                     <!-- Price only -->
                     <div>
-                        <span v-if="item.price > 0" class="text-primary font-black text-base tabular-nums leading-none">
+                        <span v-if="item.price > 0" class="text-primary font-black text-sm tabular-nums leading-tight">
                             {{ formatCurrency(item.price) }}
                         </span>
-                        <span v-else class="text-success text-xs font-bold uppercase tracking-wide leading-none">Free</span>
+                        <span v-else class="text-success text-[10px] font-bold uppercase tracking-wide leading-tight">Free</span>
                     </div>
 
                     <!-- Add button -->
@@ -186,10 +186,10 @@ const isAvailable = (item: any) => {
                         :disabled="isAddDisabled(item) || !isAvailable(item) || isLocked()"
                         :aria-disabled="isAddDisabled(item) || !isAvailable(item)"
                         :class="[
-                            'add-btn flex items-center justify-center gap-1 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all duration-150 shadow-md min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                            'add-btn flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg font-bold text-xs transition-all duration-200 shadow-md min-h-[48px] min-w-[64px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.96]',
                             isAddDisabled(item) || !isAvailable(item) || isLocked()
-                                ? 'bg-white/10 text-white/30 cursor-not-allowed'
-                                : 'bg-primary text-secondary active:scale-95 hover:bg-primary-light'
+                                ? 'bg-white/10 text-white/40 cursor-not-allowed'
+                                : 'bg-primary text-secondary hover:bg-primary-light hover:shadow-lg hover:shadow-primary/30'
                         ]"
                         @click.stop="addItem(item)"
                     >
@@ -213,10 +213,20 @@ const isAvailable = (item: any) => {
   background: linear-gradient(160deg, #1f1f1f 0%, #141414 100%);
   transform: translateZ(0);
   -webkit-tap-highlight-color: transparent;
+  transition: all 0.200s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-card:hover {
+  transform: translateY(-2px);
 }
 
 .menu-card:hover .add-btn:not(:disabled) {
-  box-shadow: 0 0 16px rgba(246, 181, 109, 0.4);
+  box-shadow: 0 0 20px rgba(246, 181, 109, 0.5);
+  transform: scale(1.02);
+}
+
+.menu-card:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .qty-badge {
