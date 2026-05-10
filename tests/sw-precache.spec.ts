@@ -31,4 +31,19 @@ describe("service worker navigation fallback", () => {
         expect(source).toMatch(/self\.skipWaiting\(\)/)
         expect(source).not.toMatch(/self\.addEventListener\(['"]install['"]/)
     })
+
+    it("queues initial orders but never background-syncs refill posts", () => {
+        const source = readServiceWorkerSource()
+
+        expect(source).toContain("/\\/api\\/devices\\/create-order$/")
+        expect(source).toContain("plugins: [bgSyncPlugin]")
+        expect(source).toContain("/\\/api\\/order\\/\\d+\\/refill$/")
+
+        const refillRouteBlock = source.slice(
+            source.indexOf("/\\/api\\/order\\/\\d+\\/refill$/"),
+            source.indexOf(")", source.indexOf("/\\/api\\/order\\/\\d+\\/refill$/"))
+        )
+
+        expect(refillRouteBlock).not.toContain("bgSyncPlugin")
+    })
 })

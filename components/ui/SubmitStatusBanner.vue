@@ -23,9 +23,6 @@
                     <div v-else-if="submitState.isFailed" class="submit-status-banner__error">
                         !
                     </div>
-                    <div v-else-if="submitState.isQueued" class="submit-status-banner__queue">
-                        ⟳
-                    </div>
                 </div>
 
                 <!-- Text content -->
@@ -33,10 +30,7 @@
                     <div class="submit-status-banner__label">
                         {{ submitState.stateLabel }}
                     </div>
-                    <div v-if="submitState.isQueued" class="submit-status-banner__detail">
-                        {{ pendingCountForDisplay }} order{{ isPlural ? 's' : '' }} queued
-                    </div>
-                    <div v-else-if="submitState.isConfirmed" class="submit-status-banner__detail">
+                    <div v-if="submitState.isConfirmed" class="submit-status-banner__detail">
                         Order #{{ submitState.confirmedOrderNumber || submitState.confirmedOrderId || '—' }}
                     </div>
                     <div v-else-if="submitState.isFailed" class="submit-status-banner__detail">
@@ -44,7 +38,7 @@
                     </div>
                 </div>
 
-                <!-- Action buttons (only for failed + retrying states) -->
+                <!-- Action buttons (only for failed state) -->
                 <div class="submit-status-banner__actions">
                     <button
                         v-if="submitState.isFailed"
@@ -61,11 +55,6 @@
                         Dismiss
                     </button>
                 </div>
-            </div>
-
-            <!-- Last sync time indicator (for queued state) -->
-            <div v-if="submitState.isQueued && lastSyncTimeAgo" class="submit-status-banner__meta">
-                Last sync attempt {{ lastSyncTimeAgo }} ago
             </div>
         </div>
     </Transition>
@@ -96,21 +85,6 @@ const showBanner = computed(() => {
     return submitState.state.value !== "idle"
 })
 
-const lastSyncTimeAgo = computed<string | null>(() => {
-    if (!submitState.lastSyncAttempt.value) { return null }
-    const elapsedMs = Date.now() - submitState.lastSyncAttempt.value
-    const seconds = Math.floor(elapsedMs / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-
-    if (hours > 0) { return `${hours}h` }
-    if (minutes > 0) { return `${minutes}m` }
-    return `${Math.max(0, seconds)}s`
-})
-
-const pendingCountForDisplay = computed(() => submitState.pendingCount.value)
-const isPlural = computed(() => pendingCountForDisplay.value !== 1)
-
 const onRetry = () => emit("retry")
 const onDismiss = () => emit("dismiss")
 </script>
@@ -133,18 +107,6 @@ const onDismiss = () => emit("dismiss")
     background: rgba(59, 130, 246, 0.15);
     border-color: rgba(59, 130, 246, 0.3);
     color: #60a5fa;
-}
-
-.submit-status-banner--queued {
-    background: rgba(168, 85, 247, 0.15);
-    border-color: rgba(168, 85, 247, 0.3);
-    color: #c084fc;
-}
-
-.submit-status-banner--retrying {
-    background: rgba(217, 119, 6, 0.15);
-    border-color: rgba(217, 119, 6, 0.3);
-    color: #fbbf24;
 }
 
 .submit-status-banner--confirmed {
@@ -199,20 +161,6 @@ const onDismiss = () => emit("dismiss")
     font-weight: bold;
 }
 
-.submit-status-banner__queue {
-    font-size: 1rem;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
-}
-
 .submit-status-banner__text {
     flex: 1;
     display: flex;
@@ -264,9 +212,4 @@ const onDismiss = () => emit("dismiss")
     background: rgba(255, 255, 255, 0.15);
 }
 
-.submit-status-banner__meta {
-    font-size: 0.75rem;
-    opacity: 0.7;
-    text-align: right;
-}
 </style>

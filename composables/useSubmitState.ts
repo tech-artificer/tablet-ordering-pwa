@@ -3,24 +3,18 @@
 //
 // States:
 // - idle: No submit in progress
-// - submitting: Initial POST request in flight
-// - queued: Order successfully queued offline (will retry automatically)
-// - retrying: Background sync attempting to send queued order
+// - submitting: POST request in flight
 // - confirmed: Order successfully submitted (server confirmed)
-// - failed: Permanent failure (auth error, terminal order, etc.)
-//
-// UI can show persistent banner with status + pending count + last sync time.
+// - failed: Submission failed — show blocking error to staff
 
 import { computed, reactive } from "vue"
 import { logger } from "~/utils/logger"
 
-export type SubmitStateValue = "idle" | "submitting" | "queued" | "retrying" | "confirmed" | "failed"
+export type SubmitStateValue = "idle" | "submitting" | "confirmed" | "failed"
 
 interface SubmitStateContext {
   state: SubmitStateValue
   lastError: string | null
-  pendingCount: number
-  lastSyncAttempt: number | null // epoch ms
   confirmedOrderNumber: string | null
   confirmedOrderId: number | null
 }
@@ -28,8 +22,6 @@ interface SubmitStateContext {
 const stateContext = reactive<SubmitStateContext>({
     state: "idle",
     lastError: null,
-    pendingCount: 0,
-    lastSyncAttempt: null,
     confirmedOrderNumber: null,
     confirmedOrderId: null,
 })
@@ -37,8 +29,6 @@ const stateContext = reactive<SubmitStateContext>({
 export const useSubmitState = () => {
     const state = computed(() => stateContext.state)
     const lastError = computed(() => stateContext.lastError)
-    const pendingCount = computed(() => stateContext.pendingCount)
-    const lastSyncAttempt = computed(() => stateContext.lastSyncAttempt)
     const confirmedOrderNumber = computed(() => stateContext.confirmedOrderNumber)
     const confirmedOrderId = computed(() => stateContext.confirmedOrderId)
 
@@ -49,25 +39,11 @@ export const useSubmitState = () => {
         logger.debug("[SubmitState] Transitioning to submitting")
     }
 
-    const setQueued = (pendingCount: number) => {
-        stateContext.state = "queued"
-        stateContext.lastError = null
-        stateContext.pendingCount = pendingCount
-        logger.debug("[SubmitState] Transitioning to queued", { pendingCount })
-    }
-
-    const setRetrying = () => {
-        stateContext.state = "retrying"
-        stateContext.lastError = null
-        logger.debug("[SubmitState] Transitioning to retrying")
-    }
-
     const setConfirmed = (orderNumber: string | null, orderId: number | null) => {
         stateContext.state = "confirmed"
         stateContext.lastError = null
         stateContext.confirmedOrderNumber = orderNumber
         stateContext.confirmedOrderId = orderId
-        stateContext.lastSyncAttempt = Date.now()
         logger.debug("[SubmitState] Transitioning to confirmed", { orderNumber, orderId })
     }
 
@@ -80,7 +56,6 @@ export const useSubmitState = () => {
     const setIdle = () => {
         stateContext.state = "idle"
         stateContext.lastError = null
-        stateContext.pendingCount = 0
         stateContext.confirmedOrderNumber = null
         stateContext.confirmedOrderId = null
         logger.debug("[SubmitState] Transitioning to idle")
@@ -89,18 +64,8 @@ export const useSubmitState = () => {
     const reset = () => {
         stateContext.state = "idle"
         stateContext.lastError = null
-        stateContext.pendingCount = 0
-        stateContext.lastSyncAttempt = null
         stateContext.confirmedOrderNumber = null
         stateContext.confirmedOrderId = null
-    }
-
-    const updateSyncAttempt = () => {
-        stateContext.lastSyncAttempt = Date.now()
-    }
-
-    const updatePendingCount = (count: number) => {
-        stateContext.pendingCount = count
     }
 
     // Display helpers
@@ -108,8 +73,6 @@ export const useSubmitState = () => {
         const m: Record<SubmitStateValue, string> = {
             idle: "Ready",
             submitting: "Submitting order...",
-            queued: "Order queued — will retry",
-            retrying: "Retrying queued order...",
             confirmed: "Order confirmed ✓",
             failed: "Submission failed",
         }
@@ -117,11 +80,7 @@ export const useSubmitState = () => {
     })
 
     const isTransitioning = computed<boolean>(() => {
-        return ["submitting", "retrying"].includes(stateContext.state)
-    })
-
-    const isQueued = computed<boolean>(() => {
-        return stateContext.state === "queued"
+        return stateContext.state === "submitting"
     })
 
     const isConfirmed = computed<boolean>(() => {
@@ -151,27 +110,20 @@ export const useSubmitState = () => {
         // State
         state,
         lastError,
-        pendingCount,
-        lastSyncAttempt,
         confirmedOrderNumber,
         confirmedOrderId,
 
         // Transitions
         setSubmitting,
-        setQueued,
-        setRetrying,
         setConfirmed,
         setFailed,
         setIdle,
         reset,
-        updateSyncAttempt,
-        updatePendingCount,
         resetForNextTransaction,
 
         // Helpers
         stateLabel,
         isTransitioning,
-        isQueued,
         isConfirmed,
         isFailed,
         shouldDisableSubmit,

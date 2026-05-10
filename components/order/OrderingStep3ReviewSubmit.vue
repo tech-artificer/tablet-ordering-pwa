@@ -5,6 +5,7 @@ import { useDeviceStore } from "~/stores/Device"
 import { useOrderSubmit } from "~/composables/useOrderSubmit"
 import { useRefillSubmit } from "~/composables/useRefillSubmit"
 import { useSubmitState } from "~/composables/useSubmitState"
+import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import SubmitStatusBanner from "~/components/ui/SubmitStatusBanner.vue"
 import { logger } from "~/utils/logger"
 
@@ -17,6 +18,7 @@ const deviceStore = useDeviceStore()
 const { submitOrder: submitInitialOrder } = useOrderSubmit()
 const { submitRefill: submitRefillOrder } = useRefillSubmit()
 const submitState = useSubmitState()
+const { isOnline } = useNetworkStatus()
 const submitError = ref<string | null>(null)
 
 onMounted(() => {
@@ -268,24 +270,20 @@ async function submit (): Promise<void> {
         return
     }
 
+    if (!isOnline.value) {
+        submitError.value = "Ordering is unavailable. Please call staff."
+        return
+    }
+
     submitError.value = null
     try {
         if (orderStore.isRefillMode) {
             const refillPayload = orderStore.buildRefillPayload()
-            const result = await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
-            if (result.queued) {
-                submitError.value = "No internet connection. Your refill has been queued and will send automatically when the tablet is back online."
-                submitState.resetForNextTransaction() // Allow retry even if queued
-                return
-            }
+            await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
             submitState.resetForNextTransaction() // Ready for next refill
         } else {
             const payload = orderStore.buildPayload()
-            const result = await submitInitialOrder(payload as unknown as Record<string, unknown>)
-            if (result.queued) {
-                submitError.value = "No internet connection. Your order has been queued and will send automatically when the tablet is back online."
-                return
-            }
+            await submitInitialOrder(payload as unknown as Record<string, unknown>)
         }
         emit("order-submitted")
     } catch (error: any) {
