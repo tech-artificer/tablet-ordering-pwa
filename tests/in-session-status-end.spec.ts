@@ -108,8 +108,6 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
     it.each(["completed", "voided", "cancelled"])(
         "ends session for terminal status %s",
         async (terminalStatus) => {
-            setActivePinia(createPinia())
-            vi.stubGlobal("navigateTo", vi.fn())
             const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
             orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
             mount(Harness)
@@ -124,8 +122,6 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
     it.each(["in_progress", "preparing", "ready", "served"])(
         "does NOT end session for non-terminal intermediate status %s",
         async (nonTerminalStatus) => {
-            setActivePinia(createPinia())
-            vi.stubGlobal("navigateTo", vi.fn())
             const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
             orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
             mount(Harness)

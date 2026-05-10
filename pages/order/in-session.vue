@@ -161,7 +161,7 @@ watch(orderStatus, (status) => {
             orderNumber: orderNumber.value ?? undefined,
         })
     }
-})
+}, { immediate: true })
 
 // ── Idle lock ─────────────────────────────────────────────────────────────────
 const showIdleWarning = ref(false)

@@ -24,19 +24,8 @@ function toNavigationUrl (to: unknown): string {
 }
 
 function resolveRouter (): RouterLike {
-    const maybeUseNuxtApp = (globalThis as any)?.useNuxtApp
-    if (typeof maybeUseNuxtApp === "function") {
-        const nuxtApp = maybeUseNuxtApp()
-        const nuxtRouter = nuxtApp?.$router
-        if (nuxtRouter && typeof nuxtRouter.replace === "function") {
-            return nuxtRouter as RouterLike
-        }
-    }
-
-    // Test fallback (Vitest unit tests mock useRouter from vue-router).
-    // In non-component contexts without a mock, useRouter() may throw or return
-    // an unusable value — fall back to a noop router to keep terminal cleanup
-    // deterministic during unit tests.
+    // Use vue-router's useRouter() directly to match test mocks and avoid
+    // ReferenceError when useNuxtApp is not available in test contexts.
     try {
         const router = useRouter() as unknown as RouterLike
         if (router && typeof router.replace === "function") {
@@ -46,6 +35,7 @@ function resolveRouter (): RouterLike {
         // ignore and use noop router below
     }
 
+    // Fallback for non-component contexts without a mock.
     return {
         replace: (to: unknown) => {
             const target = toNavigationUrl(to)

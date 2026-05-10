@@ -55,6 +55,7 @@ describe("OrderingStep3ReviewSubmit", () => {
         const button = wrapper.find("button")
 
         expect(button.text()).toContain("Continue to Session")
+        expect(button.attributes("disabled")).toBeUndefined()
         await button.trigger("click")
 
         expect(submitOrderSpy).not.toHaveBeenCalled()
@@ -130,5 +131,43 @@ describe("OrderingStep3ReviewSubmit", () => {
 
         expect(wrapper.text()).toContain("Cheese Corn")
         expect(wrapper.text()).toContain("×1")
+    })
+
+    it("submits refill and emits order-submitted when in refill mode", async () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(true)
+        order.setIsRefillMode(true)
+        order.setCartItems([
+            { id: 20, name: "Pork Belly", quantity: 2, category: "meats", price: 0 } as any,
+        ])
+
+        const submitRefillSpy = vi.spyOn(order, "submitRefill").mockResolvedValue({ success: true } as any)
+
+        const wrapper = mount(OrderingStep3ReviewSubmit)
+        const button = wrapper.find("button")
+
+        expect(button.text()).toContain("Submit Refill")
+        expect(button.attributes("disabled")).toBeUndefined()
+
+        await button.trigger("click")
+
+        expect(submitRefillSpy).toHaveBeenCalledTimes(1)
+        expect(wrapper.emitted("order-submitted")).toBeTruthy()
+    })
+
+    it("shows blocker message and keeps submit disabled when refill cart is empty", async () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(true)
+        order.setIsRefillMode(true)
+        order.setCartItems([])
+
+        const wrapper = mount(OrderingStep3ReviewSubmit)
+        const button = wrapper.find("button")
+
+        expect(button.attributes("disabled")).toBeDefined()
+        expect(wrapper.text()).toContain("Add at least one refill item")
+
+        await button.trigger("click")
+        expect(wrapper.text()).toContain("Add at least one refill item")
     })
 })

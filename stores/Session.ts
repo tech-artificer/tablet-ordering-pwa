@@ -487,6 +487,7 @@ export const useSessionStore = defineStore("session", () => {
             state.sessionEndsAt = null
             state.remainingMs = 0
             state.timerExpired = false
+            state.terminalHandled = false
             stopTimerInterval()
             stopSyncResyncTimer()
             _unregisterVisibilitySync()

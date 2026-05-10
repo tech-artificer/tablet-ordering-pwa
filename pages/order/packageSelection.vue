@@ -15,7 +15,6 @@ definePageMeta({
 })
 
 const nuxtApp = useNuxtApp()
-const router = useRouter()
 const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
@@ -135,7 +134,7 @@ const handlePackageSelection = async (packageData: Package) => {
                 console.log(`[🔐 Device Registration Required] Redirecting to Settings at ${timestamp}`)
                 // Redirect staff to Settings (PIN-protected) to register device there
                 try {
-                    await router.push("/settings")
+                    await nuxtApp.$router.push("/settings")
                 } catch (e) {
                     logger.error("Failed to navigate to Settings for registration", e)
                 }
@@ -160,7 +159,7 @@ const handlePackageSelection = async (packageData: Package) => {
         try { await menuStore.loadAllMenus() } catch (e) { /* non-fatal */ }
 
         console.log(`[📍 Navigation] Going to menu with package_id=${packageData.id} at ${timestamp}`)
-        await router.push({
+        await nuxtApp.$router.push({
             path: "/menu",
             query: { packageId: packageData.id }
         })
@@ -174,7 +173,7 @@ const handlePackageSelection = async (packageData: Package) => {
         // If device looks unregistered, surface the registration modal.
         const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
         if (needsRegistration) {
-            try { await router.push("/settings") } catch (e) { logger.error(e) }
+            try { await nuxtApp.$router.push("/settings") } catch (e) { logger.error(e) }
         }
     }
 }
@@ -190,7 +189,7 @@ onUnmounted(() => {
 
 const goBack = () => {
     console.log(`[↩️ Package Selection Cancelled] User returned to guest counter at ${new Date().toISOString()}`)
-    router.push("/order/start")
+    nuxtApp.$router.push("/order/start")
 }
 
 function nextPackage () {
