@@ -178,10 +178,3 @@ registerRoute(
   new NetworkOnly(),
   'POST',
 )
-// Auto-activate new service worker versions immediately
-
-
-// Force immediate activation of new service worker
-self.addEventListener('install', (event) => {
-  self.skipWaiting()
-})

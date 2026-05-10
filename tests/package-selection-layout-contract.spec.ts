@@ -7,12 +7,15 @@ function readProjectFile (relativePath: string): string {
 }
 
 describe("package selection responsive layout contract", () => {
-    it("implements viewport-conditional three/peek/portrait row modes", () => {
+    it("implements viewport-conditional four/three/peek/portrait row modes", () => {
         const page = readProjectFile("pages/order/packageSelection.vue")
 
-        expect(page).toContain("type PackageRowMode = \"three\" | \"peek\" | \"portrait\"")
+        expect(page).toContain("type PackageRowMode = \"four\" | \"three\" | \"peek\" | \"portrait\"")
+        expect(page).toContain("viewportWidth.value >= 1400")
         expect(page).toContain("viewportWidth.value >= 1200")
         expect(page).toContain("viewportWidth.value >= 900")
+        expect(page).toContain("grid grid-cols-4")
+        expect(page).toContain("min-w-[280px] flex-1")
         expect(page).toContain("grid grid-cols-3")
         expect(page).toContain("min-w-[36%] flex-[0_0_36%]")
         expect(page).toContain("min-w-[330px] flex-1")

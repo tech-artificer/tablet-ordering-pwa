@@ -54,7 +54,7 @@ describe("OrderingStep3ReviewSubmit", () => {
         const wrapper = mount(OrderingStep3ReviewSubmit)
         const button = wrapper.find("button")
 
-        expect(button.text()).toContain("Go to Session")
+        expect(button.text()).toContain("Continue to Session")
         expect((button.element as HTMLButtonElement).disabled).toBe(false)
         await button.trigger("click")
 
