@@ -137,7 +137,14 @@ describe("OrderingStep3ReviewSubmit", () => {
         const order = useOrderStore()
         order.setHasPlacedOrder(true)
         order.setIsRefillMode(true)
-        order.setCartItems([
+        order.setCurrentOrder({
+            order: {
+                id: 5001,
+                order_id: 5001,
+                status: "pending",
+            },
+        } as any)
+        order.setRefillItems([
             { id: 20, name: "Pork Belly", quantity: 2, category: "meats", price: 0 } as any,
         ])
 
