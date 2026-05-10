@@ -16,7 +16,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         setActivePinia(createPinia())
     })
 
-    it("should produce valid order payload schema with all required fields", () => {
+    it("should produce simplified order payload schema", () => {
         const store = useOrderStore()
 
         // Setup: Create a valid order scenario
@@ -53,19 +53,8 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         expect(payload.guest_count).toBeGreaterThan(0)
         expect(payload.guest_count).toBe(4)
 
-        expect(payload).toHaveProperty("subtotal")
-        expect(typeof payload.subtotal).toBe("number")
-
-        expect(payload).toHaveProperty("tax")
-        expect(typeof payload.tax).toBe("number")
-        expect(payload.tax).toBeGreaterThanOrEqual(0)
-
-        expect(payload).toHaveProperty("discount")
-        expect(typeof payload.discount).toBe("number")
-
-        expect(payload).toHaveProperty("total_amount")
-        expect(typeof payload.total_amount).toBe("number")
-        expect(payload.total_amount).toBeGreaterThan(0)
+        expect(payload).toHaveProperty("package_id")
+        expect(payload.package_id).toBe(1)
 
         // Assert: Items array structure
         expect(payload).toHaveProperty("items")
@@ -79,26 +68,9 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
             expect(typeof item.menu_id).toBe("number")
             expect(item.menu_id).toBeGreaterThan(0)
 
-            expect(item).toHaveProperty("name")
-            expect(typeof item.name).toBe("string")
-            expect(item.name.length).toBeGreaterThan(0)
-
             expect(item).toHaveProperty("quantity")
             expect(typeof item.quantity).toBe("number")
             expect(item.quantity).toBeGreaterThanOrEqual(1)
-
-            expect(item).toHaveProperty("price")
-            expect(typeof item.price).toBe("number")
-            expect(item.price).toBeGreaterThanOrEqual(0)
-
-            expect(item).toHaveProperty("subtotal")
-            expect(typeof item.subtotal).toBe("number")
-
-            expect(item).toHaveProperty("note")
-            // Can be null or string
-
-            expect(item).toHaveProperty("tax")
-            expect(item).toHaveProperty("discount")
         })
     })
 
@@ -107,6 +79,13 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
 
         // Setup: Mark order as placed, enter refill mode
         store.setHasPlacedOrder(true)
+        store.setCurrentOrder({
+            order: {
+                id: 1,
+                order_id: 19561,
+                status: "confirmed",
+            },
+        } as any)
         store.toggleRefillMode(true)
 
         store.addToCart({
@@ -135,10 +114,26 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         expect(((store.refillItems as any)?.value ?? store.refillItems).length).toBe(2)
     })
 
+    it("normalizes singular meat categories into menu rows", () => {
+        const store = useOrderStore()
+
+        store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
+        store.setGuestCount(2)
+        store.addToCart({
+            id: 10,
+            name: "Beef Brisket",
+            price: 150,
+            category: "meat"
+        } as any, { category: "meat" })
+
+        const payload = (store as any).buildPayload()
+        expect(payload.items).toEqual([{ menu_id: 10, quantity: 1 }])
+    })
+
     it("should reject invalid order payload (empty items)", () => {
         const store = useOrderStore()
 
-        // Setup: Package without meats (triggers modifier validation before item count check)
+        // Setup: Package with no selected items
         const mockPackage = {
             id: 1,
             name: "Premium Package",
@@ -148,10 +143,8 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
 
         store.setPackage(mockPackage as any)
         store.setGuestCount(2)
-        // No items added → package will have empty modifiers
-
-        // Act & Assert: Should throw validation error about missing modifiers
-        expect(() => (store as any).buildPayload()).toThrow("package items must have at least one modifier")
+        // No items added
+        expect(() => (store as any).buildPayload()).toThrow("Invalid items")
     })
 
     it("should clamp zero guest count to minimum of 2", () => {
@@ -179,6 +172,13 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
 
         // Setup: Refill mode with drinks (not allowed)
         store.setHasPlacedOrder(true)
+        store.setCurrentOrder({
+            order: {
+                id: 1,
+                order_id: 19561,
+                status: "confirmed",
+            },
+        } as any)
         store.toggleRefillMode(true)
 
         // Manually inject invalid item (bypassing validation)
@@ -193,6 +193,19 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
 
         // Act & Assert: Should throw
         await expect(store.submitRefill()).rejects.toThrow("only meats and sides are allowed")
+    })
+
+    it("should normalize duplicate menu rows by menu_id", () => {
+        const store = useOrderStore()
+        store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
+        store.setGuestCount(2)
+        store.setCartItems([
+            { id: 10, name: "Beef Brisket", price: 150, quantity: 1, category: "meats", isUnlimited: false },
+            { id: 10, name: "Beef Brisket", price: 150, quantity: 2, category: "meats", isUnlimited: false },
+        ] as any)
+
+        const payload = (store as any).buildPayload()
+        expect(payload.items).toEqual([{ menu_id: 10, quantity: 3 }])
     })
 
     it("should validate item quantity constraints", () => {

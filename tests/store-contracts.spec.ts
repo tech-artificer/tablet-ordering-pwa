@@ -60,9 +60,10 @@ describe("store contract regressions", () => {
 
         expect(orderStore.buildRefillPayload).toBeTypeOf("function")
         expect(orderStore.buildRefillPayload()).toEqual({
+            order_id: null,
             items: [
-                { menu_id: 41, name: "Beef", quantity: 2, note: "Refill" },
-                { menu_id: 42, name: "Kimchi", quantity: 1, note: "Refill" },
+                { menu_id: 41, quantity: 2 },
+                { menu_id: 42, quantity: 1 },
             ],
         })
     })

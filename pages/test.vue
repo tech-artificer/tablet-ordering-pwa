@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ShoppingCart, Clock, Info, Plus } from "lucide-vue-next"
+import { Info, Plus } from "lucide-vue-next"
 import { useMenuStore } from "../stores/Menu"
-import type { Modifier, Menu, MenuItem, Package } from "../types"
+import type { Menu } from "../types"
 
 const menuStore = useMenuStore()
 

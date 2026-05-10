@@ -191,7 +191,8 @@ export const useMenuStore = defineStore("menu", {
                 const cached = this.packageDetails[packageId]
                 if (cached && (
                     (Array.isArray(cached.meats) && cached.meats.length > 0) ||
-                    (Array.isArray(cached.items) && cached.items.length > 0)
+                    (Array.isArray(cached.items) && cached.items.length > 0) ||
+                    (Array.isArray(cached.allowed_menus?.meat) && cached.allowed_menus.meat.length > 0)
                 )) {
                     logger.debug(`📦 fetchPackageDetails: cache hit for package ${packageId} — skipping network call`)
                     return cached

@@ -36,8 +36,19 @@ export function normalizeApiRequestUrl ({ baseURL, requestUrl }: NormalizeApiReq
     const basePath = getBasePath(String(baseURL || ""))
     const baseEndsWithApi = /\/api$/i.test(basePath)
 
-    if (baseEndsWithApi && /^\/api(\/|$)/i.test(url)) {
-        return url.replace(/^\/api(?=\/|$)/i, "") || "/"
+    if (baseEndsWithApi) {
+        // Keep absolute-path API endpoints unchanged (/api/...) so they still
+        // target the API namespace on the host origin.
+        if (/^\/api(\/|$)/i.test(url)) {
+            return url
+        }
+
+        // Only de-duplicate for relative "api/..." paths when baseURL already
+        // includes /api (e.g. baseURL=https://host/api + requestUrl=api/menus).
+        if (/^api(\/|$)/i.test(url)) {
+            const deduped = url.replace(/^api\/?/i, "")
+            return deduped || "/"
+        }
     }
 
     return url

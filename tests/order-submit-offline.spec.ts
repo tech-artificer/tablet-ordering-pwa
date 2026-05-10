@@ -1,16 +1,12 @@
 // tests/order-submit-offline.spec.ts
-// Tests for composables/useOrderSubmit.ts — offline-safe order submission wrapper.
+// Tests for composables/useOrderSubmit.ts — live-only order submission wrapper.
 //
-// NOTE: useOrderSubmit no longer short-circuits on isOnline. It always attempts
-// the fetch via orderStore.submitOrder. When offline, the network call fails
-// immediately (no response), which is caught by the network-error path that
-// queues to Dexie and returns { queued: true }. The tests simulate this by
-// making mockSubmitOrder throw a network error (no .response property).
+// Contract: No offline queueing. Network failure (no .response) must throw
+// immediately with "Ordering is unavailable. Please call staff."
+// Kitchen staff never receives an order that cannot print.
 
 import { vi, describe, it, expect, beforeEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
-
-// ---------------------------------------------------------------------------
 
 import { useOrderSubmit } from "../composables/useOrderSubmit"
 
@@ -18,39 +14,11 @@ import { useOrderSubmit } from "../composables/useOrderSubmit"
 // Mocks
 // ---------------------------------------------------------------------------
 
-// DeviceStore
-const mockDeviceStore = { token: "device-token-123" }
-vi.mock("~/stores/Device", () => ({
-    useDeviceStore: () => mockDeviceStore,
-}))
-
 // OrderStore.submitOrder — simulates success / failure
 const mockSubmitOrder = vi.fn()
-const mockSetOrderCreated = vi.fn()
-const mockStartOrderPolling = vi.fn()
 vi.mock("~/stores/Order", () => ({
     useOrderStore: () => ({
         submitOrder: mockSubmitOrder,
-        setOrderCreated: mockSetOrderCreated,
-        startOrderPolling: mockStartOrderPolling,
-    }),
-}))
-
-// OfflineSyncStore
-const mockRefreshPendingCount = vi.fn().mockResolvedValue(undefined)
-vi.mock("~/stores/OfflineSync", () => ({
-    useOfflineSyncStore: () => ({ refreshPendingCount: mockRefreshPendingCount }),
-}))
-
-// Outbox
-const mockEnqueue = vi.fn().mockResolvedValue(undefined)
-const mockMarkStatus = vi.fn().mockResolvedValue(undefined)
-vi.mock("#app", () => ({
-    useNuxtApp: () => ({
-        $offlineOutbox: {
-            enqueue: mockEnqueue,
-            markStatus: mockMarkStatus,
-        },
     }),
 }))
 
@@ -59,9 +27,9 @@ vi.mock("~/utils/logger", () => ({
 }))
 
 const samplePayload = {
-    table_id: 1,
     guest_count: 2,
-    items: [{ menu_id: 10, quantity: 1, is_package: false, modifiers: [] }],
+    package_id: 50,
+    items: [{ menu_id: 10, quantity: 1 }],
 }
 
 describe("composables/useOrderSubmit", () => {
@@ -69,24 +37,37 @@ describe("composables/useOrderSubmit", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         mockSubmitOrder.mockReset()
-        mockSetOrderCreated.mockReset()
-        mockStartOrderPolling.mockReset()
-        mockEnqueue.mockReset()
-        mockMarkStatus.mockReset()
-        mockRefreshPendingCount.mockReset()
     })
 
     // -------------------------------------------------------------------------
-    // Offline path
-    // Simulated by making mockSubmitOrder throw a network error (no .response).
+    // Offline / network-error path: must throw, never queue
     // -------------------------------------------------------------------------
 
-    it("offline/network-error submit queues to outbox and returns { queued: true }", async () => {
+    it("network error throws with blocking message — does NOT queue", async () => {
         mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
         const { submitOrder } = useOrderSubmit()
-        const result = await submitOrder(samplePayload)
-        expect(result.queued).toBe(true)
-        expect(mockEnqueue).toHaveBeenCalledOnce()
+        await expect(submitOrder(samplePayload)).rejects.toThrow(
+            "Ordering is unavailable. Please call staff."
+        )
+    })
+
+    it("network error does not return queued:true — it throws", async () => {
+        mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
+        const { submitOrder } = useOrderSubmit()
+        let caught: Error | null = null
+        try {
+            await submitOrder(samplePayload)
+        } catch (e: any) {
+            caught = e
+        }
+        expect(caught).not.toBeNull()
+        expect(caught?.message).toBe("Ordering is unavailable. Please call staff.")
+    })
+
+    it("network error passes idempotency key to orderStore.submitOrder", async () => {
+        mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
+        const { submitOrder } = useOrderSubmit()
+        await submitOrder(samplePayload).catch(() => {})
         expect(mockSubmitOrder).toHaveBeenCalledWith(
             samplePayload,
             {
@@ -95,37 +76,14 @@ describe("composables/useOrderSubmit", () => {
                 },
             }
         )
-    })
-
-    it("offline submit does NOT call startOrderPolling", async () => {
-        mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
-        const { submitOrder } = useOrderSubmit()
-        await submitOrder(samplePayload)
-        expect(mockStartOrderPolling).not.toHaveBeenCalled()
-    })
-
-    it("offline submit captures Authorization header in outbox record", async () => {
-        mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
-        const { submitOrder } = useOrderSubmit()
-        await submitOrder(samplePayload)
-        const enqueueCall = mockEnqueue.mock.calls[0][0]
-        expect(enqueueCall.headersSnapshot.Authorization).toBe("Bearer device-token-123")
-    })
-
-    it("offline submit does NOT include X-XSRF-TOKEN in header snapshot", async () => {
-        mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
-        const { submitOrder } = useOrderSubmit()
-        await submitOrder(samplePayload)
-        const enqueueCall = mockEnqueue.mock.calls[0][0]
-        expect(enqueueCall.headersSnapshot["X-XSRF-TOKEN"]).toBeUndefined()
     })
 
     // -------------------------------------------------------------------------
     // Online success path
     // -------------------------------------------------------------------------
 
-    it("online success delegates to orderStore.submitOrder", async () => {
-        mockSubmitOrder.mockResolvedValueOnce({ success: true, order: { order_id: 5 } })
+    it("online success delegates to orderStore.submitOrder and returns data", async () => {
+        mockSubmitOrder.mockResolvedValueOnce({ success: true, order: { order_id: 5, order_number: "W-001" } })
         const { submitOrder } = useOrderSubmit()
         const result = await submitOrder(samplePayload)
         expect(mockSubmitOrder).toHaveBeenCalledWith(
@@ -136,25 +94,11 @@ describe("composables/useOrderSubmit", () => {
                 },
             }
         )
-        expect(result.queued).toBeFalsy()
+        expect(result.data).toBeDefined()
     })
 
     // -------------------------------------------------------------------------
-    // Network failure path
-    // (same mechanism as offline — no response object)
-    // -------------------------------------------------------------------------
-
-    it("network error (with message) queues to outbox for SW replay", async () => {
-        const netError = new Error("Network Error") // no .response = network failure
-        mockSubmitOrder.mockRejectedValueOnce(netError)
-        const { submitOrder } = useOrderSubmit()
-        const result = await submitOrder(samplePayload)
-        expect(result.queued).toBe(true)
-        expect(mockEnqueue).toHaveBeenCalledOnce()
-    })
-
-    // -------------------------------------------------------------------------
-    // 409 path
+    // 409 path — existing order resumed
     // -------------------------------------------------------------------------
 
     it("409 response treated as success — does not throw, returns data", async () => {
@@ -163,35 +107,27 @@ describe("composables/useOrderSubmit", () => {
         mockSubmitOrder.mockRejectedValueOnce(error)
         const { submitOrder } = useOrderSubmit()
         const result = await submitOrder(samplePayload)
-        expect(result.queued).toBeFalsy()
         expect(result.data).toBeDefined()
     })
 
     // -------------------------------------------------------------------------
-    // 401 auth error path
+    // 401 auth error path — must throw, not silently absorb
     // -------------------------------------------------------------------------
 
-    it("401 marks outbox auth_error and enqueues record", async () => {
+    it("401 re-throws after logging — does not queue", async () => {
         const error: any = new Error("Unauthorized")
         error.response = { status: 401 }
         mockSubmitOrder.mockRejectedValueOnce(error)
         const { submitOrder } = useOrderSubmit()
-        // 401 still enqueues but does NOT throw (returns normally)
-        await submitOrder(samplePayload).catch(() => {})
-        // The enqueue call should have status auth_error
-        const enqueueCall = mockEnqueue.mock.calls[0]?.[0]
-        expect(enqueueCall?.status).toBe("auth_error")
+        await expect(submitOrder(samplePayload)).rejects.toThrow()
     })
 
     // -------------------------------------------------------------------------
-    // Refill offline block (tested on the store level — shows contract)
+    // Contract: useOrderSubmit is for create-order only
     // -------------------------------------------------------------------------
 
-    it("useOrderSubmit is for create-order only, not refill (refill blocked in Order store)", () => {
-    // Contract: useOrderSubmit targets /api/devices/create-order only.
-    // Refill offline blocking is handled by submitRefill() in Order.ts.
+    it("useOrderSubmit is for create-order only — refill uses useRefillSubmit", () => {
         const { submitOrder } = useOrderSubmit()
-        // Verifying the composable exists and is callable
         expect(typeof submitOrder).toBe("function")
     })
 })

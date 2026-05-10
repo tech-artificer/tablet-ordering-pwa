@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useDeviceStore } from "~/stores/Device"
+import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
+import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
@@ -8,13 +10,25 @@ import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
-const route = useRoute()
 const nuxtApp = useNuxtApp()
 const deviceStore = useDeviceStore()
+const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { registerOnlineListener } = useOfflineOrderQueue()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
+const isUpdateApplyBlocked = computed(() =>
+    Boolean(sessionStore.isActive) || Boolean(orderStore.hasPlacedOrder) || Boolean(orderStore.isSubmitting)
+)
+const {
+    showUpdateBanner,
+    canApplyUpdate,
+    isApplyingUpdate,
+    updateError,
+    initializeAppUpdate,
+    applyUpdate,
+    disposeAppUpdate
+} = useAppUpdate({ isUpdateApplyBlocked })
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 let gestureListenersAttached = false
@@ -176,6 +190,7 @@ function handleVisibilityChange (): void {
 onMounted(async () => {
     attachListener()
     registerGestureFullscreenRecovery()
+    await initializeAppUpdate()
 
     try {
         const authenticated = await resolveAuthenticationState()
@@ -205,6 +220,7 @@ onUnmounted(() => {
     }
 
     cleanup()
+    disposeAppUpdate()
     unregisterGestureFullscreenRecovery()
 
     if (typeof document !== "undefined") {
@@ -216,14 +232,16 @@ onUnmounted(() => {
 <template>
     <div class="contents">
         <SplashScreen :visible="isLoading" />
+        <UpdateBanner
+            :visible="showUpdateBanner"
+            :disabled="!canApplyUpdate"
+            :is-applying="isApplyingUpdate"
+            :error-message="updateError"
+            @apply="applyUpdate"
+        />
 
-        <NuxtLayout name="kiosk">
-            <NetworkStatus />
-            <FullscreenRecovery />
-
-            <Transition name="page-fade" mode="out-in">
-                <NuxtPage :key="route.path" />
-            </Transition>
+        <NuxtLayout>
+            <NuxtPage />
         </NuxtLayout>
     </div>
 </template>

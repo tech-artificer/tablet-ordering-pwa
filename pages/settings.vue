@@ -102,6 +102,12 @@ const displayDeviceCode = computed(() => displayDevice.value?.security_code ?? d
 const displayIpAddress = computed(() => displayDevice.value?.ip_address ?? localIpAddress.value ?? "—")
 const displayTableName = computed(() => displayTable.value?.name ?? deviceStore.tableName ?? "")
 const displayIsAdmin = computed(() => !!(displayDevice.value && displayDevice.value.is_admin))
+const buildTime = computed(() => String(config.public.buildTime || "unknown"))
+const buildTimeDisplay = computed(() => {
+    const timestamp = Date.parse(buildTime.value)
+    if (Number.isNaN(timestamp)) { return buildTime.value }
+    return new Date(timestamp).toISOString()
+})
 
 // Collapsible sections state (persisted to localStorage)
 const STORAGE_KEY = "settings.collapsed"
@@ -110,6 +116,7 @@ const collapsed = reactive({
     deviceInfo: false,
     authentication: false,
     apiConfig: false,
+    buildInfo: false,
     display: false,
     diagnostics: false
 })
@@ -501,6 +508,25 @@ const saveTableOverride = async () => {
         tableOverride.value = ""
     } finally {
         isSavingTable.value = false
+    }
+}
+
+// Force refresh app — clears service worker caches without a browser hard refresh
+const isForceRefreshing = ref(false)
+const forceRefreshApp = async () => {
+    isForceRefreshing.value = true
+    try {
+        if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations()
+            await Promise.all(registrations.map(r => r.unregister()))
+        }
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+        window.location.reload()
+    } catch (e) {
+        logger.warn("[Settings] forceRefreshApp failed", e)
+    } finally {
+        isForceRefreshing.value = false
     }
 }
 
@@ -982,6 +1008,70 @@ onMounted(async () => {
                 </div>
             </div>
 
+            <!-- Build & Runtime Information -->
+            <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
+                <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2 justify-between">
+                    <div class="flex items-center gap-2">
+                        <span>🧾</span>
+                        <span>Build & Runtime Information</span>
+                    </div>
+                    <button class="text-sm text-white/60" aria-label="Toggle Build & Runtime Information" @click.prevent="toggle('buildInfo')">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="w-4 h-4 transition-transform duration-150"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            :style="{ transform: collapsed.buildInfo ? 'rotate(0deg)' : 'rotate(90deg)' }"
+                        >
+                            <path fill-rule="evenodd" d="M6.293 4.293a1 1 0 011.414 0L13.414 10l-5.707 5.707a1 1 0 01-1.414-1.414L10.586 10 6.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </h2>
+
+                <div v-show="!collapsed.buildInfo" class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">App Version</label>
+                        <span class="font-mono text-sm">{{ config.public.appVersion || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">App Environment</label>
+                        <span class="font-mono text-sm">{{ config.public.appEnv || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Build SHA</label>
+                        <span class="font-mono text-sm break-all text-right">{{ config.public.buildSha || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Build Branch</label>
+                        <span class="font-mono text-sm">{{ config.public.buildBranch || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Build Time</label>
+                        <span class="font-mono text-sm">{{ buildTimeDisplay }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">API Base URL</label>
+                        <span class="font-mono text-sm break-all text-right">{{ config.public.apiBaseUrl || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Host</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.host || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Port</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.port || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Scheme</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.scheme || "unknown" }}</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+                        <label class="text-sm text-white/50">Reverb Path</label>
+                        <span class="font-mono text-sm">{{ config.public.reverb?.path || "unknown" }}</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Display / Fullscreen -->
             <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
                 <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2 justify-between">
@@ -1104,6 +1194,25 @@ onMounted(async () => {
                         </ul>
                     </div>
                 </div>
+            </div>
+
+            <!-- Force Refresh App -->
+            <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    🔄 App Maintenance
+                </h2>
+                <p class="text-white/60 text-sm mb-4">
+                    Clear all cached data and service workers to force a fresh reload.
+                </p>
+                <button
+                    :disabled="isForceRefreshing"
+                    class="w-full px-6 py-3 min-h-[48px] rounded-lg bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30 active:scale-95 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    @click="forceRefreshApp"
+                >
+                    <span v-if="isForceRefreshing" class="animate-spin">⏳</span>
+                    <span v-else>🔄</span>
+                    {{ isForceRefreshing ? 'Refreshing...' : 'Force Refresh App' }}
+                </button>
             </div>
 
             <!-- Back Button was moved to header -->

@@ -1,50 +1,149 @@
 <!-- Repository-specific Copilot instructions for AI coding agents -->
-# Enable GPT-5 mini for all clients
+# Tablet Ordering PWA — AI Coding Instructions
 
-This repository is a Nuxt 3 PWA kiosk app (tablet landscape) used for in-store ordering. Below are concise, actionable notes to help AI coding agents be productive quickly.
+This repository is the standalone tablet client for Woosoo. It is a Nuxt SPA/PWA used on restaurant tablets in landscape/kiosk mode.
 
-- **Big picture:** Nuxt 3 SPA (ssr: false) with Pinia for state, PWA support (`@vite-pwa/nuxt`), Tailwind for styles, and Axios for API calls. API backend is a Laravel app (set `MAIN_API_URL` in env). See `nuxt.config.ts` for runtime config and PWA/workbox rules.
+## Current Architecture
 
-- **Key entry points & examples:**
-  - Runtime config & PWA: `nuxt.config.ts` (look for `runtimeConfig.public` and `pwa.workbox` rules).
-  - Global API client: `plugins/api.client.ts` — provides `nuxtApp.$api` (Axios) and sets auth header from `stores/device`.
-  - Simple API wrapper: `composables/useApi.ts` — use `const api = useApi()` to call backend.
-  - Stores: `stores/*.ts` (e.g., `stores/menu.ts`) — Pinia stores commonly use `persist` with a `key` like `menu-store`.
-  - Layouts: `layouts/kiosk.vue` and `layouts/default.vue` control kiosk vs normal shell.
-  - PWA extras: `public/manifest.json` and `sw.js` exist for offline behavior.
+- **Framework:** Nuxt 3 SPA, `ssr: false`
+- **State:** Pinia stores with persisted state
+- **PWA:** `@vite-pwa/nuxt` using `injectManifest`
+- **Service worker source:** `public/sw.ts`
+- **Runtime config bridge:** `/runtime-config.js` → `window.__APP_CONFIG__`
+- **Integrated deployment:** built by sibling `woosoo-nexus` through Docker Compose
+- **Production Dockerfile:** `Dockerfile.prod`
+- **Static production runtime:** Nginx serving generated output
 
-- **Run / build commands (from `package.json`):**
-  - Install: `npm install`
-  - Prepare: `npx nuxi prepare` (or runs automatically via `postinstall`)
-  - Dev (hosted for tablet): `npm run dev` (expands to `npx nuxi dev --host 0.0.0.0`)
-  - Build: `npm run build`; Preview: `npm run preview`
+## Repository Boundary
 
-- **Environment & runtime values:**
-  - API base: `runtimeConfig.public.mainApiUrl` (env var `MAIN_API_URL`).
-  - Echo / broadcasting: `runtimeConfig.public.echo` and `NUXT_PUBLIC_ECHO_*` envs.
-  - App mode: `ssr: false` (client SPA only). Use device emulation for tablet layout.
+This repo is deployed by `woosoo-nexus` as a **sibling repository**:
 
-- **Conventions & patterns to follow (concrete):**
-  - Always call API through `useApi()` (or `nuxtApp.$api`) so interceptors and device token are applied (see `plugins/api.client.ts`).
-  - Pinia stores use `persist: { key: ..., pick: [...] }` — prefer only persisting necessary keys (see `stores/menu.ts`).
-  - Loading / error flags in stores are explicit: look for `isLoading*` and `errors` objects; update them consistently when adding APIs.
-  - Network-safe caching: `stores/menu.ts` implements `lastFetched` + `isCacheStale` and `loadAllMenus()` — reuse this pattern for other cached resources.
-  - Use `nuxtApp.$router` / page navigation only from pages/layouts — components should emit events unless clearly UI-only.
+```txt
+parent/
+├── woosoo-nexus/
+└── tablet-ordering-pwa/
+```
 
-- **Broadcasting & realtime:** `plugins/echo.client.ts` / `echo.client.ts` (check `plugins/`) use runtime echo config; confirm `NUXT_PUBLIC_BROADCAST_CONNECTION` when changing broadcast logic.
+Do not assume this repo deploys itself in integrated production. Nexus Compose controls the integrated Docker build and runtime env.
 
-- **Diagnostics & debugging:**
-  - `devtools` are enabled in `nuxt.config.ts`. Check console logs (many stores use `console.log`) for runtime traces.
-  - Service worker caching is configured in `pwa.workbox.navigateFallbackDenylist` — avoid caching `/api` routes.
+## Runtime Config Rules
 
-- **Files to inspect for examples when implementing features:**
-  - `stores/menu.ts` — API calls, caching, persisted keys, and error handling.
-  - `plugins/api.client.ts` + `composables/useApi.ts` — Axios setup and consumption.
-  - `nuxt.config.ts` — env mapping, PWA, and icons.
-  - `components/` and `pages/` — domain-organized components (e.g., `components/menu`, `components/order`).
+Standalone/local development may use `.env`.
 
-- **Do not change without checks:**
-  - `nuxt.config.ts` PWA/workbox rules — these affect offline ordering and caching.
-  - Pinia persist keys (changing keys will invalidate stored sessions on devices).
+Integrated Docker deployment receives runtime values from Nexus Compose and `/runtime-config.js`.
 
-If anything in this file is unclear or you want more examples (e.g., a pattern for adding a new persisted store or a step-by-step to add a new API route), tell me which area and I'll expand with concrete code snippets. 
+Important runtime values:
+
+```txt
+NUXT_PUBLIC_API_BASE_URL
+NUXT_PUBLIC_REVERB_APP_KEY
+NUXT_PUBLIC_REVERB_HOST
+NUXT_PUBLIC_REVERB_PORT
+NUXT_PUBLIC_REVERB_SCHEME
+NUXT_PUBLIC_REVERB_PATH
+
+APP_RUNTIME_API_BASE_URL
+APP_RUNTIME_REVERB_HOST
+APP_RUNTIME_REVERB_APP_KEY
+APP_RUNTIME_REVERB_PORT
+APP_RUNTIME_REVERB_SCHEME
+APP_RUNTIME_REVERB_PATH
+```
+
+Do not hardcode IP addresses in source code.
+
+## PWA Update Rules
+
+PWA update behavior is production-critical.
+
+Required files/artifacts:
+
+```txt
+/runtime-config.js
+/sw.js
+/manifest.webmanifest
+/_nuxt/*
+```
+
+Rules:
+
+- `/runtime-config.js` must not be stale.
+- `/sw.js` must not be stale.
+- Nuxt hashed assets under `/_nuxt/*` may be cached immutably.
+- The app must expose a visible update flow through `UpdateBanner`.
+- Do not force reload during active order submission or active session unless explicitly approved.
+
+## Current Known Blockers
+
+Before merging staging, verify these are fixed:
+
+- `app.vue` must have only one `useAppUpdate()` lifecycle path.
+- `initializeAppUpdate()` must not be called twice.
+- `disposeAppUpdate()` must not be called twice.
+- Only one `UpdateBanner` should be rendered.
+- `UpdateBanner` must not reference undefined `updateAvailable` or `updating`.
+- `nuxt.config.ts` must define `app.head.script` only once.
+
+## Required Validation
+
+Run before merge:
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+npm run generate
+```
+
+For integrated Docker validation, run from sibling `woosoo-nexus`:
+
+```powershell
+$env:TABLET_DOCKERFILE = "Dockerfile.prod"
+./scripts/deployment/verify-tablet-deploy-context.sh
+docker compose build --no-cache tablet-pwa
+```
+
+## Development Rules
+
+- Use API service/composable layers instead of direct fetch scattered in components.
+- Keep route/state transitions explicit.
+- Persist only necessary store keys.
+- Never change persisted store keys without migration/clear strategy.
+- Do not edit PWA/service-worker behavior without tests.
+- Do not mix deployment fixes with UI redesign in the same PR.
+
+## Key Entry Points
+
+- **Runtime config & PWA:** `nuxt.config.ts` (runtime config, PWA rules)
+- **Global API client:** `plugins/api.client.ts` — provides `nuxtApp.$api` (Axios) with auth header from `stores/device`
+- **Simple API wrapper:** `composables/useApi.ts` — use `const api = useApi()` to call backend
+- **Stores:** `stores/*.ts` — Pinia stores with `persist` plugin (e.g., `stores/menu.ts`)
+- **Layouts:** `layouts/kiosk.vue` and `layouts/default.vue`
+- **Runtime config:** `public/runtime-config.js` template → served as `/runtime-config.js`
+
+## Run / Build Commands
+
+```bash
+npm install              # Install dependencies
+npm run dev              # Dev server (hosted for tablet)
+npm run build            # Production build
+npm run generate         # Static generation (for Docker)
+npm run preview          # Preview built version
+```
+
+## Files to Inspect for Examples
+
+- `stores/menu.ts` — API calls, caching, persisted keys, error handling
+- `plugins/api.client.ts` + `composables/useApi.ts` — Axios setup
+- `nuxt.config.ts` — env mapping, PWA, icons
+- `composables/useAppUpdate.ts` — PWA update handling
+- `components/ui/UpdateBanner.vue` — update UI component
+- `app.vue` — app initialization (check for duplicate lifecycle calls)
+
+## Do Not Change Without Checks
+
+- `nuxt.config.ts` PWA rules — affect offline ordering and caching
+- Pinia persist keys — changing keys invalidates stored sessions
+- Service worker caching strategy in `public/sw.ts`
+- Runtime config generation in `Dockerfile.prod` / nginx config 

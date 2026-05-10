@@ -5,6 +5,10 @@ import { logger } from "~/utils/logger"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 import SessionEndCard from "~/components/ui/SessionEndCard.vue"
 
+definePageMeta({
+    layout: "kiosk"
+})
+
 const route = useRoute()
 const { finalizeAndReturnHome } = useSessionEndFlow()
 

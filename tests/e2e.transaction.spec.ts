@@ -103,7 +103,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
     // 1. buildPayload — structure verification
     // =========================================================================
     describe("buildPayload — payload structure", () => {
-        it("produces is_package=true, modifiers[] for meats, and adds-on as separate flat items", () => {
+        it("produces package_id + normalized menu rows", () => {
             const order = useOrderStore()
             seedDevice()
             seedOrderState(order)
@@ -111,29 +111,18 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             const payload = order.buildPayload()
 
             expect(payload.guest_count).toBe(2)
+            expect(payload.package_id).toBe(50)
             expect(payload.items).toHaveLength(2)
 
-            // Package item
-            const pkg = payload.items[0]
-            expect(pkg.menu_id).toBe(50)
-            expect(pkg.name).toBe("Yakiniku Combo")
-            expect(pkg.is_package).toBe(true)
-            expect(Array.isArray(pkg.modifiers)).toBe(true)
-            expect(pkg.modifiers).toHaveLength(1)
-            expect(pkg.modifiers[0].menu_id).toBe(10)
-            expect(pkg.modifiers[0].quantity).toBe(1)
-
-            // AddOn item
-            const addon = payload.items[1]
-            expect(addon.menu_id).toBe(20)
-            expect(addon.name).toBe("Caesar Salad")
-            expect(addon.is_package).toBe(false)
-            expect(addon.modifiers).toEqual([])
-            expect(addon.quantity).toBe(2)
+            const meat = payload.items.find(i => i.menu_id === 10)
+            const side = payload.items.find(i => i.menu_id === 20)
+            expect(meat?.quantity).toBe(1)
+            expect(side?.quantity).toBe(2)
         })
 
         it("throws \"Invalid items\" when cart is empty and no package id", () => {
             const order = useOrderStore()
+            order.setPackage({ ...PACKAGE } as Package)
             order.setGuestCount(2)
             order.clearCart()
             expect(() => order.buildPayload()).toThrow("Invalid items")
@@ -148,13 +137,13 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             expect(payload.guest_count).toBe(2)
         })
 
-        it("throws \"must have at least one modifier\" when package has no meat items", () => {
+        it("allows non-meat menu rows and leaves inclusion/pricing to server", () => {
             const order = useOrderStore()
             order.setPackage({ ...PACKAGE } as Package)
             order.setGuestCount(2)
-            // Only a side — no meat category item → modifiers will be []
             order.setCartItems([{ ...SIDE_ITEM }] as CartItem[])
-            expect(() => order.buildPayload()).toThrow("must have at least one modifier")
+            const payload = order.buildPayload()
+            expect(payload.items).toEqual([{ menu_id: 20, quantity: 2 }])
         })
     })
 
@@ -179,16 +168,13 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
                 "/api/devices/create-order",
                 expect.objectContaining({
                     guest_count: 2,
+                    package_id: 50,
                     items: expect.arrayContaining([
-                        expect.objectContaining({ is_package: true, modifiers: expect.any(Array) }),
+                        expect.objectContaining({ menu_id: 10, quantity: 1 }),
                     ]),
                 }),
                 expect.objectContaining({ headers: expect.objectContaining({ "X-Idempotency-Key": expect.any(String) }) })
             )
-
-            // table_id injected from deviceStore
-            const callBody = mockPost.mock.calls[0][1]
-            expect(callBody.table_id).toBe(1)
 
             // Store state — polling tick runs before this line and normalises currentOrder to { order: {...} }
             expect(order.hasPlacedOrder).toBe(true)
@@ -205,10 +191,11 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             order.stopOrderPolling()
         })
 
-        it("blocks a second order submission if hasPlacedOrder is true", async () => {
+        it("blocks a second order submission when initial order is server-confirmed", async () => {
             const order = useOrderStore()
             seedDevice()
             order.setHasPlacedOrder(true)
+            order.setCurrentOrder(API_ORDER_RESP as any)
 
             await expect(order.submitOrder()).rejects.toThrow("initial order has already been placed")
         })
@@ -218,7 +205,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
     // 3. submitRefill — payload correctness (name field fix verification)
     // =========================================================================
     describe("submitRefill — payload correctness", () => {
-        it("sends items with menu_id, name, quantity, note to /api/order/{orderId}/refill", async () => {
+        it("sends order_id and normalized items to /api/order/{orderId}/refill", async () => {
             const order = useOrderStore()
             seedDevice()
 
@@ -237,9 +224,10 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             expect(mockPost).toHaveBeenCalledWith(
                 `/api/order/${API_ORDER_RESP.order.order_id}/refill`,
                 {
+                    order_id: API_ORDER_RESP.order.order_id,
                     items: [
-                        { menu_id: 30, name: "Sliced Beef", quantity: 2, note: "Refill" },
-                        { menu_id: 31, name: "Garlic Rice", quantity: 1, note: "Refill" },
+                        { menu_id: 30, quantity: 2 },
+                        { menu_id: 31, quantity: 1 },
                     ],
                 },
                 expect.objectContaining({ headers: expect.objectContaining({ "X-Idempotency-Key": expect.any(String) }) })
@@ -251,13 +239,16 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             expect(order.getHistory().length).toBeGreaterThan(0)
         })
 
-        it("includes custom note when refill item has a note property", async () => {
+        it("normalizes duplicate refill rows by menu_id", async () => {
             const order = useOrderStore()
             seedDevice()
             order.setHasPlacedOrder(true)
             order.setCurrentOrder(API_ORDER_RESP as any)
             order.setIsRefillMode(true)
-            order.setRefillItems([{ id: 30, name: "Sliced Beef", price: 0, quantity: 1, category: "meats", note: "No sauce" }] as CartItem[])
+            order.setRefillItems([
+                { id: 30, name: "Sliced Beef", price: 0, quantity: 1, category: "meats", note: "No sauce" },
+                { id: 30, name: "Sliced Beef", price: 0, quantity: 2, category: "meats", note: "No sauce" },
+            ] as CartItem[])
 
             mockGet.mockResolvedValueOnce({ data: { order: { ...API_ORDER_RESP.order, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: { success: true } })
@@ -265,7 +256,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             await order.submitRefill()
 
             const sentItems = mockPost.mock.calls[0][1].items
-            expect(sentItems[0].note).toBe("No sauce")
+            expect(sentItems).toEqual([{ menu_id: 30, quantity: 3 }])
         })
 
         it("throws if no existing order (guard against stale state)", async () => {
@@ -503,7 +494,8 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             // Verify refill called correct URL with name field present
             const refillCall = mockPost.mock.calls[1]
             expect(refillCall[0]).toBe("/api/order/19561/refill")
-            expect(refillCall[1].items[0].name).toBe("Sliced Beef")
+            expect(refillCall[1].order_id).toBe(19561)
+            expect(refillCall[1].items[0]).toEqual({ menu_id: 30, quantity: 2 })
 
             // Step 3: session teardown
             try { localStorage.setItem("session_active", "1") } catch (_) {}

@@ -24,34 +24,6 @@
             <div class="absolute inset-0" style="background: radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, rgba(0,0,0,0.45) 100%)" />
         </div>
 
-        <!-- Subtle Branded Accent (bottom, decorative) -->
-        <div class="absolute bottom-0 left-0 right-0 z-0 pointer-events-none flex justify-center" aria-hidden="true">
-            <svg
-                width="320"
-                height="64"
-                viewBox="0 0 320 64"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-[80vw] max-w-xl h-16 opacity-20"
-            >
-                <ellipse cx="160" cy="32" rx="150" ry="20" fill="url(#accentGradient)" />
-                <defs>
-                    <linearGradient
-                        id="accentGradient"
-                        x1="0"
-                        y1="32"
-                        x2="320"
-                        y2="32"
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <stop stop-color="#F6B56D" stop-opacity="0.5" />
-                        <stop offset="0.5" stop-color="#F6B56D" stop-opacity="0.2" />
-                        <stop offset="1" stop-color="#F6B56D" stop-opacity="0.5" />
-                    </linearGradient>
-                </defs>
-            </svg>
-        </div>
-
         <!-- Content Layer -->
         <div class="relative z-10 flex flex-col h-full items-center justify-center px-6">
             <!-- PIN modal -->
@@ -65,7 +37,7 @@
                             Settings
                         </h3>
                         <p class="text-sm text-white/60 mt-2">
-                            Enter your PIN
+                            {{ pinPrompt }}
                         </p>
                         <p v-if="pinNotice" class="text-xs text-primary/80 mt-2">
                             {{ pinNotice }}
@@ -115,8 +87,8 @@
                         <FlameButton variant="secondary" size="md" class="flex-1" @click="closePinModal">
                             Cancel
                         </FlameButton>
-                        <FlameButton variant="primary" size="md" class="flex-1" @click="verifyPin">
-                            Verify
+                        <FlameButton variant="primary" size="md" class="flex-1" @click="submitPin">
+                            {{ pinActionLabel }}
                         </FlameButton>
                     </div>
                 </div>
@@ -132,9 +104,6 @@
                             isWebSocketConnected ? 'bg-success animate-pulse' : 'bg-error'
                         ]"
                     />
-                    <span class="text-xs font-medium transition-colors" :class="isWebSocketConnected ? 'text-success' : 'text-error'">
-                        {{ isWebSocketConnected ? 'Online' : 'Offline' }}
-                    </span>
                 </div>
 
                 <!-- Settings Button -->
@@ -191,7 +160,6 @@
                             aria-label="Begin your order"
                             @click="start"
                         >
-                            <UtensilsCrossed :size="20" stroke-width="2.5" class="flex-shrink-0" />
                             <span>Begin the Feast</span>
                         </button>
                     </div>
@@ -219,22 +187,23 @@
 </template>
 
 <script setup lang="ts">
-import { Settings, UtensilsCrossed } from "lucide-vue-next"
+import { Settings } from "lucide-vue-next"
 import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
-import { useSessionStore } from "~/stores/Session"
-import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useMenuStore } from "~/stores/Menu"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
-const session = useSessionStore()
+
+definePageMeta({
+    layout: "kiosk"
+})
+
 const deviceStore = useDeviceStore()
 const menuStore = useMenuStore()
 const router = useRouter()
 const route = useRoute()
-const { channelStatus } = useBroadcasts()
 const { isOnline } = useNetworkStatus()
 
 // On the welcome screen, show real network connectivity — not WebSocket subscription
@@ -260,7 +229,9 @@ const PIN_STORAGE_KEY = "settings.pin"
 const SETTINGS_PIN_AUTH_KEY = "settings.pin.auth_until"
 const SETTINGS_PIN_AUTH_WINDOW_MS = 5 * 60 * 1000
 const storedPin = ref<string | null>(null)
-const DEFAULT_PIN = "0711"
+const isPinSetupMode = ref(false)
+const pendingPin = ref("")
+const pinSetupStep = ref<"create" | "confirm">("create")
 
 onMounted(async () => {
     const recovery = await recoverActiveOrderState("index")
@@ -279,7 +250,6 @@ onMounted(async () => {
         }
 
         if (!canResumeActiveOrder || !unref(deviceStore.isAuthenticated)) {
-            console.warn("[⚠️ Resume Blocked] Active order found but device is not authenticated; staying on welcome page")
             return
         }
 
@@ -301,24 +271,24 @@ onMounted(async () => {
 })
 
 const start = () => {
-    const timestamp = new Date().toISOString()
-    console.log(`[🎬 Session START] Welcome screen → Start button clicked at ${timestamp}`)
-
     if (!unref(deviceStore.isAuthenticated)) {
-        console.log(`[⚠️ Device Auth Failed] Prompting PIN for Settings at ${timestamp}`)
         openSettings()
         return
     }
 
-    console.log(`[✅ Device Ready] Starting session at ${timestamp}`)
-    session.start()
-    router.replace("/order/start")
+    router.replace("/order/start").catch(() => {})
 }
 
 const openSettings = (noticeOrEvent?: string | PointerEvent) => {
     pinNotice.value = typeof noticeOrEvent === "string" ? noticeOrEvent : ""
     pinError.value = ""
-    storedPin.value = (typeof localStorage !== "undefined" && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+    storedPin.value = typeof localStorage !== "undefined" ? localStorage.getItem(PIN_STORAGE_KEY) : null
+    isPinSetupMode.value = !storedPin.value
+    pendingPin.value = ""
+    pinSetupStep.value = "create"
+    if (isPinSetupMode.value && !pinNotice.value) {
+        pinNotice.value = "Create a settings PIN before opening tablet settings."
+    }
     showPinModal.value = true
 }
 
@@ -327,24 +297,84 @@ const closePinModal = () => {
     pinInput.value = ""
     pinError.value = ""
     pinNotice.value = ""
+    pendingPin.value = ""
+    pinSetupStep.value = "create"
+    isPinSetupMode.value = false
+}
+
+const grantSettingsAccess = () => {
+    if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(SETTINGS_PIN_AUTH_KEY, String(Date.now() + SETTINGS_PIN_AUTH_WINDOW_MS))
+    }
+    closePinModal()
+    router.push("/settings")
+}
+
+const setupPin = () => {
+    pinError.value = ""
+    if (pinInput.value.length < 4) {
+        pinError.value = "PIN must be at least 4 digits"
+        return
+    }
+
+    if (pinSetupStep.value === "create") {
+        pendingPin.value = pinInput.value
+        pinInput.value = ""
+        pinSetupStep.value = "confirm"
+        pinNotice.value = "Re-enter the same PIN to confirm."
+        return
+    }
+
+    if (pinInput.value !== pendingPin.value) {
+        pinInput.value = ""
+        pinSetupStep.value = "create"
+        pendingPin.value = ""
+        pinNotice.value = "Create a settings PIN before opening tablet settings."
+        pinError.value = "PINs did not match. Try again."
+        return
+    }
+
+    if (typeof localStorage !== "undefined") {
+        localStorage.setItem(PIN_STORAGE_KEY, pendingPin.value)
+    }
+    storedPin.value = pendingPin.value
+    grantSettingsAccess()
 }
 
 const verifyPin = () => {
     pinError.value = ""
-    storedPin.value = (typeof localStorage !== "undefined" && localStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN
+    storedPin.value = typeof localStorage !== "undefined" ? localStorage.getItem(PIN_STORAGE_KEY) : null
+
+    if (!storedPin.value) {
+        isPinSetupMode.value = true
+        setupPin()
+        return
+    }
 
     if (pinInput.value === storedPin.value) {
-        if (typeof sessionStorage !== "undefined") {
-            sessionStorage.setItem(SETTINGS_PIN_AUTH_KEY, String(Date.now() + SETTINGS_PIN_AUTH_WINDOW_MS))
-        }
-        closePinModal()
-        router.push("/settings")
+        grantSettingsAccess()
         return
     }
     pinError.value = "Incorrect PIN"
 }
 
+const submitPin = () => {
+    if (isPinSetupMode.value) {
+        setupPin()
+        return
+    }
+    verifyPin()
+}
+
 const maskedPin = computed(() => "•".repeat(pinInput.value.length))
+const pinPrompt = computed(() => {
+    if (!isPinSetupMode.value) { return "Enter your PIN" }
+    return pinSetupStep.value === "confirm" ? "Confirm your new PIN" : "Create a new PIN"
+})
+const pinActionLabel = computed(() => {
+    if (!isPinSetupMode.value) { return "Verify" }
+    return pinSetupStep.value === "confirm" ? "Save" : "Next"
+})
 const MAX_PIN_LENGTH = 6
 const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 const appendDigit = (d: string) => {

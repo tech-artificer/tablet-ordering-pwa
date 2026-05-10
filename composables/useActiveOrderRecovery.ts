@@ -5,6 +5,27 @@ import { logger } from "~/utils/logger"
 
 const TERMINAL_STATUSES = new Set(["completed", "cancelled", "voided"])
 
+function normalizeCurrentOrder (raw: any): any {
+    if (!raw) { return null }
+    return (raw.order ?? raw) as any
+}
+
+export function shouldAttemptActiveOrderRecovery () {
+    const orderStore = useOrderStore()
+    const sessionStore = useSessionStore()
+
+    const orderObj = normalizeCurrentOrder(orderStore.getCurrentOrder())
+
+    return Boolean(
+        sessionStore.getOrderId() ||
+        orderStore.hasPlacedOrder ||
+        orderStore.isRefillMode ||
+        orderStore.currentOrder ||
+        orderObj?.order_id ||
+        orderObj?.id
+    )
+}
+
 export async function recoverActiveOrderState (source: string = "unknown") {
     const orderStore = useOrderStore()
     const sessionEndStore = useSessionEndStore()
@@ -16,8 +37,7 @@ export async function recoverActiveOrderState (source: string = "unknown") {
         logger.warn(`[ActiveOrderRecovery:${source}] initializeFromSession failed`, error)
     }
 
-    const orderResp = orderStore.getCurrentOrder()
-    const orderObj = ((orderResp?.order || orderResp) as any) || null
+    const orderObj = normalizeCurrentOrder(orderStore.getCurrentOrder())
     const orderId = orderObj?.order_id || orderObj?.id || sessionStore.getOrderId()
     const packageId = Number(
         orderStore.getPackage?.value?.id ||

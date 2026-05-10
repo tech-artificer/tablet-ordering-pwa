@@ -28,7 +28,16 @@ export function resolveReverbSocketConfig (
     const configuredPort = Number(config.port ?? 0)
     const configuredScheme = String(config.scheme ?? "http").toLowerCase()
 
-    const host = configuredHost || browserHost
+    // A bare single-label hostname (no dots, not "localhost") is almost certainly
+    // a Docker/Kubernetes service name leaking through from the API container's
+    // internal env (e.g. REVERB_HOST=reverb). Browsers can't resolve those, so
+    // fall back to the hostname the PWA itself was loaded from.
+    const isLikelyInternalName =
+        configuredHost.length > 0 &&
+        !configuredHost.includes(".") &&
+        configuredHost !== "localhost"
+
+    const host = (configuredHost && !isLikelyInternalName) ? configuredHost : browserHost
     // Use the explicitly configured port when provided.
     // Do NOT fall back to the browser's current port when the configured port is 443/80 —
     // the tablet PWA lives on port 4443 while Reverb is on port 443; substituting the

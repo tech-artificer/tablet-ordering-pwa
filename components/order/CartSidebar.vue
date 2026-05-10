@@ -4,12 +4,10 @@ import { ElBadge, ElEmpty } from "element-plus"
 import { RefreshCw, Clock, ChefHat, CheckCircle, AlertCircle, Flame, X } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
 import type { Package, CartItem } from "../../types"
-import { useDeviceStore } from "../../stores/Device"
 import { useSessionStore } from "../../stores/Session"
 import { useOrderStore } from "../../stores/Order"
 import { logger } from "../../utils/logger"
 
-const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()
 const orderStore = useOrderStore()
 
@@ -42,26 +40,54 @@ const hasPackage = computed(() => Boolean(
     (props.selectedPackage && (props.selectedPackage as any).id) ||
   ((orderStore.package as any)?.id)
 ))
+const hasLiveOrderReference = computed(() => {
+    const currentOrder = (orderStore.getCurrentOrder() as any)?.order || orderStore.getCurrentOrder()
+    return Boolean(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id)
+})
+const hasSubmittedOrder = computed(() => Boolean(props.hasPlacedOrder && hasLiveOrderReference.value))
 const hasCartItems = computed(() => Array.isArray(props.cartItems) && props.cartItems.length > 0 && props.cartItems.some((i: any) => Number(i.quantity) > 0))
-const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => i?.category === "meats" && Number(i.quantity) > 0))
+const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => {
+    const category = String(i?.category || "").toLowerCase()
+    return (category === "meats" || category === "meat" || category.includes("meat")) && Number(i.quantity) > 0
+}))
 const hasGuestCount = computed(() => Number(props.guestCount) >= 2)
-const hasTableAssigned = computed(() => {
-    const tableData = deviceStore.table?.value || deviceStore.table
-    return Boolean(
-        tableData &&
-    (
-        (tableData as any).id || (tableData as any).id === 0 ||
-      (tableData as any).name
-    )
-    )
+
+const submitBlockers = computed(() => {
+    const blockers: string[] = []
+
+    if (orderStore.isSubmitting) {
+        blockers.push("Order submission already in progress")
+        return blockers
+    }
+
+    if (hasSubmittedOrder.value && !props.isRefillMode) {
+        blockers.push("Initial order already placed")
+        return blockers
+    }
+
+    if (!hasGuestCount.value) {
+        blockers.push("Guest count must be at least 2")
+    }
+
+    if (props.isRefillMode) {
+        if (!hasCartItems.value) {
+            blockers.push("Add at least one refill item")
+        }
+        return blockers
+    }
+
+    if (!hasPackage.value) {
+        blockers.push("Select a package")
+    }
+
+    if (!hasMeatSelection.value) {
+        blockers.push("Select at least one meat")
+    }
+
+    return blockers
 })
 
-const canSubmit = computed(() => {
-    if (orderStore.isSubmitting) { return false }
-    if (orderStore.hasPlacedOrder && !props.isRefillMode) { return false }
-    if (props.isRefillMode) { return hasCartItems.value && hasGuestCount.value && hasTableAssigned.value }
-    return hasPackage.value && hasMeatSelection.value && hasGuestCount.value && hasTableAssigned.value
-})
+const canSubmit = computed(() => submitBlockers.value.length === 0)
 
 // Order status helpers
 const orderStatus = computed(() => {
@@ -133,7 +159,7 @@ const orderGuestCount = computed(() => {
 })
 
 const displayedGuestCount = computed(() => {
-    return orderStore.hasPlacedOrder ? orderGuestCount.value : Number(props.guestCount)
+    return hasSubmittedOrder.value ? orderGuestCount.value : Number(props.guestCount)
 })
 
 const displayOrderId = computed(() => {
@@ -150,13 +176,18 @@ const removeItem = (itemId: number) => {
     emit("removeItem", itemId)
 }
 
+const blockedSubmitReason = computed(() => submitBlockers.value[0] || "")
+
 const submitOrder = () => {
     if (orderStore.isSubmitting) {
         logger.warn("CartSidebar submitOrder blocked: submission already in progress")
         return
     }
     if (!canSubmit.value) {
-        logger.warn("CartSidebar submitOrder blocked: cannot submit in current state")
+        logger.warn("CartSidebar submitOrder blocked", {
+            blockers: submitBlockers.value,
+            isRefillMode: Boolean(props.isRefillMode),
+        })
         return
     }
     logger.debug("CartSidebar submitOrder clicked")
@@ -165,9 +196,7 @@ const submitOrder = () => {
 </script>
 
 <template>
-    <div
-        class="w-80 flex-shrink-0 text-white bg-[#111111] border-l border-white/[0.07] flex flex-col shadow-[-8px_0_32px_rgba(0,0,0,0.5)] relative z-20"
-    >
+    <div class="h-full text-white bg-[#111111] flex flex-col">
         <!-- ─── Summary Header ──────────────────────────────────── -->
         <div class="px-5 pt-5 pb-3 border-b border-white/[0.07]">
             <!-- Label -->
@@ -199,7 +228,7 @@ const submitOrder = () => {
         <!-- Content Area -->
         <div class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
             <!-- POST-ORDER: Show ordered items (read-only) -->
-            <template v-if="orderStore.hasPlacedOrder && !isRefillMode">
+            <template v-if="hasSubmittedOrder && !isRefillMode">
                 <!-- Order Status Badge -->
                 <div
                     :class="['rounded-xl border px-3 py-2.5 mb-1 flex items-center justify-between gap-2', statusConfig.bgColor]"
@@ -364,7 +393,7 @@ const submitOrder = () => {
             <!-- Price Breakdown (only in normal mode) -->
             <div v-if="!isRefillMode" class="space-y-1 text-white text-sm">
                 <!-- After order placed: use server response values -->
-                <template v-if="orderStore.hasPlacedOrder && orderTotal > 0">
+                <template v-if="hasSubmittedOrder && orderTotal > 0">
                     <div class="flex justify-between text-white/60">
                         <span>Subtotal</span>
                         <span>{{ formatCurrency(orderSubtotal) }}</span>
@@ -414,10 +443,19 @@ const submitOrder = () => {
 
             <!-- Action Buttons -->
             <div class="space-y-2">
+                <p
+                    v-if="!canSubmit && !hasSubmittedOrder"
+                    class="text-[11px] text-warning font-medium px-1"
+                    role="status"
+                    aria-live="polite"
+                >
+                    {{ blockedSubmitReason }}
+                </p>
+
                 <!-- Inline countdown widget — replaces Place Order button while counting down -->
                 <Transition name="count-swap" mode="out-in">
                     <div
-                        v-if="isCountingDown && !orderStore.hasPlacedOrder"
+                        v-if="isCountingDown && !hasSubmittedOrder"
                         key="countdown"
                         class="w-full rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3"
                     >
@@ -446,10 +484,10 @@ const submitOrder = () => {
 
                     <!-- Place Order Button (before order placed, not counting down) -->
                     <button
-                        v-else-if="!orderStore.hasPlacedOrder"
+                        v-else-if="!hasSubmittedOrder"
                         key="place-order"
                         :disabled="!canSubmit"
-                        :title="!canSubmit ? 'Select package, guests, and items to place order' : ''"
+                        :title="!canSubmit ? blockedSubmitReason : ''"
                         :class="[
                             'w-full py-3.5 rounded-xl font-bold text-base transition-all duration-150 shadow-lg min-h-[52px] flex items-center justify-center gap-2',
                             canSubmit
@@ -468,7 +506,7 @@ const submitOrder = () => {
                         v-else-if="isRefillMode"
                         key="submit-refill"
                         :disabled="!canSubmit"
-                        :title="!canSubmit ? 'Add items and confirm guest count for refill' : ''"
+                        :title="!canSubmit ? blockedSubmitReason : ''"
                         :class="[
                             'w-full py-3.5 rounded-xl font-bold text-base transition-all duration-150 shadow-lg min-h-[52px] flex items-center justify-center gap-2',
                             canSubmit

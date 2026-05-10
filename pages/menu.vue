@@ -1,21 +1,38 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch } from "vue"
-import { Beef, UtensilsCrossed, CakeSlice, Wine, Paintbrush, Droplets, CreditCard, RefreshCw, CircleCheck } from "lucide-vue-next"
+import { Beef, UtensilsCrossed, CakeSlice, Wine } from "lucide-vue-next"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
-import { recoverActiveOrderState } from "../composables/useActiveOrderRecovery"
+import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../composables/useActiveOrderRecovery"
 import { useSessionStore } from "../stores/Session"
+import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
 import { notifyWarning, notifyInfo } from "../composables/useNotifier"
 import { useDeviceStore } from "../stores/Device"
 import { useMenuStore } from "../stores/Menu"
 import { useOrderStore } from "../stores/Order"
 
+definePageMeta({
+    layout: "kiosk"
+})
+
 const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const route = useRoute()
 const router = useRouter()
+
+const hasLiveOrderReference = (): boolean => {
+    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
+    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
+}
+
+const hasConfirmedInitialOrder = computed(() => {
+    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
+        return orderStore.hasConfirmedInitialOrder()
+    }
+    return Boolean(unref(orderStore.hasPlacedOrder) && hasLiveOrderReference())
+})
 
 onMounted(async () => {
     if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
@@ -26,7 +43,16 @@ onMounted(async () => {
         }
     }
 
-    const recovery = await recoverActiveOrderState("menu")
+    const recovery = shouldAttemptActiveOrderRecovery()
+        ? await recoverActiveOrderState("menu")
+        : {
+            hasActiveOrder: false,
+            isTerminal: false,
+            orderId: null,
+            packageId: null,
+            status: "",
+        }
+
     if (recovery.packageId && !route.query.packageId) {
         selectedPackageId.value = String(recovery.packageId)
     }
@@ -35,10 +61,15 @@ onMounted(async () => {
     const explicitMenuResume = route.query.resumeMenu === "1"
     const allowMenuAccess = hasPackageSelection || orderStore.isRefillMode || explicitMenuResume
 
-    // If an active order is recovered and not allowed to access menu, stay on menu page and enable refill mode
-    if (recovery.hasActiveOrder && !allowMenuAccess) {
+    // If an active order is recovered and not already in refill mode, enable refill mode.
+    // This must happen regardless of whether a package is known — the order is already
+    // placed, so the user should be building a refill, not a new initial order.
+    // Guard with !orderStore.isRefillMode to avoid clearing in-progress refill items.
+    if (recovery.hasActiveOrder && hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
         orderStore.toggleRefillMode(true)
-        notifyInfo("Active order recovered. Refill mode enabled.")
+        if (!allowMenuAccess) {
+            notifyInfo("Active order recovered. Refill mode enabled.")
+        }
     }
 
     // Log package details if an existing order is detected by middleware
@@ -80,15 +111,18 @@ onMounted(async () => {
     }
 
     // Cart recovery notification: if session is active with a placed order but cart is empty
-    // AND nothing has been submitted yet — the in-progress cart was likely lost
-    // (localStorage cleared / page reload mid-order). Do NOT fire if the user navigated
-    // back after a successful submission (submittedItems would be non-empty in that case).
+    // AND nothing has been submitted yet — the in-progress cart was likely lost.
+    // Do NOT fire if:
+    //   a) we just recovered an active order from the server (submittedItems will naturally
+    //      be empty because the server response does not carry display-friendly items), OR
+    //   b) the user navigated back after a successful submission (submittedItems non-empty).
     if (
+        !recovery.hasActiveOrder &&
         sessionStore.isActive &&
-    orderStore.hasPlacedOrder &&
-    !orderStore.isRefillMode &&
-    orderStore.getCartItems().length === 0 &&
-    orderStore.getSubmittedItems().length === 0
+        hasConfirmedInitialOrder.value &&
+        !orderStore.isRefillMode &&
+        orderStore.getCartItems().length === 0 &&
+        orderStore.getSubmittedItems().length === 0
     ) {
         notifyWarning("Your cart was cleared. Please re-add your items.")
         logger.warn("[Menu] Cart items missing for active session — notified user of cart loss")
@@ -140,15 +174,15 @@ watch(() => orderStore.package, (storePackage) => {
 })
 
 // Watch for order completion status changes and redirect when completed
+const { triggerSessionEnd } = useSessionEndFlow()
 watch(
     () => orderStore.getCurrentOrderStatus(),
     (newStatus) => {
         if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
-            setTimeout(() => {
-                sessionStore.end()
-                router.replace("/")
-            }, 2000)
+            triggerSessionEnd(newStatus as "completed" | "cancelled" | "voided", {
+                source: "watcher",
+            })
         }
     }
 )
@@ -165,31 +199,16 @@ const categories = [
     { id: "beverages", label: "Beverages", icon: Wine }
 ] as const
 
-// Support request buttons
-const supportRequests = [
-    { id: "clean", label: "Clean Table", icon: Paintbrush, type: "warning" },
-    { id: "water", label: "Water", icon: Droplets, type: "primary" },
-    { id: "billing", label: "Request Bill", icon: CreditCard, type: "success" },
-    { id: "refill", label: "Order Refill", icon: RefreshCw, type: "info" }
-]
-
 // Check if refills are available (order placed AND we have a valid order ID)
 const canRequestRefill = computed(() => {
-    const hasOrder = Boolean(unref(orderStore.hasPlacedOrder)) && !!unref(sessionStore.orderId)
-    return hasOrder
+    return hasConfirmedInitialOrder.value
 })
 
-const hasLiveOrderReference = (): boolean => {
-    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
-    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
-}
-
 const isBackButtonDisabled = (): boolean => {
+    // Back is blocked only when an active order exists (placed/recovered/live ref)
     return Boolean(
-        unref(sessionStore.isActive) ||
-        unref(orderStore.hasPlacedOrder) ||
-        hasLiveOrderReference() ||
-        unref(orderStore.isRefillMode)
+        hasConfirmedInitialOrder.value ||
+        hasLiveOrderReference()
     )
 }
 
@@ -260,7 +279,6 @@ const addOnsTotal = computed(() => orderStore.addOnsTotal)
 const taxAmount = computed(() => orderStore.taxAmount)
 const grandTotal = computed(() => orderStore.grandTotal)
 
-logger.debug(selectedPackage)
 const setCategory = (category: MenuCategory) => {
     activeCategory.value = category;
     // If user navigates to a category and data is empty, attempt to fetch it on-demand
@@ -327,8 +345,7 @@ const updateQuantity = (itemId: number, quantity: number) => {
     orderStore.updateQuantity(Number(itemId), Number(quantity))
 }
 
-// Assistance drawer state and sender
-const assistanceDrawerVisible = ref(false)
+const cartDrawerOpen = ref(false)
 const isSendingSupport = ref(false)
 const api = useApi()
 const deviceStore = useDeviceStore()
@@ -383,7 +400,7 @@ const getServiceTypeId = (type: string): number => {
 // Refill mode toggle
 const toggleRefillMode = () => {
     // Check if order has been placed AND confirmed by server
-    if (!orderStore.hasPlacedOrder) {
+    if (!hasConfirmedInitialOrder.value) {
         notifyWarning("Please place and confirm your order first before requesting refills")
         return
     }
@@ -436,196 +453,41 @@ const categoryError = computed(() => {
     }
 })
 
-// Order drawer state is now managed by the `OrderSummaryDrawer` component
-const isOrderDrawerOpen = ref(false)
-const openOrderDrawer = () => {
-    logger.debug("openOrderDrawer called")
-    if (orderStore.hasPlacedOrder && !orderStore.isRefillMode) {
-        notifyWarning("Order already placed — use Refill to add items")
-        logger.warn("Order already placed; only refill allowed")
-        return
-    }
-    // Safety guardrail: opening the drawer must never auto-submit.
-    // Submission is allowed only via explicit user confirm action.
-    cancelCountdown()
-    placeOrderError.value = null
-    isOrderDrawerOpen.value = true
-}
-
-// Cancel countdown whenever the confirmation drawer closes
-watch(isOrderDrawerOpen, (open) => {
-    if (!open) { cancelCountdown() }
-})
-
-// Page-managed submission UI state (countdown, submit, undo)
-const isCountingDown = ref(false)
-const countdown = ref(5)
-const isSubmitting = ref(false)
-const placeOrderError = ref<string | null>(null)
-const orderSnapshot = ref<any | null>(null)
-const showSuccessBanner = ref(false)
-const undoTimerId = ref<number | null>(null)
-
-function cancelCountdown () {
-    isCountingDown.value = false
-    countdown.value = 5
-}
-
-async function confirmOrder () {
-    logger.debug("confirmOrder called")
-    if (isSubmitting.value) { return }
-
-    // Defensive: re-sync package to the order store right before submission.
-    // Guards against the race where the store was cleared by a background resync
-    // but selectedPackage (from menuStore.packages) is still valid.
-    if (!orderStore.package && selectedPackage.value) {
-        logger.warn("[Menu] confirmOrder: package missing from order store — restoring before submission")
-        orderStore.setPackage(selectedPackage.value)
-    }
-
-    isSubmitting.value = true
-    placeOrderError.value = null
-
-    const currentCart = orderStore.isRefillMode ? orderStore.refillItems : orderStore.cartItems
-    orderSnapshot.value = {
-        cartItems: JSON.parse(JSON.stringify(currentCart)),
-        guestCount: Number(orderStore.guestCount),
-        isRefill: orderStore.isRefillMode
-    }
-    try { sessionStorage.setItem("orderSnapshot", JSON.stringify(orderSnapshot.value)) } catch (e) { }
-
-    try {
-        if (orderStore.isRefillMode) {
-            // Submit refill order
-            await orderStore.submitRefill()
-            // ElMessage.success('Refill order placed successfully!')
-        } else {
-            // Submit regular order
-            const payload = orderStore.buildPayload()
-            logger.debug("Order Payload:", payload)
-            await orderStore.submitOrder(payload)
-            // ElMessage.success('Order placed successfully!')
-        }
-
-        isSubmitting.value = false
-        isCountingDown.value = false
-        isOrderDrawerOpen.value = false
-
-        showSuccessBanner.value = true
-        try { sessionStorage.setItem("orderSnapshot", JSON.stringify(orderSnapshot.value)) } catch (e) { }
-        undoTimerId.value = window.setTimeout(() => {
-            showSuccessBanner.value = false
-            orderSnapshot.value = null
-            try { sessionStorage.removeItem("orderSnapshot") } catch (e) { }
-            undoTimerId.value = null
-        }, 5000)
-    } catch (err: any) {
-        isSubmitting.value = false
-        isCountingDown.value = false
-        placeOrderError.value = err?.message || String(err)
-    }
-}
 </script>
 
 <template>
     <NuxtErrorBoundary @error="(e: Error) => { logger.error('[Menu] Uncaught page error:', e) }">
         <div class="flex h-screen bg-app-grid text-white">
             <!-- Main Content Area -->
-            <div class="flex-1 flex flex-col overflow-hidden">
+            <div class="flex flex-col overflow-hidden w-full">
                 <!-- ─── Header Bar ──────────────────────────────────────────── -->
-                <div
-                    class="flex items-center justify-between gap-4 px-4 py-3 border-b border-white/[0.07]"
-                    style="background: rgba(15,15,15,0.95); backdrop-filter: blur(12px);"
-                >
-                    <!-- Left: Back + title -->
-                    <div class="flex items-center gap-3 min-w-0">
-                        <button
-                            :disabled="isBackButtonDisabled()"
-                            :aria-disabled="isBackButtonDisabled()"
-                            class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/[0.07] border border-white/10 flex items-center justify-center transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/40"
-                            :class="isBackButtonDisabled()
-                                ? 'text-white/25 cursor-not-allowed'
-                                : 'text-white/70 hover:text-white hover:bg-white/15 active:scale-95'"
-                            aria-label="Go back"
-                            @click="handleBackButtonClick"
-                        >
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        <div class="min-w-0">
-                            <p class="text-white font-bold text-base leading-tight truncate">
-                                {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill' }}
-                            </p>
-                            <p class="text-white/35 text-[10px] uppercase tracking-[0.15em] font-semibold leading-tight">
-                                {{ selectedPackage ? (selectedPackage as any).description || 'Korean BBQ Selection' : 'Korean BBQ' }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Right: Package pill + status -->
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <!-- Table pill -->
-                        <div class="hidden sm:flex items-center gap-1.5 bg-white/[0.05] rounded-full px-3 py-1 border border-white/[0.07]">
-                            <svg
-                                class="w-3 h-3 text-white/35"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                aria-hidden="true"
-                            ><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg>
-                            <span class="text-white/55 text-[11px] font-medium">
-                                {{ (deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'Table' }}
-                            </span>
-                        </div>
-
-                        <!-- Package name pill -->
-                        <div v-if="selectedPackage" class="flex flex-col items-end">
-                            <span class="text-white/30 text-[9px] uppercase tracking-[0.18em] font-bold leading-none mb-0.5">Package</span>
-                            <span class="text-primary font-bold text-sm leading-tight truncate max-w-[130px]">{{ selectedPackage.name }}</span>
-                        </div>
-
-                        <!-- Order placed pill -->
-                        <div
-                            v-if="orderStore.hasPlacedOrder"
-                            class="flex items-center gap-1.5 bg-success/15 border border-success/25 rounded-full px-2.5 py-1"
-                        >
-                            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse flex-shrink-0" />
-                            <span class="text-success text-[10px] font-bold uppercase tracking-wide">Live</span>
-                        </div>
-                    </div>
-                </div>
+                <menu-header
+                    :selected-package="selectedPackage"
+                    :table-name="(deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill'"
+                    :has-placed-order="hasConfirmedInitialOrder"
+                    :is-back-disabled="isBackButtonDisabled()"
+                    :cart-count="unref(orderStore.activeCart).length"
+                    @back="handleBackButtonClick"
+                    @open-cart="cartDrawerOpen = true"
+                />
 
                 <!-- Category Filter Tabs -->
                 <div class="sticky top-0 z-10">
-                    <div class="max-w-7xl mx-auto">
+                    <div>
                         <!-- Refill Mode Indicator -->
-                        <div v-if="orderStore.isRefillMode" class="bg-success/20 border-b border-success/30 px-6 py-3">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <RefreshCw :size="24" :stroke-width="2" class="text-success" />
-                                    <div>
-                                        <p class="font-bold text-success">
-                                            Refill Mode Active
-                                        </p>
-                                        <p class="text-sm text-success/80">
-                                            Only unlimited items available (Meats &amp; Sides)
-                                        </p>
-                                    </div>
-                                </div>
-                                <refill-button
-                                    :has-placed-order="orderStore.hasPlacedOrder"
-                                    :is-refill-mode="orderStore.isRefillMode"
-                                    @toggle-refill-mode="toggleRefillMode"
-                                />
-                            </div>
-                        </div>
+                        <refill-mode-banner
+                            v-if="orderStore.isRefillMode"
+                            :has-placed-order="hasConfirmedInitialOrder"
+                            :is-refill-mode="orderStore.isRefillMode"
+                            @toggle-refill-mode="toggleRefillMode"
+                            @back-to-session="router.push('/order/in-session')"
+                        />
 
                         <menu-category-tabs
                             :categories="categories"
                             :active-category="activeCategory"
                             :sticky="true"
+                            :is-refill-mode="orderStore.isRefillMode"
                             @select="setCategory"
                         />
                     </div>
@@ -633,7 +495,7 @@ async function confirmOrder () {
 
                 <!-- Content Area -->
                 <div class="flex-1 overflow-y-auto p-6">
-                    <div class="max-w-7xl mx-auto">
+                    <div>
                         <!-- Loading State -->
                         <div v-if="isLoading" class="space-y-6">
                             <SkeletonCard v-for="i in 3" :key="`skeleton-${i}`" />
@@ -682,8 +544,18 @@ async function confirmOrder () {
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Order Summary Sidebar -->
+        <!-- ─── Order Summary Drawer (slides in from right) ─── -->
+        <el-drawer
+            v-model="cartDrawerOpen"
+            direction="rtl"
+            :with-header="false"
+            :size="'min(460px, 33.333vw)'"
+            :modal="true"
+            :lock-scroll="false"
+            class="cart-drawer"
+        >
             <cart-sidebar
                 :selected-package="selectedPackage"
                 :guest-count="guestCount"
@@ -694,37 +566,36 @@ async function confirmOrder () {
                 :grand-total="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal"
                 :unlimited-item-cap="UNLIMITED_ITEM_CAP"
                 :is-refill-mode="orderStore.isRefillMode"
-                :has-placed-order="orderStore.hasPlacedOrder"
-                :is-counting-down="isCountingDown"
-                :countdown="countdown"
+                :has-placed-order="hasConfirmedInitialOrder"
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="openOrderDrawer"
-                @cancel-countdown="cancelCountdown"
+                @submit-order="() => { cartDrawerOpen = false; router.push('/order/review') }"
                 @toggle-refill-mode="toggleRefillMode"
             />
-        </div>
+        </el-drawer>
 
-        <!-- Order Confirmation Drawer (component) -->
-        <order-summary-drawer
-            v-model="isOrderDrawerOpen"
-            :selected-package="selectedPackage"
-            :guest-count="guestCount"
-            :cart-items="orderStore.activeCart"
-            :package-total="orderStore.isRefillMode ? 0 : packageTotal"
-            :add-ons-total="orderStore.isRefillMode ? orderStore.refillTotal : addOnsTotal"
-            :tax-amount="orderStore.isRefillMode ? 0 : taxAmount"
-            :grand-total="orderStore.isRefillMode ? orderStore.refillTotal : grandTotal"
-            :place-order-error="placeOrderError"
-            :is-submitting="isSubmitting || orderStore.isSubmitting"
-            :is-refill-mode="orderStore.isRefillMode"
-            :is-counting-down="isCountingDown"
-            :countdown="countdown"
-            @confirm="confirmOrder"
-            @cancel="() => { isOrderDrawerOpen = false; cancelCountdown() }"
-            @retry="confirmOrder"
-        />
+        <!-- Floating cart FAB — stays visible while scrolling -->
+        <button
+            class="fixed bottom-36 right-5 z-40 flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-secondary shadow-glow hover:opacity-90 active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label="Open order summary"
+            @click="cartDrawerOpen = true"
+        >
+            <svg
+                class="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+            >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span
+                v-if="unref(orderStore.activeCart).length > 0"
+                class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-secondary text-primary text-[10px] font-black flex items-center justify-center tabular-nums leading-none border-2 border-primary"
+            >{{ unref(orderStore.activeCart).length }}</span>
+        </button>
 
         <!-- Support FAB -->
         <support-fab @request-support="handleSupportRequest" />
@@ -737,34 +608,6 @@ async function confirmOrder () {
                 @toggle-refill-mode="toggleRefillMode"
             />
         </div>
-
-        <!-- Assistance Drawer (legacy - can be removed if not needed) -->
-        <assistance-drawer
-            v-model="assistanceDrawerVisible"
-            :support-requests="supportRequests"
-            :is-sending="isSendingSupport"
-            @send-request="handleSupportRequest"
-        />
-
-        <!-- Order Success Banner -->
-        <Transition name="slide-down">
-            <div
-                v-if="showSuccessBanner"
-                class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-            >
-                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce-once pointer-events-auto">
-                    <CircleCheck :size="28" :stroke-width="2" />
-                    <div>
-                        <p class="font-bold text-lg">
-                            {{ orderStore.isRefillMode ? 'Refill Order Placed!' : 'Order Placed Successfully!' }}
-                        </p>
-                        <p class="text-sm text-green-100">
-                            Your order is being prepared
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </Transition>
 
         <template #error="{ error, clearError }">
             <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
@@ -839,30 +682,16 @@ async function confirmOrder () {
   backdrop-filter: blur(12px);
 }
 
-/* Success banner transitions */
-.slide-down-enter-active {
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.slide-down-leave-active {
-  transition: all 0.3s ease-in;
-}
-.slide-down-enter-from {
-  transform: translateY(-100%);
-  opacity: 0;
-}
-.slide-down-leave-to {
-  transform: translateY(-50%);
-  opacity: 0;
+/* ─── Cart drawer ─────────────────────────────────── */
+:deep(.cart-drawer .el-drawer) {
+  --el-drawer-bg-color: #111111;
+  min-width: 360px;
+  max-width: 460px;
 }
 
-/* Bounce once animation */
-@keyframes bounce-once {
-  0%, 100% { transform: translateY(0); }
-  25% { transform: translateY(-8px); }
-  50% { transform: translateY(0); }
-  75% { transform: translateY(-4px); }
-}
-.animate-bounce-once {
-  animation: bounce-once 0.6s ease-out 0.2s;
+:deep(.cart-drawer .el-drawer__body) {
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 </style>

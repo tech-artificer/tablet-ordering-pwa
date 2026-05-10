@@ -26,12 +26,14 @@ declare const self: ServiceWorkerGlobalScope & {
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
-// Skip waiting so the new SW activates immediately on update
-self.addEventListener('install', () => {
-  self.skipWaiting()
-})
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
+})
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 // Navigation fallback: bind to the revisioned root app shell.
@@ -167,5 +169,12 @@ registerRoute(
     // setOrderCreated calls for normal online orders.
     plugins: [bgSyncPlugin],
   }),
+  'POST',
+)
+
+registerRoute(
+  ({ url, request }: { url: URL; request: Request }) =>
+    /\/api\/order\/\d+\/refill$/.test(url.pathname) && request.method === 'POST',
+  new NetworkOnly(),
   'POST',
 )

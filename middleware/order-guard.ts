@@ -42,6 +42,21 @@ export default defineNuxtRouteMiddleware((to, _from) => {
         return // Allow /menu access
     }
 
+    // /order/review route: requires package selection or an existing placed order
+    if (to.path === "/order/review") {
+        const packageIdFromStore = Number((orderStore.package as any)?.id || 0) || null
+        const hasPackage = !!packageIdFromStore
+        const currentOrder = (orderStore.currentOrder as any)?.order || orderStore.currentOrder
+        const hasOrderReference = !!(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id || orderStore.hasPlacedOrder)
+
+        if (!hasPackage && !hasOrderReference) {
+            logger.warn("\uD83D\uDEAB Route /order/review blocked: no package selected or active order")
+            return navigateTo("/order/packageSelection")
+        }
+
+        return
+    }
+
     // /order/in-session route: requires order to be submitted
     if (to.path === "/order/in-session") {
     // Guard 1: session must be active. A missing/expired session has no business
