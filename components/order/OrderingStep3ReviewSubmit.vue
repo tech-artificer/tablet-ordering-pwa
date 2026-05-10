@@ -312,7 +312,7 @@ async function submit (): Promise<void> {
                     <span class="text-sm text-text-muted">({{ itemCountDisplay }} {{ itemCountDisplay === 1 ? 'item' : 'items' }})</span>
                 </div>
 
-                <div v-if="displayItems.length > 0" class="space-y-3">
+                <div v-if="displayItems.length > 0" class="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
                     <div
                         v-for="(item, index) in displayItems"
                         :key="`item-${item?.id ?? index}`"
