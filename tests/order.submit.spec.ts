@@ -6,6 +6,7 @@ import { useDeviceStore } from "../stores/Device"
 import { useSessionStore } from "../stores/Session"
 import { useOrderStore } from "../stores/Order"
 import type { CartItem, Package } from "../types"
+import { ERROR_MENU_ITEM_UNAVAILABLE } from "../utils/errorCodes"
 
 if (typeof globalThis.localStorage === "undefined") {
     const storage: Record<string, string> = {}
@@ -21,12 +22,38 @@ if (typeof globalThis.localStorage === "undefined") {
 // Mock the composable that the store uses for API calls. Must be declared before importing the store.
 const mockPost = vi.fn()
 vi.mock("../composables/useApi", () => ({ useApi: () => ({ post: mockPost }) }))
+const mockLoadAllMenus = vi.fn()
+let mockPackages: any[] = []
+let mockSides: any[] = []
+let mockDesserts: any[] = []
+let mockBeverages: any[] = []
+let mockAlacartes: any[] = []
+let mockModifiers: any[] = []
+vi.mock("../stores/Menu", () => ({
+    useMenuStore: () => ({
+        loadAllMenus: mockLoadAllMenus,
+        get packages () { return mockPackages },
+        get sides () { return mockSides },
+        get desserts () { return mockDesserts },
+        get beverages () { return mockBeverages },
+        get alacartes () { return mockAlacartes },
+        get modifiers () { return mockModifiers },
+    })
+}))
 
 describe("stores/order - submitOrder", () => {
     beforeEach(() => {
         const pinia = createPinia()
         setActivePinia(pinia)
         mockPost.mockReset()
+        mockLoadAllMenus.mockReset()
+        mockLoadAllMenus.mockResolvedValue(undefined)
+        mockPackages = []
+        mockSides = []
+        mockDesserts = []
+        mockBeverages = []
+        mockAlacartes = []
+        mockModifiers = []
         // Provide a fake authenticated device to satisfy store validation
         const dsInstance = useDeviceStore()
         dsInstance.setToken("test-token")
@@ -99,5 +126,37 @@ describe("stores/order - submitOrder", () => {
 
         await expect(order.submitOrder()).rejects.toThrow("Order creation response missing body")
         expect(order.getCartItems().length).toBe(1)
+    })
+
+    it("handles MENU_ITEM_UNAVAILABLE by refreshing menus and removing unavailable cart items", async () => {
+        const order = useOrderStore()
+
+        order.setPackage({ id: 2, name: "Package", price: 50, is_taxable: false } as any)
+        order.setGuestCount(2)
+        order.setCartItems([
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
+            { id: 9999, name: "Stale Side", price: 1, quantity: 1, category: "sides", isUnlimited: false } as any,
+        ])
+
+        mockPackages = [{ id: 2 }]
+        mockSides = [{ id: 12 }]
+        mockPost.mockRejectedValueOnce({
+            response: {
+                status: 422,
+                data: {
+                    code: ERROR_MENU_ITEM_UNAVAILABLE,
+                    message: "One or more menu items are no longer available.",
+                },
+            },
+        })
+
+        await expect(order.submitOrder()).rejects.toMatchObject({
+            code: ERROR_MENU_ITEM_UNAVAILABLE,
+            message: "Some menu items are no longer available. We refreshed the menu. Please review your order again.",
+        })
+
+        expect(mockLoadAllMenus).toHaveBeenCalledWith(true)
+        expect(order.getCartItems().map(item => item.id)).toEqual([12])
+        expect((order.package as any)?.id).toBe(2)
     })
 })

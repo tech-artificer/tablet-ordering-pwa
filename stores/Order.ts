@@ -7,7 +7,9 @@ import { extractOrderId } from "../utils/orderHelpers"
 import { notifyBlockedAction } from "../composables/useNotifier"
 import type { CartItem, Package, MenuItem, SubmittedItem, OrderApiResponse, OrderPayload, OrderPayloadItem } from "../types"
 import { API_ENDPOINTS } from "../config/api"
+import { ERROR_MENU_ITEM_UNAVAILABLE } from "../utils/errorCodes"
 import { useDeviceStore } from "./Device"
+import { useMenuStore } from "./Menu"
 import { useSessionStore } from "./Session"
 import type { SessionEndReason } from "./SessionEnd"
 
@@ -36,6 +38,8 @@ type SubmitRefillOptions = {
     headers?: Record<string, string>
     idempotencyKey?: string
 }
+
+type MenuUnavailableError = Error & { code: string }
 
 export const useOrderStore = defineStore("order", () => {
     const state = reactive({
@@ -132,6 +136,34 @@ export const useOrderStore = defineStore("order", () => {
 
     function hasConfirmedInitialOrder (): boolean {
         return Boolean(state.hasPlacedOrder && hasServerBackedOrder())
+    }
+
+    function buildAvailableMenuIdSet (menuStore: ReturnType<typeof useMenuStore>): Set<number> {
+        const menuIds = new Set<number>()
+
+        const collectIds = (items: unknown[]) => {
+            items.forEach((item: any) => {
+                const id = Number(item?.id)
+                if (Number.isFinite(id) && id > 0) {
+                    menuIds.add(id)
+                }
+            })
+        }
+
+        collectIds(menuStore.packages || [])
+        collectIds(menuStore.sides || [])
+        collectIds(menuStore.desserts || [])
+        collectIds(menuStore.beverages || [])
+        collectIds(menuStore.alacartes || [])
+        collectIds(menuStore.modifiers || [])
+
+        return menuIds
+    }
+
+    function createMenuUnavailableError (): MenuUnavailableError {
+        const error = new Error("Some menu items are no longer available. We refreshed the menu. Please review your order again.") as MenuUnavailableError
+        error.code = ERROR_MENU_ITEM_UNAVAILABLE
+        return error
     }
 
     const validateOrderState = (source: string) => {
@@ -504,11 +536,36 @@ export const useOrderStore = defineStore("order", () => {
                 }
 
                 // Handle validation errors
+                if (error.response?.status === 422 && errorResponse?.code === ERROR_MENU_ITEM_UNAVAILABLE) {
+                    const menuStore = useMenuStore()
+
+                    try {
+                        await menuStore.loadAllMenus(true)
+                    } catch (refreshError) {
+                        logger.warn("Failed to refresh menus after MENU_ITEM_UNAVAILABLE", refreshError)
+                    }
+
+                    const validMenuIds = buildAvailableMenuIdSet(menuStore)
+                    state.cartItems = state.cartItems.filter(item => validMenuIds.has(Number(item.id)))
+                    state.refillItems = state.refillItems.filter(item => validMenuIds.has(Number(item.id)))
+
+                    const selectedPackageId = Number(state.package?.id ?? 0)
+                    if (selectedPackageId > 0 && !validMenuIds.has(selectedPackageId)) {
+                        state.package = null
+                    }
+
+                    throw createMenuUnavailableError()
+                }
+
                 if (error.response?.status === 422) {
                     const validationErrors = errorResponse?.errors
-                    logger.error("Validation errors:", validationErrors)
-                    const errorMessages = Object.values(validationErrors || {}).flat().join(", ")
-                    throw new Error(`Validation failed: ${errorMessages}`)
+                    if (validationErrors && Object.keys(validationErrors).length > 0) {
+                        logger.error("Validation errors:", validationErrors)
+                        const errorMessages = Object.values(validationErrors || {}).flat().join(", ")
+                        throw new Error(`Validation failed: ${errorMessages}`)
+                    }
+
+                    throw new Error(errorResponse?.message || "Order validation failed.")
                 }
 
                 // Handle active-order conflicts by resuming the existing order

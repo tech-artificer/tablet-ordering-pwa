@@ -338,7 +338,7 @@ export const useSessionStore = defineStore("session", () => {
             const menuStore = useMenuStore()
             try {
                 logger.info("[Menu Preload] Loading menus for quick response")
-                await menuStore.loadAllMenus()
+                await menuStore.loadAllMenus(true)
                 logger.info("[Menu Preloaded] Ready for ordering")
             } catch (e) {
                 logger.warn("[SessionStore] preload menus failed:", e)
