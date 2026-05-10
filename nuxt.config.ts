@@ -82,6 +82,21 @@ export default defineNuxtConfig({
         "@vueuse/motion/nuxt"
     ],
 
+    fonts: {
+        // Disable external CDN providers to avoid firewall blocks in CI/agent environments
+        providers: {
+            google: false,
+            bunny: false,
+            fontshare: false,
+            fontsource: false,
+        },
+        // Use only local/system fonts
+        defaults: {
+            styles: ["normal"],
+            subsets: ["latin"],
+        },
+    },
+
     components: [
         {
             path: "~/components",
