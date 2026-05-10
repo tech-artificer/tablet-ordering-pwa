@@ -48,9 +48,9 @@ onMounted(async () => {
 
     logger.info("[PackageSelection] Loading packages from API...")
     try {
-    // Respect cache — only fetch if stale or empty (welcome screen already preloads).
-    // Pass forceRefresh=false so a warm cache from index.vue is used immediately.
-        await menuStore.loadAllMenus(false)
+    // Force refresh at order start to avoid stale menu cache across new customer sessions.
+    // This ensures customers always see current Krypton menu data.
+        await menuStore.loadAllMenus(true)
         console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
         logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
     } catch (error: any) {
