@@ -21,7 +21,7 @@ const menus = ref<Menu[]>([
         category: "Meats",
         is_refillable: true,
         is_active: true,
-        items: menuStore.modifiers as any
+        items: [] as any
     }, {
         id: "sides",
         category: "Sides",

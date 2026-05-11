@@ -36,12 +36,6 @@ const hasConfirmedInitialOrder = computed(() => {
 onMounted(async () => {
     // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
     // No need to call loadAllMenus() here - data is already in Pinia state
-
-    // Package details are already preloaded at welcome screen
-    // If missing (rare edge case), error state will show with retry option
-    if (selectedPackageId.value && !menuStore.packageDetails[Number(selectedPackageId.value)]) {
-        logger.warn("[Menu] Package details not preloaded for:", selectedPackageId.value)
-    }
 })
 
 const resolveStoredPackageId = (): string | number | null => {
@@ -148,21 +142,14 @@ const getItemQuantity = (itemId: number) => {
     return orderStore.getCartItemQuantity(Number(itemId))
 }
 
-// Get meats from selected package allowed menus (from API)
+// Get meats from selected package modifiers
 const meats = computed(() => {
     if (!selectedPackageId.value) { return [] }
     const packageId = Number(selectedPackageId.value)
-    const packageDetails = menuStore.packageDetails[packageId]
-    // Primary: API-driven meats for this package
-    if (packageDetails && Array.isArray(packageDetails.allowed_menus?.meat) && packageDetails.allowed_menus.meat.length > 0) {
-        return packageDetails.allowed_menus.meat
-    }
-    // Fallback: legacy modifiers for this package
     const pkg = menuStore.packages.find(pkg => pkg.id === packageId)
     if (pkg?.modifiers && pkg.modifiers.length > 0) {
         return pkg.modifiers.flat()
     }
-    // If both missing, return empty array (UI will show 'No meats available')
     return []
 })
 
@@ -215,10 +202,7 @@ const reloadCategory = async () => {
     try {
         switch (category) {
         case "meats":
-            if (selectedPackageId.value) {
-                meatError.value = null
-                await menuStore.fetchPackageDetails(Number(selectedPackageId.value))
-            }
+            meatError.value = null
             break
         case "desserts":
             await menuStore.fetchDesserts()
@@ -380,7 +364,7 @@ const isLoading = computed((): boolean => {
     case "beverages":
         return Boolean(menuStore.isLoadingBeverages)
     default:
-        return Boolean(menuStore.isLoadingPackageDetails)
+        return Boolean(menuStore.isLoadingPackages)
     }
 })
 

@@ -25,13 +25,13 @@ export type OrderMode = "initial" | "refill"
 export type OrderServerStatus = "building" | "in-progress" | "completed" | "cancelled" | "voided" | string
 
 export interface OrderRound {
-    kind:          OrderRoundKind
-    number:        number               // 1 = initial, 2..n = refill #N-1
-    submittedAt:   string               // ISO timestamp from server (or client fallback)
-    items:         CartItem[]           // immutable snapshot at submit time
-    serverOrderId: number | null        // parent order id (same across all rounds for one order)
-    serverRefillId?: number | null      // refill-specific id when applicable
-    serverTotal:   number               // server-reported total for this round
+    kind: OrderRoundKind
+    number: number // 1 = initial, 2..n = refill #N-1
+    submittedAt: string // ISO timestamp from server (or client fallback)
+    items: CartItem[] // immutable snapshot at submit time
+    serverOrderId: number | null // parent order id (same across all rounds for one order)
+    serverRefillId?: number | null // refill-specific id when applicable
+    serverTotal: number // server-reported total for this round
 }
 
 // Module-level constant: cap on how many unlimited items can be added.
@@ -82,12 +82,12 @@ export const useOrderStore = defineStore("order", () => {
         pollingOrderId: null as string | null,
         error: null as string | null,
         // ─── New data model (see docs/DATA_MODEL.md). Dual-written during commit 1. ──
-        rounds:        [] as OrderRound[],
-        draft:         [] as CartItem[],
-        mode:          "initial" as OrderMode,
+        rounds: [] as OrderRound[],
+        draft: [] as CartItem[],
+        mode: "initial" as OrderMode,
         serverOrderId: null as number | null,
-        serverStatus:  "building" as OrderServerStatus,
-        serverTotal:   0 as number,
+        serverStatus: "building" as OrderServerStatus,
+        serverTotal: 0 as number,
     })
 
     let pollIntervalId: ReturnType<typeof setInterval> | null = null
@@ -115,12 +115,12 @@ export const useOrderStore = defineStore("order", () => {
             state.history = []
         }
         // New model — always reset alongside legacy fields.
-        state.rounds        = []
-        state.draft         = []
-        state.mode          = "initial"
+        state.rounds = []
+        state.draft = []
+        state.mode = "initial"
         state.serverOrderId = null
-        state.serverStatus  = "building"
-        state.serverTotal   = 0
+        state.serverStatus = "building"
+        state.serverTotal = 0
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -168,11 +168,11 @@ export const useOrderStore = defineStore("order", () => {
                 serverTotal: total,
             }
 
-            state.rounds        = [...state.rounds, round]
-            state.draft         = []
+            state.rounds = [...state.rounds, round]
+            state.draft = []
             state.serverOrderId = parentOrderId ?? state.serverOrderId
-            state.serverStatus  = String(orderObj?.status ?? respData?.status ?? state.serverStatus)
-            state.serverTotal   = total || state.serverTotal
+            state.serverStatus = String(orderObj?.status ?? respData?.status ?? state.serverStatus)
+            state.serverTotal = total || state.serverTotal
             // After the first successful submit, the order is "live" — any
             // future submission must use the refill endpoint.
             state.mode = "refill"
@@ -258,8 +258,6 @@ export const useOrderStore = defineStore("order", () => {
         collectIds(menuStore.sides || [])
         collectIds(menuStore.desserts || [])
         collectIds(menuStore.beverages || [])
-        collectIds(menuStore.alacartes || [])
-        collectIds(menuStore.modifiers || [])
 
         return menuIds
     }
