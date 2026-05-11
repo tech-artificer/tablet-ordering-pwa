@@ -326,7 +326,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const statusLabel = computed(() => STATUS_LABELS[orderStatus.value] ?? orderStatus.value)
 
-definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
+definePageMeta({ layout: "kiosk" })
 </script>
 
 <template>
