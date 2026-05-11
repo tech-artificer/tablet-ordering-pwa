@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useDeviceStore } from "~/stores/Device"
-import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
 import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useBroadcasts } from "~/composables/useBroadcasts"
@@ -12,23 +11,14 @@ import { logger } from "~/utils/logger"
 const router = useRouter()
 const nuxtApp = useNuxtApp()
 const deviceStore = useDeviceStore()
-const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
-const isUpdateApplyBlocked = computed(() =>
-    Boolean(sessionStore.isActive) || Boolean(orderStore.hasPlacedOrder) || Boolean(orderStore.isSubmitting)
-)
 const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
-const {
-    showUpdateBanner,
-    canApplyUpdate,
-    isApplyingUpdate,
-    updateError,
-    initializeAppUpdate,
-    applyUpdate,
-    disposeAppUpdate
-} = useAppUpdate({ isUpdateApplyBlocked })
+
+// Update system is now route-controlled (welcome screen + settings only)
+// See useAppUpdate.ts for new kiosk-safe API
+const { initializeAppUpdate, disposeAppUpdate } = useAppUpdate()
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 let gestureListenersAttached = false
@@ -233,13 +223,6 @@ onUnmounted(() => {
 <template>
     <div class="contents">
         <SplashScreen :visible="isLoading" />
-        <UpdateBanner
-            :visible="showUpdateBanner"
-            :disabled="!canApplyUpdate"
-            :is-applying="isApplyingUpdate"
-            :error-message="updateError"
-            @apply="applyUpdate"
-        />
 
         <NuxtLayout>
             <NuxtPage />

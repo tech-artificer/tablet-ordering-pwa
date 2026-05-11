@@ -7,7 +7,6 @@ import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
 import type { SubmittedItem } from "~/types"
 import { useApi } from "~/composables/useApi"
-import { useIdleDetector } from "~/composables/useIdleDetector"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 import { logger } from "~/utils/logger"
 
@@ -156,23 +155,8 @@ watch(orderStatus, (status) => {
     }
 }, { immediate: true })
 
-// ── Idle lock ─────────────────────────────────────────────────────────────────
-const showIdleWarning = ref(false)
-
-const { isWarning: idleWarning, start: startIdleDetector, stop: stopIdleDetector } = useIdleDetector({
-    onWarn () {
-        showIdleWarning.value = true
-    },
-    onExpire () {
-        showIdleWarning.value = false
-        logger.warn("[in-session] Idle timeout — ending session")
-        triggerSessionEnd("unknown", { source: "in-session" })
-    },
-})
-
-watch(idleWarning, (v) => {
-    if (!v) { showIdleWarning.value = false }
-})
+// Note: Session only ends when order is paid/voided/cancelled (handled by orderStatus watcher)
+// No idle timeout - customers can stay in session indefinitely until order is terminal
 
 // ── Navigation guards + lifecycle ─────────────────────────────────────────────
 onMounted(() => {
@@ -188,11 +172,9 @@ onMounted(() => {
     }
     updateCurrentTime()
     clockIntervalId = setInterval(updateCurrentTime, 1000)
-    startIdleDetector()
 })
 
 onUnmounted(() => {
-    stopIdleDetector()
     if (clockIntervalId) {
         clearInterval(clockIntervalId)
         clockIntervalId = null
@@ -502,26 +484,6 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                 <template #footer>
                     <ElButton :disabled="isSubmittingService" @click="showServiceModal = false">
                         Cancel
-                    </ElButton>
-                </template>
-            </ElDialog>
-
-            <!-- ── Idle Warning Modal ─────────────────────────────────────────── -->
-            <ElDialog
-                v-model="showIdleWarning"
-                title="Are you still there?"
-                width="360px"
-                align-center
-                :close-on-click-modal="false"
-                :show-close="false"
-                class="session-dialog"
-            >
-                <p class="text-center text-sm text-[#9b9484]">
-                    Your session will end automatically due to inactivity.
-                </p>
-                <template #footer>
-                    <ElButton type="primary" @click="showIdleWarning = false">
-                        Yes, I'm here
                     </ElButton>
                 </template>
             </ElDialog>

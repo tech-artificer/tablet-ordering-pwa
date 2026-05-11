@@ -149,7 +149,7 @@
                         <!-- Glow layer — contained, no bleed -->
                         <div
                             class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl transition-opacity duration-300 pointer-events-none"
-                            :class="isPreloading ? 'opacity-40' : 'opacity-80 group-hover:opacity-100 group-active:opacity-100'"
+                            :class="isStartingSession ? 'opacity-40' : 'opacity-80 group-hover:opacity-100 group-active:opacity-100'"
                         />
 
                         <button
@@ -165,22 +165,22 @@
                             :disabled="!canStartOrder"
                             @click="start"
                         >
-                            <span v-if="isPreloading">{{ preloadStage }}</span>
+                            <span v-if="isStartingSession">Starting session...</span>
                             <span v-else>Begin the Feast</span>
                         </button>
                     </div>
 
-                    <!-- Preloading Error -->
+                    <!-- Session Start Error -->
                     <transition name="fade-in">
-                        <div v-if="preloadError" class="bg-error/20 ring-1 ring-error/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+                        <div v-if="startSessionError" class="bg-error/20 ring-1 ring-error/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
                             <p class="text-sm text-error font-medium mb-2">
-                                {{ preloadError }}
+                                {{ startSessionError }}
                             </p>
                             <button
                                 type="button"
                                 class="w-full px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 aria-label="Retry"
-                                @click="retryPreload"
+                                @click="start"
                             >
                                 Try Again
                             </button>
@@ -189,7 +189,7 @@
 
                     <!-- Auth Status Message -->
                     <transition name="fade-in">
-                        <div v-if="!deviceStore.isAuthenticated && !isPreloading && !preloadError" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+                        <div v-if="!deviceStore.isAuthenticated && !isStartingSession && !startSessionError" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
                             <p class="text-sm text-warning font-medium mb-3">
                                 This tablet isn't registered yet
                             </p>
@@ -203,6 +203,18 @@
                             </button>
                         </div>
                     </transition>
+
+                    <!-- Update Notice - Staff controlled only -->
+                    <transition name="fade-in">
+                        <div v-if="needRefresh" class="bg-info/10 ring-1 ring-info/30 rounded-lg px-4 py-2 max-w-sm animate-slide-up">
+                            <div class="flex items-center gap-2 text-info/80">
+                                <RefreshCw :size="14" />
+                                <p class="text-xs font-medium">
+                                    New version available. Ask staff to update in Settings.
+                                </p>
+                            </div>
+                        </div>
+                    </transition>
                 </div>
             </div>
         </div>
@@ -210,13 +222,14 @@
 </template>
 
 <script setup lang="ts">
-import { Settings } from "lucide-vue-next"
+import { Settings, RefreshCw } from "lucide-vue-next"
 import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
+import { useSessionStore } from "~/stores/Session"
 import { useMenuStore } from "~/stores/Menu"
-import { useAppBootstrapStore } from "~/stores/AppBootstrap"
+import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
 import { logger } from "~/utils/logger"
@@ -226,17 +239,17 @@ definePageMeta({
 })
 
 const deviceStore = useDeviceStore()
+const sessionStore = useSessionStore()
 const menuStore = useMenuStore()
-const appBootstrap = useAppBootstrapStore()
 const router = useRouter()
 const route = useRoute()
 const { isOnline } = useNetworkStatus()
+const { needRefresh } = useAppUpdate()
 
-// Preloading state from bootstrap store (blocking preflight gate)
-const isPreloading = computed(() => appBootstrap.isPreloading)
-const preloadError = computed(() => appBootstrap.preloadError)
-const preloadStage = computed(() => appBootstrap.stageDescription)
-const canStartOrder = computed(() => !isPreloading.value && deviceStore.isAuthenticated)
+// Loading state for session start
+const isStartingSession = ref(false)
+const startSessionError = ref<string | null>(null)
+const canStartOrder = computed(() => !isStartingSession.value && deviceStore.isAuthenticated)
 
 // On the welcome screen, show real network connectivity — not WebSocket subscription
 // state, which is always false here because no channels are subscribed until the
@@ -292,8 +305,7 @@ onMounted(async () => {
         return
     }
 
-    // No silent warming — we use blocking preflight via AppBootstrap.preloadForOrdering()
-    // when user taps "Begin the Feast" instead of scattered fetches mid-flow
+    // No silent warming — sessionStore.start() on "Begin the Feast" handles all preloading
 
     if (route.query.settingsLocked === "1") {
         openSettings("Settings access expired. Please re-enter PIN.")
@@ -301,26 +313,29 @@ onMounted(async () => {
     }
 })
 
-const retryPreload = async () => {
-    appBootstrap.reset()
-    await start()
-}
-
 const start = async () => {
     if (!unref(deviceStore.isAuthenticated)) {
         openSettings()
         return
     }
 
-    // Blocking preflight: preload all data before entering order flow
+    // Start session - this authenticates, fetches session, and preloads menus
+    isStartingSession.value = true
+    startSessionError.value = null
+
     try {
-        const ready = await appBootstrap.preloadForOrdering()
-        if (ready) {
-            await router.replace("/order/start")
+        const ok = await sessionStore.start()
+        if (!ok) {
+            startSessionError.value = "Failed to start session. Please check device registration."
+            isStartingSession.value = false
+            openSettings()
+            return
         }
-    } catch (e) {
-        // Error is already in preloadError, UI will show it
-        logger.error("[Welcome] Preload failed:", e)
+        await router.replace("/order/start")
+    } catch (e: any) {
+        startSessionError.value = e?.message || "Failed to start session"
+        isStartingSession.value = false
+        logger.error("[Welcome] Session start failed:", e)
     }
 }
 

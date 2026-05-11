@@ -5,6 +5,7 @@ import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
 import { deleteTabletPwaCaches, unregisterCurrentAppServiceWorkers } from "../utils/pwaReset"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
+import { useAppUpdate } from "~/composables/useAppUpdate"
 
 // @ts-ignore - Nuxt auto-imports
 definePageMeta({
@@ -14,6 +15,9 @@ definePageMeta({
 const deviceStore = useDeviceStore()
 const config = useRuntimeConfig()
 const router = useRouter()
+
+// App update - staff controlled only
+const { needRefresh, applyUpdate, isApplyingUpdate, updateError } = useAppUpdate()
 
 const SETTINGS_PIN_AUTH_KEY = "settings.pin.auth_until"
 const SETTINGS_PIN_HIDDEN_AT_KEY = "settings.pin.hidden_at"
@@ -1197,10 +1201,41 @@ onMounted(async () => {
                 </div>
             </div>
 
+            <!-- App Updates - Staff Controlled -->
+            <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
+                <h2 class="text-2xl font-semibold mb-4">
+                    🔄 App Updates
+                </h2>
+                <p class="text-white/60 text-sm mb-4">
+                    Updates are applied manually by staff. The app will reload after applying.
+                    Only update when no customers are actively ordering.
+                </p>
+
+                <!-- Apply Update Button -->
+                <button
+                    v-if="needRefresh"
+                    :disabled="isApplyingUpdate"
+                    class="w-full px-6 py-3 min-h-[48px] rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 active:scale-95 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-3"
+                    @click="applyUpdate"
+                >
+                    <span v-if="isApplyingUpdate" class="animate-spin">⏳</span>
+                    <span v-else>✓</span>
+                    {{ isApplyingUpdate ? 'Applying...' : 'Apply Update' }}
+                </button>
+                <div v-else class="w-full px-6 py-3 min-h-[48px] rounded-lg bg-white/5 text-white/40 border border-white/10 flex items-center justify-center gap-2">
+                    <span>✓</span>
+                    <span>App is up to date</span>
+                </div>
+
+                <p v-if="updateError" class="text-xs text-red-400 mt-2">
+                    {{ updateError }}
+                </p>
+            </div>
+
             <!-- Force Refresh App -->
             <div class="bg-white/5 rounded-xl border border-white/10 p-6 mb-6">
                 <h2 class="text-2xl font-semibold mb-4">
-                    🔄 App Maintenance
+                    �️ App Maintenance
                 </h2>
                 <p class="text-white/60 text-sm mb-4">
                     Refresh only the tablet PWA caches and the active tablet service worker for this app scope.

@@ -119,43 +119,14 @@ async function confirmPackageSelection () {
 
 const proceedToMenuForPackage = async (packageData: Package): Promise<void> => {
     // Persist selected package to order store for downstream flows
-    const timestamp = new Date().toISOString()
-    console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
-    logger.debug("Selected package:", packageData)
-
-    try {
-        orderStore.setPackage(packageData)
-    } catch (err) {
-        logger.warn("Failed to persist package to order store", err)
-    }
-
-    // Auth, session, and menus are already ready from AppBootstrap.preloadForOrdering()
-    // on the welcome screen. No need to call sessionStore.start() here.
-    // Just activate the session timer if not already active.
-    if (!sessionStore.isActive) {
-        sessionStore.setIsActive(true)
-        sessionStore.startTimer()
-        logger.info("[PackageSelection] Session activated")
-    }
+    orderStore.setPackage(packageData)
 
     // Navigate to the menu page with package ID in query for downstream flows
-    try {
-        console.log(`[📍 Navigation] Going to menu with package_id=${packageData.id} at ${timestamp}`)
-        await nuxtApp.$router.push({
-            path: "/menu",
-            query: { packageId: packageData.id }
-        })
-    } catch (navErr: any) {
-        // Prevent uncaught promise rejections from bubbling to the global handler
-        console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
-        logger.error("Navigation to /menu failed:", navErr)
-
-        // If device looks unregistered, surface the registration modal.
-        const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
-        if (needsRegistration) {
-            try { await nuxtApp.$router.push("/settings") } catch (e) { logger.error(e) }
-        }
-    }
+    // Session, auth, and menus were already loaded at welcome screen via sessionStore.start()
+    await nuxtApp.$router.push({
+        path: "/menu",
+        query: { packageId: packageData.id }
+    })
 }
 
 // Cards handle inline preview directly
