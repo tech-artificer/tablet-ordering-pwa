@@ -28,7 +28,7 @@ describe("OrderingStep3ReviewSubmit", () => {
         const button = wrapper.find("button")
 
         expect(button.text()).toContain("Confirm & Send to Kitchen")
-        expect(button.attributes("disabled")).toBeUndefined()
+        expect((button.element as HTMLButtonElement).disabled).toBe(false)
 
         await button.trigger("click")
 
@@ -73,7 +73,7 @@ describe("OrderingStep3ReviewSubmit", () => {
         const wrapper = mount(OrderingStep3ReviewSubmit)
         const button = wrapper.find("button")
 
-        expect(button.attributes("disabled")).toBeDefined()
+        expect((button.element as HTMLButtonElement).disabled).toBe(true)
         expect(wrapper.text()).toContain("Select at least one meat")
 
         await button.trigger("click")
@@ -171,7 +171,7 @@ describe("OrderingStep3ReviewSubmit", () => {
         const wrapper = mount(OrderingStep3ReviewSubmit)
         const button = wrapper.find("button")
 
-        expect(button.attributes("disabled")).toBeDefined()
+        expect((button.element as HTMLButtonElement).disabled).toBe(true)
         expect(wrapper.text()).toContain("Add at least one refill item")
 
         await button.trigger("click")

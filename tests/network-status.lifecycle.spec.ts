@@ -39,4 +39,32 @@ describe("useNetworkStatus lifecycle", () => {
         expect((second.vm as any).isOnline).toBe(true)
         second.unmount()
     })
+
+    it("keeps listeners active across multiple concurrent consumers", async () => {
+        const first = mount(ProbeComponent)
+        const second = mount(ProbeComponent)
+        expect((first.vm as any).isOnline).toBe(true)
+        expect((second.vm as any).isOnline).toBe(true)
+
+        setNavigatorOnline(false)
+        window.dispatchEvent(new Event("offline"))
+        await first.vm.$nextTick()
+        await second.vm.$nextTick()
+        expect((first.vm as any).isOnline).toBe(false)
+        expect((second.vm as any).isOnline).toBe(false)
+
+        first.unmount()
+
+        setNavigatorOnline(true)
+        window.dispatchEvent(new Event("online"))
+        await second.vm.$nextTick()
+        expect((second.vm as any).isOnline).toBe(true)
+
+        second.unmount()
+
+        setNavigatorOnline(false)
+        const third = mount(ProbeComponent)
+        expect((third.vm as any).isOnline).toBe(false)
+        third.unmount()
+    })
 })

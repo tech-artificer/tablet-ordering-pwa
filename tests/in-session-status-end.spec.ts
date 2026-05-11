@@ -42,6 +42,7 @@ function makeWatcherHarness () {
             watch(orderStatus, (status) => {
                 if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
                     if (!sessionEndStore.active) {
+                        // Ignore triggerSessionEnd rejection here: this spec only asserts sessionEndStore.active state transitions.
                         triggerSessionEnd(status as any, { source: "in-session" }).catch(() => undefined)
                     }
                 }

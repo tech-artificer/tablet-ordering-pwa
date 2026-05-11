@@ -177,7 +177,7 @@ const itemCountDisplay = computed(() =>
 const tableLabel = computed(() => {
     const tbl = (deviceStore.table as any) || {}
     const name = tbl?.name ? String(tbl.name) : ""
-    const id = tbl?.id ? "Table: " : ""
+    const id = tbl?.id ? "Table:" : ""
     if (name && id) { return `${id} · ${name}` }
     return name || id || "Table"
 })

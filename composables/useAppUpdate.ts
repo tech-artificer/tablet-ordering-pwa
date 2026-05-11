@@ -38,6 +38,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     const registration = ref<ServiceWorkerRegistration | null>(null)
     let hasReloaded = false
     let reloadPending = false
+    let applyUpdateInProgress = false
     let removeControllerChangeListener: (() => void) | null = null
     let removeServiceWorkerMessageListener: (() => void) | null = null
     let removeUpdateFoundListener: (() => void) | null = null
@@ -56,6 +57,9 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     const bindControllerChangeReload = () => {
         if (!hasServiceWorkerSupport() || removeControllerChangeListener) { return }
         const onControllerChange = () => {
+            if (applyUpdateInProgress) {
+                return
+            }
             reloadIfSafe()
         }
         navigator.serviceWorker.addEventListener("controllerchange", onControllerChange)
@@ -156,6 +160,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         }
 
         isApplyingUpdate.value = true
+        applyUpdateInProgress = true
         updateError.value = null
 
         try {
@@ -174,8 +179,10 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
                 await Promise.all(cacheNames.map(name => caches.delete(name)))
             }
 
-            reload()
+            reloadIfSafe()
+            applyUpdateInProgress = false
         } catch (error) {
+            applyUpdateInProgress = false
             isApplyingUpdate.value = false
             updateError.value = "Failed to apply update. Please try again."
             logger.error("[PWA] Failed to apply update", error)

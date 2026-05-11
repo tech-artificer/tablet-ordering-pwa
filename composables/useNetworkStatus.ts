@@ -11,28 +11,28 @@ const connectionType = ref<string | null>(null)
 let initialized = false
 let activeConsumers = 0
 
+const updateOnlineStatus = () => {
+    const previousStatus = isOnline.value
+    isOnline.value = navigator.onLine
+
+    // Track recovery from offline
+    if (!previousStatus && isOnline.value) {
+        wasOffline.value = true
+        // Reset after 5 seconds
+        setTimeout(() => {
+            wasOffline.value = false
+        }, 5000)
+    }
+}
+
+const updateConnectionType = () => {
+    if ("connection" in navigator) {
+        const conn = (navigator as any).connection
+        connectionType.value = conn?.effectiveType || null
+    }
+}
+
 export function useNetworkStatus () {
-    const updateOnlineStatus = () => {
-        const previousStatus = isOnline.value
-        isOnline.value = navigator.onLine
-
-        // Track recovery from offline
-        if (!previousStatus && isOnline.value) {
-            wasOffline.value = true
-            // Reset after 5 seconds
-            setTimeout(() => {
-                wasOffline.value = false
-            }, 5000)
-        }
-    }
-
-    const updateConnectionType = () => {
-        if ("connection" in navigator) {
-            const conn = (navigator as any).connection
-            connectionType.value = conn?.effectiveType || null
-        }
-    }
-
     onMounted(() => {
         if (typeof window === "undefined") { return }
         activeConsumers += 1

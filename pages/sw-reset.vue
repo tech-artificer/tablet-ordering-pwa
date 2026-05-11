@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: false, auth: false })
+definePageMeta({ layout: false })
 
 const status = ref("Preparing reset...")
 const running = ref(false)
@@ -30,9 +30,9 @@ const resetServiceWorker = async () => {
         setTimeout(() => {
             window.location.replace(`/?sw-reset=${Date.now()}`)
         }, 1200)
-    } catch (e: any) {
-        status.value = `Error: ${e?.message}`
-    } finally {
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        status.value = `Error: ${msg}`
         running.value = false
     }
 }

@@ -403,7 +403,7 @@ This also creates:
 3. If not, use `design-system/MASTER.md` exclusively
 
 **Context-aware retrieval prompt:**
-```
+```text
 I am building the [Page Name] page. Please read design-system/MASTER.md.
 Also check if design-system/pages/[page-name].md exists.
 If the page file exists, prioritize its rules.

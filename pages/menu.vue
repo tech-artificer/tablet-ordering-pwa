@@ -143,10 +143,25 @@ onMounted(async () => {
 })
 
 const resolveStoredPackageId = (): string | number | null => {
-    const packageFromGetter = (orderStore as any).getPackage
-    const normalizedPackage = packageFromGetter?.value ?? packageFromGetter ?? (orderStore as any).package
-    const packageId = Number(normalizedPackage?.id || 0)
-    return packageId > 0 ? packageId : null
+    const orderStoreWithPackage = orderStore as unknown as { getPackage?: unknown; package?: unknown }
+    const packageFromGetter = orderStoreWithPackage.getPackage
+    let normalizedPackage: unknown = null
+
+    if (typeof packageFromGetter === "function") {
+        normalizedPackage = packageFromGetter()
+    } else if (packageFromGetter && typeof packageFromGetter === "object" && "value" in packageFromGetter) {
+        normalizedPackage = (packageFromGetter as { value?: unknown }).value
+    } else if (packageFromGetter !== undefined) {
+        normalizedPackage = packageFromGetter
+    } else {
+        normalizedPackage = orderStoreWithPackage.package
+    }
+
+    const packageIdRaw = normalizedPackage && typeof normalizedPackage === "object" && "id" in normalizedPackage
+        ? (normalizedPackage as { id?: unknown }).id
+        : null
+    const packageId = Number(packageIdRaw ?? 0)
+    return Number.isFinite(packageId) && packageId > 0 ? packageId : null
 }
 
 // Get selected package from route or store
