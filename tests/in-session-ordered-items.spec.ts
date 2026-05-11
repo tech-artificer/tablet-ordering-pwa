@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
+import { ref } from "vue"
 import { useOrderStore } from "~/stores/Order"
 
 import InSession from "~/pages/order/in-session.vue"
@@ -21,11 +22,11 @@ vi.mock("vue-router", () => ({
 // Mock Session store
 vi.mock("~/stores/Session", () => ({
     useSessionStore: () => ({
-        isActive: { value: true },
-        orderId: { value: 123 },
-        remainingMs: { value: 3600000 },
-        timerExpired: { value: false },
-        sessionStartedAt: { value: Date.now() },
+        isActive: true,
+        orderId: 123,
+        remainingMs: ref(3600000),
+        timerExpired: false,
+        sessionStartedAt: Date.now(),
         getIsActive: () => true,
         getOrderId: () => 123,
         start: vi.fn().mockResolvedValue(true),
@@ -45,7 +46,7 @@ vi.mock("~/composables/useIdleDetector", () => ({
     useIdleDetector: () => ({
         start: vi.fn(),
         stop: vi.fn(),
-        isWarning: { value: false },
+        isWarning: ref(false),
     }),
 }))
 
@@ -75,6 +76,14 @@ vi.mock("element-plus", () => ({
     },
 }))
 
+const mountOptions = {
+    global: {
+        stubs: {
+            NuxtErrorBoundary: { template: "<div><slot /></div>" },
+        },
+    },
+}
+
 describe("in-session ordered items display", () => {
     beforeEach(() => {
         const pinia = createPinia()
@@ -88,23 +97,30 @@ describe("in-session ordered items display", () => {
         orderStore.setHasPlacedOrder(true)
         orderStore.setHistory([
             {
-                order: { order_number: "1001", status: "confirmed" },
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1001",
+                    status: "confirmed",
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1002", status: "confirmed" },
-                items: [
-                    { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1002",
+                    status: "confirmed",
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
+                    ],
+                },
             },
         ] as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -118,17 +134,21 @@ describe("in-session ordered items display", () => {
         orderStore.setHasPlacedOrder(true)
         orderStore.setHistory([
             {
-                order: { order_number: "1001", status: "confirmed" },
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1001",
+                    status: "confirmed",
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
+                    ],
+                },
             },
         ] as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -143,23 +163,30 @@ describe("in-session ordered items display", () => {
         orderStore.setHasPlacedOrder(true)
         orderStore.setHistory([
             {
-                order: { order_number: "1001", status: "confirmed" },
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1001",
+                    status: "confirmed",
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1002", status: "confirmed" },
-                items: [
-                    { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1002",
+                    status: "confirmed",
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
+                    ],
+                },
             },
         ] as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -174,29 +201,39 @@ describe("in-session ordered items display", () => {
         orderStore.setHasPlacedOrder(true)
         orderStore.setHistory([
             {
-                order: { order_number: "1001", status: "confirmed" },
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1001",
+                    status: "confirmed",
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1002", status: "confirmed" },
-                items: [
-                    { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1002",
+                    status: "confirmed",
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1003", status: "confirmed" },
-                items: [
-                    { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" },
-                ],
+                order: {
+                    order_number: "1003",
+                    status: "confirmed",
+                    items: [
+                        { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" },
+                    ],
+                },
             },
         ] as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -212,29 +249,39 @@ describe("in-session ordered items display", () => {
         orderStore.setHasPlacedOrder(true)
         orderStore.setHistory([
             {
-                order: { order_number: "1001", status: "confirmed" },
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1001",
+                    status: "confirmed",
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1002", status: "confirmed" },
-                items: [
-                    { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1002",
+                    status: "confirmed",
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1003", status: "confirmed" },
-                items: [
-                    { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" },
-                ],
+                order: {
+                    order_number: "1003",
+                    status: "confirmed",
+                    items: [
+                        { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" },
+                    ],
+                },
             },
         ] as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -249,23 +296,30 @@ describe("in-session ordered items display", () => {
         orderStore.setHasPlacedOrder(true)
         orderStore.setHistory([
             {
-                order: { order_number: "1001", status: "confirmed" },
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1001",
+                    status: "confirmed",
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
+                    ],
+                },
             },
             {
-                order: { order_number: "1002", status: "confirmed" },
-                items: [
-                    { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                ],
+                order: {
+                    order_number: "1002",
+                    status: "confirmed",
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
+                    ],
+                },
             },
         ] as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -284,9 +338,10 @@ describe("in-session ordered items display", () => {
         ])
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
@@ -312,9 +367,10 @@ describe("in-session ordered items display", () => {
         } as any)
 
         const wrapper = mount(InSession, {
+            ...mountOptions,
             global: {
+                ...mountOptions.global,
                 plugins: [pinia],
-                stubs: ["NuxtErrorBoundary"],
             },
         })
 
