@@ -143,11 +143,14 @@
                     </div>
                 </div>
 
-                <!-- CTA Button -->
+                <!-- CTA Button (disabled while preloading) -->
                 <div class="space-y-4 animate-fade-in-delayed-2">
                     <div class="relative inline-block group">
                         <!-- Glow layer — contained, no bleed -->
-                        <div class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl opacity-80 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                        <div
+                            class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl transition-opacity duration-300 pointer-events-none"
+                            :class="isPreloading ? 'opacity-40' : 'opacity-80 group-hover:opacity-100 group-active:opacity-100'"
+                        />
 
                         <button
                             class="relative flex items-center justify-center gap-2.5 rounded-2xl font-bold tracking-wide transition-all duration-200
@@ -156,17 +159,37 @@
                      hover:shadow-[0_6px_32px_rgba(246,181,109,0.50)] hover:brightness-110
                      active:scale-[0.97] active:shadow-none
                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
-                     min-h-[56px] px-10 text-base"
+                     min-h-[56px] px-10 text-base
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100"
                             aria-label="Begin your order"
+                            :disabled="isPreloading || !deviceStore.isAuthenticated.value"
                             @click="start"
                         >
-                            <span>Begin the Feast</span>
+                            <span v-if="isPreloading">{{ preloadStage }}</span>
+                            <span v-else>Begin the Feast</span>
                         </button>
                     </div>
 
+                    <!-- Preloading Error -->
+                    <transition name="fade-in">
+                        <div v-if="preloadError" class="bg-error/20 ring-1 ring-error/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+                            <p class="text-sm text-error font-medium mb-2">
+                                {{ preloadError }}
+                            </p>
+                            <button
+                                type="button"
+                                class="w-full px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                aria-label="Retry"
+                                @click="retryPreload"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    </transition>
+
                     <!-- Auth Status Message -->
                     <transition name="fade-in">
-                        <div v-if="!deviceStore.isAuthenticated" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+                        <div v-if="!deviceStore.isAuthenticated && !isPreloading && !preloadError" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
                             <p class="text-sm text-warning font-medium mb-3">
                                 This tablet isn't registered yet
                             </p>
@@ -193,8 +216,10 @@ import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
 import { useMenuStore } from "~/stores/Menu"
+import { useAppBootstrapStore } from "~/stores/AppBootstrap"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
+import { logger } from "~/utils/logger"
 
 definePageMeta({
     layout: "kiosk"
@@ -202,9 +227,16 @@ definePageMeta({
 
 const deviceStore = useDeviceStore()
 const menuStore = useMenuStore()
+const appBootstrap = useAppBootstrapStore()
 const router = useRouter()
 const route = useRoute()
 const { isOnline } = useNetworkStatus()
+
+// Preloading state from bootstrap store (blocking preflight gate)
+const isPreloading = computed(() => appBootstrap.isPreloading)
+const preloadError = computed(() => appBootstrap.preloadError)
+const preloadStage = computed(() => appBootstrap.stageDescription)
+const canStartOrder = computed(() => !isPreloading.value && deviceStore.isAuthenticated)
 
 // On the welcome screen, show real network connectivity — not WebSocket subscription
 // state, which is always false here because no channels are subscribed until the
@@ -260,9 +292,8 @@ onMounted(async () => {
         return
     }
 
-    // Silently warm the package cache while kiosk is idle on the welcome screen.
-    // loadAllMenus respects the 30-min cache — no duplicate requests if already fresh.
-    menuStore.loadAllMenus().catch(() => { /* non-fatal — packageSelection will retry */ })
+    // No silent warming — we use blocking preflight via AppBootstrap.preloadForOrdering()
+    // when user taps "Begin the Feast" instead of scattered fetches mid-flow
 
     if (route.query.settingsLocked === "1") {
         openSettings("Settings access expired. Please re-enter PIN.")
@@ -270,13 +301,27 @@ onMounted(async () => {
     }
 })
 
-const start = () => {
+const retryPreload = async () => {
+    appBootstrap.reset()
+    await start()
+}
+
+const start = async () => {
     if (!unref(deviceStore.isAuthenticated)) {
         openSettings()
         return
     }
 
-    router.replace("/order/start").catch(() => {})
+    // Blocking preflight: preload all data before entering order flow
+    try {
+        const ready = await appBootstrap.preloadForOrdering()
+        if (ready) {
+            await router.replace("/order/start")
+        }
+    } catch (e) {
+        // Error is already in preloadError, UI will show it
+        logger.error("[Welcome] Preload failed:", e)
+    }
 }
 
 const openSettings = (noticeOrEvent?: string | PointerEvent) => {
