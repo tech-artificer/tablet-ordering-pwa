@@ -75,42 +75,59 @@ describe("useAppUpdate", () => {
         update.disposeAppUpdate()
     })
 
-    it("applyUpdate unregisters all SWs, clears caches, and reloads", async () => {
-        const reload = vi.fn()
-        const unregister = vi.fn().mockResolvedValue(true)
-        const { serviceWorkerContainer, registration } = createServiceWorkerMocks({ hasWaiting: true })
-        ;(registration as any).unregister = unregister
-        vi.spyOn(navigator.serviceWorker, "getRegistrations").mockResolvedValue([registration])
+    it("posts SKIP_WAITING to waiting worker when applying update", async () => {
+        const { serviceWorkerContainer, waiting } = createServiceWorkerMocks({ hasWaiting: true })
+        const update = useAppUpdate()
 
-        const cacheDelete = vi.fn().mockResolvedValue(true)
-        vi.stubGlobal("caches", { keys: vi.fn().mockResolvedValue(["v1", "v2"]), delete: cacheDelete })
-
-        const update = useAppUpdate({ reload })
         await update.initializeAppUpdate()
         serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
         await nextTick()
 
-        await update.applyUpdate()
+        update.applyUpdate()
 
-        expect(unregister).toHaveBeenCalled()
-        expect(cacheDelete).toHaveBeenCalledWith("v1")
-        expect(cacheDelete).toHaveBeenCalledWith("v2")
-        expect(reload).toHaveBeenCalledOnce()
+        expect(waiting.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" })
+        expect(update.isApplyingUpdate.value).toBe(true)
         update.disposeAppUpdate()
     })
 
-    it("applyUpdate does nothing when canApplyUpdate is false", async () => {
-        const reload = vi.fn()
-        const blocked = ref(true)
-        const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
-        const update = useAppUpdate({ isUpdateApplyBlocked: blocked, reload })
+    it("defers reload until blockers clear after update activation starts", async () => {
+        const originalLocation = window.location
+        const reloadSpy = vi.fn()
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: {
+                ...originalLocation,
+                reload: reloadSpy,
+            },
+        })
+        try {
+            const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
+            const blocked = ref(false)
+            const update = useAppUpdate({ isUpdateApplyBlocked: blocked })
 
-        await update.initializeAppUpdate()
-        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
-        await nextTick()
+            await update.initializeAppUpdate()
+            serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
+            await nextTick()
 
-        await update.applyUpdate()
-        expect(reload).not.toHaveBeenCalled()
-        update.disposeAppUpdate()
+            update.applyUpdate()
+            blocked.value = true
+            await nextTick()
+
+            serviceWorkerContainer.dispatchEvent(new Event("controllerchange"))
+            await nextTick()
+
+            expect(reloadSpy).not.toHaveBeenCalled()
+
+            blocked.value = false
+            await nextTick()
+
+            expect(reloadSpy).toHaveBeenCalledTimes(1)
+            update.disposeAppUpdate()
+        } finally {
+            Object.defineProperty(window, "location", {
+                configurable: true,
+                value: originalLocation,
+            })
+        }
     })
 })

@@ -38,7 +38,6 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     const registration = ref<ServiceWorkerRegistration | null>(null)
     let hasReloaded = false
     let reloadPending = false
-    let applyUpdateInProgress = false
     let removeControllerChangeListener: (() => void) | null = null
     let removeServiceWorkerMessageListener: (() => void) | null = null
     let removeUpdateFoundListener: (() => void) | null = null
@@ -57,9 +56,6 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     const bindControllerChangeReload = () => {
         if (!hasServiceWorkerSupport() || removeControllerChangeListener) { return }
         const onControllerChange = () => {
-            if (applyUpdateInProgress) {
-                return
-            }
             reloadIfSafe()
         }
         navigator.serviceWorker.addEventListener("controllerchange", onControllerChange)
@@ -154,35 +150,21 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         }
     }
 
-    const applyUpdate = async () => {
+    const applyUpdate = () => {
         if (!canApplyUpdate.value) {
+            return
+        }
+        if (!registration.value || !registration.value.waiting) {
             return
         }
 
         isApplyingUpdate.value = true
-        applyUpdateInProgress = true
         updateError.value = null
+        bindControllerChangeReload()
 
         try {
-            // Unregister all service workers so the new version loads clean on reload.
-            if (hasServiceWorkerSupport()) {
-                const registrations = await navigator.serviceWorker.getRegistrations()
-                for (const reg of registrations) {
-                    reg.waiting?.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
-                }
-                await Promise.all(registrations.map(r => r.unregister()))
-            }
-
-            // Clear all caches so the new SW precache takes effect immediately.
-            if ("caches" in window) {
-                const cacheNames = await caches.keys()
-                await Promise.all(cacheNames.map(name => caches.delete(name)))
-            }
-
-            reloadIfSafe()
-            applyUpdateInProgress = false
+            registration.value.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
         } catch (error) {
-            applyUpdateInProgress = false
             isApplyingUpdate.value = false
             updateError.value = "Failed to apply update. Please try again."
             logger.error("[PWA] Failed to apply update", error)
