@@ -46,19 +46,9 @@ onMounted(async () => {
         }
     }
 
-    if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
-        logger.info("[PackageSelection] Loading packages from API...")
-        try {
-            await menuStore.fetchPackages()
-            console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
-            logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
-        } catch (error: any) {
-            console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
-            logger.error("[PackageSelection] Failed to load packages:", error)
-        }
-    } else {
-        console.log(`[✅ Packages Cached] ${menuStore.packages.length} packages available at ${timestamp}`)
-    }
+    // Packages are now preloaded at the welcome screen via AppBootstrap.preloadForOrdering()
+    // No need to fetch here - just use the cached data from MenuStore
+    console.log(`[✅ Packages Ready] ${menuStore.packages.length} packages available at ${timestamp}`)
 })
 
 // Carousel state retained intentionally so existing script behavior is preserved.
@@ -127,12 +117,7 @@ async function confirmPackageSelection () {
     await proceedToMenuForPackage(packageData)
 }
 
-type SessionStartResult =
-    | { success: true }
-    | { success: false; reason: "needs_registration" }
-    | { success: false; reason: "backend_error"; error: Error }
-
-const proceedToMenuForPackage = async (packageData: Package): Promise<SessionStartResult> => {
+const proceedToMenuForPackage = async (packageData: Package): Promise<void> => {
     // Persist selected package to order store for downstream flows
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
@@ -144,54 +129,13 @@ const proceedToMenuForPackage = async (packageData: Package): Promise<SessionSta
         logger.warn("Failed to persist package to order store", err)
     }
 
-    // Start session if not already active and ensure token/menu ready
-    let sessionStartResult: SessionStartResult
-    try {
-        console.log(`[🔄 Session Start Attempt] Starting session before navigating to menu at ${timestamp}`)
-        const started = await sessionStore.start({ preserveSelection: true })
-        if (!started) {
-            console.log(`[⚠️ Session Start Failed] Device credentials check at ${timestamp}`)
-            logger.warn("Session start failed — device may require registration")
-
-            // Only show registration if device truly lacks credentials
-            const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
-
-            if (needsRegistration) {
-                console.log(`[🔐 Device Registration Required] Redirecting to Settings at ${timestamp}`)
-                // Redirect staff to Settings (PIN-protected) to register device there
-                try {
-                    await nuxtApp.$router.push("/settings")
-                } catch (e) {
-                    logger.error("Failed to navigate to Settings for registration", e)
-                }
-                sessionStartResult = { success: false, reason: "needs_registration" }
-                return sessionStartResult
-            }
-
-            // Device has credentials but session start returned false (backend/session issue)
-            // This is a backend error, not a missing registration
-            console.error(`[❌ Backend Session Failure] Device has credentials but session start failed at ${timestamp}`)
-            logger.error("Session start failed despite valid device credentials")
-            sessionStartResult = { success: false, reason: "backend_error", error: new Error("Session start failed with valid credentials") }
-            // Do NOT navigate to /menu — show blocking error instead
-            alert("Ordering is unavailable. Please call staff.")
-            return sessionStartResult
-        }
-
-        console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
-        sessionStartResult = { success: true }
-    } catch (err: any) {
-        console.error(`[❌ Session Start Error] ${err?.message} at ${timestamp}`)
-        logger.error("Session store start threw error", err)
-        sessionStartResult = { success: false, reason: "backend_error", error: err instanceof Error ? err : new Error(String(err)) }
-        // Do NOT navigate to /menu when session start throws
-        alert("Ordering is unavailable. Please call staff.")
-        return sessionStartResult
-    }
-
-    // Only navigate to menu if session started successfully
-    if (!sessionStartResult.success) {
-        return sessionStartResult
+    // Auth, session, and menus are already ready from AppBootstrap.preloadForOrdering()
+    // on the welcome screen. No need to call sessionStore.start() here.
+    // Just activate the session timer if not already active.
+    if (!sessionStore.isActive) {
+        sessionStore.setIsActive(true)
+        sessionStore.startTimer()
+        logger.info("[PackageSelection] Session activated")
     }
 
     // Navigate to the menu page with package ID in query for downstream flows
@@ -206,17 +150,12 @@ const proceedToMenuForPackage = async (packageData: Package): Promise<SessionSta
         console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
         logger.error("Navigation to /menu failed:", navErr)
 
-        // If the navigation failed due to asset/chunk fetch, show a helpful registration UI
-        // or remain on the package selection page so the user can retry.
         // If device looks unregistered, surface the registration modal.
         const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
         if (needsRegistration) {
             try { await nuxtApp.$router.push("/settings") } catch (e) { logger.error(e) }
         }
-        return { success: false, reason: "backend_error", error: navErr instanceof Error ? navErr : new Error(String(navErr)) }
     }
-
-    return sessionStartResult
 }
 
 // Cards handle inline preview directly

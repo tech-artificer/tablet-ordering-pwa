@@ -334,15 +334,9 @@ export const useSessionStore = defineStore("session", () => {
                 logger.warn("[SessionStore] fetchLatestSession failed before start:", e)
             }
 
-            // Preload menu data so customers don't wait when ordering
+            // Menus are preloaded at welcome screen via AppBootstrap.preloadForOrdering()
+            // No need to load them here - just use the already-warmed Pinia state
             const menuStore = useMenuStore()
-            try {
-                logger.info("[Menu Preload] Loading menus for quick response")
-                await menuStore.loadAllMenus(true)
-                logger.info("[Menu Preloaded] Ready for ordering")
-            } catch (e) {
-                logger.warn("[SessionStore] preload menus failed:", e)
-            }
 
             // Reset order store to fresh state — only when truly starting a new session.
             // If the session is already active (e.g. called again from packageSelection as an

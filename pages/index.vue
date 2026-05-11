@@ -162,7 +162,7 @@
                      min-h-[56px] px-10 text-base
                      disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100"
                             aria-label="Begin your order"
-                            :disabled="isPreloading || !deviceStore.isAuthenticated.value"
+                            :disabled="!canStartOrder"
                             @click="start"
                         >
                             <span v-if="isPreloading">{{ preloadStage }}</span>

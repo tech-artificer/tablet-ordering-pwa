@@ -35,13 +35,8 @@ const hasConfirmedInitialOrder = computed(() => {
 })
 
 onMounted(async () => {
-    if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
-        try {
-            await menuStore.loadAllMenus()
-        } catch (error) {
-            logger.warn("[Menu] Initial loadAllMenus failed:", error)
-        }
-    }
+    // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
+    // No need to call loadAllMenus() here - data is already in Pinia state
 
     const recovery = shouldAttemptActiveOrderRecovery()
         ? await recoverActiveOrderState("menu")
@@ -94,14 +89,9 @@ onMounted(async () => {
                 if (pkgItem) { inferredPackageId = Number(pkgItem.menu_id || pkgItem.menuId || pkgItem.id) }
             }
 
-            // If we found a package id, set it and fetch package details
+            // If we found a package id, set it (package details already preloaded at welcome)
             if (inferredPackageId) {
                 selectedPackageId.value = String(inferredPackageId)
-                try {
-                    await menuStore.fetchPackageDetails(inferredPackageId as number)
-                } catch (err) {
-                    logger.warn("[Menu] fetchPackageDetails failed for inferred package:", inferredPackageId, err)
-                }
             } else {
                 logger.warn("[Menu] Could not infer packageId from recovered order")
             }
@@ -128,17 +118,10 @@ onMounted(async () => {
         logger.warn("[Menu] Cart items missing for active session — notified user of cart loss")
     }
 
-    // Load package details with allowed menus
-    if (selectedPackageId.value) {
-        meatError.value = null
-        try {
-            logger.info("[Menu] Loading package details for package:", selectedPackageId.value)
-            await menuStore.fetchPackageDetails(Number(selectedPackageId.value))
-            logger.info("[Menu] Package details loaded")
-        } catch (error) {
-            meatError.value = (error as Error).message || "Failed to load meats — tap to retry"
-            logger.error("[Menu] Failed to load package details:", error)
-        }
+    // Package details are already preloaded at welcome screen
+    // If missing (rare edge case), error state will show with retry option
+    if (selectedPackageId.value && !menuStore.packageDetails[Number(selectedPackageId.value)]) {
+        logger.warn("[Menu] Package details not preloaded for:", selectedPackageId.value)
     }
 })
 
@@ -302,25 +285,9 @@ const taxAmount = computed(() => orderStore.taxAmount)
 const grandTotal = computed(() => orderStore.grandTotal)
 
 const setCategory = (category: MenuCategory) => {
-    activeCategory.value = category;
-    // If user navigates to a category and data is empty, attempt to fetch it on-demand
-    (async () => {
-        try {
-            switch (category) {
-            case "desserts":
-                if ((!menuStore.desserts || menuStore.desserts.length === 0) && !menuStore.loading.desserts) { await menuStore.fetchDesserts() }
-                break
-            case "sides":
-                if ((!menuStore.sides || menuStore.sides.length === 0) && !menuStore.loading.sides) { await menuStore.fetchSides() }
-                break
-            case "beverages":
-                if ((!menuStore.beverages || menuStore.beverages.length === 0) && !menuStore.loading.beverages) { await menuStore.fetchBeverages() }
-                break
-            }
-        } catch (e) {
-            logger.warn("[Menu] on-demand fetch failed for category", category, e)
-        }
-    })()
+    activeCategory.value = category
+    // All menu data is preloaded at welcome screen via AppBootstrap.preloadForOrdering()
+    // No on-demand fetching needed - category data is already in Pinia state
 }
 
 // Retry loading the current category (used by the error state UI)
