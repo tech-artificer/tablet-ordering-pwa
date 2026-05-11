@@ -127,7 +127,12 @@ async function confirmPackageSelection () {
     await proceedToMenuForPackage(packageData)
 }
 
-const proceedToMenuForPackage = async (packageData: Package) => {
+type SessionStartResult =
+    | { success: true }
+    | { success: false; reason: "needs_registration" }
+    | { success: false; reason: "backend_error"; error: Error }
+
+const proceedToMenuForPackage = async (packageData: Package): Promise<SessionStartResult> => {
     // Persist selected package to order store for downstream flows
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
@@ -140,11 +145,12 @@ const proceedToMenuForPackage = async (packageData: Package) => {
     }
 
     // Start session if not already active and ensure token/menu ready
+    let sessionStartResult: SessionStartResult
     try {
         console.log(`[🔄 Session Start Attempt] Starting session before navigating to menu at ${timestamp}`)
         const started = await sessionStore.start({ preserveSelection: true })
         if (!started) {
-            console.log(`[⚠️ Session Start Failed] But proceeding with device credentials check at ${timestamp}`)
+            console.log(`[⚠️ Session Start Failed] Device credentials check at ${timestamp}`)
             logger.warn("Session start failed — device may require registration")
 
             // Only show registration if device truly lacks credentials
@@ -158,19 +164,34 @@ const proceedToMenuForPackage = async (packageData: Package) => {
                 } catch (e) {
                     logger.error("Failed to navigate to Settings for registration", e)
                 }
-                // Stop further navigation to menu
-                return
+                sessionStartResult = { success: false, reason: "needs_registration" }
+                return sessionStartResult
             }
 
-            // If device appears registered (token/table present), log and continue gracefully
-            console.log(`[✅ Device Has Credentials] Continuing to menu at ${timestamp}`)
-            logger.warn("Session start failed but device appears registered; proceeding.")
-        } else {
-            console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
+            // Device has credentials but session start returned false (backend/session issue)
+            // This is a backend error, not a missing registration
+            console.error(`[❌ Backend Session Failure] Device has credentials but session start failed at ${timestamp}`)
+            logger.error("Session start failed despite valid device credentials")
+            sessionStartResult = { success: false, reason: "backend_error", error: new Error("Session start failed with valid credentials") }
+            // Do NOT navigate to /menu — show blocking error instead
+            alert("Ordering is unavailable. Please call staff.")
+            return sessionStartResult
         }
+
+        console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
+        sessionStartResult = { success: true }
     } catch (err: any) {
         console.error(`[❌ Session Start Error] ${err?.message} at ${timestamp}`)
-        logger.warn("Session store start failed or unavailable", err)
+        logger.error("Session store start threw error", err)
+        sessionStartResult = { success: false, reason: "backend_error", error: err instanceof Error ? err : new Error(String(err)) }
+        // Do NOT navigate to /menu when session start throws
+        alert("Ordering is unavailable. Please call staff.")
+        return sessionStartResult
+    }
+
+    // Only navigate to menu if session started successfully
+    if (!sessionStartResult.success) {
+        return sessionStartResult
     }
 
     // Navigate to the menu page with package ID in query for downstream flows
@@ -181,7 +202,7 @@ const proceedToMenuForPackage = async (packageData: Package) => {
             query: { packageId: packageData.id }
         })
     } catch (navErr: any) {
-    // Prevent uncaught promise rejections from bubbling to the global handler
+        // Prevent uncaught promise rejections from bubbling to the global handler
         console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
         logger.error("Navigation to /menu failed:", navErr)
 
@@ -192,7 +213,10 @@ const proceedToMenuForPackage = async (packageData: Package) => {
         if (needsRegistration) {
             try { await nuxtApp.$router.push("/settings") } catch (e) { logger.error(e) }
         }
+        return { success: false, reason: "backend_error", error: navErr instanceof Error ? navErr : new Error(String(navErr)) }
     }
+
+    return sessionStartResult
 }
 
 // Cards handle inline preview directly

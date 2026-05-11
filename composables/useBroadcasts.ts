@@ -59,6 +59,8 @@ interface OrderUpdatedEvent {
     updated_at: string
     device: { id: number; name: string }
     table: { id: number; name: string }
+    /** Refill items sent by backend on order.updated after refill */
+    items?: Array<{ id: number; name: string; quantity: number; price: string; is_refill: boolean }>
   }
 }
 
@@ -256,6 +258,12 @@ export const useBroadcasts = () => {
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(order.status)
+
+            // HOTFIX: Patch refill items into order (backend sends items on refill)
+            if (order.items && order.items.length > 0) {
+                orderStore.patchOrderItems(order.items)
+            }
+
             // End session only on genuine terminal statuses — in_progress, ready, served are intermediate
             if (["completed", "voided", "cancelled"].includes(order.status)) {
                 try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
@@ -419,6 +427,12 @@ export const useBroadcasts = () => {
         const deviceId = deviceStore.getDeviceId()
         if (!deviceId || !(window as any).Echo) { return }
 
+        // GUARD: Check if already subscribed to this exact device to prevent duplicates on reconnect
+        if (deviceChannel && deviceChannel.name === `device.${deviceId}`) {
+            logger.debug(`[Echo] Already subscribed to device.${deviceId}, skipping`)
+            return
+        }
+
         // Tear down any existing subscriptions before creating new ones to prevent duplicate handlers
         unsubscribeDeviceChannels()
 
@@ -455,6 +469,12 @@ export const useBroadcasts = () => {
     // Subscribe to order-specific channels
     const subscribeToOrderChannel = (orderId: string) => {
         if (!orderId || !(window as any).Echo) { return }
+
+        // GUARD: Check if already subscribed to this exact order to prevent duplicates on reconnect
+        if (orderChannel && orderChannel.name === `orders.${orderId}`) {
+            logger.debug(`[Echo] Already subscribed to orders.${orderId}, skipping`)
+            return
+        }
 
         unsubscribeFromOrderChannel()
 

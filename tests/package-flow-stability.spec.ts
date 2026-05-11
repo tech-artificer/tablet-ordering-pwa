@@ -56,6 +56,77 @@ describe("packageSelection.vue — package selection flow", () => {
 })
 
 // ---------------------------------------------------------------------------
+// 2a. Session start error handling in proceedToMenuForPackage
+// ---------------------------------------------------------------------------
+describe("packageSelection.vue — proceedToMenuForPackage error handling", () => {
+    it("defines SessionStartResult type with three outcomes", () => {
+        const page = src("pages/order/packageSelection.vue")
+
+        expect(page).toContain("type SessionStartResult")
+        expect(page).toContain("success: true")
+        expect(page).toContain("reason: \"needs_registration\"")
+        expect(page).toContain("reason: \"backend_error\"")
+    })
+
+    it("only navigates to /menu when sessionStartResult.success is true", () => {
+        const page = src("pages/order/packageSelection.vue")
+
+        // Find the navigation block and verify it's guarded by success check
+        const proceedFn = page.match(/const proceedToMenuForPackage = async[\s\S]*?\n}$/)
+        const body = proceedFn?.[0] ?? ""
+
+        // Navigation should be guarded by success check
+        expect(body).toContain("if (!sessionStartResult.success)")
+        expect(body).toContain("return sessionStartResult")
+    })
+
+    it("returns needs_registration when device lacks token/table", () => {
+        const page = src("pages/order/packageSelection.vue")
+
+        // When sessionStore.start returns false and device needs registration
+        expect(page).toContain("needsRegistration")
+        expect(page).toContain("await nuxtApp.$router.push(\"/settings\")")
+        expect(page).toContain("reason: \"needs_registration\"")
+    })
+
+    it("returns backend_error when device has credentials but session start failed", () => {
+        const page = src("pages/order/packageSelection.vue")
+
+        // When sessionStore.start returns false but device has credentials
+        expect(page).toContain("Backend Session Failure")
+        expect(page).toContain("reason: \"backend_error\"")
+        expect(page).toContain("alert(\"Ordering is unavailable. Please call staff.\")")
+    })
+
+    it("returns backend_error when session start throws an exception", () => {
+        const page = src("pages/order/packageSelection.vue")
+
+        // When sessionStore.start throws, it should not navigate to /menu
+        const catchBlock = page.match(/\} catch \(err: any\) \{[\s\S]*?return sessionStartResult/)
+        const body = catchBlock?.[0] ?? ""
+
+        expect(body).toContain("reason: \"backend_error\"")
+        expect(body).toContain("alert(\"Ordering is unavailable. Please call staff.\")")
+        expect(body).toContain("return sessionStartResult")
+    })
+
+    it("does NOT navigate to /menu when session start throws", () => {
+        const page = src("pages/order/packageSelection.vue")
+
+        // The navigation block should be AFTER the catch block and guarded
+        const proceedFn = page.match(/const proceedToMenuForPackage = async[\s\S]*?\n}$/)
+        const body = proceedFn?.[0] ?? ""
+
+        // Navigation happens after session start, only on success
+        const navIndex = body.indexOf("await nuxtApp.$router.push({\n            path: \"/menu\"")
+        const catchReturnIndex = body.indexOf("return sessionStartResult", body.indexOf("} catch (err: any)"))
+
+        // Navigation should come after the catch block's return
+        expect(navIndex).toBeGreaterThan(catchReturnIndex)
+    })
+})
+
+// ---------------------------------------------------------------------------
 // 3. menu.vue cart drawer submit navigates to /order/review?packageId=ID
 // ---------------------------------------------------------------------------
 describe("menu.vue — cart drawer submit-order handler", () => {

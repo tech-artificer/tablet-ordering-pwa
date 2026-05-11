@@ -1193,6 +1193,26 @@ export const useOrderStore = defineStore("order", () => {
         }
     }
 
+    /**
+     * Patch order items from broadcast event (for refill updates)
+     * Preserves existing items and appends new ones to prevent duplicates
+     */
+    function patchOrderItems (items: any[]) {
+        if (!state.currentOrder?.order) { return }
+
+        const order = state.currentOrder.order as any
+        const existingItems = (order.items as any[]) || []
+        const existingIds = new Set(existingItems.map((item: any) => item.id))
+
+        // Only add items that don't already exist (prevent duplicates)
+        const newItems = items.filter((item: any) => item.id && !existingIds.has(item.id))
+
+        if (newItems.length > 0) {
+            order.items = [...existingItems, ...newItems]
+            logger.debug("[OrderStore] Patched order items:", { added: newItems.length, total: order.items.length })
+        }
+    }
+
     function completeOrder () {
         if (state.currentOrder?.order) {
             state.currentOrder.order.status = "completed"
@@ -1269,6 +1289,7 @@ export const useOrderStore = defineStore("order", () => {
         setOrderCreated,
         initializeFromSession,
         updateOrderStatus,
+        patchOrderItems,
         completeOrder,
         clearOrder,
         resetTransactionalState,
