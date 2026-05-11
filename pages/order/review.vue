@@ -32,10 +32,10 @@ const handleOrderSubmitted = async () => {
     logger.info("[Order Review] Order confirmation received", { timestamp })
     sessionStartError.value = null
 
-    triggerCelebration()
+    try {
+        triggerCelebration()
 
-    if (!sessionStore.isActive) {
-        try {
+        if (!sessionStore.isActive) {
             logger.info("[Order Review] Marking session active", { timestamp })
             const started = await sessionStore.start({ preserveSubmittedOrder: true })
             if (!started) {
@@ -44,18 +44,19 @@ const handleOrderSubmitted = async () => {
                 return
             }
             logger.info("[Session Flow] Order submitted, session active, ready for refill or completion")
-        } catch (e) {
-            logger.error("[Order Review] Failed to start session store", {
-                timestamp,
-                error: (e as any)?.message,
-            })
-            sessionStartError.value = "Your order was sent to the kitchen, but this tablet could not start the dining session. Please ask staff to reopen the session screen."
-            return
         }
-    }
 
-    logger.info("[Order Review] Navigating to in-session screen", { timestamp })
-    router.replace("/order/in-session")
+        logger.info("[Order Review] Navigating to in-session screen", { timestamp })
+        await router.replace("/order/in-session")
+        logger.info("[Order Review] Navigation completed", { timestamp })
+    } catch (e: any) {
+        logger.error("[Order Review] Fatal error in handleOrderSubmitted", {
+            timestamp,
+            error: e?.message || e,
+            stack: e?.stack,
+        })
+        sessionStartError.value = `Order sent, but navigation failed: ${e?.message || "Unknown error"}. Please call staff.`
+    }
 }
 </script>
 
