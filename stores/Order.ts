@@ -32,11 +32,13 @@ const normalizeCartCategory = (category?: string | null): string | null => {
 
 type SubmitOrderOptions = {
     headers?: Record<string, string>
+    clientSubmissionId?: string
 }
 
 type SubmitRefillOptions = {
     headers?: Record<string, string>
     idempotencyKey?: string
+    clientSubmissionId?: string
 }
 
 type MenuUnavailableError = Error & { code: string }
@@ -550,6 +552,11 @@ export const useOrderStore = defineStore("order", () => {
             const api = useApi()
             const body = payload ?? buildPayload()
 
+            // WS4: Add client submission ID to payload for backend idempotency
+            if (options?.clientSubmissionId) {
+                body.client_submission_id = options.clientSubmissionId
+            }
+
             logger.debug("Order Payload:", body)
 
             // Idempotency key: persist across retries.
@@ -773,6 +780,11 @@ export const useOrderStore = defineStore("order", () => {
             }
 
             const refillPayload = buildRefillPayload()
+
+            // WS4: Add client submission ID to refill payload for backend idempotency
+            if (options?.clientSubmissionId) {
+                refillPayload.client_submission_id = options.clientSubmissionId
+            }
 
             logger.debug("[Refill] Submitting refill payload", {
                 orderId: currentOrderId,

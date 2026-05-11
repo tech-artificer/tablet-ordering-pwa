@@ -2,6 +2,7 @@
 import confetti from "canvas-confetti"
 import { ref } from "vue"
 import { useSessionStore } from "../../stores/Session"
+import { useOrderSubmission } from "../../composables/useOrderSubmission"
 import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
 import { logger } from "~/utils/logger"
 
@@ -9,6 +10,7 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
 
 const router = useRouter()
 const sessionStore = useSessionStore()
+const { submitOrderWithIdempotency } = useOrderSubmission()
 const sessionStartError = ref<string | null>(null)
 
 const triggerCelebration = () => {
