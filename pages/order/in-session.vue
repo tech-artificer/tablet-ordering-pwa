@@ -31,7 +31,88 @@ const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as number)
 
 type OrderedItem = SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string; is_unlimited?: boolean; unit_price?: number }
-const allOrderedItems = computed<OrderedItem[]>(() => (unref(orderStore.allOrderedItems) ?? []) as OrderedItem[])
+
+function normalizeHistoryItem (item: any, sourceRound: "initial" | "refill", sourceRoundLabel: string): OrderedItem {
+    return {
+        id: Number(item?.menu_id ?? item?.id ?? 0),
+        menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+        name: String(item?.name ?? item?.receipt_name ?? "Item"),
+        quantity: Number(item?.quantity ?? 0),
+        price: Number(item?.price ?? item?.unit_price ?? 0),
+        img_url: item?.img_url || null,
+        category: item?.category || null,
+        isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
+        sourceRound,
+        sourceRoundLabel,
+    }
+}
+
+const displaySubmittedItems = computed<OrderedItem[]>(() => {
+    // PRIMARY: rounds[] — append-only ledger written by appendRound() on every
+    // successful submission. Source of truth for "show every item the customer
+    // has ever ordered in this session, grouped by round". Survives refresh,
+    // recovery, and validator passes — it is never cleared mid-session.
+    const rounds = (unref(orderStore.rounds) ?? []) as any[]
+    if (Array.isArray(rounds) && rounds.length > 0) {
+        const out: OrderedItem[] = []
+        for (const round of rounds) {
+            const isRefill = round?.kind === "refill"
+            const label = isRefill
+                ? `Refill #${Math.max(1, Number(round?.number ?? 1) - 1)}`
+                : "Initial Order"
+            const items = Array.isArray(round?.items) ? round.items : []
+            for (const item of items) {
+                out.push({
+                    id: Number(item?.id ?? item?.menu_id ?? 0),
+                    menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+                    name: String(item?.name ?? "Item"),
+                    quantity: Number(item?.quantity ?? 0),
+                    price: Number(item?.price ?? 0),
+                    img_url: item?.img_url || null,
+                    category: item?.category || null,
+                    isUnlimited: Boolean(item?.isUnlimited),
+                    sourceRound: isRefill ? "refill" : "initial",
+                    sourceRoundLabel: label,
+                })
+            }
+        }
+        if (out.length > 0) { return out }
+    }
+
+    // FALLBACK 1: legacy submittedItems (now append-only via the refill fix).
+    const submitted = (unref(orderStore.submittedItems) ?? []) as SubmittedItem[]
+    if (submitted.length > 0) {
+        return submitted.map(item => ({
+            ...item,
+            sourceRound: "initial" as const,
+            sourceRoundLabel: "Order",
+        }))
+    }
+
+    // FALLBACK 2: currentOrder.items / .order_items (server-polled snapshot).
+    const co = currentOrder.value as any
+    if (Array.isArray(co?.items) && co.items.length > 0) {
+        return co.items.map((item: any) => normalizeHistoryItem(item, "initial", "Order"))
+    }
+    if (Array.isArray(co?.order_items) && co.order_items.length > 0) {
+        return co.order_items.map((item: any) => normalizeHistoryItem(item, "initial", "Order"))
+    }
+
+    // FALLBACK 3: legacy history entries.
+    const history = ([...((unref(orderStore.history) ?? []) as any[])]).reverse()
+    for (const entry of history) {
+        const order = (entry as any)?.order ?? entry
+        const items = order?.items ?? order?.order_items
+        if (Array.isArray(items) && items.length > 0) {
+            const isRefill = (entry as any)?.type === "refill"
+            const sourceRound: "initial" | "refill" = isRefill ? "refill" : "initial"
+            const sourceRoundLabel = isRefill ? "Refill" : "Order"
+            return items.map((item: any) => normalizeHistoryItem(item, sourceRound, sourceRoundLabel))
+        }
+    }
+
+    return []
+})
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const packageName = computed(() =>
@@ -41,14 +122,28 @@ const packageName = computed(() =>
 )
 
 const totalItemsOrdered = computed(() =>
-    allOrderedItems.value.reduce((s: number, i: SubmittedItem) => s + Number(i?.quantity ?? 0), 0)
+    displaySubmittedItems.value.reduce((s: number, i: SubmittedItem) => s + Number(i?.quantity ?? 0), 0)
 )
 
 // Use server/order-adapter total when available so billing matches authoritative
 // order calculation (package, multipliers, taxes, and backend adjustments).
 const displayTotal = computed<number>(() => {
-    const totalFromOrder = Number(currentOrder.value?.total_amount)
-    if (Number.isFinite(totalFromOrder)) { return totalFromOrder }
+    // 1. Server total from normalized currentOrder (polled live value).
+    //    Guard > 0: polling responses sometimes return 0 for an unpopulated field.
+    const totalFromOrder = Number((currentOrder.value as any)?.total_amount)
+    if (Number.isFinite(totalFromOrder) && totalFromOrder > 0) { return totalFromOrder }
+
+    // 2. History entries most-recent-first — submission responses carry total_amount
+    //    even after polling overwrites currentOrder with a shape that lacks it.
+    const history = ([...((unref(orderStore.history) ?? []) as any[])]).reverse()
+    for (const entry of history) {
+        const order = (entry as any)?.order ?? entry
+        const histTotal = Number(order?.total_amount ?? (entry as any)?.total_amount)
+        if (Number.isFinite(histTotal) && histTotal > 0) { return histTotal }
+    }
+
+    // 3. grandTotal — package × guestCount; add-ons zeroed after cart clear.
+    //    Only approximate, shown while server total is not yet available.
     const fallbackTotal = Number(unref(orderStore.grandTotal) ?? 0)
     return Number.isFinite(fallbackTotal) ? fallbackTotal : 0
 })
@@ -290,7 +385,7 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                     <!-- Scrollable item stream -->
                     <div class="scrollbar-warm flex-1 overflow-y-auto space-y-2 px-6 py-4">
                         <div
-                            v-for="(item, index) in allOrderedItems"
+                            v-for="(item, index) in displaySubmittedItems"
                             :key="`ordered-${item.sourceRoundLabel ?? 'order'}-${item.id ?? item.menu_id ?? index}-${index}`"
                             class="flex items-center gap-3 rounded-xl bg-[#141210] border border-transparent p-[12px_14px] transition-[border-color,background] duration-150 hover:bg-[#1e1a16] hover:border-[rgba(233,211,170,0.1)]"
                         >
@@ -335,7 +430,7 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                         </div>
 
                         <p
-                            v-if="!allOrderedItems.length"
+                            v-if="!displaySubmittedItems.length"
                             class="py-8 text-center text-sm text-[#7a776f]"
                         >
                             No items submitted yet.

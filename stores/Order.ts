@@ -280,8 +280,14 @@ export const useOrderStore = defineStore("order", () => {
         }
 
         if (state.hasPlacedOrder && !hasServerBackedOrder()) {
+            // Only mark hasPlacedOrder as false; do NOT wipe submittedItems.
+            // Submitted items are an append-only display ledger and must survive
+            // any transient mismatch between client flags and server-backed state
+            // (e.g., a refresh during the brief window between submit and the
+            // server response landing in currentOrder).
+            // The new rounds[] ledger is the canonical source going forward and
+            // is also never cleared by validation.
             state.hasPlacedOrder = false
-            state.submittedItems = []
             issues.push("hasPlacedOrderWithoutServerReference")
         }
 
@@ -914,8 +920,11 @@ export const useOrderStore = defineStore("order", () => {
                 // ── New data model: snapshot the refill batch as an append-only round ──
                 appendRound("refill", state.refillItems, responseData)
 
-                // ── Legacy fields (preserved during commit 1 for backward compat) ─────
-                state.submittedItems = state.refillItems.map(item => ({
+                // ── Legacy submittedItems: APPEND, do not overwrite. Customers
+                //    must see every item across initial + every refill round. The
+                //    previous overwrite was the root cause of "initial order
+                //    disappears after first refill". ─────────────────────────────
+                const refillSnapshot: SubmittedItem[] = state.refillItems.map(item => ({
                     id: item.id,
                     menu_id: item.id,
                     name: item.name,
@@ -925,6 +934,7 @@ export const useOrderStore = defineStore("order", () => {
                     category: item.category || null,
                     isUnlimited: item.isUnlimited,
                 }))
+                state.submittedItems = [...state.submittedItems, ...refillSnapshot]
                 state.refillItems = []
                 state.isRefillMode = false
                 state.history = [...state.history, { ...responseData, type: "refill" }]
