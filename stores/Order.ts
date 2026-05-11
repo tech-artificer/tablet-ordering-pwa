@@ -319,22 +319,20 @@ export const useOrderStore = defineStore("order", () => {
         state.refillItems.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0)
     )
 
-    // Aggregate all ordered items from history (initial order + all refills) for continuous display
+    // Aggregate all ordered items from rounds (initial order + all refills) for continuous display
+    // PRIMARY: read from the new rounds[] ledger (see docs/DATA_MODEL.md)
+    // FALLBACK: history[] for backward compat during migration
     const allOrderedItems = computed<Array<SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string }>>(() => {
-        const history = (unref(state.history) ?? []) as Array<OrderApiResponse & { type?: string }>
         const allItems: Array<SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string }> = []
 
-        // Process history entries: history[0] = initial, history[1..n] = refills
-        history.forEach((entry, entryIndex) => {
-            const order = (entry as any)?.order ?? entry
-            // Try multiple item array locations
-            const items = order?.items ?? order?.order_items ?? (entry as any)?.submittedItems ?? (entry as any)?.submitted_items ?? []
-
-            if (Array.isArray(items)) {
-                const isInitial = entryIndex === 0
-                const refillNumber = entryIndex // 0 for initial, 1+ for refills
-                const sourceRound: "initial" | "refill" = isInitial ? "initial" : "refill"
-                const sourceRoundLabel = isInitial ? "Initial Order" : `Refill #${refillNumber}`
+        // PRIMARY: new data model — read from rounds[] ledger
+        const rounds = (unref(state.rounds) ?? []) as OrderRound[]
+        if (rounds.length > 0) {
+            rounds.forEach((round) => {
+                const items = round.items ?? []
+                const sourceRoundLabel = round.kind === "initial"
+                    ? "Initial Order"
+                    : `Refill #${round.number - 1}`
 
                 items.forEach((item: any) => {
                     allItems.push({
@@ -346,14 +344,46 @@ export const useOrderStore = defineStore("order", () => {
                         img_url: item?.img_url || null,
                         category: item?.category || null,
                         isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
-                        sourceRound,
+                        sourceRound: round.kind,
                         sourceRoundLabel,
                     })
                 })
-            }
-        })
+            })
+        }
 
-        // Fallback: if history has no items but submittedItems exists, use that
+        // FALLBACK: legacy history[] for backward compat (will be removed in TASK E)
+        if (allItems.length === 0) {
+            const history = (unref(state.history) ?? []) as Array<OrderApiResponse & { type?: string }>
+            history.forEach((entry, entryIndex) => {
+                const order = (entry as any)?.order ?? entry
+                // Try multiple item array locations
+                const items = order?.items ?? order?.order_items ?? (entry as any)?.submittedItems ?? (entry as any)?.submitted_items ?? []
+
+                if (Array.isArray(items)) {
+                    const isInitial = entryIndex === 0
+                    const refillNumber = entryIndex // 0 for initial, 1+ for refills
+                    const sourceRound: "initial" | "refill" = isInitial ? "initial" : "refill"
+                    const sourceRoundLabel = isInitial ? "Initial Order" : `Refill #${refillNumber}`
+
+                    items.forEach((item: any) => {
+                        allItems.push({
+                            id: Number(item?.menu_id ?? item?.id ?? 0),
+                            menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+                            name: String(item?.name ?? item?.receipt_name ?? "Item"),
+                            quantity: Number(item?.quantity ?? 0),
+                            price: Number(item?.price ?? item?.unit_price ?? 0),
+                            img_url: item?.img_url || null,
+                            category: item?.category || null,
+                            isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
+                            sourceRound,
+                            sourceRoundLabel,
+                        })
+                    })
+                }
+            })
+        }
+
+        // FALLBACK: if history has no items but submittedItems exists, use that
         if (allItems.length === 0) {
             const submitted = (unref(state.submittedItems) ?? []) as SubmittedItem[]
             if (submitted.length > 0) {
