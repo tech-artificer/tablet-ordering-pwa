@@ -28,6 +28,7 @@
     "axios": "^1.15.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "uuid": "^10.0.0",
     "dexie": "^4.4.2",
     "element-plus": "^2.3.0",
     "jwt-decode": "^4.0.0",
