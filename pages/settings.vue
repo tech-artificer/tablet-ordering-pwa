@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { ElMessageBox, ElNotification } from "element-plus"
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
+import { deleteTabletPwaCaches, unregisterCurrentAppServiceWorkers } from "../utils/pwaReset"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 
 // @ts-ignore - Nuxt auto-imports
@@ -511,17 +512,17 @@ const saveTableOverride = async () => {
     }
 }
 
-// Force refresh app — clears service worker caches without a browser hard refresh
+// Force refresh app — clears only tablet PWA caches for the active app scope
 const isForceRefreshing = ref(false)
 const forceRefreshApp = async () => {
     isForceRefreshing.value = true
     try {
         if ("serviceWorker" in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations()
-            await Promise.all(registrations.map(r => r.unregister()))
+            await unregisterCurrentAppServiceWorkers()
         }
-        const cacheNames = await caches.keys()
-        await Promise.all(cacheNames.map(name => caches.delete(name)))
+        if ("caches" in window) {
+            await deleteTabletPwaCaches()
+        }
         window.location.reload()
     } catch (e) {
         logger.warn("[Settings] forceRefreshApp failed", e)
@@ -1202,7 +1203,8 @@ onMounted(async () => {
                     🔄 App Maintenance
                 </h2>
                 <p class="text-white/60 text-sm mb-4">
-                    Clear all cached data and service workers to force a fresh reload.
+                    Refresh only the tablet PWA caches and the active tablet service worker for this app scope.
+                    Use <code class="text-xs bg-black/30 px-1 rounded">/sw-reset</code> only for dedicated-origin emergency resets.
                 </p>
                 <button
                     :disabled="isForceRefreshing"
@@ -1211,8 +1213,14 @@ onMounted(async () => {
                 >
                     <span v-if="isForceRefreshing" class="animate-spin">⏳</span>
                     <span v-else>🔄</span>
-                    {{ isForceRefreshing ? 'Refreshing...' : 'Force Refresh App' }}
+                    {{ isForceRefreshing ? 'Refreshing...' : 'Refresh Tablet PWA' }}
                 </button>
+                <NuxtLink
+                    class="mt-3 flex min-h-[48px] items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 px-6 py-3 font-semibold text-red-300 transition-all hover:bg-red-500/20"
+                    to="/sw-reset"
+                >
+                    Emergency full-origin reset (/sw-reset)
+                </NuxtLink>
             </div>
 
             <!-- Back Button was moved to header -->

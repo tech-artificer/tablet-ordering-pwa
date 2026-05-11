@@ -19,13 +19,17 @@ describe("tablet-safe refresh controls", () => {
         expect(bannerSource).toContain("New version available - tap to apply.")
     })
 
-    it("provides a settings action that can force-refresh app cache without browser hard refresh", () => {
+    it("keeps scoped tablet refresh separate from emergency /sw-reset cleanup", () => {
         const settingsSource = readSource("pages/settings.vue")
+        const resetSource = readSource("pages/sw-reset.vue")
 
         expect(settingsSource).toContain("forceRefreshApp")
-        expect(settingsSource).toContain("getRegistrations")
-        expect(settingsSource).toContain("caches.keys()")
-        expect(settingsSource).toContain("Force Refresh App")
+        expect(settingsSource).toContain("deleteTabletPwaCaches")
+        expect(settingsSource).toContain("unregisterCurrentAppServiceWorkers")
+        expect(settingsSource).toContain("Refresh Tablet PWA")
+        expect(settingsSource).toContain("/sw-reset")
+        expect(resetSource).toContain("deleteAllCaches")
+        expect(resetSource).toContain("unregisterAllServiceWorkers")
     })
 
     it("supports explicit skip-waiting handshake from client to service worker", () => {

@@ -85,4 +85,45 @@ describe("useAppUpdate", () => {
         expect(update.isApplyingUpdate.value).toBe(true)
         update.disposeAppUpdate()
     })
+
+    it("defers reload until blockers clear after update activation starts", async () => {
+        const originalLocation = window.location
+        const reloadSpy = vi.fn()
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: {
+                ...originalLocation,
+                reload: reloadSpy,
+            },
+        })
+        try {
+            const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
+            const blocked = ref(false)
+            const update = useAppUpdate({ isUpdateApplyBlocked: blocked })
+
+            await update.initializeAppUpdate()
+            serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
+            await nextTick()
+
+            update.applyUpdate()
+            blocked.value = true
+            await nextTick()
+
+            serviceWorkerContainer.dispatchEvent(new Event("controllerchange"))
+            await nextTick()
+
+            expect(reloadSpy).not.toHaveBeenCalled()
+
+            blocked.value = false
+            await nextTick()
+
+            expect(reloadSpy).toHaveBeenCalledTimes(1)
+            update.disposeAppUpdate()
+        } finally {
+            Object.defineProperty(window, "location", {
+                configurable: true,
+                value: originalLocation,
+            })
+        }
+    })
 })
