@@ -419,6 +419,26 @@ const getServiceTypeId = (type: string): number => {
     return serviceMap[type] || 4
 }
 
+// Navigate to order review page with package context
+const handleProceedToReview = async () => {
+    cartDrawerOpen.value = false
+
+    if (!selectedPackageId.value) {
+        notifyWarning("Package selection was lost. Please select a package again.")
+        return
+    }
+
+    try {
+        await router.push({
+            path: "/order/review",
+            query: { packageId: String(selectedPackageId.value) }
+        })
+    } catch (err) {
+        logger.error("[Menu] Failed to navigate to review:", err)
+        notifyWarning("Unable to proceed to order review. Please try again.")
+    }
+}
+
 // Refill mode toggle
 const toggleRefillMode = () => {
     // Check if order has been placed AND confirmed by server
@@ -592,7 +612,7 @@ const categoryError = computed(() => {
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="() => { cartDrawerOpen = false; router.push({ path: '/order/review', query: selectedPackageId.value ? { packageId: String(selectedPackageId.value) } : {} }) }"
+                @submit-order="handleProceedToReview"
                 @toggle-refill-mode="toggleRefillMode"
             />
         </el-drawer>
