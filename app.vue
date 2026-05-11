@@ -6,6 +6,7 @@ import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
+import { useBuildVersion } from "~/composables/useBuildVersion"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
@@ -18,6 +19,7 @@ const { attachListener, requestFullscreen } = useKioskFullscreen()
 const isUpdateApplyBlocked = computed(() =>
     Boolean(sessionStore.isActive) || Boolean(orderStore.hasPlacedOrder) || Boolean(orderStore.isSubmitting)
 )
+const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
 const {
     showUpdateBanner,
     canApplyUpdate,
@@ -190,6 +192,9 @@ onMounted(async () => {
     registerGestureFullscreenRecovery()
     await initializeAppUpdate()
 
+    // Start periodic build version checking (for stale chunk detection)
+    startPeriodicCheck(false)
+
     try {
         const authenticated = await resolveAuthenticationState()
         await nuxtApp.callHook("app:auth-ready", { authenticated })
@@ -217,6 +222,7 @@ onUnmounted(() => {
     cleanup()
     disposeAppUpdate()
     unregisterGestureFullscreenRecovery()
+    stopPeriodicCheck()
 
     if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", handleVisibilityChange)
