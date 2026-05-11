@@ -6,6 +6,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
     const serviceWorkerContainer = new EventTarget() as EventTarget & {
         ready: Promise<ServiceWorkerRegistration>
         controller: Record<string, unknown>
+        getRegistrations: () => Promise<ServiceWorkerRegistration[]>
+        getRegistration: () => Promise<ServiceWorkerRegistration | undefined>
     }
 
     const waiting = {
@@ -20,6 +22,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
 
     serviceWorkerContainer.ready = Promise.resolve(registration)
     serviceWorkerContainer.controller = {}
+    serviceWorkerContainer.getRegistrations = vi.fn().mockResolvedValue([registration])
+    serviceWorkerContainer.getRegistration = vi.fn().mockResolvedValue(registration)
 
     Object.defineProperty(globalThis.navigator, "serviceWorker", {
         configurable: true,

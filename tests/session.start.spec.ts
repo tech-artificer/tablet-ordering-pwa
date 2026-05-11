@@ -64,6 +64,7 @@ describe("session start flow", () => {
         const started = await session.start({ preserveSelection: true })
 
         expect(started).toBe(true)
+        expect(mockLoadAllMenus).toHaveBeenCalledWith(true)
         expect(order.guestCount).toBe(6)
         expect(unref(order.package)?.id).toBe(101)
     })

@@ -9,37 +9,40 @@ const wasOffline = ref(false) // Track if we recovered from offline
 const connectionType = ref<string | null>(null)
 
 let initialized = false
+let activeConsumers = 0
+
+const updateOnlineStatus = () => {
+    const previousStatus = isOnline.value
+    isOnline.value = navigator.onLine
+
+    // Track recovery from offline
+    if (!previousStatus && isOnline.value) {
+        wasOffline.value = true
+        // Reset after 5 seconds
+        setTimeout(() => {
+            wasOffline.value = false
+        }, 5000)
+    }
+}
+
+const updateConnectionType = () => {
+    if ("connection" in navigator) {
+        const conn = (navigator as any).connection
+        connectionType.value = conn?.effectiveType || null
+    }
+}
 
 export function useNetworkStatus () {
-    const updateOnlineStatus = () => {
-        const previousStatus = isOnline.value
-        isOnline.value = navigator.onLine
-
-        // Track recovery from offline
-        if (!previousStatus && isOnline.value) {
-            wasOffline.value = true
-            // Reset after 5 seconds
-            setTimeout(() => {
-                wasOffline.value = false
-            }, 5000)
-        }
-    }
-
-    const updateConnectionType = () => {
-        if ("connection" in navigator) {
-            const conn = (navigator as any).connection
-            connectionType.value = conn?.effectiveType || null
-        }
-    }
-
     onMounted(() => {
         if (typeof window === "undefined") { return }
-        if (initialized) { return }
-        initialized = true
+        activeConsumers += 1
 
         // Initial status
         isOnline.value = navigator.onLine
         updateConnectionType()
+
+        if (initialized) { return }
+        initialized = true
 
         // Listen to network changes
         window.addEventListener("online", updateOnlineStatus)
@@ -52,6 +55,8 @@ export function useNetworkStatus () {
 
     onBeforeUnmount(() => {
         if (typeof window === "undefined") { return }
+        activeConsumers = Math.max(0, activeConsumers - 1)
+        if (activeConsumers > 0) { return }
 
         window.removeEventListener("online", updateOnlineStatus)
         window.removeEventListener("offline", updateOnlineStatus)
@@ -59,6 +64,7 @@ export function useNetworkStatus () {
         if ("connection" in navigator) {
             (navigator as any).connection?.removeEventListener("change", updateConnectionType)
         }
+        initialized = false
     })
 
     return {

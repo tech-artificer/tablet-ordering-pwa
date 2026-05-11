@@ -5,7 +5,6 @@ import { useSessionStore } from "~/stores/Session"
 import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
-import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "~/utils/logger"
 
@@ -15,7 +14,6 @@ const deviceStore = useDeviceStore()
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
-const { registerOnlineListener } = useOfflineOrderQueue()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
 const isUpdateApplyBlocked = computed(() =>
     Boolean(sessionStore.isActive) || Boolean(orderStore.hasPlacedOrder) || Boolean(orderStore.isSubmitting)
@@ -133,7 +131,7 @@ function enforceFullscreenIfNeeded (): void {
     if (typeof document === "undefined") { return }
     if (deviceStore.getKioskUnlocked()) { return }
 
-    void requestFullscreen()
+    requestFullscreen().catch(() => undefined)
 }
 
 function handleFullscreenGestureRecovery (): void {
@@ -202,9 +200,6 @@ onMounted(async () => {
     } finally {
         isLoading.value = false
     }
-    // Register global online event listener to drain the offline order queue
-    registerOnlineListener()
-
     // Enforce fullscreen as early as possible (browser may defer until user gesture)
     enforceFullscreenIfNeeded()
 

@@ -7,6 +7,7 @@ const UPDATE_AVAILABLE_MESSAGE_TYPES = ["UPDATE_AVAILABLE", "APP_UPDATE_AVAILABL
 
 type UseAppUpdateOptions = {
     isUpdateApplyBlocked?: MaybeRefOrGetter<boolean>
+    reload?: () => void
 }
 
 type WorkerMessageData = {
@@ -41,6 +42,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     let removeServiceWorkerMessageListener: (() => void) | null = null
     let removeUpdateFoundListener: (() => void) | null = null
     let stopBlockedWatcher: (() => void) | null = null
+    const reload = options?.reload ?? (() => window.location.reload())
 
     const reloadIfSafe = () => {
         if (hasReloaded || isUpdateApplyBlocked.value) {
@@ -48,7 +50,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
             return
         }
         hasReloaded = true
-        window.location.reload()
+        reload()
     }
 
     const bindControllerChangeReload = () => {

@@ -10,7 +10,7 @@ export default defineNuxtRouteMiddleware(async (to, _from) => {
 
     // Allow access to registration page, settings, the session-ended transition page,
     // and the root without authentication
-    const publicRoutes = ["/", "/settings", "/auth/register", "/order/session-ended"]
+    const publicRoutes = ["/", "/settings", "/auth/register", "/order/session-ended", "/sw-reset"]
     if (publicRoutes.includes(to.path)) {
         return
     }

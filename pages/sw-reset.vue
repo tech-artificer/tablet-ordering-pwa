@@ -3,6 +3,9 @@ import { onMounted, ref } from "vue"
 import { deleteAllCaches, unregisterAllServiceWorkers } from "../utils/pwaReset"
 import { logger } from "../utils/logger"
 
+definePageMeta({ layout: false })
+
+const status = ref("Preparing emergency reset...")
 const isResetting = ref(false)
 const resetError = ref("")
 
@@ -13,17 +16,23 @@ const runEmergencyReset = async () => {
 
     isResetting.value = true
     resetError.value = ""
+    status.value = "Resetting service workers and caches…"
 
     try {
-        if ("serviceWorker" in navigator) {
-            await unregisterAllServiceWorkers()
-        }
-        if ("caches" in window) {
-            await deleteAllCaches()
-        }
-        window.location.replace("/")
+        const unregisteredCount = "serviceWorker" in navigator
+            ? await unregisterAllServiceWorkers()
+            : 0
+        const deletedCaches = "caches" in window
+            ? await deleteAllCaches()
+            : []
+
+        status.value = `Unregistered ${unregisteredCount} service worker(s) and cleared ${deletedCaches.length} cache(s). Reloading...`
+        window.setTimeout(() => {
+            window.location.replace(`/?sw-reset=${Date.now()}`)
+        }, 1200)
     } catch (error) {
         resetError.value = "Emergency reset failed. Close the app and reopen it, or try again."
+        status.value = resetError.value
         logger.warn("[PWA] Emergency /sw-reset failed", error)
     } finally {
         isResetting.value = false
@@ -47,23 +56,16 @@ onMounted(() => {
             </p>
 
             <div class="mt-6 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/80">
-                <p v-if="isResetting">
-                    Resetting service workers and caches…
-                </p>
-                <p v-else-if="resetError">
-                    {{ resetError }}
-                </p>
-                <p v-else>
-                    Reset complete. Returning to the app…
-                </p>
+                {{ status }}
             </div>
 
             <button
                 v-if="resetError"
+                type="button"
                 class="mt-4 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 font-semibold text-red-300 transition hover:bg-red-500/20"
                 @click="runEmergencyReset"
             >
-                Retry emergency reset
+                {{ isResetting ? "Resetting..." : "Retry emergency reset" }}
             </button>
         </div>
     </div>

@@ -5,6 +5,7 @@ import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
+import type { SubmittedItem } from "~/types"
 import { useApi } from "~/composables/useApi"
 import { useIdleDetector } from "~/composables/useIdleDetector"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
@@ -30,16 +31,8 @@ const orderId = computed<number | null>(() => currentOrder.value?.order_id ?? se
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as number)
 
-const submittedItems = computed<any[]>(() => (unref(orderStore.submittedItems) ?? []) as any[])
-
-const refillHistory = computed(() => {
-    const h = (unref(orderStore.history) ?? []) as any[]
-    if (h.length <= 1) { return [] }
-    return h.slice(1).map((entry: any) => ({
-        orderNumber: entry?.order?.order_number ?? entry?.order_number ?? "—",
-        status: entry?.order?.status ?? entry?.status ?? "pending",
-    }))
-})
+type OrderedItem = SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string; is_unlimited?: boolean; unit_price?: number }
+const allOrderedItems = computed<OrderedItem[]>(() => (unref(orderStore.allOrderedItems) ?? []) as OrderedItem[])
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const packageName = computed(() =>
@@ -49,7 +42,7 @@ const packageName = computed(() =>
 )
 
 const totalItemsOrdered = computed(() =>
-    submittedItems.value.reduce((s: number, i: any) => s + Number(i?.quantity ?? 0), 0)
+    allOrderedItems.value.reduce((s: number, i: SubmittedItem) => s + Number(i?.quantity ?? 0), 0)
 )
 
 // Use server/order-adapter total when available so billing matches authoritative
@@ -315,8 +308,8 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                     <!-- Scrollable item stream -->
                     <div class="scrollbar-warm flex-1 overflow-y-auto space-y-2 px-6 py-4">
                         <div
-                            v-for="item in submittedItems"
-                            :key="item.id"
+                            v-for="(item, index) in allOrderedItems"
+                            :key="`ordered-${item.sourceRoundLabel ?? 'order'}-${item.id ?? item.menu_id ?? index}-${index}`"
                             class="flex items-center gap-3 rounded-xl bg-[#141210] border border-transparent p-[12px_14px] transition-[border-color,background] duration-150 hover:bg-[#1e1a16] hover:border-[rgba(233,211,170,0.1)]"
                         >
                             <!-- Emoji icon cell -->
@@ -332,6 +325,12 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                                         v-if="item.isUnlimited || item.is_unlimited"
                                         class="flex-shrink-0 rounded border border-[#e9d3aa]/30 bg-[#e9d3aa]/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#e9d3aa]"
                                     >∞</span>
+                                    <span
+                                        v-if="item.sourceRound === 'refill'"
+                                        class="flex-shrink-0 rounded border border-[#7a776f]/30 bg-[#7a776f]/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#9b9484]"
+                                    >
+                                        {{ item.sourceRoundLabel }}
+                                    </span>
                                 </div>
                                 <span class="text-xs text-[#7a776f]">
                                     ₱{{ Number(item.price ?? item.unit_price ?? 0).toFixed(2) }} each
@@ -354,37 +353,11 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                         </div>
 
                         <p
-                            v-if="!submittedItems.length"
+                            v-if="!allOrderedItems.length"
                             class="py-8 text-center text-sm text-[#7a776f]"
                         >
                             No items submitted yet.
                         </p>
-
-                        <!-- Refill history -->
-                        <div
-                            v-if="refillHistory.length"
-                            class="mt-4 space-y-2 border-t border-white/5 pt-4"
-                        >
-                            <p class="mb-3 text-xs font-medium uppercase tracking-widest text-[#7a776f]">
-                                Refill History
-                            </p>
-                            <div
-                                v-for="(refill, i) in refillHistory"
-                                :key="i"
-                                class="flex items-center justify-between rounded-lg bg-[#141210] px-4 py-2.5"
-                            >
-                                <span class="text-sm text-[#8a8578]">
-                                    Refill #{{ i + 1 }} — Order {{ refill.orderNumber }}
-                                </span>
-                                <div
-                                    class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                                    :style="getStatusDarkStyle(refill.status)"
-                                >
-                                    <span class="h-1.5 w-1.5 rounded-full" :style="getStatusDotStyle(refill.status)" />
-                                    {{ STATUS_LABELS[refill.status] ?? refill.status }}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 

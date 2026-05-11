@@ -48,9 +48,9 @@ onMounted(async () => {
 
     logger.info("[PackageSelection] Loading packages from API...")
     try {
-    // Respect cache — only fetch if stale or empty (welcome screen already preloads).
-    // Pass forceRefresh=false so a warm cache from index.vue is used immediately.
-        await menuStore.loadAllMenus(false)
+    // Force refresh at order start to avoid stale menu cache across new customer sessions.
+    // This ensures customers always see current Krypton menu data.
+        await menuStore.loadAllMenus(true)
         console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
         logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
     } catch (error: any) {
@@ -64,10 +64,12 @@ const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages)
 const guestCount = computed(() => Number(orderStore.guestCount))
 
-// Responsive layout
-type PackageRowMode = "three" | "peek" | "portrait"
+// Responsive layout - optimized for 4-column grid on tablet
+type PackageRowMode = "four" | "three" | "peek" | "portrait"
 const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1280)
 const packageRowMode = computed<PackageRowMode>(() => {
+    if (packages.value.length <= 3 && viewportWidth.value >= 900) { return "three" }
+    if (viewportWidth.value >= 1400) { return "four" }
     if (viewportWidth.value >= 1200) { return "three" }
     if (viewportWidth.value >= 900) { return "peek" }
     return "portrait"
@@ -79,6 +81,7 @@ function onResize () {
 // Card focus and modifier inspector
 const focusedPackageId = ref<number | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
+const pendingPackageSelection = ref<Package | null>(null)
 
 function handleCardFocus (pkg: Package) {
     focusedPackageId.value = pkg.id
@@ -107,7 +110,22 @@ const formatCurrency = (value: number | string) => {
     return phpCurrencyFormatter.format(Number.isFinite(amount) ? amount : 0)
 }
 
-const handlePackageSelection = async (packageData: Package) => {
+const handlePackageSelection = (packageData: Package) => {
+    pendingPackageSelection.value = packageData
+}
+
+function cancelPackageSelection () {
+    pendingPackageSelection.value = null
+}
+
+async function confirmPackageSelection () {
+    if (!pendingPackageSelection.value) { return }
+    const packageData = pendingPackageSelection.value
+    pendingPackageSelection.value = null
+    await proceedToMenuForPackage(packageData)
+}
+
+const proceedToMenuForPackage = async (packageData: Package) => {
     // Persist selected package to order store for downstream flows
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
@@ -325,17 +343,43 @@ function handleTouchEnd () {
                 <!-- Package Row Display -->
                 <div
                     v-else
-                    class="flex-1 min-h-0 overflow-x-auto overflow-y-visible pt-3 pkg-row-scroll"
+                    class="flex-1 min-h-0 pt-3"
+                    :class="(packageRowMode === 'three' || packageRowMode === 'four')
+                        ? 'overflow-hidden'
+                        : 'overflow-x-auto overflow-y-visible pkg-row-scroll'"
                 >
-                    <!-- Three-up grid mode (≥1200px) -->
+                    <!-- Four-up grid mode (≥1400px) -->
                     <div
-                        v-if="packageRowMode === 'three'"
-                        class="grid grid-cols-3 gap-5 xl:gap-6 h-full pb-2"
+                        v-if="packageRowMode === 'four'"
+                        class="grid grid-cols-4 gap-4 h-full pb-2"
                     >
                         <div
                             v-for="pkg in packages"
                             :key="pkg.id"
-                            class="flex h-full min-w-[330px] flex-1"
+                            class="flex h-full min-w-[280px] flex-1"
+                        >
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
+                                @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Three-up grid mode (≥1200px) -->
+                    <div
+                        v-else-if="packageRowMode === 'three'"
+                        class="grid gap-4 xl:gap-5 h-full pb-2"
+                        :class="packages.length === 1 ? 'grid-cols-1' : (packages.length === 2 ? 'grid-cols-2' : 'grid-cols-3')"
+                    >
+                        <div
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-0 flex-1"
                         >
                             <PackageCard
                                 :pkg="pkg"
@@ -390,6 +434,44 @@ function handleTouchEnd () {
                                 @focus="handleCardFocus"
                                 @view-modifiers="openModifierInspector"
                             />
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    v-if="pendingPackageSelection"
+                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/75 backdrop-blur-sm"
+                    @click.self="cancelPackageSelection"
+                >
+                    <div class="mx-4 w-full max-w-xl rounded-2xl border border-white/15 bg-[#161618] p-6">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">
+                            Confirm package
+                        </p>
+                        <h3 class="mt-2 text-2xl font-extrabold text-white font-raleway">
+                            {{ pendingPackageSelection.name }}
+                        </h3>
+                        <p class="mt-2 text-sm text-white/70">
+                            You are selecting this package for {{ guestCount }} {{ guestCount === 1 ? "guest" : "guests" }}.
+                        </p>
+                        <p class="mt-1 text-sm font-bold text-[#f6b56d]">
+                            Total: {{ formatCurrency(Number(pendingPackageSelection.price) * guestCount) }}
+                        </p>
+
+                        <div class="mt-6 grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                class="h-12 rounded-xl border border-white/15 bg-white/5 text-sm font-bold text-white/80 transition hover:bg-white/10"
+                                @click="cancelPackageSelection"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                class="h-12 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-sm font-extrabold text-secondary transition active:scale-[0.99]"
+                                @click="confirmPackageSelection"
+                            >
+                                Continue to Menu
+                            </button>
                         </div>
                     </div>
                 </div>
