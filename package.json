@@ -12,6 +12,7 @@
     "test:run": "vitest run",
     "build": "npx nuxi build",
     "generate": "npx nuxi generate",
+    "analyze:bundle": "node scripts/analyze-bundle.js",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
