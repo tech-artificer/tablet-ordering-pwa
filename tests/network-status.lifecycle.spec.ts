@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, afterAll } from "vitest"
 import { defineComponent } from "vue"
 import { mount } from "@vue/test-utils"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
+
+// Capture original navigator.onLine descriptor for cleanup
+const originalNavigatorOnLineDescriptor = Object.getOwnPropertyDescriptor(window.navigator, "onLine")
 
 function setNavigatorOnline (online: boolean) {
     Object.defineProperty(window.navigator, "onLine", {
@@ -21,6 +24,17 @@ const ProbeComponent = defineComponent({
 describe("useNetworkStatus lifecycle", () => {
     beforeEach(() => {
         setNavigatorOnline(true)
+    })
+
+    afterAll(() => {
+        // Restore original navigator.onLine descriptor
+        if (originalNavigatorOnLineDescriptor) {
+            Object.defineProperty(window.navigator, "onLine", originalNavigatorOnLineDescriptor)
+        } else {
+            // If no original descriptor, delete the mocked property
+            // @ts-ignore
+            delete window.navigator.onLine
+        }
     })
 
     it("refreshes network state when a new consumer mounts after previous unmount", async () => {

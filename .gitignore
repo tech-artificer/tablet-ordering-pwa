@@ -39,3 +39,4 @@ public/
 
 # AI agent runtime files
 skills-lock.json
+.agents/
