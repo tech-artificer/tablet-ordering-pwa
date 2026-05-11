@@ -1,5 +1,5 @@
 import { defineStore } from "pinia"
-import { reactive, computed, toRefs, onScopeDispose } from "vue"
+import { reactive, computed, toRefs, onScopeDispose, unref } from "vue"
 import { useApi } from "../composables/useApi"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
@@ -211,6 +211,79 @@ export const useOrderStore = defineStore("order", () => {
         state.refillItems.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0)
     )
 
+    // Aggregate all ordered items from history (initial order + all refills) for continuous display
+    const allOrderedItems = computed<Array<SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string }>>(() => {
+        const history = (unref(state.history) ?? []) as Array<OrderApiResponse & { type?: string }>
+        const allItems: Array<SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string }> = []
+
+        // Process history entries: history[0] = initial, history[1..n] = refills
+        history.forEach((entry, entryIndex) => {
+            const order = (entry as any)?.order ?? entry
+            // Try multiple item array locations
+            const items = order?.items ?? order?.order_items ?? (entry as any)?.submittedItems ?? (entry as any)?.submitted_items ?? []
+
+            if (Array.isArray(items)) {
+                const isInitial = entryIndex === 0
+                const refillNumber = entryIndex // 0 for initial, 1+ for refills
+                const sourceRound: "initial" | "refill" = isInitial ? "initial" : "refill"
+                const sourceRoundLabel = isInitial ? "Initial Order" : `Refill #${refillNumber}`
+
+                items.forEach((item: any) => {
+                    allItems.push({
+                        id: Number(item?.menu_id ?? item?.id ?? 0),
+                        menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+                        name: String(item?.name ?? item?.receipt_name ?? "Item"),
+                        quantity: Number(item?.quantity ?? 0),
+                        price: Number(item?.price ?? item?.unit_price ?? 0),
+                        img_url: item?.img_url || null,
+                        category: item?.category || null,
+                        isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
+                        sourceRound,
+                        sourceRoundLabel,
+                    })
+                })
+            }
+        })
+
+        // Fallback: if history has no items but submittedItems exists, use that
+        if (allItems.length === 0) {
+            const submitted = (unref(state.submittedItems) ?? []) as SubmittedItem[]
+            if (submitted.length > 0) {
+                submitted.forEach((item) => {
+                    allItems.push({
+                        ...item,
+                        sourceRound: "initial",
+                        sourceRoundLabel: "Initial Order",
+                    })
+                })
+            }
+        }
+
+        // Final fallback: currentOrder items
+        if (allItems.length === 0) {
+            const current = (unref(state.currentOrder) as any)?.order ?? unref(state.currentOrder)
+            const currentItems = current?.items ?? current?.order_items ?? current?.order?.items ?? current?.order?.order_items ?? []
+            if (Array.isArray(currentItems)) {
+                currentItems.forEach((item: any) => {
+                    allItems.push({
+                        id: Number(item?.menu_id ?? item?.id ?? 0),
+                        menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+                        name: String(item?.name ?? item?.receipt_name ?? "Item"),
+                        quantity: Number(item?.quantity ?? 0),
+                        price: Number(item?.price ?? item?.unit_price ?? 0),
+                        img_url: item?.img_url || null,
+                        category: item?.category || null,
+                        isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
+                        sourceRound: "initial",
+                        sourceRoundLabel: "Initial Order",
+                    })
+                })
+            }
+        }
+
+        return allItems
+    })
+
     const activeCart = computed(() => state.isRefillMode ? state.refillItems : state.cartItems)
 
     const packageTotal = computed(() => toMoney(Number(state.package?.price || 0) * Number(state.guestCount || 1)))
@@ -355,14 +428,25 @@ export const useOrderStore = defineStore("order", () => {
     function buildPayload (): OrderPayload {
         logger.debug("Validating payload structure...")
 
-        const packageId = Number(state.package?.id)
-        if (!Number.isFinite(packageId) || packageId <= 0) {
-            throw new Error("Invalid package_id: package must be selected")
+        // Prefer krypton_menu_id, fallback to package_id, then local id
+        // This ensures we send the Krypton menu ID that POS expects
+        const pkg = state.package as any
+        const kryptonMenuId = Number(pkg?.krypton_menu_id ?? pkg?.package_id ?? pkg?.id)
+
+        logger.debug("Package selection for order", {
+            local_package_id: pkg?.id,
+            krypton_menu_id: pkg?.krypton_menu_id,
+            package_id_fallback: pkg?.package_id,
+            submitted_package_id: kryptonMenuId,
+        })
+
+        if (!Number.isFinite(kryptonMenuId) || kryptonMenuId <= 0) {
+            throw new Error("Invalid package_id: package must be selected with valid krypton_menu_id")
         }
 
         const payload = {
             guest_count: Number(state.guestCount),
-            package_id: packageId,
+            package_id: kryptonMenuId,
             items: normalizePayloadItems(state.cartItems),
         }
 
@@ -1123,6 +1207,7 @@ export const useOrderStore = defineStore("order", () => {
     function setHasPlacedOrder (val: boolean) { state.hasPlacedOrder = val }
     function setIsRefillMode (val: boolean) { state.isRefillMode = val }
     function clearHistory () { state.history = [] }
+    function setHistory (history: Array<OrderApiResponse & { type?: string }>) { state.history = history }
     function setCartItems (items: CartItem[]) { state.cartItems = items }
     function setRefillItems (items: CartItem[]) { state.refillItems = items }
     function setSubmittedItems (items: SubmittedItem[]) { state.submittedItems = items }
@@ -1156,6 +1241,7 @@ export const useOrderStore = defineStore("order", () => {
         taxAmount,
         grandTotal,
         refillTotal,
+        allOrderedItems,
         activeCart,
         setPackage,
         setGuestCount,
@@ -1182,6 +1268,7 @@ export const useOrderStore = defineStore("order", () => {
         setHasPlacedOrder,
         setIsRefillMode,
         clearHistory,
+        setHistory,
         setCartItems,
         setRefillItems,
         setSubmittedItems,

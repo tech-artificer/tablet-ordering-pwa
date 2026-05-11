@@ -21,7 +21,8 @@ if (typeof globalThis.localStorage === "undefined") {
 
 // Mock the composable that the store uses for API calls. Must be declared before importing the store.
 const mockPost = vi.fn()
-vi.mock("../composables/useApi", () => ({ useApi: () => ({ post: mockPost }) }))
+const mockGet = vi.fn()
+vi.mock("../composables/useApi", () => ({ useApi: () => ({ post: mockPost, get: mockGet }) }))
 const mockLoadAllMenus = vi.fn()
 let mockPackages: any[] = []
 let mockSides: any[] = []
@@ -46,6 +47,7 @@ describe("stores/order - submitOrder", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         mockPost.mockReset()
+        mockGet.mockReset()
         mockLoadAllMenus.mockReset()
         mockLoadAllMenus.mockResolvedValue(undefined)
         mockPackages = []
@@ -83,6 +85,7 @@ describe("stores/order - submitOrder", () => {
         // API call shape
         expect(mockPost).toHaveBeenCalledWith("/api/devices/create-order", expect.objectContaining({
             guest_count: expect.any(Number),
+            package_id: 1,
             items: expect.any(Array)
         }), expect.any(Object))
 
@@ -94,6 +97,30 @@ describe("stores/order - submitOrder", () => {
         expect(order.getHistory()[order.getHistory().length - 1]).toEqual(apiResp)
         // function returns backend data
         expect(result).toEqual(apiResp)
+    })
+
+    it("stores server order id, marks order placed, and allows entering refill mode after initial submit", async () => {
+        const order = useOrderStore()
+        const session = useSessionStore()
+        order.setPackage({ id: 7, name: "Package", price: 100, is_taxable: false } as any)
+        order.setGuestCount(2)
+        order.setCartItems([
+            { id: 10, name: "Beef Brisket", price: 5, quantity: 1, category: "meats", isUnlimited: false } as any,
+        ])
+
+        const apiResp = {
+            success: true,
+            order: { id: 999, order_id: 19561, order_number: "ORD-19561", total_amount: 110 },
+        }
+        mockPost.mockResolvedValueOnce({ data: apiResp })
+
+        await order.submitOrder()
+
+        expect(order.hasPlacedOrder).toBe(true)
+        expect(session.getOrderId()).toBe(19561)
+
+        order.toggleRefillMode(true)
+        expect(order.isRefillMode).toBe(true)
     })
 
     it("propagates API errors and does not clear cartItems on failure", async () => {
@@ -158,5 +185,107 @@ describe("stores/order - submitOrder", () => {
         expect(mockLoadAllMenus).toHaveBeenCalledWith(true)
         expect(order.getCartItems().map(item => item.id)).toEqual([12])
         expect((order.package as any)?.id).toBe(2)
+    })
+})
+
+describe("stores/order - submitRefill", () => {
+    beforeEach(() => {
+        const pinia = createPinia()
+        setActivePinia(pinia)
+        mockPost.mockReset()
+        mockGet.mockReset()
+        mockLoadAllMenus.mockReset()
+        mockLoadAllMenus.mockResolvedValue(undefined)
+        mockPackages = []
+        mockSides = []
+        mockDesserts = []
+        mockBeverages = []
+        mockAlacartes = []
+        mockModifiers = []
+        const dsInstance = useDeviceStore()
+        dsInstance.setToken("test-token")
+        dsInstance.setTable({ id: 1, name: "Test Table", status: "active", is_available: true, is_locked: false } as any)
+        const session = useSessionStore()
+        session.setIsActive(true)
+        session.setOrderId(19561)
+    })
+
+    it("submits refill to /api/order/{orderId}/refill and payload excludes package_id", async () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(true)
+        order.setCurrentOrder({
+            order: { id: 999, order_id: 19561, status: "pending" },
+        } as any)
+        order.setRefillItems([
+            { id: 12, name: "Pork Belly", price: 4, quantity: 2, category: "meats", isUnlimited: false } as any,
+        ])
+        order.setIsRefillMode(true)
+
+        mockGet.mockResolvedValueOnce({ data: { order: { id: 999, order_id: 19561, status: "pending" } } })
+        mockPost.mockResolvedValueOnce({ data: { success: true, order: { id: 999, order_id: 19561, status: "pending" } } })
+
+        await order.submitRefill()
+
+        expect(mockPost).toHaveBeenCalledTimes(1)
+        const [endpoint, payload] = mockPost.mock.calls[0]
+        expect(endpoint).toBe("/api/order/19561/refill")
+        expect(payload).not.toHaveProperty("package_id")
+        expect(payload).toEqual(expect.objectContaining({
+            order_id: 19561,
+            items: expect.any(Array),
+        }))
+    })
+
+    it("keeps refill mode true while refill request is in-flight", async () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(true)
+        order.setCurrentOrder({
+            order: { id: 999, order_id: 19561, status: "pending" },
+        } as any)
+        order.setRefillItems([
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
+        ])
+        order.setIsRefillMode(true)
+
+        let resolvePost: (value: any) => void = () => {}
+        const postPromise = new Promise((resolve) => {
+            resolvePost = resolve
+        })
+
+        mockGet.mockResolvedValueOnce({ data: { order: { id: 999, order_id: 19561, status: "pending" } } })
+        mockPost.mockReturnValueOnce(postPromise as any)
+
+        const submitPromise = order.submitRefill()
+        await Promise.resolve()
+
+        expect(order.isRefillMode).toBe(true)
+
+        resolvePost({ data: { success: true, order: { id: 999, order_id: 19561, status: "pending" } } })
+        await submitPromise
+    })
+
+    it("on successful refill clears refill cart, exits refill mode, appends history, and does not recreate initial order", async () => {
+        const order = useOrderStore()
+        order.setHasPlacedOrder(true)
+        order.setCurrentOrder({
+            order: { id: 999, order_id: 19561, status: "pending" },
+        } as any)
+        order.setRefillItems([
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
+        ])
+        order.setIsRefillMode(true)
+
+        mockGet.mockResolvedValueOnce({ data: { order: { id: 999, order_id: 19561, status: "pending" } } })
+        mockPost.mockResolvedValueOnce({ data: { success: true, order: { id: 999, order_id: 19561, status: "pending" } } })
+
+        const historyBefore = order.getHistory().length
+        await order.submitRefill()
+
+        expect(order.hasPlacedOrder).toBe(true)
+        expect(order.refillItems).toEqual([])
+        expect(order.isRefillMode).toBe(false)
+        expect(order.getHistory().length).toBe(historyBefore + 1)
+        expect((order.getHistory()[order.getHistory().length - 1] as any).type).toBe("refill")
+        expect(mockPost).not.toHaveBeenCalledWith("/api/devices/create-order", expect.anything(), expect.anything())
     })
 })

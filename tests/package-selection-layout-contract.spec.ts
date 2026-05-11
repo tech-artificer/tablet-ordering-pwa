@@ -14,9 +14,10 @@ describe("package selection responsive layout contract", () => {
         expect(page).toContain("viewportWidth.value >= 1400")
         expect(page).toContain("viewportWidth.value >= 1200")
         expect(page).toContain("viewportWidth.value >= 900")
+        expect(page).toContain("packages.value.length <= 3 && viewportWidth.value >= 900")
         expect(page).toContain("grid grid-cols-4")
         expect(page).toContain("min-w-[280px] flex-1")
-        expect(page).toContain("grid grid-cols-3")
+        expect(page).toContain("grid gap-4 xl:gap-5")
         expect(page).toContain("min-w-[36%] flex-[0_0_36%]")
         expect(page).toContain("min-w-[330px] flex-1")
     })
@@ -28,5 +29,14 @@ describe("package selection responsive layout contract", () => {
         expect(page).toContain("@view-modifiers=\"openModifierInspector\"")
         expect(page).toContain("v-if=\"activeInspectorPackage\"")
         expect(page).toContain("event.key === \"Escape\"")
+    })
+
+    it("requires a confirmation step before proceeding to menu", () => {
+        const page = readProjectFile("pages/order/packageSelection.vue")
+
+        expect(page).toContain("pendingPackageSelection")
+        expect(page).toContain("Confirm package")
+        expect(page).toContain("@click=\"confirmPackageSelection\"")
+        expect(page).toContain("Continue to Menu")
     })
 })

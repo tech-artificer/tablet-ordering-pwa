@@ -103,20 +103,8 @@ const fallbackServerItems = computed<ReviewItem[]>(() => {
 })
 
 const displayItems = computed<any[]>(() => {
-    if (!orderStore.isRefillMode) {
-        const submitted = (unref(orderStore.submittedItems) as any[]) || []
-        if (submitted.length > 0) {
-            logger.debug("[OrderingStep3ReviewSubmit] displayItems: Using submittedItems (" + submitted.length + " items)")
-            return submitted
-        }
-
-        const fallback = fallbackServerItems.value
-        if (fallback.length > 0) {
-            logger.debug("[OrderingStep3ReviewSubmit] displayItems: submittedItems empty, using fallback (" + fallback.length + " items)")
-            return fallback
-        }
-    }
-
+    // Always show only the items currently being submitted (activeCart)
+    // Do NOT show previously submitted items when reviewing a new refill
     logger.debug("[OrderingStep3ReviewSubmit] displayItems: Using activeCart (" + activeCart.value.length + " items)")
     return activeCart.value
 })
@@ -302,17 +290,20 @@ async function submit (): Promise<void> {
         <SubmitStatusBanner />
 
         <!-- Order Review Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6 min-h-0">
             <!-- LEFT: Your Order -->
-            <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
-                <div class="flex items-baseline gap-2 mb-4">
+            <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6 flex flex-col min-h-0 overflow-hidden md:h-[calc(100dvh-220px)] md:max-h-[calc(100dvh-220px)]">
+                <div class="flex items-baseline gap-2 mb-4 flex-shrink-0">
                     <h2 class="text-lg md:text-xl font-extrabold font-raleway text-white tracking-tight">
                         Your Order
                     </h2>
                     <span class="text-sm text-text-muted">({{ itemCountDisplay }} {{ itemCountDisplay === 1 ? 'item' : 'items' }})</span>
                 </div>
 
-                <div v-if="displayItems.length > 0" class="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+                <div
+                    v-if="displayItems.length > 0"
+                    class="scrollbar-warm min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1"
+                >
                     <div
                         v-for="(item, index) in displayItems"
                         :key="`item-${item?.id ?? index}`"
@@ -401,29 +392,6 @@ async function submit (): Promise<void> {
                     </div>
                 </div>
 
-                <!-- Table card -->
-                <div class="rounded-2xl border border-success/30 bg-success/10 p-4 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center flex-shrink-0 text-base">
-                        🪑
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-sm font-bold text-white truncate">
-                            {{ tableLabel }}
-                        </p>
-                        <p class="text-xs text-text-muted truncate">
-                            Order will be sent to grill station
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Errors / blockers -->
-                <p v-if="submitError" class="text-sm text-error font-semibold">
-                    {{ submitError }}
-                </p>
-                <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
-                    {{ submitBlockers[0] }}
-                </p>
-
                 <!-- CTA -->
                 <button
                     type="button"
@@ -434,6 +402,14 @@ async function submit (): Promise<void> {
                     <span v-if="orderStore.isSubmitting">Submitting…</span>
                     <span v-else>{{ buttonLabel }} →</span>
                 </button>
+
+                <!-- Errors / blockers -->
+                <p v-if="submitError" class="text-sm text-error font-semibold">
+                    {{ submitError }}
+                </p>
+                <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
+                    {{ submitBlockers[0] }}
+                </p>
             </aside>
         </div>
     </div>

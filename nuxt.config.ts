@@ -196,6 +196,10 @@ export default defineNuxtConfig({
     },
 
     app: {
+        pageTransition: {
+            name: "page-fade",
+            mode: "out-in",
+        },
         head: {
             script: [
                 { src: "/runtime-config.js", async: false, defer: false },

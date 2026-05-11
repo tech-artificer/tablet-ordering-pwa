@@ -39,12 +39,6 @@ const packageDuration = computed(() => {
     return normalized
 })
 
-const previewLimit = 6
-const previewOverflow = computed<number>(() => {
-    const total = (props.pkg?.modifiers || []).length
-    return Math.max(0, total - previewLimit)
-})
-
 type ModifierGroup = { label: string; items: Modifier[] }
 
 const PRIORITY_ORDER = ["PORK", "BEEF", "CHICKEN", "SEAFOOD", "OTHER"]
@@ -53,24 +47,24 @@ const modifierGroups = computed<ModifierGroup[]>(() => {
     const mods = (props.pkg?.modifiers || []) as Modifier[]
     if (!mods.length) { return [] }
 
-    // Mirrors stores/Menu.ts:extractModifierGroups — if any group is the "meat"
-    // umbrella, bucket by name regex; otherwise group by the modifier's own group.
-    const hasMeatUmbrella = mods.some(m => /meat/i.test(String(m.group ?? "")))
-
     const buckets = new Map<string, Modifier[]>()
 
-    if (hasMeatUmbrella) {
-        for (const m of mods) {
-            const name = m.name || ""
-            let label = "OTHER"
-            if (/pork/i.test(name)) { label = "PORK" } else if (/beef/i.test(name)) { label = "BEEF" } else if (/chicken/i.test(name)) { label = "CHICKEN" } else if (/seafood|shrimp|fish|crab|lobster|squid/i.test(name)) { label = "SEAFOOD" }
-            pushTo(buckets, label, m)
+    for (const m of mods) {
+        const name = String(m.name || "").toUpperCase()
+        const group = String(m.group || "").toUpperCase()
+        let label = "OTHER"
+
+        if (/PORK|SAMGYUPSAL|LIEMPO|BELLY|PIG/.test(name) || /PORK/.test(group)) {
+            label = "PORK"
+        } else if (/BEEF|BRISKET|RIBEYE|SIRLOIN/.test(name) || /BEEF/.test(group)) {
+            label = "BEEF"
+        } else if (/CHICKEN/.test(name) || /CHICKEN|POULTRY/.test(group)) {
+            label = "CHICKEN"
+        } else if (/SEAFOOD|SHRIMP|FISH|CRAB|LOBSTER|SQUID/.test(name) || /SEAFOOD/.test(group)) {
+            label = "SEAFOOD"
         }
-    } else {
-        for (const m of mods) {
-            const label = (m.group || "OTHER").toString().toUpperCase()
-            pushTo(buckets, label, m)
-        }
+
+        pushTo(buckets, label, m)
     }
 
     const ordered: ModifierGroup[] = []
@@ -213,9 +207,8 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
                 class="mx-auto mt-4 flex items-center gap-2 font-kanit text-sm font-bold text-[#ffad63] transition group-hover:gap-3 group-hover:text-[#ffc58a] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 @click.stop="emit('select', pkg)"
             >
-                View cuts
+                Choose package
                 <ChevronRight :size="18" />
-                <span v-if="previewOverflow > 0" class="text-xs font-semibold text-white/50">+{{ previewOverflow }}</span>
             </button>
         </footer>
     </article>
