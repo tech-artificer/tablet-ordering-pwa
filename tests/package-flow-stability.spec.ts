@@ -130,23 +130,20 @@ describe("packageSelection.vue — proceedToMenuForPackage error handling", () =
 // 3. menu.vue cart drawer submit navigates to /order/review?packageId=ID
 // ---------------------------------------------------------------------------
 describe("menu.vue — cart drawer submit-order handler", () => {
-    it("includes packageId in route query when navigating to /order/review", () => {
+    it("navigates to /order/review when submit-order is emitted", () => {
         const page = src("pages/menu.vue")
 
-        const submitHandler = page.match(/@submit-order="[^"]*"/)
-        const handler = submitHandler?.[0] ?? ""
-        expect(handler).toContain("/order/review")
-        expect(handler).toContain("packageId")
-        expect(handler).toContain("selectedPackageId")
+        // Handler is bound by method reference; verify it pushes /order/review.
+        expect(page).toContain("@submit-order=\"handleProceedToReview\"")
+        expect(page).toMatch(/router\.push\(\s*["']\/order\/review["']\s*\)/)
     })
 
-    it("uses route object form (path + query) not bare string for review navigation", () => {
+    it("does not append a packageId query to the review navigation (guard reads it from store)", () => {
         const page = src("pages/menu.vue")
 
-        const submitHandler = page.match(/@submit-order="[^"]*"/)
-        const handler = submitHandler?.[0] ?? ""
-        expect(handler).toContain("path: '/order/review'")
-        expect(handler).toContain("query:")
+        const handlerBlock = page.match(/const handleProceedToReview = async[\s\S]*?\n\}/)
+        const body = handlerBlock?.[0] ?? ""
+        expect(body).not.toMatch(/query:\s*\{\s*packageId/)
     })
 })
 

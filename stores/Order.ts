@@ -5,13 +5,34 @@ import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
 import { extractOrderId } from "../utils/orderHelpers"
 import { notifyBlockedAction } from "../composables/useNotifier"
-import type { CartItem, Package, MenuItem, SubmittedItem, OrderApiResponse, OrderPayload, OrderPayloadItem } from "../types"
+import type { CartItem, Package, MenuItem, SubmittedItem, OrderApiResponse, OrderPayload, OrderPayloadItem, RefillPayload } from "../types"
 import { API_ENDPOINTS } from "../config/api"
 import { ERROR_MENU_ITEM_UNAVAILABLE } from "../utils/errorCodes"
 import { useDeviceStore } from "./Device"
 import { useMenuStore } from "./Menu"
 import { useSessionStore } from "./Session"
 import type { SessionEndReason } from "./SessionEnd"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW DATA MODEL (see docs/DATA_MODEL.md)
+// Append-only ledger of submitted rounds. Commit 1 introduces these fields
+// alongside the legacy ones (cartItems/refillItems/submittedItems/history).
+// Submit paths dual-write to both. Readers migrate in commit 2. Legacy fields
+// are deleted in commit 3.
+// ─────────────────────────────────────────────────────────────────────────────
+export type OrderRoundKind = "initial" | "refill"
+export type OrderMode = "initial" | "refill"
+export type OrderServerStatus = "building" | "in-progress" | "completed" | "cancelled" | "voided" | string
+
+export interface OrderRound {
+    kind:          OrderRoundKind
+    number:        number               // 1 = initial, 2..n = refill #N-1
+    submittedAt:   string               // ISO timestamp from server (or client fallback)
+    items:         CartItem[]           // immutable snapshot at submit time
+    serverOrderId: number | null        // parent order id (same across all rounds for one order)
+    serverRefillId?: number | null      // refill-specific id when applicable
+    serverTotal:   number               // server-reported total for this round
+}
 
 // Module-level constant: cap on how many unlimited items can be added.
 const UNLIMITED_ITEM_CAP = 5
@@ -60,6 +81,13 @@ export const useOrderStore = defineStore("order", () => {
         pollInflight: false as boolean,
         pollingOrderId: null as string | null,
         error: null as string | null,
+        // ─── New data model (see docs/DATA_MODEL.md). Dual-written during commit 1. ──
+        rounds:        [] as OrderRound[],
+        draft:         [] as CartItem[],
+        mode:          "initial" as OrderMode,
+        serverOrderId: null as number | null,
+        serverStatus:  "building" as OrderServerStatus,
+        serverTotal:   0 as number,
     })
 
     let pollIntervalId: ReturnType<typeof setInterval> | null = null
@@ -85,6 +113,80 @@ export const useOrderStore = defineStore("order", () => {
         state.error = null
         if (options?.clearHistory) {
             state.history = []
+        }
+        // New model — always reset alongside legacy fields.
+        state.rounds        = []
+        state.draft         = []
+        state.mode          = "initial"
+        state.serverOrderId = null
+        state.serverStatus  = "building"
+        state.serverTotal   = 0
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // appendRound — single mutator for the new ledger. Called AFTER a server
+    // success response from either initial-submit or refill-submit paths.
+    // See docs/DATA_MODEL.md "Submit semantics".
+    // ─────────────────────────────────────────────────────────────────────
+    function appendRound (
+        kind: OrderRoundKind,
+        sourceItems: CartItem[],
+        respData: any
+    ): void {
+        try {
+            const orderObj = respData?.order ?? respData ?? {}
+            const parentOrderId = Number(
+                orderObj?.order_id ??
+                respData?.order_id ??
+                state.rounds[0]?.serverOrderId ??
+                state.serverOrderId ??
+                0
+            ) || null
+            const refillId = Number(
+                orderObj?.refill_id ?? respData?.refill_id ?? 0
+            ) || null
+            const total = Number(
+                orderObj?.total_amount ??
+                respData?.total_amount ??
+                orderObj?.total ??
+                0
+            ) || 0
+            const submittedAt = String(
+                orderObj?.created_at ??
+                respData?.created_at ??
+                new Date().toISOString()
+            )
+            const nextNumber = state.rounds.length + 1
+
+            const round: OrderRound = {
+                kind,
+                number: nextNumber,
+                submittedAt,
+                items: sourceItems.map(item => ({ ...item })),
+                serverOrderId: parentOrderId,
+                serverRefillId: refillId,
+                serverTotal: total,
+            }
+
+            state.rounds        = [...state.rounds, round]
+            state.draft         = []
+            state.serverOrderId = parentOrderId ?? state.serverOrderId
+            state.serverStatus  = String(orderObj?.status ?? respData?.status ?? state.serverStatus)
+            state.serverTotal   = total || state.serverTotal
+            // After the first successful submit, the order is "live" — any
+            // future submission must use the refill endpoint.
+            state.mode = "refill"
+
+            logger.info("[Order Ledger] Round appended", {
+                kind,
+                number: nextNumber,
+                itemCount: round.items.length,
+                serverOrderId: round.serverOrderId,
+                serverRefillId: round.serverRefillId,
+                serverTotal: round.serverTotal,
+            })
+        } catch (error) {
+            logger.error("[Order Ledger] Failed to append round", error)
         }
     }
 
@@ -473,9 +575,9 @@ export const useOrderStore = defineStore("order", () => {
         return payload
     }
 
-    function buildRefillPayload () {
+    function buildRefillPayload (): RefillPayload {
         return {
-            order_id: getServerOrderId(),
+            order_id: getServerOrderId() as number,
             items: normalizePayloadItems(state.refillItems),
         }
     }
@@ -809,8 +911,10 @@ export const useOrderStore = defineStore("order", () => {
                     handleOrderError("Refill response missing body")
                     throw new Error("Refill response missing body")
                 }
-                // Update submittedItems to reflect the current refill round so the
-                // in-session left column always shows the LAST submitted batch of items.
+                // ── New data model: snapshot the refill batch as an append-only round ──
+                appendRound("refill", state.refillItems, responseData)
+
+                // ── Legacy fields (preserved during commit 1 for backward compat) ─────
                 state.submittedItems = state.refillItems.map(item => ({
                     id: item.id,
                     menu_id: item.id,
@@ -857,6 +961,10 @@ export const useOrderStore = defineStore("order", () => {
         state.hasPlacedOrder = true
         state.currentOrder = respData
 
+        // ── New data model: snapshot the initial cart as round #1 ────────────
+        appendRound("initial", state.cartItems, respData)
+
+        // ── Legacy fields (preserved during commit 1 for backward compat) ────
         // Save submitted items with names before clearing cart (for display in sidebar)
         // Backend order_items may not include names, so we keep our local copy
         state.submittedItems = state.cartItems.map(item => ({

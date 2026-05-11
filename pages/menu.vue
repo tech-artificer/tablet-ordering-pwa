@@ -335,6 +335,21 @@ const updateQuantity = (itemId: number, quantity: number) => {
 }
 
 const cartDrawerOpen = ref(false)
+// Resolver fired by el-drawer's @closed event so callers can await full close
+// animation before navigating. Without this, Element Plus's teleported overlay
+// (.el-overlay) is orphaned in <body> when the owning page unmounts mid-animation,
+// producing a black mask on the destination route until a hard refresh.
+let drawerClosedResolver: (() => void) | null = null
+const waitForDrawerClosed = (): Promise<void> => {
+    if (!cartDrawerOpen.value) { return Promise.resolve() }
+    return new Promise<void>((resolve) => {
+        drawerClosedResolver = resolve
+    })
+}
+const handleDrawerClosed = () => {
+    drawerClosedResolver?.()
+    drawerClosedResolver = null
+}
 const isSendingSupport = ref(false)
 const api = useApi()
 const deviceStore = useDeviceStore()
@@ -388,18 +403,23 @@ const getServiceTypeId = (type: string): number => {
 
 // Navigate to order review page with package context
 const handleProceedToReview = async () => {
-    cartDrawerOpen.value = false
-
     if (!selectedPackageId.value) {
         notifyWarning("Package selection was lost. Please select a package again.")
+        cartDrawerOpen.value = false
         return
     }
 
+    // Close drawer and WAIT for the close animation to finish before navigating.
+    // Otherwise el-drawer's teleported .el-overlay is orphaned in <body> when the
+    // page unmounts mid-animation, leaving a black mask over the next route.
+    if (cartDrawerOpen.value) {
+        const closed = waitForDrawerClosed()
+        cartDrawerOpen.value = false
+        await closed
+    }
+
     try {
-        await router.push({
-            path: "/order/review",
-            query: { packageId: String(selectedPackageId.value) }
-        })
+        await router.push("/order/review")
     } catch (err) {
         logger.error("[Menu] Failed to navigate to review:", err)
         notifyWarning("Unable to proceed to order review. Please try again.")
@@ -564,6 +584,7 @@ const categoryError = computed(() => {
             :modal="true"
             :lock-scroll="false"
             class="cart-drawer"
+            @closed="handleDrawerClosed"
         >
             <cart-sidebar
                 :selected-package="selectedPackage"

@@ -139,14 +139,20 @@ body {
    PAGE TRANSITIONS - Enhanced for app-like feel
    ============================================ */
 
-/* Subtle page fade */
+/* Subtle page fade — cross-fade (no out-in mode). Both pages exist briefly so
+   the entering view paints immediately. The leaving page is taken out of normal
+   flow with position:absolute so the two siblings overlap cleanly. Requires the
+   parent (kiosk layout slot container) to be position:relative. */
 .page-fade-enter-active {
-  transition: opacity 160ms ease-out;
+  transition: opacity 140ms ease-out;
   will-change: opacity;
 }
 .page-fade-leave-active {
-  transition: opacity 120ms ease-in;
+  transition: opacity 140ms ease-in;
   will-change: opacity;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 .page-fade-enter-from {
   opacity: 0;
