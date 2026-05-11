@@ -46,16 +46,18 @@ onMounted(async () => {
         }
     }
 
-    logger.info("[PackageSelection] Loading packages from API...")
-    try {
-    // Force refresh at order start to avoid stale menu cache across new customer sessions.
-    // This ensures customers always see current Krypton menu data.
-        await menuStore.loadAllMenus(true)
-        console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
-        logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
-    } catch (error: any) {
-        console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
-        logger.error("[PackageSelection] Failed to load packages:", error)
+    if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
+        logger.info("[PackageSelection] Loading packages from API...")
+        try {
+            await menuStore.fetchPackages()
+            console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
+            logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
+        } catch (error: any) {
+            console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
+            logger.error("[PackageSelection] Failed to load packages:", error)
+        }
+    } else {
+        console.log(`[✅ Packages Cached] ${menuStore.packages.length} packages available at ${timestamp}`)
     }
 })
 
@@ -173,9 +175,6 @@ const proceedToMenuForPackage = async (packageData: Package) => {
 
     // Navigate to the menu page with package ID in query for downstream flows
     try {
-    // Ensure menus are loaded (session.start already attempts this, but double-check)
-        try { await menuStore.loadAllMenus() } catch (e) { /* non-fatal */ }
-
         console.log(`[📍 Navigation] Going to menu with package_id=${packageData.id} at ${timestamp}`)
         await nuxtApp.$router.push({
             path: "/menu",

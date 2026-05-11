@@ -592,7 +592,7 @@ const categoryError = computed(() => {
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="() => { cartDrawerOpen = false; router.push('/order/review') }"
+                @submit-order="() => { cartDrawerOpen = false; router.push({ path: '/order/review', query: selectedPackageId ? { packageId: String(selectedPackageId) } : {} }) }"
                 @toggle-refill-mode="toggleRefillMode"
             />
         </el-drawer>

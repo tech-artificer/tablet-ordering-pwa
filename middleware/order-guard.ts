@@ -44,8 +44,9 @@ export default defineNuxtRouteMiddleware((to, _from) => {
 
     // /order/review route: requires package selection or an existing placed order
     if (to.path === "/order/review") {
+        const packageIdFromQuery = Number(to.query?.packageId || 0) || null
         const packageIdFromStore = Number((orderStore.package as any)?.id || 0) || null
-        const hasPackage = !!packageIdFromStore
+        const hasPackage = !!(packageIdFromQuery || packageIdFromStore)
         const currentOrder = (orderStore.currentOrder as any)?.order || orderStore.currentOrder
         const hasOrderReference = !!(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id || orderStore.hasPlacedOrder)
 
