@@ -12,14 +12,22 @@ const sessionStore = useSessionStore()
 const sessionStartError = ref<string | null>(null)
 
 const triggerCelebration = () => {
-    const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
-    confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.5 },
-        colors,
-        duration: 2000
-    })
+    try {
+        const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
+        if (typeof confetti === "function") {
+            confetti({
+                particleCount: 120,
+                spread: 80,
+                origin: { y: 0.5 },
+                colors,
+                duration: 2000
+            })
+        } else {
+            logger.warn("[Order Review] Confetti not available")
+        }
+    } catch (e) {
+        logger.warn("[Order Review] Confetti error (non-fatal):", e)
+    }
 }
 
 const handleGoBack = () => {
