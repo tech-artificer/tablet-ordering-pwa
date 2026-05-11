@@ -7,7 +7,6 @@ import { useOrderStore } from "../../stores/Order"
 import { useSessionStore } from "../../stores/Session"
 import { useDeviceStore } from "../../stores/Device"
 import { logger } from "../../utils/logger"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
 import PackageCard from "../../components/PackageCard.vue"
 
 definePageMeta({
@@ -29,22 +28,6 @@ onMounted(async () => {
 
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
-
-    if (shouldAttemptActiveOrderRecovery()) {
-        try {
-            const recovery = await recoverActiveOrderState("package-selection")
-            if (recovery.hasActiveOrder) {
-                console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
-                await nuxtApp.$router.replace({
-                    path: "/menu",
-                    query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
-                })
-                return
-            }
-        } catch (recoveryError: unknown) {
-            logger.error("[PackageSelection] Active order recovery failed — continuing with normal mount", recoveryError)
-        }
-    }
 
     // Packages are now preloaded at the welcome screen via AppBootstrap.preloadForOrdering()
     // No need to fetch here - just use the cached data from MenuStore

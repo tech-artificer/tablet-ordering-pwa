@@ -3,7 +3,6 @@ import { computed, onMounted, ref, toRef, unref, watch } from "vue"
 import { Beef, UtensilsCrossed, CakeSlice, Wine } from "lucide-vue-next"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../composables/useActiveOrderRecovery"
 import { useSessionStore } from "../stores/Session"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
@@ -37,86 +36,6 @@ const hasConfirmedInitialOrder = computed(() => {
 onMounted(async () => {
     // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
     // No need to call loadAllMenus() here - data is already in Pinia state
-
-    const recovery = shouldAttemptActiveOrderRecovery()
-        ? await recoverActiveOrderState("menu")
-        : {
-            hasActiveOrder: false,
-            isTerminal: false,
-            orderId: null,
-            packageId: null,
-            status: "",
-        }
-
-    if (recovery.packageId && !route.query.packageId) {
-        selectedPackageId.value = String(recovery.packageId)
-    }
-
-    const hasPackageSelection = !!selectedPackageId.value
-    const explicitMenuResume = route.query.resumeMenu === "1"
-    const allowMenuAccess = hasPackageSelection || orderStore.isRefillMode || explicitMenuResume
-
-    // If an active order is recovered and not already in refill mode, enable refill mode.
-    // This must happen regardless of whether a package is known — the order is already
-    // placed, so the user should be building a refill, not a new initial order.
-    // Guard with !orderStore.isRefillMode to avoid clearing in-progress refill items.
-    if (recovery.hasActiveOrder && hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
-        orderStore.toggleRefillMode(true)
-        if (!allowMenuAccess) {
-            notifyInfo("Active order recovered. Refill mode enabled.")
-        }
-    }
-
-    // Log package details if an existing order is detected by middleware
-    if (recovery.hasActiveOrder && selectedPackageId.value) {
-    // package details pre-loaded for recovered order
-    }
-
-    // If we recovered an active order but no packageId in route, attempt to infer package from the recovered order
-    if (recovery.hasActiveOrder && !selectedPackageId.value) {
-        try {
-            const currentOrder = orderStore.getCurrentOrder()
-            const orderObj = ((currentOrder?.order || currentOrder) as any) || null
-            let inferredPackageId = null
-
-            // Check common fields first
-            if (orderObj?.package_id) { inferredPackageId = Number(orderObj.package_id) }
-            if (!inferredPackageId && orderObj?.menu_id) { inferredPackageId = Number(orderObj.menu_id) }
-
-            // Fallback: inspect order items for an item marked as package/is_package
-            if (!inferredPackageId && Array.isArray(orderObj?.items)) {
-                const pkgItem = orderObj.items.find((it: any) => it.is_package || it.isPackage || it.is_package === true)
-                if (pkgItem) { inferredPackageId = Number(pkgItem.menu_id || pkgItem.menuId || pkgItem.id) }
-            }
-
-            // If we found a package id, set it (package details already preloaded at welcome)
-            if (inferredPackageId) {
-                selectedPackageId.value = String(inferredPackageId)
-            } else {
-                logger.warn("[Menu] Could not infer packageId from recovered order")
-            }
-        } catch (err) {
-            logger.warn("[Menu] Error while inferring package from recovered order:", err)
-        }
-    }
-
-    // Cart recovery notification: if session is active with a placed order but cart is empty
-    // AND nothing has been submitted yet — the in-progress cart was likely lost.
-    // Do NOT fire if:
-    //   a) we just recovered an active order from the server (submittedItems will naturally
-    //      be empty because the server response does not carry display-friendly items), OR
-    //   b) the user navigated back after a successful submission (submittedItems non-empty).
-    if (
-        !recovery.hasActiveOrder &&
-        sessionStore.isActive &&
-        hasConfirmedInitialOrder.value &&
-        !orderStore.isRefillMode &&
-        orderStore.getCartItems().length === 0 &&
-        orderStore.getSubmittedItems().length === 0
-    ) {
-        notifyWarning("Your cart was cleared. Please re-add your items.")
-        logger.warn("[Menu] Cart items missing for active session — notified user of cart loss")
-    }
 
     // Package details are already preloaded at welcome screen
     // If missing (rare edge case), error state will show with retry option
