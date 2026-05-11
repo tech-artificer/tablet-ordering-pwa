@@ -148,28 +148,24 @@ describe("menu.vue — cart drawer submit-order handler", () => {
 })
 
 // ---------------------------------------------------------------------------
-// 4. order-guard.ts /order/review accepts packageId from query
+// 4. boot.global.ts /order/review and other internal routes are protected
 // ---------------------------------------------------------------------------
-describe("order-guard.ts — /order/review guard", () => {
-    it("reads packageId from route query for the review route", () => {
-        const guard = src("middleware/order-guard.ts")
+describe("boot.global.ts — route protection", () => {
+    it("has PUBLIC_ROUTES set with /, /settings, /auth/register, /order/session-ended", () => {
+        const middleware = src("middleware/boot.global.ts")
 
-        expect(guard).toContain("to.query?.packageId")
-        expect(guard).toContain("packageIdFromQuery")
+        expect(middleware).toContain("PUBLIC_ROUTES")
+        expect(middleware).toContain("\"/\"")
+        expect(middleware).toContain("\"/settings\"")
+        expect(middleware).toContain("\"/auth/register\"")
+        expect(middleware).toContain("\"/order/session-ended\"")
     })
 
-    it("allows access when packageId is present in query even without orderStore.package", () => {
-        const guard = src("middleware/order-guard.ts")
+    it("redirects same-path (deep-link) attempts to welcome", () => {
+        const middleware = src("middleware/boot.global.ts")
 
-        const hasPackageExpr = guard.match(/const hasPackage = !!\(packageIdFromQuery \|\| packageIdFromStore\)/)
-        expect(hasPackageExpr).not.toBeNull()
-    })
-
-    it("blocks /order/review when neither query packageId nor store package nor order reference exist", () => {
-        const guard = src("middleware/order-guard.ts")
-
-        expect(guard).toContain("!hasPackage && !hasOrderReference")
-        expect(guard).toContain("navigateTo(\"/order/packageSelection\")")
+        expect(middleware).toContain("to.path === from.path")
+        expect(middleware).toContain("navigateTo(\"/\", { replace: true })")
     })
 })
 

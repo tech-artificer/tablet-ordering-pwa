@@ -16,7 +16,7 @@
  * See docs/DATA_MODEL.md "Routing contract".
  */
 
-const PUBLIC_ROUTES = new Set(["/", "/settings", "/auth/register"])
+const PUBLIC_ROUTES = new Set(["/", "/settings", "/auth/register", "/order/session-ended"])
 
 export default defineNuxtRouteMiddleware((to, from) => {
     if (import.meta.server) { return }

@@ -13,11 +13,11 @@ vi.mock("../composables/useApi", () => ({ useApi: () => ({ get: vi.fn(), post: v
 
 describe("session-ended route — middleware guard", () => {
     it("/order/session-ended is in publicRoutes (no auth required)", () => {
-    // Read the middleware source and verify the route is listed
-    // This is a structural test — the middleware file must contain the route string
-        const middlewarePath = resolve(__dirname, "../middleware/auth.global.ts")
+        // Verify boot.global.ts includes /order/session-ended in PUBLIC_ROUTES
+        const middlewarePath = resolve(__dirname, "../middleware/boot.global.ts")
         const src = readFileSync(middlewarePath, "utf8")
         expect(src).toContain("/order/session-ended")
+        expect(src).toContain("PUBLIC_ROUTES")
     })
 })
 
