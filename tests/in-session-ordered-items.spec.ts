@@ -199,17 +199,44 @@ describe("in-session ordered items display", () => {
         setActivePinia(pinia)
         const orderStore = useOrderStore()
         orderStore.setHasPlacedOrder(true)
-        // Set currentOrder with items directly to test the page renders them
-        orderStore.setCurrentOrder({
-            order_id: 123,
-            order_number: "ORD-123",
-            status: "confirmed",
-            items: [
-                { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats", menu_id: 10 },
-                { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats", menu_id: 20 },
-                { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides", menu_id: 30 },
+        // Set rounds directly on the state for testing
+        orderStore.$patch({
+            rounds: [
+                {
+                    kind: "initial",
+                    number: 1,
+                    submittedAt: new Date().toISOString(),
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" } as any,
+                    ],
+                    serverOrderId: 1001,
+                    serverRefillId: null,
+                    serverTotal: 100,
+                },
+                {
+                    kind: "refill",
+                    number: 2,
+                    submittedAt: new Date().toISOString(),
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" } as any,
+                    ],
+                    serverOrderId: 1001,
+                    serverRefillId: 1002,
+                    serverTotal: 50,
+                },
+                {
+                    kind: "refill",
+                    number: 3,
+                    submittedAt: new Date().toISOString(),
+                    items: [
+                        { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" } as any,
+                    ],
+                    serverOrderId: 1001,
+                    serverRefillId: 1003,
+                    serverTotal: 75,
+                },
             ],
-        } as any)
+        })
 
         const wrapper = mount(InSession, {
             ...mountOptions,
@@ -229,49 +256,44 @@ describe("in-session ordered items display", () => {
         setActivePinia(pinia)
         const orderStore = useOrderStore()
         orderStore.setHasPlacedOrder(true)
-        // Set currentOrder so the page has a reference point
-        orderStore.setCurrentOrder({
-            order_id: 456,
-            order_number: "ORD-456",
-            status: "confirmed",
-            items: [],
-        } as any)
-        // Set rounds using the Ref's .value property
-        orderStore.rounds.value = [
-            {
-                kind: "initial",
-                number: 1,
-                submittedAt: new Date().toISOString(),
-                items: [
-                    { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" } as any,
-                ],
-                serverOrderId: 1001,
-                serverRefillId: null,
-                serverTotal: 100,
-            },
-            {
-                kind: "refill",
-                number: 2,
-                submittedAt: new Date().toISOString(),
-                items: [
-                    { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" } as any,
-                ],
-                serverOrderId: 1001,
-                serverRefillId: 1002,
-                serverTotal: 50,
-            },
-            {
-                kind: "refill",
-                number: 3,
-                submittedAt: new Date().toISOString(),
-                items: [
-                    { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" } as any,
-                ],
-                serverOrderId: 1001,
-                serverRefillId: 1003,
-                serverTotal: 75,
-            },
-        ]
+        // Set rounds directly on the state for testing
+        orderStore.$patch({
+            rounds: [
+                {
+                    kind: "initial",
+                    number: 1,
+                    submittedAt: new Date().toISOString(),
+                    items: [
+                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" } as any,
+                    ],
+                    serverOrderId: 1001,
+                    serverRefillId: null,
+                    serverTotal: 100,
+                },
+                {
+                    kind: "refill",
+                    number: 2,
+                    submittedAt: new Date().toISOString(),
+                    items: [
+                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" } as any,
+                    ],
+                    serverOrderId: 1001,
+                    serverRefillId: 1002,
+                    serverTotal: 50,
+                },
+                {
+                    kind: "refill",
+                    number: 3,
+                    submittedAt: new Date().toISOString(),
+                    items: [
+                        { id: 30, name: "Refill Side", quantity: 3, price: 0, category: "sides" } as any,
+                    ],
+                    serverOrderId: 1001,
+                    serverRefillId: 1003,
+                    serverTotal: 75,
+                },
+            ],
+        })
 
         const wrapper = mount(InSession, {
             ...mountOptions,
