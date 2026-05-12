@@ -3,7 +3,6 @@ import { computed, onMounted, ref, toRef, unref, watch } from "vue"
 import { Beef, UtensilsCrossed, CakeSlice, Wine } from "lucide-vue-next"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../composables/useActiveOrderRecovery"
 import { useSessionStore } from "../stores/Session"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
@@ -23,106 +22,16 @@ const route = useRoute()
 const router = useRouter()
 
 const hasLiveOrderReference = (): boolean => {
-    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
-    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
+    return Boolean(unref(sessionStore.orderId) || orderStore.serverOrderId)
 }
 
-const hasConfirmedInitialOrder = computed(() => {
-    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
-        return orderStore.hasConfirmedInitialOrder()
-    }
-    return Boolean(unref(orderStore.hasPlacedOrder) && hasLiveOrderReference())
-})
+const hasConfirmedInitialOrder = computed(() =>
+    orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
+)
 
 onMounted(async () => {
     // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
     // No need to call loadAllMenus() here - data is already in Pinia state
-
-    const recovery = shouldAttemptActiveOrderRecovery()
-        ? await recoverActiveOrderState("menu")
-        : {
-            hasActiveOrder: false,
-            isTerminal: false,
-            orderId: null,
-            packageId: null,
-            status: "",
-        }
-
-    if (recovery.packageId && !route.query.packageId) {
-        selectedPackageId.value = String(recovery.packageId)
-    }
-
-    const hasPackageSelection = !!selectedPackageId.value
-    const explicitMenuResume = route.query.resumeMenu === "1"
-    const allowMenuAccess = hasPackageSelection || orderStore.isRefillMode || explicitMenuResume
-
-    // If an active order is recovered and not already in refill mode, enable refill mode.
-    // This must happen regardless of whether a package is known — the order is already
-    // placed, so the user should be building a refill, not a new initial order.
-    // Guard with !orderStore.isRefillMode to avoid clearing in-progress refill items.
-    if (recovery.hasActiveOrder && hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
-        orderStore.toggleRefillMode(true)
-        if (!allowMenuAccess) {
-            notifyInfo("Active order recovered. Refill mode enabled.")
-        }
-    }
-
-    // Log package details if an existing order is detected by middleware
-    if (recovery.hasActiveOrder && selectedPackageId.value) {
-    // package details pre-loaded for recovered order
-    }
-
-    // If we recovered an active order but no packageId in route, attempt to infer package from the recovered order
-    if (recovery.hasActiveOrder && !selectedPackageId.value) {
-        try {
-            const currentOrder = orderStore.getCurrentOrder()
-            const orderObj = ((currentOrder?.order || currentOrder) as any) || null
-            let inferredPackageId = null
-
-            // Check common fields first
-            if (orderObj?.package_id) { inferredPackageId = Number(orderObj.package_id) }
-            if (!inferredPackageId && orderObj?.menu_id) { inferredPackageId = Number(orderObj.menu_id) }
-
-            // Fallback: inspect order items for an item marked as package/is_package
-            if (!inferredPackageId && Array.isArray(orderObj?.items)) {
-                const pkgItem = orderObj.items.find((it: any) => it.is_package || it.isPackage || it.is_package === true)
-                if (pkgItem) { inferredPackageId = Number(pkgItem.menu_id || pkgItem.menuId || pkgItem.id) }
-            }
-
-            // If we found a package id, set it (package details already preloaded at welcome)
-            if (inferredPackageId) {
-                selectedPackageId.value = String(inferredPackageId)
-            } else {
-                logger.warn("[Menu] Could not infer packageId from recovered order")
-            }
-        } catch (err) {
-            logger.warn("[Menu] Error while inferring package from recovered order:", err)
-        }
-    }
-
-    // Cart recovery notification: if session is active with a placed order but cart is empty
-    // AND nothing has been submitted yet — the in-progress cart was likely lost.
-    // Do NOT fire if:
-    //   a) we just recovered an active order from the server (submittedItems will naturally
-    //      be empty because the server response does not carry display-friendly items), OR
-    //   b) the user navigated back after a successful submission (submittedItems non-empty).
-    if (
-        !recovery.hasActiveOrder &&
-        sessionStore.isActive &&
-        hasConfirmedInitialOrder.value &&
-        !orderStore.isRefillMode &&
-        orderStore.getCartItems().length === 0 &&
-        orderStore.getSubmittedItems().length === 0
-    ) {
-        notifyWarning("Your cart was cleared. Please re-add your items.")
-        logger.warn("[Menu] Cart items missing for active session — notified user of cart loss")
-    }
-
-    // Package details are already preloaded at welcome screen
-    // If missing (rare edge case), error state will show with retry option
-    if (selectedPackageId.value && !menuStore.packageDetails[Number(selectedPackageId.value)]) {
-        logger.warn("[Menu] Package details not preloaded for:", selectedPackageId.value)
-    }
 })
 
 const resolveStoredPackageId = (): string | number | null => {
@@ -181,7 +90,7 @@ watch(() => orderStore.package, (storePackage) => {
 // Watch for order completion status changes and redirect when completed
 const { triggerSessionEnd } = useSessionEndFlow()
 watch(
-    () => orderStore.getCurrentOrderStatus(),
+    () => unref(orderStore.serverStatus),
     (newStatus) => {
         if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
@@ -229,21 +138,14 @@ const getItemQuantity = (itemId: number) => {
     return orderStore.getCartItemQuantity(Number(itemId))
 }
 
-// Get meats from selected package allowed menus (from API)
+// Get meats from selected package modifiers
 const meats = computed(() => {
     if (!selectedPackageId.value) { return [] }
     const packageId = Number(selectedPackageId.value)
-    const packageDetails = menuStore.packageDetails[packageId]
-    // Primary: API-driven meats for this package
-    if (packageDetails && Array.isArray(packageDetails.allowed_menus?.meat) && packageDetails.allowed_menus.meat.length > 0) {
-        return packageDetails.allowed_menus.meat
-    }
-    // Fallback: legacy modifiers for this package
     const pkg = menuStore.packages.find(pkg => pkg.id === packageId)
     if (pkg?.modifiers && pkg.modifiers.length > 0) {
         return pkg.modifiers.flat()
     }
-    // If both missing, return empty array (UI will show 'No meats available')
     return []
 })
 
@@ -296,10 +198,7 @@ const reloadCategory = async () => {
     try {
         switch (category) {
         case "meats":
-            if (selectedPackageId.value) {
-                meatError.value = null
-                await menuStore.fetchPackageDetails(Number(selectedPackageId.value))
-            }
+            meatError.value = null
             break
         case "desserts":
             await menuStore.fetchDesserts()
@@ -335,6 +234,21 @@ const updateQuantity = (itemId: number, quantity: number) => {
 }
 
 const cartDrawerOpen = ref(false)
+// Resolver fired by el-drawer's @closed event so callers can await full close
+// animation before navigating. Without this, Element Plus's teleported overlay
+// (.el-overlay) is orphaned in <body> when the owning page unmounts mid-animation,
+// producing a black mask on the destination route until a hard refresh.
+let drawerClosedResolver: (() => void) | null = null
+const waitForDrawerClosed = (): Promise<void> => {
+    if (!cartDrawerOpen.value) { return Promise.resolve() }
+    return new Promise<void>((resolve) => {
+        drawerClosedResolver = resolve
+    })
+}
+const handleDrawerClosed = () => {
+    drawerClosedResolver?.()
+    drawerClosedResolver = null
+}
 const isSendingSupport = ref(false)
 const api = useApi()
 const deviceStore = useDeviceStore()
@@ -388,18 +302,23 @@ const getServiceTypeId = (type: string): number => {
 
 // Navigate to order review page with package context
 const handleProceedToReview = async () => {
-    cartDrawerOpen.value = false
-
     if (!selectedPackageId.value) {
         notifyWarning("Package selection was lost. Please select a package again.")
+        cartDrawerOpen.value = false
         return
     }
 
+    // Close drawer and WAIT for the close animation to finish before navigating.
+    // Otherwise el-drawer's teleported .el-overlay is orphaned in <body> when the
+    // page unmounts mid-animation, leaving a black mask over the next route.
+    if (cartDrawerOpen.value) {
+        const closed = waitForDrawerClosed()
+        cartDrawerOpen.value = false
+        await closed
+    }
+
     try {
-        await router.push({
-            path: "/order/review",
-            query: { packageId: String(selectedPackageId.value) }
-        })
+        await router.push("/order/review")
     } catch (err) {
         logger.error("[Menu] Failed to navigate to review:", err)
         notifyWarning("Unable to proceed to order review. Please try again.")
@@ -420,7 +339,7 @@ const toggleRefillMode = () => {
         return
     }
 
-    const newMode = !orderStore.isRefillMode
+    const newMode = !(orderStore.isRefillMode)
     orderStore.toggleRefillMode(newMode)
 
     if (newMode) {
@@ -441,7 +360,7 @@ const isLoading = computed((): boolean => {
     case "beverages":
         return Boolean(menuStore.isLoadingBeverages)
     default:
-        return Boolean(menuStore.isLoadingPackageDetails)
+        return Boolean(menuStore.isLoadingPackages)
     }
 })
 
@@ -564,6 +483,7 @@ const categoryError = computed(() => {
             :modal="true"
             :lock-scroll="false"
             class="cart-drawer"
+            @closed="handleDrawerClosed"
         >
             <cart-sidebar
                 :selected-package="selectedPackage"

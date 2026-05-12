@@ -103,7 +103,7 @@ describe("session start flow", () => {
         ;(device as any).expiration = Date.now() + 60 * 60 * 1000
 
         // Seed transactional cart state that must be cleared on session start
-        order.setCartItems([{ id: 1, name: "Pre-existing Item", quantity: 2 } as any])
+        ;(order as any).draft = [{ id: 1, name: "Pre-existing Item", quantity: 2 }]
         order.setGuestCount(4)
 
         const started = await session.start({ preserveSelection: true })
@@ -112,7 +112,7 @@ describe("session start flow", () => {
         // Guest count is preserved by preserveSelection
         expect(order.guestCount).toBe(4)
         // Cart items are transactional state and must be cleared regardless of preserveSelection
-        expect(order.getCartItems()).toHaveLength(0)
+        expect((order as any).draft).toHaveLength(0)
     })
 
     it("preserves submitted order state during post-submit handoff", async () => {
@@ -124,32 +124,28 @@ describe("session start flow", () => {
         ;(device as any).expiration = Date.now() + 60 * 60 * 1000
 
         session.setOrderId(19561)
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({
-            success: true,
-            order: {
-                id: 1,
-                order_id: 19561,
-                order_number: "ORD-19561",
-                status: "confirmed",
-            },
-        } as any)
-        order.setSubmittedItems([
-            { id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, category: "meats" } as any,
-        ])
+        ;(order as any).rounds = [{
+            kind: "initial",
+            number: 1,
+            submittedAt: new Date().toISOString(),
+            items: [{ id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }],
+            serverOrderId: 19561,
+            serverTotal: 0,
+        }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "confirmed"
 
         const started = await session.start({ preserveSubmittedOrder: true })
 
         expect(started).toBe(true)
         expect(order.hasPlacedOrder).toBe(true)
-        expect(order.getCurrentOrder()?.order?.order_id).toBe(19561)
-        expect(order.submittedItems).toHaveLength(1)
+        expect(order.serverOrderId).toBe(19561)
+        expect((order as any).rounds[0].items).toHaveLength(1)
         expect(session.orderId).toBe(19561)
     })
 
     it("returns false when device authentication fails", async () => {
         const session = useSessionStore()
-        const device = useDeviceStore()
 
         // Device has no token, and authentication will fail
         // Mock the authenticate call to return false

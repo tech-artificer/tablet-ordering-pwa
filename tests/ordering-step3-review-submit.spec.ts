@@ -14,13 +14,11 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("submits initial order and emits order-submitted", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
         order.setGuestCount(2)
         order.setPackage({ id: 1, name: "A-La-Carte", price: 199 } as any)
-        order.setCartItems([
-            { id: 10, name: "Beef", quantity: 1, category: "meats", price: 0 } as any,
-        ])
+        ;(order as any).draft = [
+            { id: 10, name: "Beef", quantity: 1, category: "meats", price: 0 },
+        ]
 
         const submitOrderSpy = vi.spyOn(order, "submitOrder").mockResolvedValue({ success: true } as any)
         const submitRefillSpy = vi.spyOn(order, "submitRefill")
@@ -40,16 +38,9 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("allows continue-to-session when initial order already exists", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setIsRefillMode(false)
-        order.setCurrentOrder({
-            order: {
-                id: 9001,
-                order_id: 9001,
-                status: "pending",
-                items: [],
-            },
-        } as any)
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 9001, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 9001
+        ;(order as any).serverStatus = "pending"
 
         const submitOrderSpy = vi.spyOn(order, "submitOrder")
 
@@ -66,11 +57,9 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("shows blocker message and keeps submit disabled when meat selection is missing", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
         order.setGuestCount(2)
         order.setPackage({ id: 7, name: "Premium", price: 299 } as any)
-        order.setCartItems([])
+        ;(order as any).draft = []
 
         const wrapper = mount(OrderingStep3ReviewSubmit)
         const button = wrapper.find("button")
@@ -84,11 +73,9 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("renders items from activeCart for initial order review", () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
-        order.setCartItems([
-            { id: 201, name: "Korean Chili Samgyupsal", quantity: 2, category: "meats", price: 0 } as any,
-        ])
+        ;(order as any).draft = [
+            { id: 201, name: "Korean Chili Samgyupsal", quantity: 2, category: "meats", price: 0 },
+        ]
 
         const wrapper = mount(OrderingStep3ReviewSubmit)
 
@@ -98,11 +85,11 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("renders items from activeCart for refill review", () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setIsRefillMode(true)
-        order.setRefillItems([
-            { id: 301, name: "Cheese Corn", quantity: 1, category: "side", price: 0 } as any,
-        ])
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 1, serverTotal: 0 }]
+        ;(order as any).mode = "refill"
+        ;(order as any).draft = [
+            { id: 301, name: "Cheese Corn", quantity: 1, category: "side", price: 0 },
+        ]
 
         const wrapper = mount(OrderingStep3ReviewSubmit)
 
@@ -112,18 +99,13 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("submits refill and emits order-submitted when in refill mode", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setIsRefillMode(true)
-        order.setCurrentOrder({
-            order: {
-                id: 5001,
-                order_id: 5001,
-                status: "pending",
-            },
-        } as any)
-        order.setRefillItems([
-            { id: 20, name: "Pork Belly", quantity: 2, category: "meats", price: 0 } as any,
-        ])
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 5001, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 5001
+        ;(order as any).serverStatus = "pending"
+        ;(order as any).mode = "refill"
+        ;(order as any).draft = [
+            { id: 20, name: "Pork Belly", quantity: 2, category: "meats", price: 0 },
+        ]
 
         const submitRefillSpy = vi.spyOn(order, "submitRefill").mockResolvedValue({ success: true } as any)
         const submitOrderSpy = vi.spyOn(order, "submitOrder")
@@ -143,9 +125,9 @@ describe("OrderingStep3ReviewSubmit", () => {
 
     it("shows blocker message and keeps submit disabled when refill cart is empty", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setIsRefillMode(true)
-        order.setCartItems([])
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 1, serverTotal: 0 }]
+        ;(order as any).mode = "refill"
+        ;(order as any).draft = []
 
         const wrapper = mount(OrderingStep3ReviewSubmit)
         const button = wrapper.find("button")

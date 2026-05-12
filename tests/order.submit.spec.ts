@@ -65,16 +65,16 @@ describe("stores/order - submitOrder", () => {
         session.setIsActive(true)
     })
 
-    it("submits order, sets currentOrder and clears cartItems (success path)", async () => {
+    it("submits order, appends round and clears draft (success path)", async () => {
         const order = useOrderStore()
 
         // Prepare store state
         order.setPackage({ id: 1, name: "Package", price: 100, is_taxable: false } as any)
         order.setGuestCount(2)
-        order.setCartItems([
-            { id: 10, name: "Beef Brisket", price: 5, quantity: 2, category: "meats", isUnlimited: false } as any,
-            { id: 11, name: "Extra Side", price: 3, quantity: 1, category: "sides", isUnlimited: false } as any,
-        ])
+        ;(order as any).draft = [
+            { id: 10, name: "Beef Brisket", price: 5, quantity: 2, category: "meats", isUnlimited: false },
+            { id: 11, name: "Extra Side", price: 3, quantity: 1, category: "sides", isUnlimited: false },
+        ]
 
         const apiOrder = { id: 999, total_amount: 110, order_number: "ORD-999" }
         const apiResp = { success: true, order: apiOrder }
@@ -89,12 +89,13 @@ describe("stores/order - submitOrder", () => {
             items: expect.any(Array)
         }), expect.any(Object))
 
-        // Store updated: currentOrder should be the full response data
-        expect(order.currentOrder).toEqual(apiResp)
-        expect(order.cartItems).toEqual([])
-        // history appended
-        expect(order.getHistory().length).toBeGreaterThanOrEqual(1)
-        expect(order.getHistory()[order.getHistory().length - 1]).toEqual(apiResp)
+        // Round appended
+        expect((order as any).rounds).toHaveLength(1)
+        expect((order as any).rounds[0].kind).toBe("initial")
+        // draft cleared
+        expect((order as any).draft).toEqual([])
+        // hasPlacedOrder is now true
+        expect(order.hasPlacedOrder).toBe(true)
         // function returns backend data
         expect(result).toEqual(apiResp)
     })
@@ -104,9 +105,9 @@ describe("stores/order - submitOrder", () => {
         const session = useSessionStore()
         order.setPackage({ id: 7, name: "Package", price: 100, is_taxable: false } as any)
         order.setGuestCount(2)
-        order.setCartItems([
-            { id: 10, name: "Beef Brisket", price: 5, quantity: 1, category: "meats", isUnlimited: false } as any,
-        ])
+        ;(order as any).draft = [
+            { id: 10, name: "Beef Brisket", price: 5, quantity: 1, category: "meats", isUnlimited: false },
+        ]
 
         const apiResp = {
             success: true,
@@ -123,21 +124,21 @@ describe("stores/order - submitOrder", () => {
         expect(order.isRefillMode).toBe(true)
     })
 
-    it("propagates API errors and does not clear cartItems on failure", async () => {
+    it("propagates API errors and does not clear draft on failure", async () => {
         const order = useOrderStore()
 
         order.setPackage({ id: 2, name: "Package", price: 50, is_taxable: false } as any)
         order.setGuestCount(2)
-        order.setCartItems([
-            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
-        ])
+        ;(order as any).draft = [
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false },
+        ]
 
         mockPost.mockRejectedValueOnce(new Error("Network error"))
 
         await expect(order.submitOrder()).rejects.toThrow("Network error")
 
-        // ensure cartItems remain unchanged on failure
-        expect(order.getCartItems().length).toBeGreaterThan(0)
+        // ensure draft remains unchanged on failure
+        expect((order as any).draft.length).toBeGreaterThan(0)
     })
 
     it("fails cleanly when order creation response body is empty", async () => {
@@ -145,14 +146,14 @@ describe("stores/order - submitOrder", () => {
 
         order.setPackage({ id: 1, name: "Combo", price: 100, is_taxable: false } as Package)
         order.setGuestCount(2)
-        order.setCartItems([
-      { id: 9, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats", isUnlimited: false } as CartItem,
-        ])
+        ;(order as any).draft = [
+            { id: 9, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats", isUnlimited: false },
+        ]
 
         mockPost.mockResolvedValueOnce(undefined as any)
 
         await expect(order.submitOrder()).rejects.toThrow("Order creation response missing body")
-        expect(order.getCartItems().length).toBe(1)
+        expect((order as any).draft.length).toBe(1)
     })
 
     it("handles MENU_ITEM_UNAVAILABLE by refreshing menus and removing unavailable cart items", async () => {
@@ -160,10 +161,10 @@ describe("stores/order - submitOrder", () => {
 
         order.setPackage({ id: 2, name: "Package", price: 50, is_taxable: false } as any)
         order.setGuestCount(2)
-        order.setCartItems([
-            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
-            { id: 9999, name: "Stale Side", price: 1, quantity: 1, category: "sides", isUnlimited: false } as any,
-        ])
+        ;(order as any).draft = [
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false },
+            { id: 9999, name: "Stale Side", price: 1, quantity: 1, category: "sides", isUnlimited: false },
+        ]
 
         mockPackages = [{ id: 2 }]
         mockSides = [{ id: 12 }]
@@ -183,7 +184,7 @@ describe("stores/order - submitOrder", () => {
         })
 
         expect(mockLoadAllMenus).toHaveBeenCalledWith(true)
-        expect(order.getCartItems().map(item => item.id)).toEqual([12])
+        expect((order as any).draft.map((item: any) => item.id)).toEqual([12])
         expect((order.package as any)?.id).toBe(2)
     })
 })
@@ -212,14 +213,13 @@ describe("stores/order - submitRefill", () => {
 
     it("submits refill to /api/order/{orderId}/refill and payload excludes package_id", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({
-            order: { id: 999, order_id: 19561, status: "pending" },
-        } as any)
-        order.setRefillItems([
-            { id: 12, name: "Pork Belly", price: 4, quantity: 2, category: "meats", isUnlimited: false } as any,
-        ])
-        order.setIsRefillMode(true)
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "pending"
+        ;(order as any).draft = [
+            { id: 12, name: "Pork Belly", price: 4, quantity: 2, category: "meats", isUnlimited: false },
+        ]
+        ;(order as any).mode = "refill"
 
         mockGet.mockResolvedValueOnce({ data: { order: { id: 999, order_id: 19561, status: "pending" } } })
         mockPost.mockResolvedValueOnce({ data: { success: true, order: { id: 999, order_id: 19561, status: "pending" } } })
@@ -238,14 +238,13 @@ describe("stores/order - submitRefill", () => {
 
     it("keeps refill mode true while refill request is in-flight", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({
-            order: { id: 999, order_id: 19561, status: "pending" },
-        } as any)
-        order.setRefillItems([
-            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
-        ])
-        order.setIsRefillMode(true)
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "pending"
+        ;(order as any).draft = [
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false },
+        ]
+        ;(order as any).mode = "refill"
 
         let resolvePost: (value: any) => void = () => {}
         const postPromise = new Promise((resolve) => {
@@ -264,28 +263,28 @@ describe("stores/order - submitRefill", () => {
         await submitPromise
     })
 
-    it("on successful refill clears refill cart, exits refill mode, appends history, and does not recreate initial order", async () => {
+    it("on successful refill clears draft, appends round, and does not recreate initial order", async () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({
-            order: { id: 999, order_id: 19561, status: "pending" },
-        } as any)
-        order.setRefillItems([
-            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false } as any,
-        ])
-        order.setIsRefillMode(true)
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "pending"
+        ;(order as any).draft = [
+            { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false },
+        ]
+        ;(order as any).mode = "refill"
 
         mockGet.mockResolvedValueOnce({ data: { order: { id: 999, order_id: 19561, status: "pending" } } })
         mockPost.mockResolvedValueOnce({ data: { success: true, order: { id: 999, order_id: 19561, status: "pending" } } })
 
-        const historyBefore = order.getHistory().length
+        const roundsBefore = (order as any).rounds.length
         await order.submitRefill()
 
         expect(order.hasPlacedOrder).toBe(true)
-        expect(order.refillItems).toEqual([])
-        expect(order.isRefillMode).toBe(false)
-        expect(order.getHistory().length).toBe(historyBefore + 1)
-        expect((order.getHistory()[order.getHistory().length - 1] as any).type).toBe("refill")
+        expect((order as any).draft).toEqual([])
+        // appendRound keeps mode as "refill" (ready for another refill)
+        expect(order.isRefillMode).toBe(true)
+        expect((order as any).rounds.length).toBe(roundsBefore + 1)
+        expect((order as any).rounds[(order as any).rounds.length - 1].kind).toBe("refill")
         expect(mockPost).not.toHaveBeenCalledWith("/api/devices/create-order", expect.anything(), expect.anything())
     })
 })

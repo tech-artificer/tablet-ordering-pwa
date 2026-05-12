@@ -198,8 +198,8 @@ describe("Error Handler Plugin", () => {
 
     describe("Build Version Mismatch", () => {
         it("detects build version mismatch", () => {
-            const storedBuild = "abc123"
-            const currentBuild = "def456"
+            const storedBuild: string = "abc123"
+            const currentBuild: string = "def456"
 
             const hasMismatch = storedBuild !== currentBuild
             expect(hasMismatch).toBe(true)

@@ -196,9 +196,12 @@ export default defineNuxtConfig({
     },
 
     app: {
+        // Cross-fade (no "out-in") so the entering page mounts immediately and
+        // overlaps the leaving page — eliminates the perceived "blank gap" between
+        // routes. The leaving page is positioned absolutely via CSS so the two
+        // siblings can coexist without affecting layout.
         pageTransition: {
             name: "page-fade",
-            mode: "out-in",
         },
         head: {
             script: [

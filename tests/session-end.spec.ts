@@ -15,14 +15,14 @@ describe("session end behavior", () => {
         const order = useOrderStore()
         const session = useSessionStore()
 
-        // Simulate active session + order state
+        // Simulate active session + order state using new API
         session.setIsActive(true)
         session.setOrderId(123)
         try { localStorage.setItem("session_active", "1") } catch (e) {}
 
-        order.setCartItems([{ id: 1, name: "Taco", price: 10, quantity: 1 } as any])
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({ order: { order_id: 123 } })
+        ;(order as any).draft = [{ id: 1, name: "Taco", price: 10, quantity: 1 }]
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 123, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 123
 
         // Act: end session
         await session.end()
@@ -34,8 +34,8 @@ describe("session end behavior", () => {
         expect(localStorage.getItem("session_active")).toBeNull()
 
         // Assert: order cleared
-        expect(order.getCartItems().length).toBe(0)
-        expect(order.currentOrder).toBeNull()
+        expect((order as any).draft).toHaveLength(0)
+        expect(order.serverOrderId).toBeNull()
         expect(order.hasPlacedOrder).toBe(false)
     })
 })

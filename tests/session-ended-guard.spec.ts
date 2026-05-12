@@ -13,11 +13,11 @@ vi.mock("../composables/useApi", () => ({ useApi: () => ({ get: vi.fn(), post: v
 
 describe("session-ended route — middleware guard", () => {
     it("/order/session-ended is in publicRoutes (no auth required)", () => {
-    // Read the middleware source and verify the route is listed
-    // This is a structural test — the middleware file must contain the route string
-        const middlewarePath = resolve(__dirname, "../middleware/auth.global.ts")
+        // Verify boot.global.ts includes /order/session-ended in PUBLIC_ROUTES
+        const middlewarePath = resolve(__dirname, "../middleware/boot.global.ts")
         const src = readFileSync(middlewarePath, "utf8")
         expect(src).toContain("/order/session-ended")
+        expect(src).toContain("PUBLIC_ROUTES")
     })
 })
 
@@ -34,8 +34,9 @@ describe("useActiveOrderRecovery — skips cleanup when transition active", () =
         // Simulate an active transition already in progress
         sessionEndStore.startTransition({ reason: "completed", source: "broadcast" })
 
-        // Set up a terminal order in order store
-        orderStore.setCurrentOrder({ order: { order_id: 99, status: "completed", order_number: "ORD-X" } } as any)
+        // Set up a terminal order in order store using new API
+        ;(orderStore as any).serverOrderId = 99
+        ;(orderStore as any).serverStatus = "completed"
 
         const endSpy = vi.spyOn(sessionStore, "end")
 
@@ -54,7 +55,8 @@ describe("useActiveOrderRecovery — skips cleanup when transition active", () =
         const sessionStore = useSessionStore()
         const orderStore = useOrderStore()
 
-        orderStore.setCurrentOrder({ order: { order_id: 99, status: "voided", order_number: "ORD-Y" } } as any)
+        ;(orderStore as any).serverOrderId = 99
+        ;(orderStore as any).serverStatus = "voided"
         vi.spyOn(orderStore, "initializeFromSession").mockResolvedValue(undefined)
 
         const endSpy = vi.spyOn(sessionStore, "end")

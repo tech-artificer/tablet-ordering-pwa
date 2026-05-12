@@ -146,15 +146,6 @@ export const useSessionStore = defineStore("session", () => {
         // Always re-sync session timer from server
         syncFromServer()
 
-        // Restart order polling if an order is active and we have a known order ID
-        const orderStore = useOrderStore()
-        if (orderStore.hasPlacedOrder) {
-            const orderId = orderStore.getPollingOrderId()
-            if (orderId) {
-                orderStore.startOrderPolling(orderId)
-            }
-        }
-
         // Note: WebSocket reconnection is handled automatically by useBroadcasts
         // exponential-backoff state-change handler (Mission-7 Task 1.7).
         // Log the wake duration so operators can monitor sleep recovery.
@@ -359,7 +350,7 @@ export const useSessionStore = defineStore("session", () => {
                 const preservedPackageId = unref(orderStore.package)?.id ?? null
 
                 if (!preserveSubmittedOrder) {
-                    orderStore.resetTransactionalState()
+                    orderStore.resetOrderState()
 
                     if (preserveSelection) {
                         orderStore.setGuestCount(preservedGuestCount)
@@ -399,7 +390,7 @@ export const useSessionStore = defineStore("session", () => {
             const timestamp = new Date().toISOString()
             const orderStore = useOrderStore()
             const currentOrderId = state.orderId
-            const finalStatus = orderStore.getCurrentOrderStatus() || "unknown"
+            const finalStatus = orderStore.serverStatus || "unknown"
 
             logger.info(`[Session Ending] order_id=${currentOrderId} final_status=${finalStatus}`)
             logger.info("🔚 Session ending - clearing all session and order state")
@@ -425,12 +416,7 @@ export const useSessionStore = defineStore("session", () => {
 
         // Reset order state when session ends
         const orderStore = useOrderStore()
-
-        // Stop any active polling first
-        try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[SessionStore] stopOrderPolling failed", e) }
-
-        orderStore.resetTransactionalState()
-        // Note: orderStore.history is KEPT for historical tracking
+        orderStore.resetOrderState()
 
         logger.info(`[Session] State cleared at ${timestamp}`)
 
@@ -493,11 +479,7 @@ export const useSessionStore = defineStore("session", () => {
             _unregisterVisibilitySync()
 
             const orderStore = useOrderStore()
-
-            // Stop any active polling first
-            try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[SessionStore] stopOrderPolling failed", e) }
-
-            orderStore.resetTransactionalState({ clearHistory: true })
+            orderStore.resetOrderState()
 
             // Force persist to localStorage immediately
             if (typeof window !== "undefined" && window.localStorage) {

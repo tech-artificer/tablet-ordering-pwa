@@ -94,8 +94,8 @@ describe("PWA Recovery System", () => {
 
     describe("Build Version Check", () => {
         it("detects build mismatch", () => {
-            const currentBuild = "abc123"
-            const serverBuild = "def456"
+            const currentBuild: string = "abc123"
+            const serverBuild: string = "def456"
 
             const hasMismatch = currentBuild !== serverBuild
             expect(hasMismatch).toBe(true)
