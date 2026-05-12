@@ -84,6 +84,29 @@ const mountOptions = {
     },
 }
 
+function makeInitialRound (items: any[]) {
+    return {
+        kind: "initial" as const,
+        number: 1,
+        submittedAt: new Date().toISOString(),
+        items,
+        serverOrderId: null,
+        serverTotal: 0,
+    }
+}
+
+function makeRefillRound (number: number, items: any[]) {
+    return {
+        kind: "refill" as const,
+        number,
+        submittedAt: new Date().toISOString(),
+        items,
+        serverOrderId: null,
+        serverRefillId: null,
+        serverTotal: 0,
+    }
+}
+
 describe("in-session ordered items display", () => {
     beforeEach(() => {
         const pinia = createPinia()
@@ -94,27 +117,10 @@ describe("in-session ordered items display", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        orderStore.setHistory([
-            {
-                order: {
-                    order_number: "1001",
-                    status: "confirmed",
-                    items: [
-                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                    ],
-                },
-            },
-            {
-                order: {
-                    order_number: "1002",
-                    status: "confirmed",
-                    items: [
-                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                    ],
-                },
-            },
-        ] as any)
+        ;(orderStore as any).rounds = [
+            makeInitialRound([{ id: 10, name: "Initial Beef", quantity: 2, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+            makeRefillRound(2, [{ id: 20, name: "Refill Pork", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+        ]
 
         const wrapper = mount(InSession, {
             ...mountOptions,
@@ -131,18 +137,9 @@ describe("in-session ordered items display", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        orderStore.setHistory([
-            {
-                order: {
-                    order_number: "1001",
-                    status: "confirmed",
-                    items: [
-                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                    ],
-                },
-            },
-        ] as any)
+        ;(orderStore as any).rounds = [
+            makeInitialRound([{ id: 10, name: "Initial Beef", quantity: 2, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+        ]
 
         const wrapper = mount(InSession, {
             ...mountOptions,
@@ -160,27 +157,10 @@ describe("in-session ordered items display", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        orderStore.setHistory([
-            {
-                order: {
-                    order_number: "1001",
-                    status: "confirmed",
-                    items: [
-                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                    ],
-                },
-            },
-            {
-                order: {
-                    order_number: "1002",
-                    status: "confirmed",
-                    items: [
-                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                    ],
-                },
-            },
-        ] as any)
+        ;(orderStore as any).rounds = [
+            makeInitialRound([{ id: 10, name: "Initial Beef", quantity: 2, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+            makeRefillRound(2, [{ id: 20, name: "Refill Pork", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+        ]
 
         const wrapper = mount(InSession, {
             ...mountOptions,
@@ -198,15 +178,10 @@ describe("in-session ordered items display", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        // Set currentOrder for page context
-        orderStore.setCurrentOrder({
-            order_id: 123,
-            order_number: "ORD-123",
-            status: "confirmed",
-        } as any)
+        ;(orderStore as any).serverOrderId = 123
+        ;(orderStore as any).serverStatus = "confirmed"
         // Set rounds[] directly — primary path per DATA_MODEL.md
-        ;(orderStore.rounds as any) = [
+        ;(orderStore as any).rounds = [
             {
                 kind: "initial",
                 number: 1,
@@ -262,15 +237,10 @@ describe("in-session ordered items display", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        // Set currentOrder for page context
-        orderStore.setCurrentOrder({
-            order_id: 456,
-            order_number: "ORD-456",
-            status: "confirmed",
-        } as any)
+        ;(orderStore as any).serverOrderId = 456
+        ;(orderStore as any).serverStatus = "confirmed"
         // Set rounds[] directly — primary path per DATA_MODEL.md
-        ;(orderStore.rounds as any) = [
+        ;(orderStore as any).rounds = [
             {
                 kind: "initial",
                 number: 1,
@@ -324,27 +294,10 @@ describe("in-session ordered items display", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
         const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        orderStore.setHistory([
-            {
-                order: {
-                    order_number: "1001",
-                    status: "confirmed",
-                    items: [
-                        { id: 10, name: "Initial Beef", quantity: 2, price: 0, category: "meats" },
-                    ],
-                },
-            },
-            {
-                order: {
-                    order_number: "1002",
-                    status: "confirmed",
-                    items: [
-                        { id: 20, name: "Refill Pork", quantity: 1, price: 0, category: "meats" },
-                    ],
-                },
-            },
-        ] as any)
+        ;(orderStore as any).rounds = [
+            makeInitialRound([{ id: 10, name: "Initial Beef", quantity: 2, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+            makeRefillRound(2, [{ id: 20, name: "Refill Pork", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }]),
+        ]
 
         const wrapper = mount(InSession, {
             ...mountOptions,
@@ -358,15 +311,10 @@ describe("in-session ordered items display", () => {
         expect(wrapper.text()).toContain("Refill #1")
     })
 
-    it("falls back to submittedItems when history is empty", () => {
+    it("shows empty state when no rounds have been submitted", () => {
         const pinia = createPinia()
         setActivePinia(pinia)
-        const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        orderStore.setHistory([])
-        orderStore.setSubmittedItems([
-            { id: 10, menu_id: 10, name: "Fallback Item", quantity: 2, price: 0, category: "meats", isUnlimited: false, img_url: null },
-        ])
+        // rounds is empty by default — nothing to display
 
         const wrapper = mount(InSession, {
             ...mountOptions,
@@ -376,36 +324,8 @@ describe("in-session ordered items display", () => {
             },
         })
 
-        expect(wrapper.text()).toContain("Fallback Item")
-        expect(wrapper.text()).toContain("×2")
-    })
-
-    it("falls back to currentOrder items when history and submittedItems are empty", () => {
-        const pinia = createPinia()
-        setActivePinia(pinia)
-        const orderStore = useOrderStore()
-        orderStore.setHasPlacedOrder(true)
-        orderStore.setHistory([])
-        orderStore.setSubmittedItems([])
-        orderStore.setCurrentOrder({
-            order: {
-                order_number: "1005",
-                status: "confirmed",
-                items: [
-                    { id: 50, name: "Current Order Item", quantity: 5, price: 0, category: "meats" },
-                ],
-            },
-        } as any)
-
-        const wrapper = mount(InSession, {
-            ...mountOptions,
-            global: {
-                ...mountOptions.global,
-                plugins: [pinia],
-            },
-        })
-
-        expect(wrapper.text()).toContain("Current Order Item")
-        expect(wrapper.text()).toContain("×5")
+        // No items text since rounds is empty
+        expect(wrapper.text()).not.toContain("Initial Beef")
+        expect(wrapper.text()).not.toContain("Fallback Item")
     })
 })

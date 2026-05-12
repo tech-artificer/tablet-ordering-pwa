@@ -16,16 +16,9 @@ const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
 
 // ── Derived state ─────────────────────────────────────────────────────────────
-const currentOrder = computed(() => {
-    const raw = orderStore.currentOrder
-    if (!raw) { return null }
-    // Normalise nested vs flat shape
-    return (raw as any).order ?? raw
-})
-
-const orderStatus = computed<string>(() => currentOrder.value?.status ?? "pending")
-const orderNumber = computed<string | null>(() => currentOrder.value?.order_number ?? null)
-const orderId = computed<number | null>(() => currentOrder.value?.order_id ?? sessionStore.orderId ?? null)
+const orderStatus = computed<string>(() => String(unref(orderStore.serverStatus) || "pending"))
+const orderNumber = computed<string | null>(() => null)
+const orderId = computed<number | null>(() => unref(orderStore.serverOrderId) ?? sessionStore.getOrderId() ?? null)
 
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as number)
@@ -79,45 +72,12 @@ const displaySubmittedItems = computed<OrderedItem[]>(() => {
         if (out.length > 0) { return out }
     }
 
-    // FALLBACK 1: legacy submittedItems (now append-only via the refill fix).
-    const submitted = (unref(orderStore.submittedItems) ?? []) as SubmittedItem[]
-    if (submitted.length > 0) {
-        return submitted.map(item => ({
-            ...item,
-            sourceRound: "initial" as const,
-            sourceRoundLabel: "Order",
-        }))
-    }
-
-    // FALLBACK 2: currentOrder.items / .order_items (server-polled snapshot).
-    const co = currentOrder.value as any
-    if (Array.isArray(co?.items) && co.items.length > 0) {
-        return co.items.map((item: any) => normalizeHistoryItem(item, "initial", "Order"))
-    }
-    if (Array.isArray(co?.order_items) && co.order_items.length > 0) {
-        return co.order_items.map((item: any) => normalizeHistoryItem(item, "initial", "Order"))
-    }
-
-    // FALLBACK 3: legacy history entries.
-    const history = ([...((unref(orderStore.history) ?? []) as any[])]).reverse()
-    for (const entry of history) {
-        const order = (entry as any)?.order ?? entry
-        const items = order?.items ?? order?.order_items
-        if (Array.isArray(items) && items.length > 0) {
-            const isRefill = (entry as any)?.type === "refill"
-            const sourceRound: "initial" | "refill" = isRefill ? "refill" : "initial"
-            const sourceRoundLabel = isRefill ? "Refill" : "Order"
-            return items.map((item: any) => normalizeHistoryItem(item, sourceRound, sourceRoundLabel))
-        }
-    }
-
     return []
 })
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const packageName = computed(() =>
     (orderStore.package as any)?.name ??
-    (currentOrder.value as any)?.package_name ??
     "Package"
 )
 
@@ -125,25 +85,10 @@ const totalItemsOrdered = computed(() =>
     displaySubmittedItems.value.reduce((s: number, i: SubmittedItem) => s + Number(i?.quantity ?? 0), 0)
 )
 
-// Use server/order-adapter total when available so billing matches authoritative
-// order calculation (package, multipliers, taxes, and backend adjustments).
+// Use server total from store (authoritative server-reported value)
 const displayTotal = computed<number>(() => {
-    // 1. Server total from normalized currentOrder (polled live value).
-    //    Guard > 0: polling responses sometimes return 0 for an unpopulated field.
-    const totalFromOrder = Number((currentOrder.value as any)?.total_amount)
-    if (Number.isFinite(totalFromOrder) && totalFromOrder > 0) { return totalFromOrder }
-
-    // 2. History entries most-recent-first — submission responses carry total_amount
-    //    even after polling overwrites currentOrder with a shape that lacks it.
-    const history = ([...((unref(orderStore.history) ?? []) as any[])]).reverse()
-    for (const entry of history) {
-        const order = (entry as any)?.order ?? entry
-        const histTotal = Number(order?.total_amount ?? (entry as any)?.total_amount)
-        if (Number.isFinite(histTotal) && histTotal > 0) { return histTotal }
-    }
-
-    // 3. grandTotal — package × guestCount; add-ons zeroed after cart clear.
-    //    Only approximate, shown while server total is not yet available.
+    const serverTotal = Number(unref(orderStore.serverTotal) ?? 0)
+    if (Number.isFinite(serverTotal) && serverTotal > 0) { return serverTotal }
     const fallbackTotal = Number(unref(orderStore.grandTotal) ?? 0)
     return Number.isFinite(fallbackTotal) ? fallbackTotal : 0
 })
@@ -175,18 +120,8 @@ function getStatusDotStyle (status: string): string {
     return m[status] ?? "background:#9ca3af"
 }
 
-function itemEmoji (item: any): string {
-    const cat = String(item?.category ?? "").toLowerCase()
-    if (cat.includes("meat")) { return "🔥" }
-    if (cat.includes("side")) { return "🌿" }
-    if (
-        cat.includes("drink") || cat.includes("bev") ||
-        cat.includes("soju") || cat.includes("beer") ||
-        cat.includes("wine") || cat.includes("juice") ||
-        cat.includes("tea") || cat.includes("coffee")
-    ) { return "🥤" }
-    if (cat.includes("dessert")) { return "🍮" }
-    return "🍽️"
+function itemCategory (item: any): string {
+    return String(item?.category ?? "").toLowerCase()
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
@@ -219,9 +154,8 @@ let clockIntervalId: ReturnType<typeof setInterval> | null = null
 
 // ── Order round label (Initial Order / Refill #N) ─────────────────────────────
 const orderRound = computed<string>(() => {
-    const h = (unref(orderStore.history) ?? []) as any[]
-    // history[0] = initial order; history[1..n] = refills
-    const refillCount = Math.max(0, h.length - 1)
+    const rounds = (unref(orderStore.rounds) ?? []) as any[] // unref needed for Pinia setup store
+    const refillCount = Math.max(0, rounds.length - 1)
     if (refillCount === 0) { return "Initial Order" }
     return `Refill #${refillCount}`
 })
@@ -389,11 +323,6 @@ definePageMeta({ layout: "kiosk" })
                             :key="`ordered-${item.sourceRoundLabel ?? 'order'}-${item.id ?? item.menu_id ?? index}-${index}`"
                             class="flex items-center gap-3 rounded-xl bg-[#141210] border border-transparent p-[12px_14px] transition-[border-color,background] duration-150 hover:bg-[#1e1a16] hover:border-[rgba(233,211,170,0.1)]"
                         >
-                            <!-- Emoji icon cell -->
-                            <div class="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-[10px] bg-[#1e1a16]">
-                                <span class="text-xl leading-none">{{ itemEmoji(item) }}</span>
-                            </div>
-
                             <!-- Item details -->
                             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                                 <div class="flex items-center gap-2">

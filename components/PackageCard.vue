@@ -147,21 +147,12 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
             v-if="modifierGroups.length"
             class="mt-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden px-4"
         >
-            <div class="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40">
-                Included
-            </div>
-
             <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pkg-groups-scroll">
                 <div
                     v-for="group in modifierGroups"
                     :key="group.label"
                     class="flex flex-col gap-1"
                 >
-                    <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
-                        <span class="text-[#f6b56d]">{{ group.label }}</span>
-                        <span class="text-white/35">{{ group.items.length }}</span>
-                    </div>
-
                     <div
                         class="flex gap-1.5 overflow-x-auto snap-x snap-mandatory pkg-modifier-row"
                     >
@@ -200,11 +191,10 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
         </section>
 
         <!-- Footer / CTA -->
-        <footer class="mt-auto flex-none px-4 pb-4 pt-4">
-            <div class="h-px w-full bg-white/[0.08]" />
+        <footer class="mt-auto flex-none px-4 pb-4 pt-3">
             <button
                 type="button"
-                class="mx-auto mt-4 flex items-center gap-2 font-kanit text-sm font-bold text-[#ffad63] transition group-hover:gap-3 group-hover:text-[#ffc58a] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                class="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#f6b56d] to-[#ffa040] font-kanit text-sm font-extrabold text-black shadow-[0_4px_16px_rgba(246,181,109,0.35)] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 @click.stop="emit('select', pkg)"
             >
                 Choose package
@@ -263,12 +253,12 @@ footer button {
 }
 
 footer button:hover {
-  transform: scale(1.02);
-  box-shadow: 0 8px 24px rgba(246, 181, 109, 0.3);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 28px rgba(246, 181, 109, 0.45);
 }
 
 footer button:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 /* Modifier tile hover effects */

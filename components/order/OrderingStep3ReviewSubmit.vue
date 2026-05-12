@@ -41,17 +41,11 @@ type ReviewItem = {
 
 const activeCart = computed<any[]>(() => (unref(orderStore.activeCart) as any[]) || [])
 
-const currentOrderSnapshot = computed<any>(() => {
-    return (unref(orderStore.currentOrder) as any)?.order || unref(orderStore.currentOrder) || null
-})
+const currentOrderSnapshot = computed<any>(() => null)
 
-const hasConfirmedInitialOrder = computed(() => {
-    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
-        return orderStore.hasConfirmedInitialOrder()
-    }
-    const liveOrderId = currentOrderSnapshot.value?.order_id ?? currentOrderSnapshot.value?.id
-    return Boolean(orderStore.hasPlacedOrder && liveOrderId)
-})
+const hasConfirmedInitialOrder = computed(() =>
+    orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
+)
 
 const fallbackServerItems = computed<ReviewItem[]>(() => {
     const rawItems = currentOrderSnapshot.value?.items ?? currentOrderSnapshot.value?.order_items

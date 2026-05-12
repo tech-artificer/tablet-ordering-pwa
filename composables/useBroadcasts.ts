@@ -1,4 +1,4 @@
-import { ref, watch } from "vue"
+import { ref, unref, watch } from "vue"
 import { ElNotification, ElMessage } from "element-plus"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
@@ -131,7 +131,7 @@ export const useBroadcasts = () => {
     const sessionStore = useSessionStore()
     const { triggerSessionEnd } = useSessionEndFlow()
 
-    const getCurrentOrderId = (): string | number | null => extractOrderId(orderStore.getCurrentOrder())
+    const getCurrentOrderId = (): string | number | null => unref(orderStore.serverOrderId)
     const getEventOrderId = (payload: { order?: Record<string, any> }): string | number | null => extractOrderId(payload?.order ?? payload)
 
     let deviceChannel: any = null
@@ -259,14 +259,8 @@ export const useBroadcasts = () => {
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(order.status)
 
-            // HOTFIX: Patch refill items into order (backend sends items on refill)
-            if (order.items && order.items.length > 0) {
-                orderStore.patchOrderItems(order.items)
-            }
-
             // End session only on genuine terminal statuses — in_progress, ready, served are intermediate
             if (["completed", "voided", "cancelled"].includes(order.status)) {
-                try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
                 logger.info("[Broadcasts] Terminal order status via broadcast — ending session", { status: order.status })
                 triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", {
                     source: "broadcast",
@@ -293,8 +287,7 @@ export const useBroadcasts = () => {
         logger.debug("✅ Order completed check:", { currentOrderId, eventOrderId })
 
         if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
-            orderStore.completeOrder()
-            try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
+            orderStore.updateOrderStatus("completed")
             logger.info("✅ Order completed via broadcast — ending session")
             triggerSessionEnd("completed", {
                 source: "broadcast",
@@ -317,8 +310,7 @@ export const useBroadcasts = () => {
         const currentId = getCurrentOrderId()
         const eventOrderId = getEventOrderId(event)
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
-            orderStore.clearOrder()
-            try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
+            orderStore.updateOrderStatus(event.order.status)
             logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session")
             triggerSessionEnd(event.order.status, {
                 source: "broadcast",

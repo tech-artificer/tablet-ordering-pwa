@@ -77,15 +77,10 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
     it("should produce valid refill payload schema", () => {
         const store = useOrderStore()
 
-        // Setup: Mark order as placed, enter refill mode
-        store.setHasPlacedOrder(true)
-        store.setCurrentOrder({
-            order: {
-                id: 1,
-                order_id: 19561,
-                status: "confirmed",
-            },
-        } as any)
+        // Setup: Mark order as placed using new API, enter refill mode
+        ;(store as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(store as any).serverOrderId = 19561
+        ;(store as any).serverStatus = "confirmed"
         store.toggleRefillMode(true)
 
         store.addToCart({
@@ -102,16 +97,14 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
             category: "sides"
         } as any, { category: "sides" })
 
-        store.setHasPlacedOrder(true)
-        store.setIsRefillMode(true)
-        store.setRefillItems([
+        ;(store as any).draft = [
             { id: 10, name: "Beef Brisket", price: 150, quantity: 1, category: "meats", isUnlimited: false },
             { id: 20, name: "Kimchi", price: 50, quantity: 1, category: "sides", isUnlimited: false }
-        ] as any)
+        ]
 
         expect(store.hasPlacedOrder).toBe(true)
         expect(store.isRefillMode).toBe(true)
-        expect(((store.refillItems as any)?.value ?? store.refillItems).length).toBe(2)
+        expect((store as any).draft.length).toBe(2)
     })
 
     it("normalizes singular meat categories into menu rows", () => {
@@ -171,25 +164,20 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         const store = useOrderStore()
 
         // Setup: Refill mode with drinks (not allowed)
-        store.setHasPlacedOrder(true)
-        store.setCurrentOrder({
-            order: {
-                id: 1,
-                order_id: 19561,
-                status: "confirmed",
-            },
-        } as any)
+        ;(store as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(store as any).serverOrderId = 19561
+        ;(store as any).serverStatus = "confirmed"
         store.toggleRefillMode(true)
 
         // Manually inject invalid item (bypassing validation)
-        store.setRefillItems([{
+        ;(store as any).draft = [{
             id: 30,
             name: "Soda",
             price: 30,
             quantity: 1,
             isUnlimited: false,
             category: "drinks" // ❌ Not allowed in refills
-        }] as any)
+        }]
 
         // Act & Assert: Should throw
         await expect(store.submitRefill()).rejects.toThrow("only meats and sides are allowed")
@@ -199,10 +187,10 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         const store = useOrderStore()
         store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
         store.setGuestCount(2)
-        store.setCartItems([
+        ;(store as any).draft = [
             { id: 10, name: "Beef Brisket", price: 150, quantity: 1, category: "meats", isUnlimited: false },
             { id: 10, name: "Beef Brisket", price: 150, quantity: 2, category: "meats", isUnlimited: false },
-        ] as any)
+        ]
 
         const payload = (store as any).buildPayload()
         expect(payload.items).toEqual([{ menu_id: 10, quantity: 3 }])

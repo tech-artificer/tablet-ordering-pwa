@@ -73,9 +73,6 @@ export function useSessionEndFlow () {
 
         logger.info("[SessionEndFlow] Triggering transition", { reason, source: options.source, orderNumber: options.orderNumber })
 
-        // Stop polling before clearing state
-        try { orderStore.stopOrderPolling?.() } catch (e) { /* ignore */ }
-
         // Clear session (handles order state cleanup internally)
         try {
             await Promise.resolve(sessionStore.end())

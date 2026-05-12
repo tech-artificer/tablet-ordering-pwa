@@ -34,8 +34,9 @@ describe("useActiveOrderRecovery — skips cleanup when transition active", () =
         // Simulate an active transition already in progress
         sessionEndStore.startTransition({ reason: "completed", source: "broadcast" })
 
-        // Set up a terminal order in order store
-        orderStore.setCurrentOrder({ order: { order_id: 99, status: "completed", order_number: "ORD-X" } } as any)
+        // Set up a terminal order in order store using new API
+        ;(orderStore as any).serverOrderId = 99
+        ;(orderStore as any).serverStatus = "completed"
 
         const endSpy = vi.spyOn(sessionStore, "end")
 
@@ -54,7 +55,8 @@ describe("useActiveOrderRecovery — skips cleanup when transition active", () =
         const sessionStore = useSessionStore()
         const orderStore = useOrderStore()
 
-        orderStore.setCurrentOrder({ order: { order_id: 99, status: "voided", order_number: "ORD-Y" } } as any)
+        ;(orderStore as any).serverOrderId = 99
+        ;(orderStore as any).serverStatus = "voided"
         vi.spyOn(orderStore, "initializeFromSession").mockResolvedValue(undefined)
 
         const endSpy = vi.spyOn(sessionStore, "end")

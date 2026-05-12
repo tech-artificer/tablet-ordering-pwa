@@ -22,16 +22,12 @@ const route = useRoute()
 const router = useRouter()
 
 const hasLiveOrderReference = (): boolean => {
-    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
-    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
+    return Boolean(unref(sessionStore.orderId) || orderStore.serverOrderId)
 }
 
-const hasConfirmedInitialOrder = computed(() => {
-    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
-        return orderStore.hasConfirmedInitialOrder()
-    }
-    return Boolean(unref(orderStore.hasPlacedOrder) && hasLiveOrderReference())
-})
+const hasConfirmedInitialOrder = computed(() =>
+    orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
+)
 
 onMounted(async () => {
     // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
@@ -94,7 +90,7 @@ watch(() => orderStore.package, (storePackage) => {
 // Watch for order completion status changes and redirect when completed
 const { triggerSessionEnd } = useSessionEndFlow()
 watch(
-    () => orderStore.getCurrentOrderStatus(),
+    () => unref(orderStore.serverStatus),
     (newStatus) => {
         if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
@@ -343,7 +339,7 @@ const toggleRefillMode = () => {
         return
     }
 
-    const newMode = !orderStore.isRefillMode
+    const newMode = !(orderStore.isRefillMode)
     orderStore.toggleRefillMode(newMode)
 
     if (newMode) {
