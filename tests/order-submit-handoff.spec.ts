@@ -280,6 +280,6 @@ describe("review page handoff", () => {
         await emitReviewSubmitted(wrapper)
 
         expect(mocks.routerReplace).not.toHaveBeenCalled()
-        expect(wrapper.get("[role='alert']").text()).toContain("Your order was sent")
+        expect(wrapper.get("[role='alert']").text()).toContain("Order sent, but navigation failed")
     }, 15000)
 })

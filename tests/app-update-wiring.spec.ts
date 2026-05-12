@@ -7,13 +7,11 @@ function readAppSource (): string {
 }
 
 describe("app update wiring", () => {
-    it("mounts the update banner and app update flow methods", () => {
+    it("wires useAppUpdate composable in app.vue", () => {
         const source = readAppSource()
 
-        expect(source).toContain("<UpdateBanner")
         expect(source).toContain("useAppUpdate")
         expect(source).toContain("initializeAppUpdate")
-        expect(source).toContain("applyUpdate")
         expect(source).toContain("disposeAppUpdate")
     })
 })

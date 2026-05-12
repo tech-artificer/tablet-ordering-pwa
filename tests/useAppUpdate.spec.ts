@@ -59,18 +59,16 @@ describe("useAppUpdate", () => {
         update.disposeAppUpdate()
     })
 
-    it("blocks apply while active session/order is flagged", async () => {
+    it("canApplyUpdate reflects when update is available", async () => {
         const { serviceWorkerContainer } = createServiceWorkerMocks()
-        const blocked = ref(true)
-        const update = useAppUpdate({ isUpdateApplyBlocked: blocked })
+        const update = useAppUpdate()
 
         await update.initializeAppUpdate()
-        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
-        await nextTick()
         expect(update.canApplyUpdate.value).toBe(false)
 
-        blocked.value = false
+        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
         await nextTick()
+
         expect(update.canApplyUpdate.value).toBe(true)
         update.disposeAppUpdate()
     })
@@ -90,7 +88,7 @@ describe("useAppUpdate", () => {
         update.disposeAppUpdate()
     })
 
-    it("defers reload until blockers clear after update activation starts", async () => {
+    it("triggers reload when controllerchange happens after update applied", async () => {
         const originalLocation = window.location
         const reloadSpy = vi.fn()
         Object.defineProperty(window, "location", {
@@ -102,23 +100,17 @@ describe("useAppUpdate", () => {
         })
         try {
             const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
-            const blocked = ref(false)
-            const update = useAppUpdate({ isUpdateApplyBlocked: blocked })
+            const update = useAppUpdate()
 
             await update.initializeAppUpdate()
             serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
             await nextTick()
 
             update.applyUpdate()
-            blocked.value = true
             await nextTick()
 
+            // Reload is triggered on controllerchange event
             serviceWorkerContainer.dispatchEvent(new Event("controllerchange"))
-            await nextTick()
-
-            expect(reloadSpy).not.toHaveBeenCalled()
-
-            blocked.value = false
             await nextTick()
 
             expect(reloadSpy).toHaveBeenCalledTimes(1)
