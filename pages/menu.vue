@@ -102,7 +102,7 @@ watch(
 )
 
 // Menu categories
-type MenuCategory = "meats" | "sides" | "desserts" | "beverages";
+type MenuCategory = "meats" | "sides" | "desserts" | "drinks";
 
 const activeCategory = ref<MenuCategory>("meats")
 
@@ -110,7 +110,7 @@ const categories = [
     { id: "meats", label: "Meats", icon: Beef },
     { id: "sides", label: "Sides", icon: UtensilsCrossed },
     { id: "desserts", label: "Desserts", icon: CakeSlice },
-    { id: "beverages", label: "Beverages", icon: Wine }
+    { id: "drinks", label: "Drinks", icon: Wine }
 ] as const
 
 // Check if refills are available (order placed AND we have a valid order ID)
@@ -138,29 +138,32 @@ const getItemQuantity = (itemId: number) => {
     return orderStore.getCartItemQuantity(Number(itemId))
 }
 
-// Get meats from selected package modifiers
-const meats = computed(() => {
-    if (!selectedPackageId.value) { return [] }
-    const packageId = Number(selectedPackageId.value)
-    const pkg = menuStore.packages.find(pkg => pkg.id === packageId)
-    if (pkg?.modifiers && pkg.modifiers.length > 0) {
-        return pkg.modifiers.flat()
-    }
-    return []
+// Get all available meats independent of package selection
+const meats = computed(() => menuStore.meats)
+
+// Compute which meats are allowed based on selected package
+const allowedMeatIds = computed(() => {
+    const pkg = menuStore.packages.find(p => p.id === Number(selectedPackageId.value))
+    return new Set((pkg?.modifiers ?? []).map(m => m.id))
 })
+
+// Decorate meats with disabled state
+const decorateMeats = computed(() =>
+    meats.value.map(item => ({ ...item, disabled: !allowedMeatIds.value.has(item.id) }))
+)
 
 // Get items based on active category for MenuItemGrid
 const displayItems = computed(() => {
     const baseItems = (() => {
         switch (activeCategory.value) {
         case "meats":
-            return meats.value
+            return decorateMeats.value
         case "sides":
             return menuStore.sides
         case "desserts":
             return menuStore.desserts
-        case "beverages":
-            return menuStore.beverages
+        case "drinks":
+            return menuStore.drinks
         default:
             return []
         }
@@ -206,8 +209,8 @@ const reloadCategory = async () => {
         case "sides":
             await menuStore.fetchSides()
             break
-        case "beverages":
-            await menuStore.fetchBeverages()
+        case "drinks":
+            await menuStore.fetchDrinks()
             break
         }
     } catch (e) {
@@ -353,12 +356,14 @@ const toggleRefillMode = () => {
 // Check if category is loading
 const isLoading = computed((): boolean => {
     switch (activeCategory.value) {
+    case "meats":
+        return Boolean(menuStore.isLoadingMeats)
     case "sides":
         return Boolean(menuStore.isLoadingSides)
     case "desserts":
         return Boolean(menuStore.isLoadingDesserts)
-    case "beverages":
-        return Boolean(menuStore.isLoadingBeverages)
+    case "drinks":
+        return Boolean(menuStore.isLoadingDrinks)
     default:
         return Boolean(menuStore.isLoadingPackages)
     }
@@ -370,14 +375,16 @@ const meatError = ref<string | null>(null)
 // Check for errors
 const categoryError = computed(() => {
     switch (activeCategory.value) {
+    case "meats":
+        return meatError.value
     case "sides":
         return menuStore.errors.sides
     case "desserts":
         return menuStore.errors.desserts
-    case "beverages":
-        return menuStore.errors.beverages
+    case "drinks":
+        return menuStore.errors.drinks
     default:
-        return meatError.value
+        return null
     }
 })
 

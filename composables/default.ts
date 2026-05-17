@@ -24,7 +24,7 @@ export enum CategoryFilter {
     SIDES_BANCHAN = "sides (banchan)",
     A_LA_CARTE = "a la carte",
     DESSERT = "dessert",
-    BEVERAGE = "beverage",
+    DRINKS = "drinks",
 }
 
 export enum OrderStatus {

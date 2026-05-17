@@ -3,6 +3,7 @@ import { ElNotification, ElMessage } from "element-plus"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
+import { useConnectionStore } from "~/stores/Connection"
 import { extractOrderId } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
@@ -152,10 +153,14 @@ export const useBroadcasts = () => {
     const MAX_RECONNECTION_ATTEMPTS = 10
 
     const scheduleReconnection = () => {
+        const connectionStore = useConnectionStore()
+
         if (reconnectTimer) { return } // Already scheduled
         if (reconnectAttempts >= MAX_RECONNECTION_ATTEMPTS) {
             logger.warn(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
             logger.warn("WebSocket max reconnection attempts reached")
+            connectionStore.setReverbState("failed")
+            connectionStore.setReconnectAttempt(reconnectAttempts)
             ElNotification({
                 title: "⚠️ Connection Lost",
                 message: "Please reload the page to reconnect",
@@ -167,6 +172,8 @@ export const useBroadcasts = () => {
         }
 
         reconnectAttempts++
+        connectionStore.setReverbState("disconnected")
+        connectionStore.setReconnectAttempt(reconnectAttempts)
         const backoffIndex = Math.min(reconnectAttempts - 1, RECONNECTION_BACKOFF.length - 1)
         const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
 
@@ -186,11 +193,15 @@ export const useBroadcasts = () => {
     }
 
     const cancelReconnection = () => {
+        const connectionStore = useConnectionStore()
+
         if (reconnectTimer) {
             window.clearTimeout(reconnectTimer)
             reconnectTimer = null
         }
         reconnectAttempts = 0 // Reset on successful connection
+        connectionStore.setReverbState("connected")
+        connectionStore.setReconnectAttempt(0)
     }
 
     // Channel connection status
@@ -601,6 +612,7 @@ export const useBroadcasts = () => {
         unbindConnectionStateHandler()
 
         boundStateChangeHandler = (states: any) => {
+            const connectionStore = useConnectionStore()
             const timestamp = new Date().toISOString()
             logger.debug(`[🔗 WebSocket State Change] ${states.previous || "?"} → ${states.current} at ${timestamp}`)
             logger.debug("WebSocket state change:", states.current)
@@ -608,6 +620,7 @@ export const useBroadcasts = () => {
             if (states.current === "connected") {
                 logger.debug(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
                 logger.debug("✅ WebSocket connected")
+                connectionStore.setReverbState("connected")
                 cancelReconnection()
                 resubscribeChannels()
                 ElNotification({
@@ -620,7 +633,18 @@ export const useBroadcasts = () => {
                 return
             }
 
-            if (states.current === "disconnected" || states.current === "unavailable" || states.current === "failed") {
+            if (states.current === "disconnected") {
+                connectionStore.setReverbState("disconnected")
+                logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
+                resetChannelStatus()
+                scheduleReconnection()
+            } else if (states.current === "unavailable") {
+                connectionStore.setReverbState("unavailable")
+                logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
+                resetChannelStatus()
+                scheduleReconnection()
+            } else if (states.current === "failed") {
+                connectionStore.setReverbState("failed")
                 logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
                 resetChannelStatus()
                 scheduleReconnection()

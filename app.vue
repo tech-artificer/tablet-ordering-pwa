@@ -224,6 +224,9 @@ onUnmounted(() => {
     <div class="contents">
         <SplashScreen :visible="isLoading" />
 
+        <!-- Global connection and error overlays -->
+        <ConnectionBlockingOverlay />
+
         <NuxtLayout>
             <NuxtPage />
         </NuxtLayout>

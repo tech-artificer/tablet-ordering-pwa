@@ -25,18 +25,20 @@ const mockGet = vi.fn()
 vi.mock("../composables/useApi", () => ({ useApi: () => ({ post: mockPost, get: mockGet }) }))
 const mockLoadAllMenus = vi.fn()
 let mockPackages: any[] = []
+let mockMeats: any[] = []
 let mockSides: any[] = []
 let mockDesserts: any[] = []
-let mockBeverages: any[] = []
+let mockDrinks: any[] = []
 let mockAlacartes: any[] = []
 let mockModifiers: any[] = []
 vi.mock("../stores/Menu", () => ({
     useMenuStore: () => ({
         loadAllMenus: mockLoadAllMenus,
         get packages () { return mockPackages },
+        get meats () { return mockMeats },
         get sides () { return mockSides },
         get desserts () { return mockDesserts },
-        get beverages () { return mockBeverages },
+        get drinks () { return mockDrinks },
         get alacartes () { return mockAlacartes },
         get modifiers () { return mockModifiers },
     })
@@ -51,9 +53,10 @@ describe("stores/order - submitOrder", () => {
         mockLoadAllMenus.mockReset()
         mockLoadAllMenus.mockResolvedValue(undefined)
         mockPackages = []
+        mockMeats = []
         mockSides = []
         mockDesserts = []
-        mockBeverages = []
+        mockDrinks = []
         mockAlacartes = []
         mockModifiers = []
         // Provide a fake authenticated device to satisfy store validation
@@ -135,7 +138,8 @@ describe("stores/order - submitOrder", () => {
 
         mockPost.mockRejectedValueOnce(new Error("Network error"))
 
-        await expect(order.submitOrder()).rejects.toThrow("Network error")
+        // Plan D: Network errors are sanitized to customer-safe messages
+        await expect(order.submitOrder()).rejects.toThrow("Something went wrong. Please ask a staff member for assistance.")
 
         // ensure draft remains unchanged on failure
         expect((order as any).draft.length).toBeGreaterThan(0)
@@ -198,9 +202,10 @@ describe("stores/order - submitRefill", () => {
         mockLoadAllMenus.mockReset()
         mockLoadAllMenus.mockResolvedValue(undefined)
         mockPackages = []
+        mockMeats = []
         mockSides = []
         mockDesserts = []
-        mockBeverages = []
+        mockDrinks = []
         mockAlacartes = []
         mockModifiers = []
         const dsInstance = useDeviceStore()
