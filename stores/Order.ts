@@ -1,6 +1,7 @@
 import { defineStore } from "pinia"
 import { reactive, computed, toRefs } from "vue"
 import { useApi } from "../composables/useApi"
+import { classifyError } from "../composables/useErrorClassifier"
 import { logger } from "../utils/logger"
 import { notifyBlockedAction } from "../composables/useNotifier"
 import type { CartItem, Package, MenuItem, OrderApiResponse, OrderPayload, OrderPayloadItem, RefillPayload } from "../types"
@@ -188,9 +189,10 @@ export const useOrderStore = defineStore("order", () => {
         }
 
         collectIds(menuStore.packages || [])
+        collectIds(menuStore.meats || [])
         collectIds(menuStore.sides || [])
         collectIds(menuStore.desserts || [])
-        collectIds(menuStore.beverages || [])
+        collectIds(menuStore.drinks || [])
 
         return menuIds
     }
@@ -293,7 +295,9 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     function toggleRefillMode (enabled: boolean) {
-        if (enabled && state.rounds.length === 0) {
+        // Plan B: Refill mode must check hasPlacedOrder to allow recovered orders
+        // (via sessionStore.orderId or serverOrderId), not just local rounds
+        if (enabled && !hasPlacedOrder.value) {
             logger.warn("toggleRefillMode blocked: cannot enter refill mode before placing initial order")
             notifyBlockedAction("Cannot enter Refill mode until initial order is placed")
             return
@@ -370,7 +374,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     async function submitOrder (payload?: OrderPayload, options?: SubmitOrderOptions) {
-        if (state.rounds.length > 0 || state.serverOrderId !== null) {
+        if (state.rounds.length > 0 || getServerOrderId() !== null) {
             throw new Error("An initial order has already been placed for this session. Use refill instead.")
         }
         if (state.isSubmitting) {
@@ -496,11 +500,14 @@ export const useOrderStore = defineStore("order", () => {
                 logger.error("Order submission failed:", error.message)
                 const errorResponse = extractErrorResponse(error)
 
-                if (error.response?.status === 401 || errorResponse?.exception === "authentication") {
+                // 401 - Session expired
+                if (error.response?.status === 401) {
                     logger.error("Authentication error - token invalid or expired")
-                    throw new Error("Your session has expired. Please re-register this device in Settings.")
+                    const classified = classifyError(error)
+                    throw new Error(classified.message)
                 }
 
+                // 422 - Menu item unavailable: refresh menus and filter draft
                 if (error.response?.status === 422 && errorResponse?.code === ERROR_MENU_ITEM_UNAVAILABLE) {
                     const menuStore = useMenuStore()
 
@@ -521,17 +528,18 @@ export const useOrderStore = defineStore("order", () => {
                     throw createMenuUnavailableError()
                 }
 
+                // 422 - Generic validation error
                 if (error.response?.status === 422) {
                     const validationErrors = errorResponse?.errors
                     if (validationErrors && Object.keys(validationErrors).length > 0) {
                         logger.error("Validation errors:", validationErrors)
-                        const errorMessages = Object.values(validationErrors || {}).flat().join(", ")
-                        throw new Error(`Validation failed: ${errorMessages}`)
                     }
 
-                    throw new Error(errorResponse?.message || "Order validation failed.")
+                    const classified = classifyError(error)
+                    throw new Error(classified.message)
                 }
 
+                // 409 - Conflict: order already exists (resumable)
                 if (error.response?.status === 409) {
                     const existingOrder = errorResponse?.order
                     if (existingOrder) {
@@ -551,36 +559,37 @@ export const useOrderStore = defineStore("order", () => {
                         return recoveredResponse
                     }
 
-                    throw new Error(errorResponse?.message || "An active order already exists for this device. Please continue the existing session.")
+                    const classified = classifyError(error)
+                    throw new Error(classified.message)
                 }
 
+                // 503 - Session not found
                 if (error.response?.status === 503 && errorResponse?.code === "SESSION_NOT_FOUND") {
-                    throw new Error("No active POS terminal session found. Please ask staff to open a POS session, then try again.")
+                    const classified = classifyError(error)
+                    throw new Error(classified.message)
                 }
 
+                // 5xx - Server error
                 if (error.response?.status === 500) {
-                    const serverMessage = errorResponse?.message || "Internal server error"
                     logger.error("SERVER ERROR (500) - Backend crashed")
-
-                    throw new Error(
-                        `${serverMessage}\n\n` +
-          "Backend debugging needed:\n" +
-          "1. Check Laravel logs (storage/logs/laravel.log)\n" +
-          "2. Enable APP_DEBUG=true in .env\n" +
-          "3. Verify database schema and OrderService\n\n" +
-          "Use Settings > Backend Diagnostics to test directly."
-                    )
+                    const classified = classifyError(error)
+                    throw new Error(classified.message)
                 }
 
+                // Pass through errors with explicit messages (e.g., "missing body")
                 if (error instanceof Error && /missing body|Cannot mark order created from empty response/.test(error.message)) {
                     throw error
                 }
 
+                // Network error (no response)
                 if (!error.response) {
-                    throw new Error("Network error: Cannot reach backend server. Check if Laravel is running.")
+                    const classified = classifyError(error)
+                    throw new Error(classified.message)
                 }
 
-                throw error
+                // Fallback: classify any remaining error
+                const classified = classifyError(error)
+                throw new Error(classified.message)
             }
         } finally {
             state.isSubmitting = false
@@ -857,7 +866,12 @@ export const useOrderStore = defineStore("order", () => {
     // Computed helpers — TypeScript-safe accessors that unwrap ref types for component consumers
     const isRefillMode = computed(() => state.mode === "refill")
     // hasPlacedOrder is true when rounds exist OR when serverOrderId is recovered (e.g. via initializeFromSession)
-    const hasPlacedOrder = computed(() => state.rounds.length > 0 || state.serverOrderId !== null)
+    const hasPlacedOrder = computed(() => {
+        const sessionStore = useSessionStore()
+        return state.rounds.length > 0 ||
+            state.serverOrderId !== null ||
+            sessionStore.orderId !== null
+    })
     const allOrderedItems = computed(() => state.rounds.flatMap(r => r.items))
 
     function resetOrderState () {

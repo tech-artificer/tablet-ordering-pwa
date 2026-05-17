@@ -118,6 +118,21 @@ export default defineNuxtPlugin(() => {
             const originalRequest = error?.config as RetriableRequestConfig | undefined
             const status = error?.response?.status
 
+            // Strip sensitive data from error response (keep raw on internal field for logging)
+            if (error?.response?.data && typeof error.response.data === "object") {
+                const sensitiveFields = ["exception", "trace", "stack", "file", "line"]
+                const data = error.response.data as Record<string, any>
+
+                // Create a safe copy for user-facing errors
+                if (sensitiveFields.some(field => field in data)) {
+                    logger.error("❌ API Response contains sensitive data:", data)
+                    // Strip the sensitive fields - keep the safe ones
+                    const safeCopy = { ...data }
+                    sensitiveFields.forEach(field => delete safeCopy[field])
+                    error.response.data = safeCopy
+                }
+            }
+
             if (
                 status === 401 &&
         originalRequest &&

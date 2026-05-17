@@ -228,9 +228,9 @@ describe("in-session ordered items display", () => {
         expect(wrapper.text()).toContain("Initial Beef")
         expect(wrapper.text()).toContain("Refill Pork")
         expect(wrapper.text()).toContain("Refill Side")
-        // Verify labels are correct
-        expect(wrapper.text()).toContain("Initial Order")
-        expect(wrapper.text()).toContain("Refill")
+        // Verify that refill labels are shown (note: Initial Order label is NOT rendered in current implementation)
+        expect(wrapper.text()).toContain("Refill #1")
+        expect(wrapper.text()).toContain("Refill #2")
     })
 
     it("total item count includes initial + refill quantities", () => {

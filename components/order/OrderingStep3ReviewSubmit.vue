@@ -6,6 +6,7 @@ import { useOrderSubmit } from "~/composables/useOrderSubmit"
 import { useRefillSubmit } from "~/composables/useRefillSubmit"
 import { useSubmitState } from "~/composables/useSubmitState"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
+import { classifyError } from "~/composables/useErrorClassifier"
 import SubmitStatusBanner from "~/components/ui/SubmitStatusBanner.vue"
 import { logger } from "~/utils/logger"
 
@@ -269,10 +270,12 @@ async function submit (): Promise<void> {
         }
         emit("order-submitted")
     } catch (error: any) {
-        submitError.value = error?.message || "Order submission failed"
+        const classified = classifyError(error)
+        submitError.value = classified.message
         submitState.resetForNextTransaction() // Allow retry on error
         logger.error("[OrderingStep3ReviewSubmit] Submission failed", {
             error: error?.message || error,
+            category: classified.category,
         })
     }
 }

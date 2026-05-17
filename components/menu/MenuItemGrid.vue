@@ -3,10 +3,10 @@ import { ElEmpty } from "element-plus"
 import { formatCurrency } from "../../utils/formats"
 import type { MenuItem, Modifier } from "../../types"
 
-type CategoryType = "meats" | "sides" | "desserts" | "beverages";
+type CategoryType = "meats" | "sides" | "desserts" | "drinks";
 
 const props = defineProps<{
-  items:(MenuItem | Modifier)[];
+  items:((MenuItem | Modifier) & { disabled?: boolean })[];
   categoryType: CategoryType;
   isUnlimitedCategory: boolean;
   getItemQuantity: (id: number) => number;
@@ -23,13 +23,13 @@ const emit = defineEmits<{
 
 const isLocked = () => Boolean(props.isRefillMode && props.isCategoryLocked)
 
-const addItem = (item: MenuItem | Modifier) => {
-    if (isLocked()) { return }
+const addItem = (item: any) => {
+    if (isLocked() || item.disabled) { return }
     emit("addItem", item)
 }
 
-const isAddDisabled = (item: MenuItem | Modifier) => {
-    if (isLocked()) { return true }
+const isAddDisabled = (item: any) => {
+    if (isLocked() || item.disabled) { return true }
     if (props.isUnlimitedCategory) {
         return props.getItemQuantity(item.id) >= (props.maxQuantity || 5)
     }
@@ -68,12 +68,13 @@ const isAvailable = (item: any) => {
             :key="item.id"
             :class="[
                 'menu-card group relative rounded-2xl overflow-hidden transition-all duration-200 shadow-xl border',
-                isAvailable(item) && !isLocked()
+                isAvailable(item) && !isLocked() && !item.disabled
                     ? 'border-white/10 cursor-pointer hover:border-primary/40 hover:shadow-primary/20 hover:shadow-2xl active:scale-[0.97]'
                     : 'border-white/5 cursor-not-allowed opacity-55'
             ]"
-            :title="isLocked() ? (props.lockedReason || 'Locked during refill mode') : ''"
-            @click="isAvailable(item) && !isLocked() && addItem(item)"
+            :aria-disabled="item.disabled ? 'true' : undefined"
+            :title="item.disabled ? 'Not available for this package' : isLocked() ? (props.lockedReason || 'Locked during refill mode') : ''"
+            @click="isAvailable(item) && !isLocked() && !item.disabled && addItem(item)"
         >
             <!-- Quantity Badge -->
             <div
@@ -156,7 +157,7 @@ const isAvailable = (item: any) => {
                             'text-primary/60': categoryType === 'meats',
                             'text-success/70': categoryType === 'sides',
                             'text-primary-light/60': categoryType === 'desserts',
-                            'text-white/35': categoryType === 'beverages',
+                            'text-white/35': categoryType === 'drinks',
                         }"
                     >{{ isUnlimitedCategory ? 'UNLIMITED' : categoryType }}</span>
                 </div>

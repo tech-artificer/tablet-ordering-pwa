@@ -3,6 +3,7 @@
 
 import { ref, onMounted, onBeforeUnmount } from "vue"
 import { logger } from "~/utils/logger"
+import { useConnectionStore } from "~/stores/Connection"
 
 const isOnline = ref(true)
 const wasOffline = ref(false) // Track if we recovered from offline
@@ -14,6 +15,14 @@ let activeConsumers = 0
 const updateOnlineStatus = () => {
     const previousStatus = isOnline.value
     isOnline.value = navigator.onLine
+
+    // Wire to connection store for blocking overlay
+    try {
+        const connectionStore = useConnectionStore()
+        connectionStore.setOnline(isOnline.value)
+    } catch (e) {
+        logger.debug("[useNetworkStatus] Connection store not available yet", e)
+    }
 
     // Track recovery from offline
     if (!previousStatus && isOnline.value) {
