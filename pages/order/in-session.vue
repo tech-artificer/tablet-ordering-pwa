@@ -5,8 +5,8 @@ import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
+import type { SubmittedItem } from "~/types"
 import { useApi } from "~/composables/useApi"
-import { useIdleDetector } from "~/composables/useIdleDetector"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 import { logger } from "~/utils/logger"
 
@@ -16,47 +16,79 @@ const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
 
 // ── Derived state ─────────────────────────────────────────────────────────────
-const currentOrder = computed(() => {
-    const raw = orderStore.currentOrder
-    if (!raw) { return null }
-    // Normalise nested vs flat shape
-    return (raw as any).order ?? raw
-})
-
-const orderStatus = computed<string>(() => currentOrder.value?.status ?? "pending")
-const orderNumber = computed<string | null>(() => currentOrder.value?.order_number ?? null)
-const orderId = computed<number | null>(() => currentOrder.value?.order_id ?? sessionStore.orderId ?? null)
+const orderStatus = computed<string>(() => String(unref(orderStore.serverStatus) || "pending"))
+const orderNumber = computed<string | null>(() => null)
+const orderId = computed<number | null>(() => unref(orderStore.serverOrderId) ?? sessionStore.getOrderId() ?? null)
 
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as number)
 
-const submittedItems = computed<any[]>(() => (unref(orderStore.submittedItems) ?? []) as any[])
+type OrderedItem = SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string; is_unlimited?: boolean; unit_price?: number }
 
-const refillHistory = computed(() => {
-    const h = (unref(orderStore.history) ?? []) as any[]
-    if (h.length <= 1) { return [] }
-    return h.slice(1).map((entry: any) => ({
-        orderNumber: entry?.order?.order_number ?? entry?.order_number ?? "—",
-        status: entry?.order?.status ?? entry?.status ?? "pending",
-    }))
+function normalizeHistoryItem (item: any, sourceRound: "initial" | "refill", sourceRoundLabel: string): OrderedItem {
+    return {
+        id: Number(item?.menu_id ?? item?.id ?? 0),
+        menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+        name: String(item?.name ?? item?.receipt_name ?? "Item"),
+        quantity: Number(item?.quantity ?? 0),
+        price: Number(item?.price ?? item?.unit_price ?? 0),
+        img_url: item?.img_url || null,
+        category: item?.category || null,
+        isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
+        sourceRound,
+        sourceRoundLabel,
+    }
+}
+
+const displaySubmittedItems = computed<OrderedItem[]>(() => {
+    // PRIMARY: rounds[] — append-only ledger written by appendRound() on every
+    // successful submission. Source of truth for "show every item the customer
+    // has ever ordered in this session, grouped by round". Survives refresh,
+    // recovery, and validator passes — it is never cleared mid-session.
+    const rounds = (unref(orderStore.rounds) ?? []) as any[]
+    if (Array.isArray(rounds) && rounds.length > 0) {
+        const out: OrderedItem[] = []
+        for (const round of rounds) {
+            const isRefill = round?.kind === "refill"
+            const label = isRefill
+                ? `Refill #${Math.max(1, Number(round?.number ?? 1) - 1)}`
+                : "Initial Order"
+            const items = Array.isArray(round?.items) ? round.items : []
+            for (const item of items) {
+                out.push({
+                    id: Number(item?.id ?? item?.menu_id ?? 0),
+                    menu_id: Number(item?.menu_id ?? item?.id ?? 0),
+                    name: String(item?.name ?? "Item"),
+                    quantity: Number(item?.quantity ?? 0),
+                    price: Number(item?.price ?? 0),
+                    img_url: item?.img_url || null,
+                    category: item?.category || null,
+                    isUnlimited: Boolean(item?.isUnlimited),
+                    sourceRound: isRefill ? "refill" : "initial",
+                    sourceRoundLabel: label,
+                })
+            }
+        }
+        if (out.length > 0) { return out }
+    }
+
+    return []
 })
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const packageName = computed(() =>
     (orderStore.package as any)?.name ??
-    (currentOrder.value as any)?.package_name ??
     "Package"
 )
 
 const totalItemsOrdered = computed(() =>
-    submittedItems.value.reduce((s: number, i: any) => s + Number(i?.quantity ?? 0), 0)
+    displaySubmittedItems.value.reduce((s: number, i: SubmittedItem) => s + Number(i?.quantity ?? 0), 0)
 )
 
-// Use server/order-adapter total when available so billing matches authoritative
-// order calculation (package, multipliers, taxes, and backend adjustments).
+// Use server total from store (authoritative server-reported value)
 const displayTotal = computed<number>(() => {
-    const totalFromOrder = Number(currentOrder.value?.total_amount)
-    if (Number.isFinite(totalFromOrder)) { return totalFromOrder }
+    const serverTotal = Number(unref(orderStore.serverTotal) ?? 0)
+    if (Number.isFinite(serverTotal) && serverTotal > 0) { return serverTotal }
     const fallbackTotal = Number(unref(orderStore.grandTotal) ?? 0)
     return Number.isFinite(fallbackTotal) ? fallbackTotal : 0
 })
@@ -88,18 +120,8 @@ function getStatusDotStyle (status: string): string {
     return m[status] ?? "background:#9ca3af"
 }
 
-function itemEmoji (item: any): string {
-    const cat = String(item?.category ?? "").toLowerCase()
-    if (cat.includes("meat")) { return "🔥" }
-    if (cat.includes("side")) { return "🌿" }
-    if (
-        cat.includes("drink") || cat.includes("bev") ||
-        cat.includes("soju") || cat.includes("beer") ||
-        cat.includes("wine") || cat.includes("juice") ||
-        cat.includes("tea") || cat.includes("coffee")
-    ) { return "🥤" }
-    if (cat.includes("dessert")) { return "🍮" }
-    return "🍽️"
+function itemCategory (item: any): string {
+    return String(item?.category ?? "").toLowerCase()
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
@@ -132,9 +154,8 @@ let clockIntervalId: ReturnType<typeof setInterval> | null = null
 
 // ── Order round label (Initial Order / Refill #N) ─────────────────────────────
 const orderRound = computed<string>(() => {
-    const h = (unref(orderStore.history) ?? []) as any[]
-    // history[0] = initial order; history[1..n] = refills
-    const refillCount = Math.max(0, h.length - 1)
+    const rounds = (unref(orderStore.rounds) ?? []) as any[] // unref needed for Pinia setup store
+    const refillCount = Math.max(0, rounds.length - 1)
     if (refillCount === 0) { return "Initial Order" }
     return `Refill #${refillCount}`
 })
@@ -163,23 +184,8 @@ watch(orderStatus, (status) => {
     }
 }, { immediate: true })
 
-// ── Idle lock ─────────────────────────────────────────────────────────────────
-const showIdleWarning = ref(false)
-
-const { isWarning: idleWarning, start: startIdleDetector, stop: stopIdleDetector } = useIdleDetector({
-    onWarn () {
-        showIdleWarning.value = true
-    },
-    onExpire () {
-        showIdleWarning.value = false
-        logger.warn("[in-session] Idle timeout — ending session")
-        triggerSessionEnd("unknown", { source: "in-session" })
-    },
-})
-
-watch(idleWarning, (v) => {
-    if (!v) { showIdleWarning.value = false }
-})
+// Note: Session only ends when order is paid/voided/cancelled (handled by orderStatus watcher)
+// No idle timeout - customers can stay in session indefinitely until order is terminal
 
 // ── Navigation guards + lifecycle ─────────────────────────────────────────────
 onMounted(() => {
@@ -195,11 +201,9 @@ onMounted(() => {
     }
     updateCurrentTime()
     clockIntervalId = setInterval(updateCurrentTime, 1000)
-    startIdleDetector()
 })
 
 onUnmounted(() => {
-    stopIdleDetector()
     if (clockIntervalId) {
         clearInterval(clockIntervalId)
         clockIntervalId = null
@@ -256,7 +260,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const statusLabel = computed(() => STATUS_LABELS[orderStatus.value] ?? orderStatus.value)
 
-definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
+definePageMeta({ layout: "kiosk" })
 </script>
 
 <template>
@@ -315,15 +319,10 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                     <!-- Scrollable item stream -->
                     <div class="scrollbar-warm flex-1 overflow-y-auto space-y-2 px-6 py-4">
                         <div
-                            v-for="item in submittedItems"
-                            :key="item.id"
+                            v-for="(item, index) in displaySubmittedItems"
+                            :key="`ordered-${item.sourceRoundLabel ?? 'order'}-${item.id ?? item.menu_id ?? index}-${index}`"
                             class="flex items-center gap-3 rounded-xl bg-[#141210] border border-transparent p-[12px_14px] transition-[border-color,background] duration-150 hover:bg-[#1e1a16] hover:border-[rgba(233,211,170,0.1)]"
                         >
-                            <!-- Emoji icon cell -->
-                            <div class="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-[10px] bg-[#1e1a16]">
-                                <span class="text-xl leading-none">{{ itemEmoji(item) }}</span>
-                            </div>
-
                             <!-- Item details -->
                             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                                 <div class="flex items-center gap-2">
@@ -332,6 +331,12 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                                         v-if="item.isUnlimited || item.is_unlimited"
                                         class="flex-shrink-0 rounded border border-[#e9d3aa]/30 bg-[#e9d3aa]/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#e9d3aa]"
                                     >∞</span>
+                                    <span
+                                        v-if="item.sourceRound === 'refill'"
+                                        class="flex-shrink-0 rounded border border-[#7a776f]/30 bg-[#7a776f]/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#9b9484]"
+                                    >
+                                        {{ item.sourceRoundLabel }}
+                                    </span>
                                 </div>
                                 <span class="text-xs text-[#7a776f]">
                                     ₱{{ Number(item.price ?? item.unit_price ?? 0).toFixed(2) }} each
@@ -354,37 +359,11 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                         </div>
 
                         <p
-                            v-if="!submittedItems.length"
+                            v-if="!displaySubmittedItems.length"
                             class="py-8 text-center text-sm text-[#7a776f]"
                         >
                             No items submitted yet.
                         </p>
-
-                        <!-- Refill history -->
-                        <div
-                            v-if="refillHistory.length"
-                            class="mt-4 space-y-2 border-t border-white/5 pt-4"
-                        >
-                            <p class="mb-3 text-xs font-medium uppercase tracking-widest text-[#7a776f]">
-                                Refill History
-                            </p>
-                            <div
-                                v-for="(refill, i) in refillHistory"
-                                :key="i"
-                                class="flex items-center justify-between rounded-lg bg-[#141210] px-4 py-2.5"
-                            >
-                                <span class="text-sm text-[#8a8578]">
-                                    Refill #{{ i + 1 }} — Order {{ refill.orderNumber }}
-                                </span>
-                                <div
-                                    class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                                    :style="getStatusDarkStyle(refill.status)"
-                                >
-                                    <span class="h-1.5 w-1.5 rounded-full" :style="getStatusDotStyle(refill.status)" />
-                                    {{ STATUS_LABELS[refill.status] ?? refill.status }}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -529,26 +508,6 @@ definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
                 <template #footer>
                     <ElButton :disabled="isSubmittingService" @click="showServiceModal = false">
                         Cancel
-                    </ElButton>
-                </template>
-            </ElDialog>
-
-            <!-- ── Idle Warning Modal ─────────────────────────────────────────── -->
-            <ElDialog
-                v-model="showIdleWarning"
-                title="Are you still there?"
-                width="360px"
-                align-center
-                :close-on-click-modal="false"
-                :show-close="false"
-                class="session-dialog"
-            >
-                <p class="text-center text-sm text-[#9b9484]">
-                    Your session will end automatically due to inactivity.
-                </p>
-                <template #footer>
-                    <ElButton type="primary" @click="showIdleWarning = false">
-                        Yes, I'm here
                     </ElButton>
                 </template>
             </ElDialog>

@@ -58,6 +58,17 @@ Service worker freshness requirement:
 
 - The active service worker script (`/sw.js`) must update promptly after each release so clients can activate the new precache manifest.
 
+Dedicated-origin assumption:
+
+- Aggressive full-origin cache/service-worker resets are only safe when the tablet PWA owns the entire origin.
+- If the tablet PWA shares an origin with admin, docs, assets, or other surfaces, normal tablet update apply must not delete unrelated same-origin caches or unregister unrelated same-origin service workers.
+
+Update/reset safety rules:
+
+- Normal in-app update apply (via `UpdateBanner`) must only activate the waiting tablet service worker and reload once blockers are clear; it must not perform full-origin cache purges.
+- The Settings maintenance action must only clear formalized tablet PWA cache names/prefixes and the current tablet app registration.
+- `/sw-reset` is an emergency operator path for dedicated-origin recovery only; it may clear every same-origin cache and unregister every same-origin service worker.
+
 ## 5) Required visible debug values
 
 Each deployment MUST expose (in a visible debug panel/banner/log block available to operators):

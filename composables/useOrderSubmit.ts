@@ -82,6 +82,14 @@ export function useOrderSubmit () {
                 throw err
             }
 
+            // 419: Laravel CSRF/session protection triggered — backend middleware misconfiguration
+            if (status === 419) {
+                logger.error("[OrderSubmit] 419 CSRF error — backend treating device API as web/session route")
+                const message = "Order submit hit Laravel CSRF/session protection. Move /api/devices/create-order to API/Sanctum middleware or exclude it from CSRF."
+                submitState.setFailed(message)
+                throw new Error(message)
+            }
+
             // Re-throw all other errors (422 validation, 500, etc.) for the caller
             submitState.setFailed(err?.message || "Order submission failed")
             throw err

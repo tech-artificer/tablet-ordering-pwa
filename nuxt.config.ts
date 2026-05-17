@@ -129,8 +129,8 @@ export default defineNuxtConfig({
         ],
 
         manifest: {
-            name: "Wooserve KBBQ Ordering",
-            short_name: "Wooserve",
+            name: "Woosoo Grillpad",
+            short_name: "Grillpad",
             start_url: "/",
             display: "fullscreen",
             orientation: "landscape",
@@ -196,6 +196,13 @@ export default defineNuxtConfig({
     },
 
     app: {
+        // Cross-fade (no "out-in") so the entering page mounts immediately and
+        // overlaps the leaving page — eliminates the perceived "blank gap" between
+        // routes. The leaving page is positioned absolutely via CSS so the two
+        // siblings can coexist without affecting layout.
+        pageTransition: {
+            name: "page-fade",
+        },
         head: {
             script: [
                 { src: "/runtime-config.js", async: false, defer: false },
@@ -209,7 +216,7 @@ export default defineNuxtConfig({
                 { name: "mobile-web-app-capable", content: "yes" },
                 { name: "apple-mobile-web-app-capable", content: "yes" },
                 { name: "apple-mobile-web-app-status-bar-style", content: "black" },
-                { name: "apple-mobile-web-app-title", content: "Wooserve" },
+                { name: "apple-mobile-web-app-title", content: "Grillpad" },
             ],
             link: [
                 { rel: "manifest", href: "/manifest.webmanifest" },

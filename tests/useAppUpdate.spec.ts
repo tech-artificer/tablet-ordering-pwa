@@ -6,6 +6,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
     const serviceWorkerContainer = new EventTarget() as EventTarget & {
         ready: Promise<ServiceWorkerRegistration>
         controller: Record<string, unknown>
+        getRegistrations: () => Promise<ServiceWorkerRegistration[]>
+        getRegistration: () => Promise<ServiceWorkerRegistration | undefined>
     }
 
     const waiting = {
@@ -20,6 +22,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
 
     serviceWorkerContainer.ready = Promise.resolve(registration)
     serviceWorkerContainer.controller = {}
+    serviceWorkerContainer.getRegistrations = vi.fn().mockResolvedValue([registration])
+    serviceWorkerContainer.getRegistration = vi.fn().mockResolvedValue(registration)
 
     Object.defineProperty(globalThis.navigator, "serviceWorker", {
         configurable: true,
@@ -55,18 +59,16 @@ describe("useAppUpdate", () => {
         update.disposeAppUpdate()
     })
 
-    it("blocks apply while active session/order is flagged", async () => {
+    it("canApplyUpdate reflects when update is available", async () => {
         const { serviceWorkerContainer } = createServiceWorkerMocks()
-        const blocked = ref(true)
-        const update = useAppUpdate({ isUpdateApplyBlocked: blocked })
+        const update = useAppUpdate()
 
         await update.initializeAppUpdate()
-        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
-        await nextTick()
         expect(update.canApplyUpdate.value).toBe(false)
 
-        blocked.value = false
+        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
         await nextTick()
+
         expect(update.canApplyUpdate.value).toBe(true)
         update.disposeAppUpdate()
     })
@@ -84,5 +86,40 @@ describe("useAppUpdate", () => {
         expect(waiting.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" })
         expect(update.isApplyingUpdate.value).toBe(true)
         update.disposeAppUpdate()
+    })
+
+    it("triggers reload when controllerchange happens after update applied", async () => {
+        const originalLocation = window.location
+        const reloadSpy = vi.fn()
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: {
+                ...originalLocation,
+                reload: reloadSpy,
+            },
+        })
+        try {
+            const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
+            const update = useAppUpdate()
+
+            await update.initializeAppUpdate()
+            serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
+            await nextTick()
+
+            update.applyUpdate()
+            await nextTick()
+
+            // Reload is triggered on controllerchange event
+            serviceWorkerContainer.dispatchEvent(new Event("controllerchange"))
+            await nextTick()
+
+            expect(reloadSpy).toHaveBeenCalledTimes(1)
+            update.disposeAppUpdate()
+        } finally {
+            Object.defineProperty(window, "location", {
+                configurable: true,
+                value: originalLocation,
+            })
+        }
     })
 })

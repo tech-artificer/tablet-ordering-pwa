@@ -7,7 +7,6 @@ import { useOrderStore } from "../../stores/Order"
 import { useSessionStore } from "../../stores/Session"
 import { useDeviceStore } from "../../stores/Device"
 import { logger } from "../../utils/logger"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
 import PackageCard from "../../components/PackageCard.vue"
 
 definePageMeta({
@@ -30,33 +29,9 @@ onMounted(async () => {
     const timestamp = new Date().toISOString()
     console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
 
-    if (shouldAttemptActiveOrderRecovery()) {
-        try {
-            const recovery = await recoverActiveOrderState("package-selection")
-            if (recovery.hasActiveOrder) {
-                console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
-                await nuxtApp.$router.replace({
-                    path: "/menu",
-                    query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
-                })
-                return
-            }
-        } catch (recoveryError: unknown) {
-            logger.error("[PackageSelection] Active order recovery failed — continuing with normal mount", recoveryError)
-        }
-    }
-
-    logger.info("[PackageSelection] Loading packages from API...")
-    try {
-    // Respect cache — only fetch if stale or empty (welcome screen already preloads).
-    // Pass forceRefresh=false so a warm cache from index.vue is used immediately.
-        await menuStore.loadAllMenus(false)
-        console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
-        logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
-    } catch (error: any) {
-        console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
-        logger.error("[PackageSelection] Failed to load packages:", error)
-    }
+    // Packages are now preloaded at the welcome screen via AppBootstrap.preloadForOrdering()
+    // No need to fetch here - just use the cached data from MenuStore
+    console.log(`[✅ Packages Ready] ${menuStore.packages.length} packages available at ${timestamp}`)
 })
 
 // Carousel state retained intentionally so existing script behavior is preserved.
@@ -64,10 +39,12 @@ const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages)
 const guestCount = computed(() => Number(orderStore.guestCount))
 
-// Responsive layout
-type PackageRowMode = "three" | "peek" | "portrait"
+// Responsive layout - optimized for 4-column grid on tablet
+type PackageRowMode = "four" | "three" | "peek" | "portrait"
 const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1280)
 const packageRowMode = computed<PackageRowMode>(() => {
+    if (packages.value.length <= 3 && viewportWidth.value >= 900) { return "three" }
+    if (viewportWidth.value >= 1400) { return "four" }
     if (viewportWidth.value >= 1200) { return "three" }
     if (viewportWidth.value >= 900) { return "peek" }
     return "portrait"
@@ -79,6 +56,7 @@ function onResize () {
 // Card focus and modifier inspector
 const focusedPackageId = ref<number | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
+const pendingPackageSelection = ref<Package | null>(null)
 
 function handleCardFocus (pkg: Package) {
     focusedPackageId.value = pkg.id
@@ -107,75 +85,31 @@ const formatCurrency = (value: number | string) => {
     return phpCurrencyFormatter.format(Number.isFinite(amount) ? amount : 0)
 }
 
-const handlePackageSelection = async (packageData: Package) => {
+const handlePackageSelection = (packageData: Package) => {
+    pendingPackageSelection.value = packageData
+}
+
+function cancelPackageSelection () {
+    pendingPackageSelection.value = null
+}
+
+async function confirmPackageSelection () {
+    if (!pendingPackageSelection.value) { return }
+    const packageData = pendingPackageSelection.value
+    pendingPackageSelection.value = null
+    await proceedToMenuForPackage(packageData)
+}
+
+const proceedToMenuForPackage = async (packageData: Package): Promise<void> => {
     // Persist selected package to order store for downstream flows
-    const timestamp = new Date().toISOString()
-    console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
-    logger.debug("Selected package:", packageData)
-
-    try {
-        orderStore.setPackage(packageData)
-    } catch (err) {
-        logger.warn("Failed to persist package to order store", err)
-    }
-
-    // Start session if not already active and ensure token/menu ready
-    try {
-        console.log(`[🔄 Session Start Attempt] Starting session before navigating to menu at ${timestamp}`)
-        const started = await sessionStore.start({ preserveSelection: true })
-        if (!started) {
-            console.log(`[⚠️ Session Start Failed] But proceeding with device credentials check at ${timestamp}`)
-            logger.warn("Session start failed — device may require registration")
-
-            // Only show registration if device truly lacks credentials
-            const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
-
-            if (needsRegistration) {
-                console.log(`[🔐 Device Registration Required] Redirecting to Settings at ${timestamp}`)
-                // Redirect staff to Settings (PIN-protected) to register device there
-                try {
-                    await nuxtApp.$router.push("/settings")
-                } catch (e) {
-                    logger.error("Failed to navigate to Settings for registration", e)
-                }
-                // Stop further navigation to menu
-                return
-            }
-
-            // If device appears registered (token/table present), log and continue gracefully
-            console.log(`[✅ Device Has Credentials] Continuing to menu at ${timestamp}`)
-            logger.warn("Session start failed but device appears registered; proceeding.")
-        } else {
-            console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
-        }
-    } catch (err: any) {
-        console.error(`[❌ Session Start Error] ${err?.message} at ${timestamp}`)
-        logger.warn("Session store start failed or unavailable", err)
-    }
+    orderStore.setPackage(packageData)
 
     // Navigate to the menu page with package ID in query for downstream flows
-    try {
-    // Ensure menus are loaded (session.start already attempts this, but double-check)
-        try { await menuStore.loadAllMenus() } catch (e) { /* non-fatal */ }
-
-        console.log(`[📍 Navigation] Going to menu with package_id=${packageData.id} at ${timestamp}`)
-        await nuxtApp.$router.push({
-            path: "/menu",
-            query: { packageId: packageData.id }
-        })
-    } catch (navErr: any) {
-    // Prevent uncaught promise rejections from bubbling to the global handler
-        console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
-        logger.error("Navigation to /menu failed:", navErr)
-
-        // If the navigation failed due to asset/chunk fetch, show a helpful registration UI
-        // or remain on the package selection page so the user can retry.
-        // If device looks unregistered, surface the registration modal.
-        const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
-        if (needsRegistration) {
-            try { await nuxtApp.$router.push("/settings") } catch (e) { logger.error(e) }
-        }
-    }
+    // Session, auth, and menus were already loaded at welcome screen via sessionStore.start()
+    await nuxtApp.$router.push({
+        path: "/menu",
+        query: { packageId: packageData.id }
+    })
 }
 
 // Cards handle inline preview directly
@@ -325,17 +259,43 @@ function handleTouchEnd () {
                 <!-- Package Row Display -->
                 <div
                     v-else
-                    class="flex-1 min-h-0 overflow-x-auto overflow-y-visible pt-3 pkg-row-scroll"
+                    class="flex-1 min-h-0 pt-3"
+                    :class="(packageRowMode === 'three' || packageRowMode === 'four')
+                        ? 'overflow-hidden'
+                        : 'overflow-x-auto overflow-y-visible pkg-row-scroll'"
                 >
-                    <!-- Three-up grid mode (≥1200px) -->
+                    <!-- Four-up grid mode (≥1400px) -->
                     <div
-                        v-if="packageRowMode === 'three'"
-                        class="grid grid-cols-3 gap-5 xl:gap-6 h-full pb-2"
+                        v-if="packageRowMode === 'four'"
+                        class="grid grid-cols-4 gap-4 h-full pb-2"
                     >
                         <div
                             v-for="pkg in packages"
                             :key="pkg.id"
-                            class="flex h-full min-w-[330px] flex-1"
+                            class="flex h-full min-w-[280px] flex-1"
+                        >
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
+                                @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Three-up grid mode (≥1200px) -->
+                    <div
+                        v-else-if="packageRowMode === 'three'"
+                        class="grid gap-4 xl:gap-5 h-full pb-2"
+                        :class="packages.length === 1 ? 'grid-cols-1' : (packages.length === 2 ? 'grid-cols-2' : 'grid-cols-3')"
+                    >
+                        <div
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-0 flex-1"
                         >
                             <PackageCard
                                 :pkg="pkg"
@@ -390,6 +350,44 @@ function handleTouchEnd () {
                                 @focus="handleCardFocus"
                                 @view-modifiers="openModifierInspector"
                             />
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    v-if="pendingPackageSelection"
+                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/75 backdrop-blur-sm"
+                    @click.self="cancelPackageSelection"
+                >
+                    <div class="mx-4 w-full max-w-xl rounded-2xl border border-white/15 bg-[#161618] p-6">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">
+                            Confirm package
+                        </p>
+                        <h3 class="mt-2 text-2xl font-extrabold text-white font-raleway">
+                            {{ pendingPackageSelection.name }}
+                        </h3>
+                        <p class="mt-2 text-sm text-white/70">
+                            You are selecting this package for {{ guestCount }} {{ guestCount === 1 ? "guest" : "guests" }}.
+                        </p>
+                        <p class="mt-1 text-sm font-bold text-[#f6b56d]">
+                            Total: {{ formatCurrency(Number(pendingPackageSelection.price) * guestCount) }}
+                        </p>
+
+                        <div class="mt-6 grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                class="h-12 rounded-xl border border-white/15 bg-white/5 text-sm font-bold text-white/80 transition hover:bg-white/10"
+                                @click="cancelPackageSelection"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                class="h-12 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-sm font-extrabold text-secondary transition active:scale-[0.99]"
+                                @click="confirmPackageSelection"
+                            >
+                                Continue to Menu
+                            </button>
                         </div>
                     </div>
                 </div>

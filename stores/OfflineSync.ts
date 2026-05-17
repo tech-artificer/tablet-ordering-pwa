@@ -70,9 +70,6 @@ export const useOfflineSyncStore = defineStore("offline-sync", () => {
                     const orderStore = useOrderStore()
                     if (order) {
                         await orderStore.setOrderCreated(order)
-                        orderStore.startOrderPolling(
-                            order?.order_id ?? order?.id ?? order?.order?.order_id
-                        )
                     }
                 } catch (err) {
                     logger.error("[OfflineSync] Failed to set order created after SW sync:", err)

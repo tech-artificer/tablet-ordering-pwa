@@ -12,14 +12,15 @@ describe("package card interaction contract", () => {
 
         expect(component).toContain("@click.stop=\"emit('select', pkg)\"")
         expect(component).not.toContain("@click=\"emit('select', pkg)\"")
-        expect(component).toContain("View cuts")
+        expect(component).toContain("Choose package")
     })
 
-    it("caps modifier preview and surfaces overflow indicator", () => {
+    it("prioritizes dining meat groups in card content", () => {
         const component = readProjectFile("components/PackageCard.vue")
 
-        expect(component).toContain("const previewLimit = 6")
-        expect(component).toContain("const previewOverflow = computed<number>")
-        expect(component).toContain("+{{ previewOverflow }}")
+        expect(component).toContain("const PRIORITY_ORDER = [\"PORK\", \"BEEF\", \"CHICKEN\", \"SEAFOOD\", \"OTHER\"]")
+        expect(component).toContain("label = \"PORK\"")
+        expect(component).toContain("label = \"BEEF\"")
+        expect(component).toContain("label = \"CHICKEN\"")
     })
 })

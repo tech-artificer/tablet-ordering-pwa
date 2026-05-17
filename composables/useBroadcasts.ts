@@ -1,8 +1,9 @@
-import { ref, watch } from "vue"
+import { ref, unref, watch } from "vue"
 import { ElNotification, ElMessage } from "element-plus"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
+import { useConnectionStore } from "~/stores/Connection"
 import { extractOrderId } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
@@ -59,6 +60,8 @@ interface OrderUpdatedEvent {
     updated_at: string
     device: { id: number; name: string }
     table: { id: number; name: string }
+    /** Refill items sent by backend on order.updated after refill */
+    items?: Array<{ id: number; name: string; quantity: number; price: string; is_refill: boolean }>
   }
 }
 
@@ -129,7 +132,7 @@ export const useBroadcasts = () => {
     const sessionStore = useSessionStore()
     const { triggerSessionEnd } = useSessionEndFlow()
 
-    const getCurrentOrderId = (): string | number | null => extractOrderId(orderStore.getCurrentOrder())
+    const getCurrentOrderId = (): string | number | null => unref(orderStore.serverOrderId)
     const getEventOrderId = (payload: { order?: Record<string, any> }): string | number | null => extractOrderId(payload?.order ?? payload)
 
     let deviceChannel: any = null
@@ -150,10 +153,14 @@ export const useBroadcasts = () => {
     const MAX_RECONNECTION_ATTEMPTS = 10
 
     const scheduleReconnection = () => {
+        const connectionStore = useConnectionStore()
+
         if (reconnectTimer) { return } // Already scheduled
         if (reconnectAttempts >= MAX_RECONNECTION_ATTEMPTS) {
             logger.warn(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
             logger.warn("WebSocket max reconnection attempts reached")
+            connectionStore.setReverbState("failed")
+            connectionStore.setReconnectAttempt(reconnectAttempts)
             ElNotification({
                 title: "⚠️ Connection Lost",
                 message: "Please reload the page to reconnect",
@@ -165,6 +172,8 @@ export const useBroadcasts = () => {
         }
 
         reconnectAttempts++
+        connectionStore.setReverbState("disconnected")
+        connectionStore.setReconnectAttempt(reconnectAttempts)
         const backoffIndex = Math.min(reconnectAttempts - 1, RECONNECTION_BACKOFF.length - 1)
         const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
 
@@ -184,11 +193,15 @@ export const useBroadcasts = () => {
     }
 
     const cancelReconnection = () => {
+        const connectionStore = useConnectionStore()
+
         if (reconnectTimer) {
             window.clearTimeout(reconnectTimer)
             reconnectTimer = null
         }
         reconnectAttempts = 0 // Reset on successful connection
+        connectionStore.setReverbState("connected")
+        connectionStore.setReconnectAttempt(0)
     }
 
     // Channel connection status
@@ -256,9 +269,9 @@ export const useBroadcasts = () => {
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(order.status)
+
             // End session only on genuine terminal statuses — in_progress, ready, served are intermediate
             if (["completed", "voided", "cancelled"].includes(order.status)) {
-                try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
                 logger.info("[Broadcasts] Terminal order status via broadcast — ending session", { status: order.status })
                 triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", {
                     source: "broadcast",
@@ -285,8 +298,7 @@ export const useBroadcasts = () => {
         logger.debug("✅ Order completed check:", { currentOrderId, eventOrderId })
 
         if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
-            orderStore.completeOrder()
-            try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
+            orderStore.updateOrderStatus("completed")
             logger.info("✅ Order completed via broadcast — ending session")
             triggerSessionEnd("completed", {
                 source: "broadcast",
@@ -309,8 +321,7 @@ export const useBroadcasts = () => {
         const currentId = getCurrentOrderId()
         const eventOrderId = getEventOrderId(event)
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
-            orderStore.clearOrder()
-            try { orderStore.stopOrderPolling && orderStore.stopOrderPolling() } catch (e) { logger.debug("[Broadcasts] stopOrderPolling failed", e) }
+            orderStore.updateOrderStatus(event.order.status)
             logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session")
             triggerSessionEnd(event.order.status, {
                 source: "broadcast",
@@ -419,6 +430,12 @@ export const useBroadcasts = () => {
         const deviceId = deviceStore.getDeviceId()
         if (!deviceId || !(window as any).Echo) { return }
 
+        // GUARD: Check if already subscribed to this exact device to prevent duplicates on reconnect
+        if (deviceChannel && deviceChannel.name === `device.${deviceId}`) {
+            logger.debug(`[Echo] Already subscribed to device.${deviceId}, skipping`)
+            return
+        }
+
         // Tear down any existing subscriptions before creating new ones to prevent duplicate handlers
         unsubscribeDeviceChannels()
 
@@ -455,6 +472,12 @@ export const useBroadcasts = () => {
     // Subscribe to order-specific channels
     const subscribeToOrderChannel = (orderId: string) => {
         if (!orderId || !(window as any).Echo) { return }
+
+        // GUARD: Check if already subscribed to this exact order to prevent duplicates on reconnect
+        if (orderChannel && orderChannel.name === `orders.${orderId}`) {
+            logger.debug(`[Echo] Already subscribed to orders.${orderId}, skipping`)
+            return
+        }
 
         unsubscribeFromOrderChannel()
 
@@ -589,6 +612,7 @@ export const useBroadcasts = () => {
         unbindConnectionStateHandler()
 
         boundStateChangeHandler = (states: any) => {
+            const connectionStore = useConnectionStore()
             const timestamp = new Date().toISOString()
             logger.debug(`[🔗 WebSocket State Change] ${states.previous || "?"} → ${states.current} at ${timestamp}`)
             logger.debug("WebSocket state change:", states.current)
@@ -596,6 +620,7 @@ export const useBroadcasts = () => {
             if (states.current === "connected") {
                 logger.debug(`[✅ WebSocket Connected] All subscriptions active at ${timestamp}`)
                 logger.debug("✅ WebSocket connected")
+                connectionStore.setReverbState("connected")
                 cancelReconnection()
                 resubscribeChannels()
                 ElNotification({
@@ -608,7 +633,18 @@ export const useBroadcasts = () => {
                 return
             }
 
-            if (states.current === "disconnected" || states.current === "unavailable" || states.current === "failed") {
+            if (states.current === "disconnected") {
+                connectionStore.setReverbState("disconnected")
+                logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
+                resetChannelStatus()
+                scheduleReconnection()
+            } else if (states.current === "unavailable") {
+                connectionStore.setReverbState("unavailable")
+                logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
+                resetChannelStatus()
+                scheduleReconnection()
+            } else if (states.current === "failed") {
+                connectionStore.setReverbState("failed")
                 logger.warn(`⚠️ WebSocket ${states.current} — scheduling reconnect`)
                 resetChannelStatus()
                 scheduleReconnection()

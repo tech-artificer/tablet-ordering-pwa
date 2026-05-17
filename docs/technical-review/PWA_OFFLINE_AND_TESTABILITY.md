@@ -26,6 +26,13 @@ flowchart TD
 | Images | CacheFirst | 7 days | Max 200 entries |
 | `POST /api/devices/create-order` | NetworkOnly + BackgroundSyncPlugin | 2 hours | Queued on network failure |
 
+## Update and reset safety
+
+- The default tablet update flow is intentionally conservative: it sends `SKIP_WAITING`, waits for the new worker to control the page, and reloads only when order/session blockers are clear.
+- Normal maintenance refreshes must only purge formalized tablet cache names/prefixes (`menus-cache`, `images-cache`, and Workbox tablet caches) plus the current tablet app registration.
+- A full same-origin reset belongs only on the explicit `/sw-reset` emergency path, and only when the tablet PWA is deployed on a dedicated origin.
+- Shared-origin deployments must treat `/sw-reset` as an operator-only escape hatch because it can remove unrelated same-origin caches and service workers.
+
 ## Offline Order Submission Flow
 
 ```mermaid

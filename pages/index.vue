@@ -143,11 +143,14 @@
                     </div>
                 </div>
 
-                <!-- CTA Button -->
+                <!-- CTA Button (disabled while preloading) -->
                 <div class="space-y-4 animate-fade-in-delayed-2">
                     <div class="relative inline-block group">
                         <!-- Glow layer — contained, no bleed -->
-                        <div class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl opacity-80 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                        <div
+                            class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl transition-opacity duration-300 pointer-events-none"
+                            :class="isStartingSession ? 'opacity-40' : 'opacity-80 group-hover:opacity-100 group-active:opacity-100'"
+                        />
 
                         <button
                             class="relative flex items-center justify-center gap-2.5 rounded-2xl font-bold tracking-wide transition-all duration-200
@@ -156,17 +159,37 @@
                      hover:shadow-[0_6px_32px_rgba(246,181,109,0.50)] hover:brightness-110
                      active:scale-[0.97] active:shadow-none
                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
-                     min-h-[56px] px-10 text-base"
+                     min-h-[56px] px-10 text-base
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100"
                             aria-label="Begin your order"
+                            :disabled="!canStartOrder"
                             @click="start"
                         >
-                            <span>Begin the Feast</span>
+                            <span v-if="isStartingSession">Starting session...</span>
+                            <span v-else>Begin the Feast</span>
                         </button>
                     </div>
 
+                    <!-- Session Start Error -->
+                    <transition name="fade-in">
+                        <div v-if="startSessionError" class="bg-error/20 ring-1 ring-error/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+                            <p class="text-sm text-error font-medium mb-2">
+                                {{ startSessionError }}
+                            </p>
+                            <button
+                                type="button"
+                                class="w-full px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                aria-label="Retry"
+                                @click="start"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    </transition>
+
                     <!-- Auth Status Message -->
                     <transition name="fade-in">
-                        <div v-if="!deviceStore.isAuthenticated" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
+                        <div v-if="!deviceStore.isAuthenticated && !isStartingSession && !startSessionError" class="bg-warning/20 ring-1 ring-warning/40 rounded-lg px-6 py-3 max-w-sm animate-slide-up">
                             <p class="text-sm text-warning font-medium mb-3">
                                 This tablet isn't registered yet
                             </p>
@@ -180,6 +203,18 @@
                             </button>
                         </div>
                     </transition>
+
+                    <!-- Update Notice - Staff controlled only -->
+                    <transition name="fade-in">
+                        <div v-if="needRefresh" class="bg-info/10 ring-1 ring-info/30 rounded-lg px-4 py-2 max-w-sm animate-slide-up">
+                            <div class="flex items-center gap-2 text-info/80">
+                                <RefreshCw :size="14" />
+                                <p class="text-xs font-medium">
+                                    New version available. Ask staff to update in Settings.
+                                </p>
+                            </div>
+                        </div>
+                    </transition>
                 </div>
             </div>
         </div>
@@ -187,24 +222,34 @@
 </template>
 
 <script setup lang="ts">
-import { Settings } from "lucide-vue-next"
+import { Settings, RefreshCw } from "lucide-vue-next"
 import { unref } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
+import { useSessionStore } from "~/stores/Session"
 import { useMenuStore } from "~/stores/Menu"
+import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
+import { logger } from "~/utils/logger"
 
 definePageMeta({
     layout: "kiosk"
 })
 
 const deviceStore = useDeviceStore()
+const sessionStore = useSessionStore()
 const menuStore = useMenuStore()
 const router = useRouter()
 const route = useRoute()
 const { isOnline } = useNetworkStatus()
+const { needRefresh } = useAppUpdate()
+
+// Loading state for session start
+const isStartingSession = ref(false)
+const startSessionError = ref<string | null>(null)
+const canStartOrder = computed(() => !isStartingSession.value && deviceStore.isAuthenticated)
 
 // On the welcome screen, show real network connectivity — not WebSocket subscription
 // state, which is always false here because no channels are subscribed until the
@@ -260,9 +305,7 @@ onMounted(async () => {
         return
     }
 
-    // Silently warm the package cache while kiosk is idle on the welcome screen.
-    // loadAllMenus respects the 30-min cache — no duplicate requests if already fresh.
-    menuStore.loadAllMenus().catch(() => { /* non-fatal — packageSelection will retry */ })
+    // No silent warming — sessionStore.start() on "Begin the Feast" handles all preloading
 
     if (route.query.settingsLocked === "1") {
         openSettings("Settings access expired. Please re-enter PIN.")
@@ -270,13 +313,30 @@ onMounted(async () => {
     }
 })
 
-const start = () => {
+const start = async () => {
     if (!unref(deviceStore.isAuthenticated)) {
         openSettings()
         return
     }
 
-    router.replace("/order/start").catch(() => {})
+    // Start session - this authenticates, fetches session, and preloads menus
+    isStartingSession.value = true
+    startSessionError.value = null
+
+    try {
+        const ok = await sessionStore.start()
+        if (!ok) {
+            startSessionError.value = "Failed to start session. Please check device registration."
+            isStartingSession.value = false
+            openSettings()
+            return
+        }
+        await router.replace("/order/start")
+    } catch (e: any) {
+        startSessionError.value = e?.message || "Failed to start session"
+        isStartingSession.value = false
+        logger.error("[Welcome] Session start failed:", e)
+    }
 }
 
 const openSettings = (noticeOrEvent?: string | PointerEvent) => {
@@ -375,8 +435,6 @@ const pinActionLabel = computed(() => {
     if (!isPinSetupMode.value) { return "Verify" }
     return pinSetupStep.value === "confirm" ? "Save" : "Next"
 })
-const MAX_PIN_LENGTH = 6
-const KEYPAD_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 const appendDigit = (d: string) => {
     if (pinInput.value.length >= 6) { return }
     pinInput.value += d

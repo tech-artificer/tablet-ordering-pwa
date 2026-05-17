@@ -1,4 +1,4 @@
-Wooserve Kiosk — Nuxt 3 tablet ordering app
+Grillpad Kiosk — Nuxt 3 tablet ordering app
 
 Nuxt 3-based kiosk client for Woosoo Nexus. Intended to run on landscape tablets (for example Galaxy Tab A9).
 Connects to the Laravel API to display menus and submit orders. Includes a fullscreen PWA manifest for kiosk mode.

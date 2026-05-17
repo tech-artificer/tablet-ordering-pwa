@@ -287,6 +287,7 @@ export interface ModifierGroup {
 export interface Modifier {
   id: number;
   group: string | null;
+  groupName?: string;
   category: string | null;
   name: string;
   price: number;
@@ -421,6 +422,15 @@ export interface OrderPayload {
   guest_count: number;
   package_id: number;
   items: OrderPayloadItem[];
+  // Optional client-side idempotency token; the server uses this to dedupe
+  // retries that re-send the same logical order. Only set by submit composables.
+  client_submission_id?: string;
+}
+
+export interface RefillPayload {
+  order_id: number;
+  items: OrderPayloadItem[];
+  client_submission_id?: string;
 }
 
 // API Response types
@@ -487,7 +497,7 @@ export interface PackageDetails {
       meat: { min: number; max: number };
       side: { min: number; max: number };
       dessert: { min: number; max: number };
-      beverage: { min: number; max: number };
+      drinks: { min: number; max: number };
     };
     has_limits: boolean;
   };
@@ -495,7 +505,7 @@ export interface PackageDetails {
     meat: AllowedMenu[];
     side: AllowedMenu[];
     dessert: AllowedMenu[];
-    beverage: AllowedMenu[];
+    drinks: AllowedMenu[];
   };
   default_selections: Array<{
     menu_id: number;
