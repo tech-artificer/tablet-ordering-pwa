@@ -16,9 +16,15 @@ const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
 const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
 
-// Update system is now route-controlled (welcome screen + settings only)
-// See useAppUpdate.ts for new kiosk-safe API
-const { initializeAppUpdate, disposeAppUpdate } = useAppUpdate()
+// Kiosk auto-update: a pending PWA update is applied automatically, but ONLY
+// when no customer is mid-order (no active dining session). If an order is in
+// progress the update is held and applied the instant the session ends, so a
+// deployed UI change always reaches installed tablets without losing a cart
+// and without staff intervention. Staff can still force it from /settings.
+const { initializeAppUpdate, disposeAppUpdate, checkForUpdate } = useAppUpdate({
+    isSafeToReload: () => !sessionStore.isActive,
+    autoApply: true,
+})
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 let gestureListenersAttached = false
@@ -162,6 +168,10 @@ function handleVisibilityChange (): void {
 
     logger.info(`[App] Wake detected after ${Math.round(hiddenDurationMs / 1000)}s`)
 
+    // A tablet that just woke may have missed a deployment while asleep —
+    // check immediately (auto-applies if safe).
+    checkForUpdate().catch(() => {})
+
     if (!deviceStore.isAuthenticated.value || !sessionStore.isActive) { return }
 
     if (hiddenDurationMs >= FORCE_REINIT_THRESHOLD_MS) {
@@ -182,8 +192,11 @@ onMounted(async () => {
     registerGestureFullscreenRecovery()
     await initializeAppUpdate()
 
-    // Start periodic build version checking (for stale chunk detection)
-    startPeriodicCheck(false)
+    // Start periodic build version checking. redirectOnMismatch=true is the
+    // safety-net backstop: if the service-worker auto-update path ever fails
+    // and a stale build is confirmed (2 consecutive mismatches over >5min),
+    // route to /recovery to force a clean reload instead of running stale.
+    startPeriodicCheck(true)
 
     try {
         const authenticated = await resolveAuthenticationState()
