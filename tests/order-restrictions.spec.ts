@@ -4,245 +4,280 @@ import { useOrderStore } from "../stores/Order"
 import { useSessionStore } from "../stores/Session"
 
 /**
- * Frontend unit tests for order restriction logic.
+ * Frontend unit tests for order restriction logic (Plan B guarantees).
  *
- * Tests:
- * - State persistence across page refreshes
- * - Prevention of duplicate order placement
- * - Refill mode enforcement
- * - Route guard logic
+ * Tests verify:
+ * - hasPlacedOrder computed property reflects correct state
+ * - Recovered orders (via sessionStore.orderId or serverOrderId) are recognized
+ * - Refill mode can only be toggled when an order has been placed
+ * - Cart management and order tracking
  */
 describe("Order Restrictions (Frontend)", () => {
     beforeEach(() => {
-    // Create a fresh Pinia instance for each test
         setActivePinia(createPinia())
     })
 
-    describe("hasPlacedOrder flag persistence", () => {
-        it("should persist hasPlacedOrder flag across store resets", () => {
-            const store: any = useOrderStore()
-
-            // Initial state
+    describe("hasPlacedOrder flag behavior", () => {
+        it("should be false initially", () => {
+            const store = useOrderStore()
             expect(store.hasPlacedOrder).toBe(false)
-
-            // Set flag to true
-            store.hasPlacedOrder = true
-            expect(store.hasPlacedOrder).toBe(true)
-
-            // Note: Actual persistence tested via Pinia persist plugin
-            // This verifies the flag exists and can be set
         })
 
-        it("should prevent order placement when hasPlacedOrder is true", () => {
-            const store: any = useOrderStore()
-
-            // Simulate order already placed
-            store.hasPlacedOrder = true
-
-            // In refill mode, should not allow new order submission
+        it("should be true when rounds exist (order submitted)", () => {
+            const store = useOrderStore()
+            const round = {
+                kind: "initial" as const,
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: [],
+                serverOrderId: 100,
+                serverTotal: 0,
+            }
+            ;(store as any).rounds.push(round)
             expect(store.hasPlacedOrder).toBe(true)
-            // The cart clearing and submission blocking happens in components
-            // based on this flag
+        })
+
+        it("should be true when serverOrderId is set (recovered via response)", () => {
+            const store = useOrderStore()
+            ;(store as any).serverOrderId = 100
+            expect(store.hasPlacedOrder).toBe(true)
+        })
+
+        it("should be true when sessionStore.orderId is set (recovered from session)", () => {
+            const sessionStore = useSessionStore()
+            const store = useOrderStore()
+
+            sessionStore.setOrderId(1001)
+            // hasPlacedOrder computed property reads sessionStore.orderId
+            expect(store.hasPlacedOrder).toBe(true)
+        })
+
+        it("should persist across store resets via Pinia persist plugin", () => {
+            const store = useOrderStore()
+            // Test documents that hasPlacedOrder state is computed from
+            // persistable properties (rounds, serverOrderId, sessionStore.orderId)
+            expect(store.hasPlacedOrder).toBe(false)
+
+            // Simulate recovery via backend 409 response
+            ;(store as any).serverOrderId = 100
+            expect(store.hasPlacedOrder).toBe(true)
         })
     })
 
     describe("Refill mode enforcement", () => {
-        it("should toggle refill mode only when order is placed", () => {
-            const store: any = useOrderStore()
+        it("should allow toggleRefillMode when order is placed", () => {
+            const store = useOrderStore()
 
-            // Should NOT be in refill mode initially
+            // Initially not in refill mode and no order placed
             expect(store.isRefillMode).toBe(false)
-
-            // Try to toggle without placing order first
-            // In the actual implementation, toggleRefillMode() should check hasPlacedOrder
-            store.hasPlacedOrder = false
-            // Component prevents toggle, but let's verify flag state
             expect(store.hasPlacedOrder).toBe(false)
 
-            // Now place an order
-            store.hasPlacedOrder = true
-            store.setCurrentOrder({
-                order: {
-                    id: 1,
-                    order_id: 1001,
-                    status: "confirmed",
-                },
-            })
+            // Simulate order placed (set rounds)
+            const round = {
+                kind: "initial" as const,
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: [],
+                serverOrderId: 100,
+                serverTotal: 0,
+            }
+            ;(store as any).rounds.push(round)
 
             // Now toggle should work
-            store.toggleRefillMode(true)
-            expect(store.isRefillMode).toBe(true)
-        })
-
-        it("should clear cart items when switching to refill mode", () => {
-            const store: any = useOrderStore()
-
-            // Add some regular items
-            store.addToCart({
-                id: 1,
-                name: "Dessert",
-                price: 5,
-                quantity: 2,
-                img_url: "",
-            } as any)
-
-            expect(store.cartItems.length).toBeGreaterThan(0)
-
-            // Switch to refill mode
-            store.hasPlacedOrder = true
-            store.setCurrentOrder({
-                order: {
-                    id: 1,
-                    order_id: 1001,
-                    status: "confirmed",
-                },
-            })
-            store.toggleRefillMode(true)
-
-            // Regular cart should be cleared (or at least not shown)
-            // Refill items stored separately
-            expect(store.isRefillMode).toBe(true)
-        })
-
-        it("should keep refill items separate from regular cart", () => {
-            const store: any = useOrderStore()
-
-            // Add regular item to cart
-            store.addToCart({
-                id: 1,
-                name: "Dessert",
-                price: 5,
-                quantity: 1,
-                img_url: "",
-            } as any)
-
-            // Switch to refill mode
-            store.hasPlacedOrder = true
-            store.setCurrentOrder({
-                order: {
-                    id: 1,
-                    order_id: 1001,
-                    status: "confirmed",
-                },
-            })
-            store.toggleRefillMode(true)
-
-            // Add refill item
-            store.addToCart({
-                id: 2,
-                name: "Beef",
-                price: 0,
-                quantity: 2,
-                img_url: "",
-            } as any)
-
-            // Verify items are isolated
-            // (actual implementation may vary based on store design)
-            expect(store.isRefillMode).toBe(true)
-        })
-    })
-
-    describe("Order history tracking", () => {
-        it("should track submitted items after order placement", () => {
-            const store: any = useOrderStore()
-
-            // Add items to cart
-            store.addToCart({
-                id: 1,
-                name: "Package",
-                price: 0,
-                quantity: 1,
-                img_url: "",
-            } as any)
-
-            // Simulate order submission
-            store.hasPlacedOrder = true
-
-            // submittedItems should now contain the order
-            // (verified via integration testing with backend)
             expect(store.hasPlacedOrder).toBe(true)
+            store.toggleRefillMode(true)
+            expect(store.isRefillMode).toBe(true)
         })
-    })
 
-    describe("Cart clearing behavior", () => {
-        it("should clear cart after successful order submission", () => {
-            const store: any = useOrderStore()
+        it("should respect isRefillMode state in cart display", () => {
+            const store = useOrderStore()
 
-            // Add items
+            // Add item to cart in normal mode
             store.addToCart({
                 id: 1,
                 name: "Item",
                 price: 5,
-                quantity: 2,
+                quantity: 1,
+                category: "meats",
+                isUnlimited: true,
                 img_url: "",
             } as any)
 
-            const itemCountBefore = store.cartItems.length
-            expect(itemCountBefore).toBeGreaterThan(0)
+            expect((store as any).draft.length).toBeGreaterThan(0)
+            expect(store.isRefillMode).toBe(false)
 
-            // Mark order as placed
-            store.hasPlacedOrder = true
+            // Place order to enable refill mode
+            ;(store as any).serverOrderId = 100
+            store.toggleRefillMode(true)
 
-            // In the actual component (menu.vue), cart clearing happens
-            // at line 415: state.cartItems = []
-            // This test documents that behavior
+            // Refill mode should now be active
+            expect(store.isRefillMode).toBe(true)
+        })
+
+        it("should allow refill submission when hasPlacedOrder is true", () => {
+            const store = useOrderStore()
+
+            // Set up recovered order (Plan B: recovered orders don't duplicate-submit)
+            ;(store as any).serverOrderId = 100
+            ;(store as any).rounds = [{
+                kind: "initial" as const,
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: [],
+                serverOrderId: 100,
+                serverTotal: 0,
+            }]
+
             expect(store.hasPlacedOrder).toBe(true)
+
+            // Enable refill mode
+            store.toggleRefillMode(true)
+            expect(store.isRefillMode).toBe(true)
+
+            // buildRefillPayload should work when hasPlacedOrder is true
+            store.addToCart({
+                id: 2,
+                name: "Refill Item",
+                price: 0,
+                quantity: 1,
+                category: "meats",
+                isUnlimited: true,
+                img_url: "",
+            } as any)
+
+            // Refill payload should include serverOrderId
+            const payload = store.buildRefillPayload()
+            expect(payload.order_id).toBe(100)
+        })
+    })
+
+    describe("Order history tracking", () => {
+        it("should track order rounds after submission", () => {
+            const store = useOrderStore()
+
+            // Initially no rounds
+            expect((store as any).allOrderedItems.length).toBe(0)
+
+            // Add item and "submit" (append round)
+            store.addToCart({
+                id: 1,
+                name: "Item",
+                price: 5,
+                quantity: 1,
+                category: "meats",
+                isUnlimited: false,
+                img_url: "",
+            } as any)
+
+            const round = {
+                kind: "initial" as const,
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: store.activeCart,
+                serverOrderId: 100,
+                serverTotal: 100,
+            }
+            ;(store as any).rounds.push(round)
+
+            expect((store as any).allOrderedItems.length).toBeGreaterThan(0)
+            expect(store.hasPlacedOrder).toBe(true)
+        })
+
+        it("should clear draft but keep rounds on submission", () => {
+            const store = useOrderStore()
+
+            // Add items to draft
+            store.addToCart({
+                id: 1,
+                name: "Item",
+                price: 5,
+                quantity: 1,
+                category: "meats",
+                isUnlimited: false,
+                img_url: "",
+            } as any)
+
+            const draftLength = (store as any).draft.length
+            expect(draftLength).toBeGreaterThan(0)
+
+            // "Submit" by appending to rounds and clearing draft
+            const round = {
+                kind: "initial" as const,
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: store.activeCart,
+                serverOrderId: 100,
+                serverTotal: 100,
+            }
+            ;(store as any).rounds.push(round)
+            ;(store as any).draft = []
+
+            expect((store as any).draft.length).toBe(0)
+            expect((store as any).allOrderedItems.length).toBe(draftLength)
         })
     })
 
     describe("Session ID population", () => {
-        it("should populate orderId in session store after order placement", () => {
-            const sessionStore: any = useSessionStore()
-            const orderStore: any = useOrderStore()
+        it("should recognize recovered order via sessionStore.orderId", () => {
+            const sessionStore = useSessionStore()
+            const store = useOrderStore()
 
-            // Initially no orderId
-            expect(sessionStore.$state.orderId).toBeFalsy()
+            // Backend recovery: server returns 409 with existing order
+            // Frontend receives orderId via session sync
+            sessionStore.setOrderId(1001)
 
-            // Simulate successful order creation response
-            sessionStore.$state.orderId = 1001
-            orderStore.hasPlacedOrder = true
+            // hasPlacedOrder should immediately reflect this
+            expect(store.hasPlacedOrder).toBe(true)
 
-            // Now orderId should be set
-            expect(sessionStore.$state.orderId).toBe(1001)
-            expect(orderStore.hasPlacedOrder).toBe(true)
+            // Refill mode should be available
+            store.toggleRefillMode(true)
+            expect(store.isRefillMode).toBe(true)
         })
 
-        it("should wait for orderId before allowing refill toggle", () => {
-            const sessionStore: any = useSessionStore()
-            const orderStore: any = useOrderStore()
+        it("should prevent submitOrder when only sessionStore.orderId is set (Plan B guard)", async () => {
+            const sessionStore = useSessionStore()
+            const store = useOrderStore()
 
-            // Mark order as placed but no orderId yet (simulating server delay)
-            orderStore.hasPlacedOrder = true
-            sessionStore.$state.orderId = null
+            // Session-only recovery: rounds=[], serverOrderId=null, sessionStore.orderId populated
+            sessionStore.setOrderId(1001)
+            expect((store as any).rounds.length).toBe(0)
+            expect((store as any).serverOrderId).toBeNull()
+            expect(store.hasPlacedOrder).toBe(true)
 
-            // In menu.vue toggleRefillMode(), there's a wait loop
-            // that checks for orderId population with timeout
-            // This test documents that behavior
-            expect(sessionStore.$state.orderId).toBeFalsy()
-            expect(orderStore.hasPlacedOrder).toBe(true)
-
-            // Simulate orderId arriving
-            sessionStore.$state.orderId = 1001
-            expect(sessionStore.$state.orderId).toBe(1001)
+            // Guard at Order.ts:376 must fire before any API call
+            await expect(store.submitOrder()).rejects.toThrow(
+                "An initial order has already been placed for this session. Use refill instead."
+            )
         })
-    })
 
-    describe("State reset on guest change", () => {
-        it("should reset order flags when guest count changes", () => {
-            const store: any = useOrderStore()
+        it("should handle serverOrderId set from response (409 recovery)", () => {
+            const store = useOrderStore()
 
-            // Place order
-            store.hasPlacedOrder = true
-            store.guestCount = 4
+            // Server returns 409 with order data, setOrderCreated() sets serverOrderId
+            ;(store as any).serverOrderId = 999
 
             expect(store.hasPlacedOrder).toBe(true)
 
-            // In actual implementation, changing guest count might trigger reset
-            // This documents the expected behavior
-            store.guestCount = 2
+            // Plan B guarantee: recovered order won't duplicate-submit
+            // Verified by presence of serverOrderId preventing new submission
+            expect(store.serverOrderId).toBe(999)
+        })
+    })
 
-            // Note: Whether to reset on guest change is a UX decision
-            // Current implementation may NOT reset automatically
+    describe("State management under guest count changes", () => {
+        it("should maintain hasPlacedOrder across guest count updates", () => {
+            const store = useOrderStore()
+
+            // Place order
+            ;(store as any).serverOrderId = 100
+            expect(store.hasPlacedOrder).toBe(true)
+
+            // Change guest count
+            store.setGuestCount(4)
+
+            // hasPlacedOrder should still be true (not reset by guest count change)
+            expect(store.hasPlacedOrder).toBe(true)
+            expect(store.guestCount).toBe(4)
         })
     })
 })

@@ -2,7 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs"
 import { resolve, join } from "node:path"
 import { describe, it, expect } from "vitest"
 
-const ROOT = resolve(__dirname, "..")
+// Resolve from project root (tests run from project directory)
+const ROOT = process.cwd()
 const SCAN_DIRS = ["pages", "components", "layouts"]
 const EXCLUDE_PATTERNS = ["node_modules", ".nuxt", "dist", ".output", "docs"]
 

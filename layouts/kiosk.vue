@@ -18,7 +18,7 @@ if (import.meta.client) {
     <div class="min-h-screen min-w-screen flex items-center justify-center bg-app-grid overflow-hidden">
         <NetworkStatus />
         <FullscreenRecovery />
-        <div class="h-screen w-screen z-10 safe-area-top safe-area-bottom">
+        <div class="relative h-screen w-screen z-10 safe-area-top safe-area-bottom">
             <slot />
         </div>
     </div>

@@ -127,7 +127,7 @@ describe("stores/OfflineSync", () => {
             expect(store.lastError).toBeNull()
         })
 
-        it("orders-sync-success calls setOrderCreated and startOrderPolling", async () => {
+        it("orders-sync-success calls setOrderCreated", async () => {
             const store = useOfflineSyncStore()
             store.attachServiceWorkerEvents()
             const fakeOrder = { order_id: 42, status: "confirmed" }
@@ -136,7 +136,6 @@ describe("stores/OfflineSync", () => {
             await new Promise(resolve => setTimeout(resolve, 20))
 
             expect(mockSetOrderCreated).toHaveBeenCalled()
-            expect(mockStartOrderPolling).toHaveBeenCalledWith(42)
             expect(store.isSyncing).toBe(false)
         })
 

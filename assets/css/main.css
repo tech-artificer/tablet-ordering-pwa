@@ -139,27 +139,30 @@ body {
    PAGE TRANSITIONS - Enhanced for app-like feel
    ============================================ */
 
-/* Fade with lift */
+/* Subtle page fade — cross-fade (no out-in mode). Both pages exist briefly so
+   the entering view paints immediately. The leaving page is taken out of normal
+   flow with position:absolute so the two siblings overlap cleanly. Requires the
+   parent (kiosk layout slot container) to be position:relative. */
 .page-fade-enter-active {
-  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform, opacity;
+  transition: opacity 140ms ease-out;
+  will-change: opacity;
 }
 .page-fade-leave-active {
-  transition: opacity 180ms cubic-bezier(0.4, 0, 0.6, 1), transform 180ms cubic-bezier(0.4, 0, 0.6, 1);
-  will-change: transform, opacity;
+  transition: opacity 140ms ease-in;
+  will-change: opacity;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 .page-fade-enter-from {
   opacity: 0;
-  transform: translate3d(0, 18px, 0) scale(0.98);
 }
 .page-fade-leave-to {
   opacity: 0;
-  transform: translate3d(0, -12px, 0) scale(0.98);
 }
 .page-fade-enter-to,
 .page-fade-leave-from {
   opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
 }
 
 /* Slide left (forward navigation) */
@@ -430,6 +433,18 @@ body {
     repeating-linear-gradient(rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0px, transparent 1px, transparent 40px),
     linear-gradient(to bottom right, #0F0F0F, #1A1A1A, #3D3530);
+}
+
+/* Warm charcoal grill-table surface (welcome + package selection only) */
+.bg-grill-table {
+  background-color: #080604;
+  background-image:
+    radial-gradient(ellipse 78% 58% at 50% 38%, rgba(255, 181, 109, 0.12) 0%, rgba(255, 181, 109, 0.035) 38%, transparent 72%),
+    radial-gradient(ellipse 120% 92% at 50% 110%, rgba(139, 78, 33, 0.22) 0%, transparent 64%),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(140deg, #080604 0%, #130d09 50%, #26180f 100%);
+  background-size: auto, auto, 40px 40px, 40px 40px, auto;
 }
 
 /* ============================================

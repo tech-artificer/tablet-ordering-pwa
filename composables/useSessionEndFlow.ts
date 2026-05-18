@@ -1,7 +1,6 @@
 import { useRouter } from "vue-router"
 import { useSessionEndStore, type SessionEndReason, type SessionEndSource } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
-import { useOrderStore } from "~/stores/Order"
 import { logger } from "~/utils/logger"
 
 type RouterLike = {
@@ -51,7 +50,6 @@ function resolveRouter (): RouterLike {
 export function useSessionEndFlow () {
     const sessionEndStore = useSessionEndStore()
     const sessionStore = useSessionStore()
-    const orderStore = useOrderStore()
 
     async function triggerSessionEnd (
         reason: SessionEndReason,
@@ -72,9 +70,6 @@ export function useSessionEndFlow () {
         }
 
         logger.info("[SessionEndFlow] Triggering transition", { reason, source: options.source, orderNumber: options.orderNumber })
-
-        // Stop polling before clearing state
-        try { orderStore.stopOrderPolling?.() } catch (e) { /* ignore */ }
 
         // Clear session (handles order state cleanup internally)
         try {

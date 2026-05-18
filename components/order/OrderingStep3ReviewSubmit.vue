@@ -6,6 +6,7 @@ import { useOrderSubmit } from "~/composables/useOrderSubmit"
 import { useRefillSubmit } from "~/composables/useRefillSubmit"
 import { useSubmitState } from "~/composables/useSubmitState"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
+import { classifyError } from "~/composables/useErrorClassifier"
 import SubmitStatusBanner from "~/components/ui/SubmitStatusBanner.vue"
 import { logger } from "~/utils/logger"
 
@@ -41,82 +42,15 @@ type ReviewItem = {
 
 const activeCart = computed<any[]>(() => (unref(orderStore.activeCart) as any[]) || [])
 
-const currentOrderSnapshot = computed<any>(() => {
-    return (unref(orderStore.currentOrder) as any)?.order || unref(orderStore.currentOrder) || null
-})
+const currentOrderSnapshot = computed<any>(() => null)
 
-const hasConfirmedInitialOrder = computed(() => {
-    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
-        return orderStore.hasConfirmedInitialOrder()
-    }
-    const liveOrderId = currentOrderSnapshot.value?.order_id ?? currentOrderSnapshot.value?.id
-    return Boolean(orderStore.hasPlacedOrder && liveOrderId)
-})
-
-const fallbackServerItems = computed<ReviewItem[]>(() => {
-    const rawItems = currentOrderSnapshot.value?.items ?? currentOrderSnapshot.value?.order_items
-    if (!Array.isArray(rawItems) || rawItems.length === 0) {
-        logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: No items available", {
-            hasItems: !!rawItems,
-            isArray: Array.isArray(rawItems),
-            length: rawItems?.length || 0,
-        })
-        return []
-    }
-
-    logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: Processing " + rawItems.length + " items")
-
-    const normalized: ReviewItem[] = []
-
-    rawItems.forEach((item: any, index: number) => {
-        const packageModifiers = Array.isArray(item?.modifiers) ? item.modifiers : []
-        const isPackage = Boolean(item?.is_package)
-
-        if (isPackage && packageModifiers.length > 0) {
-            packageModifiers.forEach((modifier: any, modifierIndex: number) => {
-                normalized.push({
-                    id: Number(modifier?.menu_id ?? modifier?.id ?? -(index * 1000 + modifierIndex + 1)),
-                    name: String(modifier?.name || modifier?.receipt_name || `Inclusion ${modifierIndex + 1}`),
-                    quantity: Number(modifier?.quantity || 1),
-                    category: String(modifier?.category || "meats"),
-                    price: Number(modifier?.price || 0),
-                    img_url: modifier?.img_url || null,
-                    description: modifier?.description || null,
-                })
-            })
-            return
-        }
-
-        normalized.push({
-            id: Number(item?.menu_id ?? item?.id ?? -(index + 1)),
-            name: String(item?.name || item?.receipt_name || `Item ${index + 1}`),
-            quantity: Number(item?.quantity || 1),
-            category: String(item?.category || (isPackage ? "meats" : "side")),
-            price: Number(item?.price || 0),
-            img_url: item?.img_url || null,
-            description: item?.description || null,
-        })
-    })
-
-    logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: Normalized " + normalized.length + " items")
-    return normalized
-})
+const hasConfirmedInitialOrder = computed(() =>
+    orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
+)
 
 const displayItems = computed<any[]>(() => {
-    if (!orderStore.isRefillMode) {
-        const submitted = (unref(orderStore.submittedItems) as any[]) || []
-        if (submitted.length > 0) {
-            logger.debug("[OrderingStep3ReviewSubmit] displayItems: Using submittedItems (" + submitted.length + " items)")
-            return submitted
-        }
-
-        const fallback = fallbackServerItems.value
-        if (fallback.length > 0) {
-            logger.debug("[OrderingStep3ReviewSubmit] displayItems: submittedItems empty, using fallback (" + fallback.length + " items)")
-            return fallback
-        }
-    }
-
+    // Always show only the items currently being submitted (activeCart)
+    // Do NOT show previously submitted items when reviewing a new refill
     logger.debug("[OrderingStep3ReviewSubmit] displayItems: Using activeCart (" + activeCart.value.length + " items)")
     return activeCart.value
 })
@@ -177,7 +111,7 @@ const itemCountDisplay = computed(() =>
 const tableLabel = computed(() => {
     const tbl = (deviceStore.table as any) || {}
     const name = tbl?.name ? String(tbl.name) : ""
-    const id = tbl?.id ? `Table ${tbl.id}` : ""
+    const id = tbl?.id ? "Table:" : ""
     if (name && id) { return `${id} · ${name}` }
     return name || id || "Table"
 })
@@ -287,10 +221,12 @@ async function submit (): Promise<void> {
         }
         emit("order-submitted")
     } catch (error: any) {
-        submitError.value = error?.message || "Order submission failed"
+        const classified = classifyError(error)
+        submitError.value = classified.message
         submitState.resetForNextTransaction() // Allow retry on error
         logger.error("[OrderingStep3ReviewSubmit] Submission failed", {
             error: error?.message || error,
+            category: classified.category,
         })
     }
 }
@@ -302,17 +238,20 @@ async function submit (): Promise<void> {
         <SubmitStatusBanner />
 
         <!-- Order Review Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)] gap-5 md:gap-6 min-h-0">
             <!-- LEFT: Your Order -->
-            <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6">
-                <div class="flex items-baseline gap-2 mb-4">
+            <section class="rounded-2xl border border-white/10 bg-secondary/70 backdrop-blur-sm p-5 md:p-6 flex flex-col min-h-0 overflow-hidden md:h-[calc(100dvh-220px)] md:max-h-[calc(100dvh-220px)]">
+                <div class="flex items-baseline gap-2 mb-4 flex-shrink-0">
                     <h2 class="text-lg md:text-xl font-extrabold font-raleway text-white tracking-tight">
                         Your Order
                     </h2>
                     <span class="text-sm text-text-muted">({{ itemCountDisplay }} {{ itemCountDisplay === 1 ? 'item' : 'items' }})</span>
                 </div>
 
-                <div v-if="displayItems.length > 0" class="space-y-3">
+                <div
+                    v-if="displayItems.length > 0"
+                    class="scrollbar-warm min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1"
+                >
                     <div
                         v-for="(item, index) in displayItems"
                         :key="`item-${item?.id ?? index}`"
@@ -401,29 +340,6 @@ async function submit (): Promise<void> {
                     </div>
                 </div>
 
-                <!-- Table card -->
-                <div class="rounded-2xl border border-success/30 bg-success/10 p-4 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-success/20 border border-success/30 flex items-center justify-center flex-shrink-0 text-base">
-                        🪑
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-sm font-bold text-white truncate">
-                            {{ tableLabel }}
-                        </p>
-                        <p class="text-xs text-text-muted truncate">
-                            Order will be sent to grill station
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Errors / blockers -->
-                <p v-if="submitError" class="text-sm text-error font-semibold">
-                    {{ submitError }}
-                </p>
-                <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
-                    {{ submitBlockers[0] }}
-                </p>
-
                 <!-- CTA -->
                 <button
                     type="button"
@@ -434,6 +350,14 @@ async function submit (): Promise<void> {
                     <span v-if="orderStore.isSubmitting">Submitting…</span>
                     <span v-else>{{ buttonLabel }} →</span>
                 </button>
+
+                <!-- Errors / blockers -->
+                <p v-if="submitError" class="text-sm text-error font-semibold">
+                    {{ submitError }}
+                </p>
+                <p v-else-if="!canSubmit && submitBlockers.length > 0" class="text-sm text-warning font-semibold">
+                    {{ submitBlockers[0] }}
+                </p>
             </aside>
         </div>
     </div>

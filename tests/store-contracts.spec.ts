@@ -22,15 +22,6 @@ vi.mock("../composables/useApi", () => ({
     useApi: () => ({ get: mockGet, post: mockPost }),
 }))
 
-vi.mock("../composables/useOfflineOrderQueue", () => ({
-    useOfflineOrderQueue: () => ({
-        queueOrder: vi.fn(),
-        drainQueue: vi.fn(),
-        clearQueue: vi.fn(),
-        registerOnlineListener: vi.fn(),
-    }),
-}))
-
 describe("store contract regressions", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
@@ -53,10 +44,10 @@ describe("store contract regressions", () => {
     it("exposes buildRefillPayload and maps refill items into request shape", () => {
         const orderStore = useOrderStore()
 
-        orderStore.setRefillItems([
-      { id: 41, name: "Beef", price: 0, quantity: 2, note: "Refill", category: "meats", img_url: "" } as any,
-      { id: 42, name: "Kimchi", price: 0, quantity: 1, note: null, category: "sides", img_url: "" } as any,
-        ])
+        ;(orderStore as any).draft = [
+            { id: 41, name: "Beef", price: 0, quantity: 2, note: "Refill", category: "meats", img_url: "" },
+            { id: 42, name: "Kimchi", price: 0, quantity: 1, note: null, category: "sides", img_url: "" },
+        ]
 
         expect(orderStore.buildRefillPayload).toBeTypeOf("function")
         expect(orderStore.buildRefillPayload()).toEqual({

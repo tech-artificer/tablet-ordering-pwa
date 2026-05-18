@@ -1,5 +1,5 @@
 {
-  "name": "wooserve",
+  "name": "grillpad",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,7 @@
     "test:run": "vitest run",
     "build": "npx nuxi build",
     "generate": "npx nuxi generate",
+    "analyze:bundle": "node scripts/analyze-bundle.js",
     "preview": "npx nuxi preview --host 0.0.0.0",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -28,6 +29,7 @@
     "axios": "^1.15.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "uuid": "^10.0.0",
     "dexie": "^4.4.2",
     "element-plus": "^2.3.0",
     "jwt-decode": "^4.0.0",

@@ -1,4 +1,4 @@
-import { computed, defineComponent, nextTick, watch } from "vue"
+import { computed, defineComponent, nextTick, unref, watch } from "vue"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest"
@@ -29,23 +29,19 @@ function makeWatcherHarness () {
     const sessionEndStore = useSessionEndStore()
     const { triggerSessionEnd } = useSessionEndFlow()
 
-    // Mirror the exact computed chain from in-session.vue
-    const currentOrder = computed(() => {
-        const raw = orderStore.currentOrder
-        if (!raw) { return null }
-        return (raw as any).order ?? raw
-    })
-    const orderStatus = computed<string>(() => (currentOrder.value as any)?.status ?? "pending")
+    // Mirror the exact computed chain from in-session.vue (uses serverStatus directly)
+    const orderStatus = computed<string>(() => String(unref(orderStore.serverStatus) || "pending"))
 
     const Harness = defineComponent({
         setup () {
             watch(orderStatus, (status) => {
                 if ((TERMINAL_STATUSES as readonly string[]).includes(status)) {
                     if (!sessionEndStore.active) {
-                        void triggerSessionEnd(status as any, { source: "in-session" })
+                        // Ignore triggerSessionEnd rejection here: this spec only asserts sessionEndStore.active state transitions.
+                        triggerSessionEnd(status as any, { source: "in-session" }).catch(() => undefined)
                     }
                 }
-            })
+            }, { immediate: true })
             return {}
         },
         template: "<div />",
@@ -69,17 +65,17 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
         vi.unstubAllGlobals()
     })
 
-    it("does not fire immediately for an already-terminal initial status", async () => {
+    it("fires immediately for an already-terminal initial status", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-        orderStore.setCurrentOrder({ order: { status: "completed" } } as any)
+        ;(orderStore as any).serverStatus = "completed"
         mount(Harness)
         await nextTick()
-        expect(sessionEndStore.active).toBe(false)
+        expect(sessionEndStore.active).toBe(true)
     })
 
     it("does NOT end session when initial status is pending", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-        orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
+        ;(orderStore as any).serverStatus = "pending"
         mount(Harness)
         await nextTick()
         expect(sessionEndStore.active).toBe(false)
@@ -87,7 +83,7 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
 
     it("does NOT end session when initial status is confirmed", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-        orderStore.setCurrentOrder({ order: { status: "confirmed" } } as any)
+        ;(orderStore as any).serverStatus = "confirmed"
         mount(Harness)
         await nextTick()
         expect(sessionEndStore.active).toBe(false)
@@ -95,7 +91,7 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
 
     it("ends session when status transitions from live to completed", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-        orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
+        ;(orderStore as any).serverStatus = "pending"
         mount(Harness)
         await nextTick()
         expect(sessionEndStore.active).toBe(false)
@@ -109,7 +105,7 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
         "ends session for terminal status %s",
         async (terminalStatus) => {
             const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-            orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
+            ;(orderStore as any).serverStatus = "pending"
             mount(Harness)
             await nextTick()
 
@@ -123,7 +119,7 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
         "does NOT end session for non-terminal intermediate status %s",
         async (nonTerminalStatus) => {
             const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-            orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
+            ;(orderStore as any).serverStatus = "pending"
             mount(Harness)
             await nextTick()
 
@@ -135,7 +131,7 @@ describe("in-session status watcher — POS Payment Sync spec", () => {
 
     it("startTransition is idempotent — second terminal status does not re-claim", async () => {
         const { Harness, sessionEndStore, orderStore } = makeWatcherHarness()
-        orderStore.setCurrentOrder({ order: { status: "pending" } } as any)
+        ;(orderStore as any).serverStatus = "pending"
         mount(Harness)
         await nextTick()
 

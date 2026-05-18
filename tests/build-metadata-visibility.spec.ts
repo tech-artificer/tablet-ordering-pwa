@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 const readText = (relativePath: string) =>
-    readFileSync(resolve(__dirname, "..", relativePath), "utf-8")
+    readFileSync(resolve(PROJECT_ROOT, relativePath), "utf-8")
 
 describe("build metadata visibility wiring", () => {
     it("declares build metadata in Nuxt public runtime config", () => {

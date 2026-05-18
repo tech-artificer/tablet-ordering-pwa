@@ -1,5 +1,4 @@
-import { ref, computed } from "vue"
-import type { OrderApiResponse } from "../types"
+import { ref, computed, unref } from "vue"
 import { useDeviceStore } from "../stores/Device"
 import { useOrderStore } from "../stores/Order"
 import { logger } from "../utils/logger"
@@ -65,16 +64,14 @@ export const useRealtimeStatus = () => {
 
     // Order status
     const currentOrderStatus = computed(() => {
-        const orderResp = orderStore.getCurrentOrder()
-        const order = (orderResp?.order || orderResp) as (OrderApiResponse["order"] & { unprinted_items_count?: number }) | null | undefined
         return {
-            hasOrder: !!order?.id,
-            orderId: order?.id,
-            orderNumber: order?.order_number,
-            status: order?.status,
-            hasUnprinted: order?.unprinted_items_count > 0 || false,
-            isPolling: orderStore.getIsPolling(),
-            pollingOrderId: orderStore.getPollingOrderId()
+            hasOrder: unref(orderStore.serverOrderId) !== null,
+            orderId: unref(orderStore.serverOrderId),
+            orderNumber: null,
+            status: unref(orderStore.serverStatus),
+            hasUnprinted: false,
+            isPolling: false,
+            pollingOrderId: null,
         }
     })
 

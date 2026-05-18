@@ -2,24 +2,34 @@
 import confetti from "canvas-confetti"
 import { ref } from "vue"
 import { useSessionStore } from "../../stores/Session"
+import { useOrderSubmission } from "../../composables/useOrderSubmission"
 import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
 import { logger } from "~/utils/logger"
 
-definePageMeta({ layout: "kiosk", middleware: ["order-guard"] })
+definePageMeta({ layout: "kiosk" })
 
 const router = useRouter()
 const sessionStore = useSessionStore()
+const { submitOrderWithIdempotency } = useOrderSubmission()
 const sessionStartError = ref<string | null>(null)
 
 const triggerCelebration = () => {
-    const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
-    confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.5 },
-        colors,
-        duration: 2000
-    })
+    try {
+        const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
+        if (typeof confetti === "function") {
+            confetti({
+                particleCount: 120,
+                spread: 80,
+                origin: { y: 0.5 },
+                colors,
+                duration: 2000
+            })
+        } else {
+            logger.warn("[Order Review] Confetti not available")
+        }
+    } catch (e) {
+        logger.warn("[Order Review] Confetti error (non-fatal):", e)
+    }
 }
 
 const handleGoBack = () => {
@@ -32,10 +42,10 @@ const handleOrderSubmitted = async () => {
     logger.info("[Order Review] Order confirmation received", { timestamp })
     sessionStartError.value = null
 
-    triggerCelebration()
+    try {
+        triggerCelebration()
 
-    if (!sessionStore.isActive) {
-        try {
+        if (!sessionStore.isActive) {
             logger.info("[Order Review] Marking session active", { timestamp })
             const started = await sessionStore.start({ preserveSubmittedOrder: true })
             if (!started) {
@@ -44,24 +54,25 @@ const handleOrderSubmitted = async () => {
                 return
             }
             logger.info("[Session Flow] Order submitted, session active, ready for refill or completion")
-        } catch (e) {
-            logger.error("[Order Review] Failed to start session store", {
-                timestamp,
-                error: (e as any)?.message,
-            })
-            sessionStartError.value = "Your order was sent to the kitchen, but this tablet could not start the dining session. Please ask staff to reopen the session screen."
-            return
         }
-    }
 
-    logger.info("[Order Review] Navigating to in-session screen", { timestamp })
-    router.replace("/order/in-session")
+        logger.info("[Order Review] Navigating to in-session screen", { timestamp })
+        await router.replace("/order/in-session")
+        logger.info("[Order Review] Navigation completed", { timestamp })
+    } catch (e: any) {
+        logger.error("[Order Review] Fatal error in handleOrderSubmitted", {
+            timestamp,
+            error: e?.message || e,
+            stack: e?.stack,
+        })
+        sessionStartError.value = `Order sent, but navigation failed: ${e?.message || "Unknown error"}. Please call staff.`
+    }
 }
 </script>
 
 <template>
     <NuxtErrorBoundary>
-        <div class="min-h-screen bg-app-grid text-white px-4 py-5 md:px-6 md:py-6 overflow-y-auto">
+        <div class="min-h-screen bg-app-grid text-white px-4 py-5 md:px-6 md:py-6 overflow-hidden">
             <div class="max-w-6xl mx-auto">
                 <div class="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-sm px-4 py-3 md:px-5 md:py-4 mb-5 md:mb-6">
                     <div class="flex items-center justify-between gap-4">

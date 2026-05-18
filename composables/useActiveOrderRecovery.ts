@@ -1,3 +1,4 @@
+import { unref } from "vue"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionEndStore } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
@@ -5,24 +6,15 @@ import { logger } from "~/utils/logger"
 
 const TERMINAL_STATUSES = new Set(["completed", "cancelled", "voided"])
 
-function normalizeCurrentOrder (raw: any): any {
-    if (!raw) { return null }
-    return (raw.order ?? raw) as any
-}
-
 export function shouldAttemptActiveOrderRecovery () {
     const orderStore = useOrderStore()
     const sessionStore = useSessionStore()
 
-    const orderObj = normalizeCurrentOrder(orderStore.getCurrentOrder())
-
     return Boolean(
         sessionStore.getOrderId() ||
-        orderStore.hasPlacedOrder ||
-        orderStore.isRefillMode ||
-        orderStore.currentOrder ||
-        orderObj?.order_id ||
-        orderObj?.id
+        unref(orderStore.rounds).length > 0 ||
+        unref(orderStore.mode) === "refill" ||
+        unref(orderStore.serverOrderId) !== null
     )
 }
 
@@ -37,15 +29,9 @@ export async function recoverActiveOrderState (source: string = "unknown") {
         logger.warn(`[ActiveOrderRecovery:${source}] initializeFromSession failed`, error)
     }
 
-    const orderObj = normalizeCurrentOrder(orderStore.getCurrentOrder())
-    const orderId = orderObj?.order_id || orderObj?.id || sessionStore.getOrderId()
-    const packageId = Number(
-        orderStore.getPackage?.value?.id ||
-      orderObj?.package_id ||
-      orderObj?.menu_id ||
-      0
-    ) || null
-    const status = String(orderObj?.status || "").toLowerCase()
+    const orderId = unref(orderStore.serverOrderId) || sessionStore.getOrderId()
+    const packageId = Number(orderStore.getPackage?.value?.id || 0) || null
+    const status = String(unref(orderStore.serverStatus) || "").toLowerCase()
     const hasSessionFlag = sessionStore.getIsActive() || (typeof window !== "undefined" && window.localStorage?.getItem("session_active") === "1")
 
     if (!orderId) {

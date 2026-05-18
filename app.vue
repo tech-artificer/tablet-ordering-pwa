@@ -1,34 +1,24 @@
 <script setup lang="ts">
 import { useDeviceStore } from "~/stores/Device"
-import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
 import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
-import { useOfflineOrderQueue } from "~/composables/useOfflineOrderQueue"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
+import { useBuildVersion } from "~/composables/useBuildVersion"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
 const nuxtApp = useNuxtApp()
 const deviceStore = useDeviceStore()
-const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
-const { registerOnlineListener } = useOfflineOrderQueue()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
-const isUpdateApplyBlocked = computed(() =>
-    Boolean(sessionStore.isActive) || Boolean(orderStore.hasPlacedOrder) || Boolean(orderStore.isSubmitting)
-)
-const {
-    showUpdateBanner,
-    canApplyUpdate,
-    isApplyingUpdate,
-    updateError,
-    initializeAppUpdate,
-    applyUpdate,
-    disposeAppUpdate
-} = useAppUpdate({ isUpdateApplyBlocked })
+const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
+
+// Update system is now route-controlled (welcome screen + settings only)
+// See useAppUpdate.ts for new kiosk-safe API
+const { initializeAppUpdate, disposeAppUpdate } = useAppUpdate()
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 let gestureListenersAttached = false
@@ -133,7 +123,7 @@ function enforceFullscreenIfNeeded (): void {
     if (typeof document === "undefined") { return }
     if (deviceStore.getKioskUnlocked()) { return }
 
-    void requestFullscreen()
+    requestFullscreen().catch(() => undefined)
 }
 
 function handleFullscreenGestureRecovery (): void {
@@ -192,6 +182,9 @@ onMounted(async () => {
     registerGestureFullscreenRecovery()
     await initializeAppUpdate()
 
+    // Start periodic build version checking (for stale chunk detection)
+    startPeriodicCheck(false)
+
     try {
         const authenticated = await resolveAuthenticationState()
         await nuxtApp.callHook("app:auth-ready", { authenticated })
@@ -202,9 +195,6 @@ onMounted(async () => {
     } finally {
         isLoading.value = false
     }
-    // Register global online event listener to drain the offline order queue
-    registerOnlineListener()
-
     // Enforce fullscreen as early as possible (browser may defer until user gesture)
     enforceFullscreenIfNeeded()
 
@@ -222,6 +212,7 @@ onUnmounted(() => {
     cleanup()
     disposeAppUpdate()
     unregisterGestureFullscreenRecovery()
+    stopPeriodicCheck()
 
     if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", handleVisibilityChange)
@@ -232,13 +223,9 @@ onUnmounted(() => {
 <template>
     <div class="contents">
         <SplashScreen :visible="isLoading" />
-        <UpdateBanner
-            :visible="showUpdateBanner"
-            :disabled="!canApplyUpdate"
-            :is-applying="isApplyingUpdate"
-            :error-message="updateError"
-            @apply="applyUpdate"
-        />
+
+        <!-- Global connection and error overlays -->
+        <ConnectionBlockingOverlay />
 
         <NuxtLayout>
             <NuxtPage />

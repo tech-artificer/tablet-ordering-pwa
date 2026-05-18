@@ -31,17 +31,11 @@ describe("CartSidebar UI", () => {
     it("hides Place Order button after initial order is placed", () => {
         const order = useOrderStore()
         const session = useSessionStore()
-        // Set up order state to simulate an already-placed order
-        order.setHasPlacedOrder(true)
-        order.setIsRefillMode(false)
+        // Simulate placed order state using new API
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "confirmed"
         session.setOrderId(19561)
-        order.setCurrentOrder({
-            order: {
-                order_id: 19561,
-                order_number: "ORD-19561",
-                status: "confirmed",
-            },
-        } as any)
 
         const wrapper = mount(CartSidebar, {
             global: {
@@ -75,8 +69,6 @@ describe("CartSidebar UI", () => {
         const order = useOrderStore()
 
         order.setPackage({ id: 5, name: "Store Package", price: 249 } as any)
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
 
         const wrapper = mount(CartSidebar, {
             global: {
@@ -105,8 +97,6 @@ describe("CartSidebar UI", () => {
         const order = useOrderStore()
 
         order.setPackage({ id: 9, name: "UI Package", price: 199 } as any)
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
 
         const wrapper = mount(CartSidebar, {
             global: {
@@ -135,8 +125,6 @@ describe("CartSidebar UI", () => {
         const order = useOrderStore()
 
         order.setPackage({ id: 5, name: "Store Package", price: 249 } as any)
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
 
         const wrapper = mount(CartSidebar, {
             global: {
@@ -167,8 +155,6 @@ describe("CartSidebar UI", () => {
         const order = useOrderStore()
 
         order.setPackage({ id: 8, name: "Package", price: 199 } as any)
-        order.setHasPlacedOrder(false)
-        order.setIsRefillMode(false)
 
         const wrapper = mount(CartSidebar, {
             global: {

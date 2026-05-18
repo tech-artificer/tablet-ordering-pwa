@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onMounted } from "vue"
+import { logger } from "./utils/logger"
 
 const props = defineProps<{
   error: {
     statusCode?: number
     message?: string
+    statusMessage?: string
   }
 }>()
 
@@ -12,19 +14,50 @@ const router = useRouter()
 
 const isNotFound = computed(() => props.error?.statusCode === 404)
 
-const title = computed(() =>
-    isNotFound.value ? "Page Not Found" : "Something Went Wrong"
-)
+// Detect chunk load errors in error boundary
+const isChunkError = computed(() => {
+    const msg = props.error?.message || props.error?.statusMessage || ""
+    return (
+        msg.includes("chunk") ||
+        msg.includes("ChunkLoadError") ||
+        msg.includes("Loading chunk") ||
+        msg.includes("Failed to fetch dynamically") ||
+        msg.includes("import()")
+    )
+})
 
-const subtitle = computed(() =>
-    isNotFound.value
-        ? "The page you requested does not exist."
-        : "An unexpected error occurred. Please tap the button below to return to the start screen."
-)
+const title = computed(() => {
+    if (isNotFound.value) { return "Page Not Found" }
+    if (isChunkError.value) { return "App Update Required" }
+    return "Something Went Wrong"
+})
+
+const subtitle = computed(() => {
+    if (isNotFound.value) {
+        return "The page you requested does not exist."
+    }
+    if (isChunkError.value) {
+        return "The app was updated and needs to reload. Please use the recovery option below."
+    }
+    return "An unexpected error occurred. Please tap the button below to return to the start screen."
+})
 
 function handleError () {
+    // For chunk errors, go to recovery page instead of just router.replace
+    if (isChunkError.value) {
+        window.location.href = "/recovery?type=chunk-load&source=error-boundary"
+        return
+    }
     router.replace("/")
 }
+
+function goToRecovery () {
+    window.location.href = "/recovery?type=error&source=error-page"
+}
+
+onMounted(() => {
+    logger.error("[ErrorPage] Error boundary caught:", props.error)
+})
 </script>
 
 <template>
@@ -69,11 +102,28 @@ function handleError () {
         </p>
 
         <!-- CTA -->
-        <button
-            class="min-h-[52px] px-10 rounded-xl bg-primary text-secondary font-bold text-base tracking-wide active:scale-95 transition-transform"
-            @click="handleError"
-        >
-            Return to Start
-        </button>
+        <div class="space-y-3">
+            <button
+                class="min-h-[52px] px-10 rounded-xl bg-primary text-secondary font-bold text-base tracking-wide active:scale-95 transition-transform w-full"
+                @click="handleError"
+            >
+                {{ isChunkError ? "Reload App" : "Return to Start" }}
+            </button>
+
+            <button
+                v-if="!isNotFound"
+                class="min-h-[48px] px-6 rounded-xl border border-white/20 text-white/80 font-medium text-sm active:scale-95 transition-transform w-full"
+                @click="goToRecovery"
+            >
+                Recovery Options
+            </button>
+        </div>
+
+        <!-- Debug info -->
+        <div class="mt-8 text-center">
+            <p class="text-white/20 text-xs font-mono">
+                {{ isChunkError ? "Chunk load error detected" : `Error ${props.error?.statusCode || ""}` }}
+            </p>
+        </div>
     </div>
 </template>

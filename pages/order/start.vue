@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from "vue"
 import { ArrowLeft } from "lucide-vue-next"
 import { useOrderStore } from "~/stores/Order"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "~/composables/useActiveOrderRecovery"
 import { logger } from "~/utils/logger"
 
 definePageMeta({
@@ -11,15 +9,6 @@ definePageMeta({
 
 const router = useRouter()
 const orderStore = useOrderStore()
-
-onMounted(async () => {
-    if (!shouldAttemptActiveOrderRecovery()) { return }
-
-    const recovery = await recoverActiveOrderState("order-start")
-    if (recovery.hasActiveOrder) {
-        await router.replace("/order/in-session")
-    }
-})
 
 const handleGuestConfirmation = () => {
     const timestamp = new Date().toISOString()

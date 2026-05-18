@@ -20,7 +20,7 @@ if (typeof globalThis.localStorage === "undefined") {
 
 /**
  * Composite mock that works for BOTH usage patterns found in this codebase:
- *   - api.get(url)      → used by Order polling
+ *   - api.get(url)      → used by Order store
  *   - api.post(url, b)  → used by Order submit / refill
  *   - api(url, config)  → used by Session.fetchLatestSession (axios callable form)
  */
@@ -67,7 +67,24 @@ function seedDevice () {
 function seedOrderState (order: ReturnType<typeof useOrderStore>) {
     order.setPackage({ ...PACKAGE } as Package)
     order.setGuestCount(2)
-    order.setCartItems([{ ...MEAT_ITEM }, { ...SIDE_ITEM }] as CartItem[])
+    ;(order as any).draft = [{ ...MEAT_ITEM }, { ...SIDE_ITEM }] as CartItem[]
+}
+
+function seedSubmittedOrderState () {
+    const session = useSessionStore()
+    const order = useOrderStore()
+
+    session.setOrderId(19561)
+    ;(order as any).rounds = [{
+        kind: "initial",
+        number: 1,
+        submittedAt: new Date().toISOString(),
+        items: [{ id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }],
+        serverOrderId: 19561,
+        serverTotal: 0,
+    }]
+    ;(order as any).serverOrderId = 19561
+    ;(order as any).serverStatus = "confirmed"
 }
 
 // ---------------------------------------------------------------------------
@@ -83,16 +100,6 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
         mockApiInvoke.mockReset()
         ;(mockApiInvoke as any).get = mockGet
         ;(mockApiInvoke as any).post = mockPost
-
-        // Ensure navigator.onLine = true so polling can start
-        if (typeof global.navigator === "undefined") {
-            // @ts-ignore
-            global.navigator = { onLine: true }
-        } else {
-            try {
-                Object.defineProperty(global.navigator, "onLine", { value: true, configurable: true })
-            } catch (_) { /* ignore if non-configurable */ }
-        }
     })
 
     afterEach(() => {
@@ -124,7 +131,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             const order = useOrderStore()
             order.setPackage({ ...PACKAGE } as Package)
             order.setGuestCount(2)
-            order.clearCart()
+            ;(order as any).draft = []
             expect(() => order.buildPayload()).toThrow("Invalid items")
         })
 
@@ -132,7 +139,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             const order = useOrderStore()
             order.setPackage({ ...PACKAGE } as Package)
             order.setGuestCount(0)
-            order.setCartItems([{ ...MEAT_ITEM }] as CartItem[])
+            ;(order as any).draft = [{ ...MEAT_ITEM }] as CartItem[]
             const payload = order.buildPayload()
             expect(payload.guest_count).toBe(2)
         })
@@ -141,7 +148,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             const order = useOrderStore()
             order.setPackage({ ...PACKAGE } as Package)
             order.setGuestCount(2)
-            order.setCartItems([{ ...SIDE_ITEM }] as CartItem[])
+            ;(order as any).draft = [{ ...SIDE_ITEM }] as CartItem[]
             const payload = order.buildPayload()
             expect(payload.items).toEqual([{ menu_id: 20, quantity: 2 }])
         })
@@ -151,14 +158,12 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
     // 2. submitOrder — happy path
     // =========================================================================
     describe("submitOrder — happy path", () => {
-        it("calls POST /api/devices/create-order with idempotency key, sets state, starts polling", async () => {
+        it("calls POST /api/devices/create-order with idempotency key, sets state", async () => {
             const order = useOrderStore()
             const session = useSessionStore()
             seedDevice()
             seedOrderState(order)
 
-            // Polling tick (immediate) returns preparing so isPolling stays true
-            mockGet.mockResolvedValue({ data: { order: { id: 1, order_id: 19561, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: API_ORDER_RESP })
 
             const result = await order.submitOrder()
@@ -176,26 +181,23 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
                 expect.objectContaining({ headers: expect.objectContaining({ "X-Idempotency-Key": expect.any(String) }) })
             )
 
-            // Store state — polling tick runs before this line and normalises currentOrder to { order: {...} }
+            // Store state
             expect(order.hasPlacedOrder).toBe(true)
-            expect(order.currentOrder).toMatchObject({ order: expect.objectContaining({ order_id: 19561 }) })
-            expect(order.cartItems).toEqual([])
-            expect(order.getHistory().length).toBeGreaterThanOrEqual(1)
+            expect(order.serverOrderId).toBe(19561)
+            expect((order as any).draft).toEqual([])
+            expect((order as any).rounds).toHaveLength(1)
 
             // Session order id set to business order_id from response
             expect(session.orderId).toBe(19561)
 
             // Return value matches API response
             expect(result).toEqual(API_ORDER_RESP)
-
-            order.stopOrderPolling()
         })
 
         it("blocks a second order submission when initial order is server-confirmed", async () => {
             const order = useOrderStore()
             seedDevice()
-            order.setHasPlacedOrder(true)
-            order.setCurrentOrder(API_ORDER_RESP as any)
+            ;(order as any).serverOrderId = 19561
 
             await expect(order.submitOrder()).rejects.toThrow("initial order has already been placed")
         })
@@ -210,10 +212,11 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             seedDevice()
 
             // Post-order state
-            order.setHasPlacedOrder(true)
-            order.setCurrentOrder(API_ORDER_RESP as any)
-            order.setIsRefillMode(true)
-            order.setRefillItems([{ ...REFILL_ITEM_1 }, { ...REFILL_ITEM_2 }] as CartItem[])
+            ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+            ;(order as any).serverOrderId = 19561
+            ;(order as any).serverStatus = "preparing"
+            ;(order as any).mode = "refill"
+            ;(order as any).draft = [{ ...REFILL_ITEM_1 }, { ...REFILL_ITEM_2 }] as CartItem[]
 
             mockGet.mockResolvedValueOnce({ data: { order: { ...API_ORDER_RESP.order, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: { success: true } })
@@ -234,21 +237,23 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             )
 
             // Refill state cleared
-            expect(order.refillItems).toEqual([])
-            expect(order.isRefillMode).toBe(false)
-            expect(order.getHistory().length).toBeGreaterThan(0)
+            expect((order as any).draft).toEqual([])
+            // mode stays "refill" — ready for next refill
+            expect(order.isRefillMode).toBe(true)
+            expect((order as any).rounds.length).toBeGreaterThan(0)
         })
 
         it("normalizes duplicate refill rows by menu_id", async () => {
             const order = useOrderStore()
             seedDevice()
-            order.setHasPlacedOrder(true)
-            order.setCurrentOrder(API_ORDER_RESP as any)
-            order.setIsRefillMode(true)
-            order.setRefillItems([
+            ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+            ;(order as any).serverOrderId = 19561
+            ;(order as any).serverStatus = "preparing"
+            ;(order as any).mode = "refill"
+            ;(order as any).draft = [
                 { id: 30, name: "Sliced Beef", price: 0, quantity: 1, category: "meats", note: "No sauce" },
                 { id: 30, name: "Sliced Beef", price: 0, quantity: 2, category: "meats", note: "No sauce" },
-            ] as CartItem[])
+            ] as CartItem[]
 
             mockGet.mockResolvedValueOnce({ data: { order: { ...API_ORDER_RESP.order, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: { success: true } })
@@ -261,8 +266,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
         it("throws if no existing order (guard against stale state)", async () => {
             const order = useOrderStore()
-            order.setHasPlacedOrder(false)
-            order.clearCurrentOrder()
+            ;(order as any).serverOrderId = null
 
             await expect(order.submitRefill()).rejects.toThrow("No existing order found")
         })
@@ -274,10 +278,11 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
             session.setIsActive(true)
             session.setOrderId(19561)
-            order.setHasPlacedOrder(true)
-            order.setCurrentOrder({ order: { ...API_ORDER_RESP.order, status: "completed" } } as any)
-            order.setIsRefillMode(true)
-            order.setRefillItems([{ ...REFILL_ITEM_1 }] as CartItem[])
+            ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+            ;(order as any).serverOrderId = 19561
+            ;(order as any).serverStatus = "completed"
+            ;(order as any).mode = "refill"
+            ;(order as any).draft = [{ ...REFILL_ITEM_1 }] as CartItem[]
 
             await expect(order.submitRefill()).rejects.toThrow("already completed/cancelled")
 
@@ -294,10 +299,11 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
             session.setIsActive(true)
             session.setOrderId(19561)
-            order.setHasPlacedOrder(true)
-            order.setCurrentOrder({ order: { ...API_ORDER_RESP.order, status: "preparing" } } as any)
-            order.setIsRefillMode(true)
-            order.setRefillItems([{ ...REFILL_ITEM_1 }] as CartItem[])
+            ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+            ;(order as any).serverOrderId = 19561
+            ;(order as any).serverStatus = "preparing"
+            ;(order as any).mode = "refill"
+            ;(order as any).draft = [{ ...REFILL_ITEM_1 }] as CartItem[]
 
             mockGet.mockResolvedValueOnce({
                 data: { order: { ...API_ORDER_RESP.order, status: "completed" } },
@@ -331,17 +337,13 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
                 },
             }
             mockPost.mockRejectedValueOnce(conflictErr)
-            // polling tick after recovery
-            mockGet.mockResolvedValue({ data: { order: { id: 1, order_id: 19561, status: "preparing" } } })
 
             const result = await order.submitOrder()
 
             expect(result.resumed).toBe(true)
             expect(result.success).toBe(true)
             expect(order.hasPlacedOrder).toBe(true)
-            expect(order.currentOrder).toBeTruthy()
-
-            order.stopOrderPolling()
+            expect(order.serverOrderId).toBe(19561)
         })
     })
 
@@ -424,7 +426,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             seedDevice()
             order.setPackage({} as Package)
             order.setGuestCount(2)
-            order.setCartItems([{ ...MEAT_ITEM }] as CartItem[])
+            ;(order as any).draft = [{ ...MEAT_ITEM }] as CartItem[]
 
             await expect(order.submitOrder()).rejects.toThrow("No package selected")
         })
@@ -440,9 +442,16 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             seedDevice()
 
             // Simulate a fully placed order
-            order.setHasPlacedOrder(true)
-            order.setCurrentOrder(API_ORDER_RESP as any)
-            order.setSubmittedItems([{ id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, isUnlimited: false }])
+            ;(order as any).rounds = [{
+                kind: "initial",
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: [{ id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }],
+                serverOrderId: 19561,
+                serverTotal: 0,
+            }]
+            ;(order as any).serverOrderId = 19561
+            ;(order as any).serverStatus = "confirmed"
             session.setIsActive(true)
             session.setOrderId(19561)
             try { localStorage.setItem("session_active", "1") } catch (_) {}
@@ -452,8 +461,8 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             expect(session.isActive).toBe(false)
             expect(session.orderId).toBeNull()
             expect(order.hasPlacedOrder).toBe(false)
-            expect(order.currentOrder).toBeNull()
-            expect(order.cartItems).toEqual([])
+            expect(order.serverOrderId).toBeNull()
+            expect((order as any).draft).toEqual([])
             expect(localStorage.getItem("session_active")).toBeNull()
         })
     })
@@ -469,27 +478,26 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             seedOrderState(order)
 
             // Step 1: submit initial order
-            mockGet.mockResolvedValue({ data: { order: { id: 1, order_id: 19561, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: API_ORDER_RESP })
 
             await order.submitOrder()
 
             expect(order.hasPlacedOrder).toBe(true)
             expect(session.orderId).toBe(19561)
-            expect(order.cartItems).toEqual([])
+            expect((order as any).draft).toEqual([])
 
-            order.stopOrderPolling()
+            // Step 2: set up refill items and submit refill
+            // After appendRound, mode is already "refill"
+            ;(order as any).draft = [{ ...REFILL_ITEM_1 }] as CartItem[]
+            ;(order as any).serverStatus = "preparing"
 
-            // Step 2: enter refill mode and submit refill
-            order.setIsRefillMode(true)
-            order.setRefillItems([{ ...REFILL_ITEM_1 }] as CartItem[])
-
+            mockGet.mockResolvedValueOnce({ data: { order: { ...API_ORDER_RESP.order, status: "preparing" } } })
             mockPost.mockResolvedValueOnce({ data: { success: true } })
 
             await order.submitRefill()
 
-            expect(order.refillItems).toEqual([])
-            expect(order.isRefillMode).toBe(false)
+            expect((order as any).draft).toEqual([])
+            expect(order.isRefillMode).toBe(true)
 
             // Verify refill called correct URL with name field present
             const refillCall = mockPost.mock.calls[1]
@@ -505,7 +513,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
             expect(session.isActive).toBe(false)
             expect(order.hasPlacedOrder).toBe(false)
-            expect(order.currentOrder).toBeNull()
+            expect(order.serverOrderId).toBeNull()
             expect(localStorage.getItem("session_active")).toBeNull()
         })
     })

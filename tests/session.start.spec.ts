@@ -64,6 +64,7 @@ describe("session start flow", () => {
         const started = await session.start({ preserveSelection: true })
 
         expect(started).toBe(true)
+        expect(mockLoadAllMenus).toHaveBeenCalledWith(true)
         expect(order.guestCount).toBe(6)
         expect(unref(order.package)?.id).toBe(101)
     })
@@ -102,7 +103,7 @@ describe("session start flow", () => {
         ;(device as any).expiration = Date.now() + 60 * 60 * 1000
 
         // Seed transactional cart state that must be cleared on session start
-        order.setCartItems([{ id: 1, name: "Pre-existing Item", quantity: 2 } as any])
+        ;(order as any).draft = [{ id: 1, name: "Pre-existing Item", quantity: 2 }]
         order.setGuestCount(4)
 
         const started = await session.start({ preserveSelection: true })
@@ -111,7 +112,7 @@ describe("session start flow", () => {
         // Guest count is preserved by preserveSelection
         expect(order.guestCount).toBe(4)
         // Cart items are transactional state and must be cleared regardless of preserveSelection
-        expect(order.getCartItems()).toHaveLength(0)
+        expect((order as any).draft).toHaveLength(0)
     })
 
     it("preserves submitted order state during post-submit handoff", async () => {
@@ -123,26 +124,87 @@ describe("session start flow", () => {
         ;(device as any).expiration = Date.now() + 60 * 60 * 1000
 
         session.setOrderId(19561)
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({
-            success: true,
-            order: {
-                id: 1,
-                order_id: 19561,
-                order_number: "ORD-19561",
-                status: "confirmed",
-            },
-        } as any)
-        order.setSubmittedItems([
-            { id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, category: "meats" } as any,
-        ])
+        ;(order as any).rounds = [{
+            kind: "initial",
+            number: 1,
+            submittedAt: new Date().toISOString(),
+            items: [{ id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, isUnlimited: false, img_url: null, category: "meats" }],
+            serverOrderId: 19561,
+            serverTotal: 0,
+        }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "confirmed"
 
         const started = await session.start({ preserveSubmittedOrder: true })
 
         expect(started).toBe(true)
         expect(order.hasPlacedOrder).toBe(true)
-        expect(order.getCurrentOrder()?.order?.order_id).toBe(19561)
-        expect(order.submittedItems).toHaveLength(1)
+        expect(order.serverOrderId).toBe(19561)
+        expect((order as any).rounds[0].items).toHaveLength(1)
         expect(session.orderId).toBe(19561)
+    })
+
+    it("returns false when device authentication fails", async () => {
+        const session = useSessionStore()
+
+        // Device has no token, and authentication will fail
+        // Mock the authenticate call to return false
+        mockGet.mockRejectedValue(new Error("Authentication failed"))
+
+        const started = await session.start()
+
+        expect(started).toBe(false)
+        expect(session.isActive).toBe(false)
+    })
+
+    it("returns false when token refresh fails", async () => {
+        const session = useSessionStore()
+        const device = useDeviceStore()
+
+        // Set an expired token
+        device.setToken("expired-token")
+        ;(device as any).expiration = Date.now() - 1000 // Expired 1 second ago
+
+        // Mock refresh to fail
+        mockPost.mockRejectedValue(new Error("Token refresh failed"))
+
+        const started = await session.start()
+
+        expect(started).toBe(false)
+        expect(session.isActive).toBe(false)
+    })
+
+    it("handles menu preload failure gracefully and still starts session", async () => {
+        const session = useSessionStore()
+        const device = useDeviceStore()
+
+        device.setToken("test-device-token")
+        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+
+        // Mock menu loading to fail
+        mockLoadAllMenus.mockRejectedValue(new Error("Menu load failed"))
+
+        // Session should still start even if menu preload fails
+        const started = await session.start()
+
+        expect(started).toBe(true)
+        expect(session.isActive).toBe(true)
+    })
+
+    it("handles fetchLatestSession failure gracefully and still starts session", async () => {
+        const session = useSessionStore()
+        const device = useDeviceStore()
+
+        device.setToken("test-device-token")
+        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+
+        // Mock the /api/session/latest call to fail
+        mockGet.mockRejectedValue(new Error("Session fetch failed"))
+
+        // Session should still start even if latest session fetch fails
+        const started = await session.start()
+
+        expect(started).toBe(true)
+        expect(session.isActive).toBe(true)
     })
 })

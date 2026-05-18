@@ -3,7 +3,6 @@ import { computed, onMounted, ref, toRef, unref, watch } from "vue"
 import { Beef, UtensilsCrossed, CakeSlice, Wine } from "lucide-vue-next"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../composables/useActiveOrderRecovery"
 import { useSessionStore } from "../stores/Session"
 import { useSessionEndFlow } from "../composables/useSessionEndFlow"
 import { logger } from "../utils/logger"
@@ -23,127 +22,42 @@ const route = useRoute()
 const router = useRouter()
 
 const hasLiveOrderReference = (): boolean => {
-    const currentOrder = (unref(orderStore.currentOrder) as any)?.order ?? unref(orderStore.currentOrder)
-    return Boolean(unref(sessionStore.orderId) || currentOrder?.order_id || currentOrder?.id)
+    return Boolean(unref(sessionStore.orderId) || orderStore.serverOrderId)
 }
 
-const hasConfirmedInitialOrder = computed(() => {
-    if (typeof orderStore.hasConfirmedInitialOrder === "function") {
-        return orderStore.hasConfirmedInitialOrder()
-    }
-    return Boolean(unref(orderStore.hasPlacedOrder) && hasLiveOrderReference())
-})
+const hasConfirmedInitialOrder = computed(() =>
+    orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
+)
 
 onMounted(async () => {
-    if (menuStore.packages.length === 0 || menuStore.isCacheStale) {
-        try {
-            await menuStore.loadAllMenus()
-        } catch (error) {
-            logger.warn("[Menu] Initial loadAllMenus failed:", error)
-        }
-    }
-
-    const recovery = shouldAttemptActiveOrderRecovery()
-        ? await recoverActiveOrderState("menu")
-        : {
-            hasActiveOrder: false,
-            isTerminal: false,
-            orderId: null,
-            packageId: null,
-            status: "",
-        }
-
-    if (recovery.packageId && !route.query.packageId) {
-        selectedPackageId.value = String(recovery.packageId)
-    }
-
-    const hasPackageSelection = !!selectedPackageId.value
-    const explicitMenuResume = route.query.resumeMenu === "1"
-    const allowMenuAccess = hasPackageSelection || orderStore.isRefillMode || explicitMenuResume
-
-    // If an active order is recovered and not already in refill mode, enable refill mode.
-    // This must happen regardless of whether a package is known — the order is already
-    // placed, so the user should be building a refill, not a new initial order.
-    // Guard with !orderStore.isRefillMode to avoid clearing in-progress refill items.
-    if (recovery.hasActiveOrder && hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
-        orderStore.toggleRefillMode(true)
-        if (!allowMenuAccess) {
-            notifyInfo("Active order recovered. Refill mode enabled.")
-        }
-    }
-
-    // Log package details if an existing order is detected by middleware
-    if (recovery.hasActiveOrder && selectedPackageId.value) {
-    // package details pre-loaded for recovered order
-    }
-
-    // If we recovered an active order but no packageId in route, attempt to infer package from the recovered order
-    if (recovery.hasActiveOrder && !selectedPackageId.value) {
-        try {
-            const currentOrder = orderStore.getCurrentOrder()
-            const orderObj = ((currentOrder?.order || currentOrder) as any) || null
-            let inferredPackageId = null
-
-            // Check common fields first
-            if (orderObj?.package_id) { inferredPackageId = Number(orderObj.package_id) }
-            if (!inferredPackageId && orderObj?.menu_id) { inferredPackageId = Number(orderObj.menu_id) }
-
-            // Fallback: inspect order items for an item marked as package/is_package
-            if (!inferredPackageId && Array.isArray(orderObj?.items)) {
-                const pkgItem = orderObj.items.find((it: any) => it.is_package || it.isPackage || it.is_package === true)
-                if (pkgItem) { inferredPackageId = Number(pkgItem.menu_id || pkgItem.menuId || pkgItem.id) }
-            }
-
-            // If we found a package id, set it and fetch package details
-            if (inferredPackageId) {
-                selectedPackageId.value = String(inferredPackageId)
-                try {
-                    await menuStore.fetchPackageDetails(inferredPackageId as number)
-                } catch (err) {
-                    logger.warn("[Menu] fetchPackageDetails failed for inferred package:", inferredPackageId, err)
-                }
-            } else {
-                logger.warn("[Menu] Could not infer packageId from recovered order")
-            }
-        } catch (err) {
-            logger.warn("[Menu] Error while inferring package from recovered order:", err)
-        }
-    }
-
-    // Cart recovery notification: if session is active with a placed order but cart is empty
-    // AND nothing has been submitted yet — the in-progress cart was likely lost.
-    // Do NOT fire if:
-    //   a) we just recovered an active order from the server (submittedItems will naturally
-    //      be empty because the server response does not carry display-friendly items), OR
-    //   b) the user navigated back after a successful submission (submittedItems non-empty).
-    if (
-        !recovery.hasActiveOrder &&
-        sessionStore.isActive &&
-        hasConfirmedInitialOrder.value &&
-        !orderStore.isRefillMode &&
-        orderStore.getCartItems().length === 0 &&
-        orderStore.getSubmittedItems().length === 0
-    ) {
-        notifyWarning("Your cart was cleared. Please re-add your items.")
-        logger.warn("[Menu] Cart items missing for active session — notified user of cart loss")
-    }
-
-    // Load package details with allowed menus
-    if (selectedPackageId.value) {
-        meatError.value = null
-        try {
-            logger.info("[Menu] Loading package details for package:", selectedPackageId.value)
-            await menuStore.fetchPackageDetails(Number(selectedPackageId.value))
-            logger.info("[Menu] Package details loaded")
-        } catch (error) {
-            meatError.value = (error as Error).message || "Failed to load meats — tap to retry"
-            logger.error("[Menu] Failed to load package details:", error)
-        }
-    }
+    // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
+    // No need to call loadAllMenus() here - data is already in Pinia state
 })
 
+const resolveStoredPackageId = (): string | number | null => {
+    const orderStoreWithPackage = orderStore as unknown as { getPackage?: unknown; package?: unknown }
+    const packageFromGetter = orderStoreWithPackage.getPackage
+    let normalizedPackage: unknown = null
+
+    if (typeof packageFromGetter === "function") {
+        normalizedPackage = packageFromGetter()
+    } else if (packageFromGetter && typeof packageFromGetter === "object" && "value" in packageFromGetter) {
+        normalizedPackage = (packageFromGetter as { value?: unknown }).value
+    } else if (packageFromGetter !== undefined) {
+        normalizedPackage = packageFromGetter
+    } else {
+        normalizedPackage = orderStoreWithPackage.package
+    }
+
+    const packageIdRaw = normalizedPackage && typeof normalizedPackage === "object" && "id" in normalizedPackage
+        ? (normalizedPackage as { id?: unknown }).id
+        : null
+    const packageId = Number(packageIdRaw ?? 0)
+    return Number.isFinite(packageId) && packageId > 0 ? packageId : null
+}
+
 // Get selected package from route or store
-const selectedPackageId = ref(route.query.packageId || orderStore.getPackage?.value?.id || null)
+const selectedPackageId = ref(route.query.packageId || resolveStoredPackageId())
 const selectedPackage = computed(() => {
     if (!selectedPackageId.value) { return null }
     return menuStore.packages.find(pkg => pkg.id === Number(selectedPackageId.value))
@@ -176,7 +90,7 @@ watch(() => orderStore.package, (storePackage) => {
 // Watch for order completion status changes and redirect when completed
 const { triggerSessionEnd } = useSessionEndFlow()
 watch(
-    () => orderStore.getCurrentOrderStatus(),
+    () => unref(orderStore.serverStatus),
     (newStatus) => {
         if (newStatus === "completed" || newStatus === "cancelled" || newStatus === "voided") {
             logger.info("📢 Order status changed to:", newStatus, "- ending session")
@@ -188,7 +102,7 @@ watch(
 )
 
 // Menu categories
-type MenuCategory = "meats" | "sides" | "desserts" | "beverages";
+type MenuCategory = "meats" | "sides" | "desserts" | "drinks";
 
 const activeCategory = ref<MenuCategory>("meats")
 
@@ -196,7 +110,7 @@ const categories = [
     { id: "meats", label: "Meats", icon: Beef },
     { id: "sides", label: "Sides", icon: UtensilsCrossed },
     { id: "desserts", label: "Desserts", icon: CakeSlice },
-    { id: "beverages", label: "Beverages", icon: Wine }
+    { id: "drinks", label: "Drinks", icon: Wine }
 ] as const
 
 // Check if refills are available (order placed AND we have a valid order ID)
@@ -224,36 +138,32 @@ const getItemQuantity = (itemId: number) => {
     return orderStore.getCartItemQuantity(Number(itemId))
 }
 
-// Get meats from selected package allowed menus (from API)
-const meats = computed(() => {
-    if (!selectedPackageId.value) { return [] }
-    const packageId = Number(selectedPackageId.value)
-    const packageDetails = menuStore.packageDetails[packageId]
-    // Primary: API-driven meats for this package
-    if (packageDetails && Array.isArray(packageDetails.allowed_menus?.meat) && packageDetails.allowed_menus.meat.length > 0) {
-        return packageDetails.allowed_menus.meat
-    }
-    // Fallback: legacy modifiers for this package
-    const pkg = menuStore.packages.find(pkg => pkg.id === packageId)
-    if (pkg?.modifiers && pkg.modifiers.length > 0) {
-        return pkg.modifiers.flat()
-    }
-    // If both missing, return empty array (UI will show 'No meats available')
-    return []
+// Get all available meats independent of package selection
+const meats = computed(() => menuStore.meats)
+
+// Compute which meats are allowed based on selected package
+const allowedMeatIds = computed(() => {
+    const pkg = menuStore.packages.find(p => p.id === Number(selectedPackageId.value))
+    return new Set((pkg?.modifiers ?? []).map(m => m.id))
 })
+
+// Decorate meats with disabled state
+const decorateMeats = computed(() =>
+    meats.value.map(item => ({ ...item, disabled: !allowedMeatIds.value.has(item.id) }))
+)
 
 // Get items based on active category for MenuItemGrid
 const displayItems = computed(() => {
     const baseItems = (() => {
         switch (activeCategory.value) {
         case "meats":
-            return meats.value
+            return decorateMeats.value
         case "sides":
             return menuStore.sides
         case "desserts":
             return menuStore.desserts
-        case "beverages":
-            return menuStore.beverages
+        case "drinks":
+            return menuStore.drinks
         default:
             return []
         }
@@ -280,25 +190,9 @@ const taxAmount = computed(() => orderStore.taxAmount)
 const grandTotal = computed(() => orderStore.grandTotal)
 
 const setCategory = (category: MenuCategory) => {
-    activeCategory.value = category;
-    // If user navigates to a category and data is empty, attempt to fetch it on-demand
-    (async () => {
-        try {
-            switch (category) {
-            case "desserts":
-                if ((!menuStore.desserts || menuStore.desserts.length === 0) && !menuStore.loading.desserts) { await menuStore.fetchDesserts() }
-                break
-            case "sides":
-                if ((!menuStore.sides || menuStore.sides.length === 0) && !menuStore.loading.sides) { await menuStore.fetchSides() }
-                break
-            case "beverages":
-                if ((!menuStore.beverages || menuStore.beverages.length === 0) && !menuStore.loading.beverages) { await menuStore.fetchBeverages() }
-                break
-            }
-        } catch (e) {
-            logger.warn("[Menu] on-demand fetch failed for category", category, e)
-        }
-    })()
+    activeCategory.value = category
+    // All menu data is preloaded at welcome screen via AppBootstrap.preloadForOrdering()
+    // No on-demand fetching needed - category data is already in Pinia state
 }
 
 // Retry loading the current category (used by the error state UI)
@@ -307,10 +201,7 @@ const reloadCategory = async () => {
     try {
         switch (category) {
         case "meats":
-            if (selectedPackageId.value) {
-                meatError.value = null
-                await menuStore.fetchPackageDetails(Number(selectedPackageId.value))
-            }
+            meatError.value = null
             break
         case "desserts":
             await menuStore.fetchDesserts()
@@ -318,8 +209,8 @@ const reloadCategory = async () => {
         case "sides":
             await menuStore.fetchSides()
             break
-        case "beverages":
-            await menuStore.fetchBeverages()
+        case "drinks":
+            await menuStore.fetchDrinks()
             break
         }
     } catch (e) {
@@ -346,6 +237,21 @@ const updateQuantity = (itemId: number, quantity: number) => {
 }
 
 const cartDrawerOpen = ref(false)
+// Resolver fired by el-drawer's @closed event so callers can await full close
+// animation before navigating. Without this, Element Plus's teleported overlay
+// (.el-overlay) is orphaned in <body> when the owning page unmounts mid-animation,
+// producing a black mask on the destination route until a hard refresh.
+let drawerClosedResolver: (() => void) | null = null
+const waitForDrawerClosed = (): Promise<void> => {
+    if (!cartDrawerOpen.value) { return Promise.resolve() }
+    return new Promise<void>((resolve) => {
+        drawerClosedResolver = resolve
+    })
+}
+const handleDrawerClosed = () => {
+    drawerClosedResolver?.()
+    drawerClosedResolver = null
+}
 const isSendingSupport = ref(false)
 const api = useApi()
 const deviceStore = useDeviceStore()
@@ -397,6 +303,31 @@ const getServiceTypeId = (type: string): number => {
     return serviceMap[type] || 4
 }
 
+// Navigate to order review page with package context
+const handleProceedToReview = async () => {
+    if (!selectedPackageId.value) {
+        notifyWarning("Package selection was lost. Please select a package again.")
+        cartDrawerOpen.value = false
+        return
+    }
+
+    // Close drawer and WAIT for the close animation to finish before navigating.
+    // Otherwise el-drawer's teleported .el-overlay is orphaned in <body> when the
+    // page unmounts mid-animation, leaving a black mask over the next route.
+    if (cartDrawerOpen.value) {
+        const closed = waitForDrawerClosed()
+        cartDrawerOpen.value = false
+        await closed
+    }
+
+    try {
+        await router.push("/order/review")
+    } catch (err) {
+        logger.error("[Menu] Failed to navigate to review:", err)
+        notifyWarning("Unable to proceed to order review. Please try again.")
+    }
+}
+
 // Refill mode toggle
 const toggleRefillMode = () => {
     // Check if order has been placed AND confirmed by server
@@ -411,7 +342,7 @@ const toggleRefillMode = () => {
         return
     }
 
-    const newMode = !orderStore.isRefillMode
+    const newMode = !(orderStore.isRefillMode)
     orderStore.toggleRefillMode(newMode)
 
     if (newMode) {
@@ -425,14 +356,16 @@ const toggleRefillMode = () => {
 // Check if category is loading
 const isLoading = computed((): boolean => {
     switch (activeCategory.value) {
+    case "meats":
+        return Boolean(menuStore.isLoadingMeats)
     case "sides":
         return Boolean(menuStore.isLoadingSides)
     case "desserts":
         return Boolean(menuStore.isLoadingDesserts)
-    case "beverages":
-        return Boolean(menuStore.isLoadingBeverages)
+    case "drinks":
+        return Boolean(menuStore.isLoadingDrinks)
     default:
-        return Boolean(menuStore.isLoadingPackageDetails)
+        return Boolean(menuStore.isLoadingPackages)
     }
 })
 
@@ -442,14 +375,16 @@ const meatError = ref<string | null>(null)
 // Check for errors
 const categoryError = computed(() => {
     switch (activeCategory.value) {
+    case "meats":
+        return meatError.value
     case "sides":
         return menuStore.errors.sides
     case "desserts":
         return menuStore.errors.desserts
-    case "beverages":
-        return menuStore.errors.beverages
+    case "drinks":
+        return menuStore.errors.drinks
     default:
-        return meatError.value
+        return null
     }
 })
 
@@ -555,6 +490,7 @@ const categoryError = computed(() => {
             :modal="true"
             :lock-scroll="false"
             class="cart-drawer"
+            @closed="handleDrawerClosed"
         >
             <cart-sidebar
                 :selected-package="selectedPackage"
@@ -570,7 +506,7 @@ const categoryError = computed(() => {
                 @update-quantity="updateQuantity"
                 @remove-item="removeFromOrder"
                 @set-guest-count="(count) => orderStore.setGuestCount(count)"
-                @submit-order="() => { cartDrawerOpen = false; router.push('/order/review') }"
+                @submit-order="handleProceedToReview"
                 @toggle-refill-mode="toggleRefillMode"
             />
         </el-drawer>

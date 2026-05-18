@@ -15,7 +15,7 @@ const dots = [0, 1, 2]
             class="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-[#0F0F0F]"
             role="status"
             aria-live="polite"
-            aria-label="Loading Wooserve"
+            aria-label="Loading Grillpad"
         >
             <div class="absolute inset-0 splash-grid" />
             <div class="absolute inset-0 splash-noise opacity-30" />
@@ -29,20 +29,20 @@ const dots = [0, 1, 2]
                     <div class="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(246,181,109,0.22)_0%,rgba(246,181,109,0)_68%)] splash-pulse" />
                     <img
                         :src="logoSrc"
-                        alt="Wooserve"
+                        alt="Grillpad"
                         class="relative h-24 w-24 object-contain drop-shadow-[0_0_32px_rgba(246,181,109,0.25)]"
                     >
                 </div>
 
                 <div class="space-y-2">
                     <p class="text-xs font-semibold uppercase tracking-[0.45em] text-[#F6B56D]/75">
-                        Wooserve
+                        Woosoo Grillpad
                     </p>
                     <h1 class="font-raleway text-4xl font-extrabold tracking-[0.08em] text-white">
                         Welcome to the Grill
                     </h1>
                     <p class="font-kanit text-base tracking-[0.2em] text-white/55 uppercase">
-                        Korean BBQ Ordering
+                        Woosoo Korean BBQ
                     </p>
                 </div>
 

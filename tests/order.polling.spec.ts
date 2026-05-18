@@ -1,5 +1,5 @@
 // Ensure localStorage shim for Node/jsdom
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest"
+import { vi, describe, it, expect, beforeEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
 
 import { useOrderStore } from "../stores/Order"
@@ -23,72 +23,45 @@ const mockGet = vi.fn()
 const mockPost = vi.fn()
 vi.mock("../composables/useApi", () => ({ useApi: () => ({ get: mockGet, post: mockPost }) }))
 
-describe("order polling fallback", () => {
+describe("order store — setOrderCreated and round ledger", () => {
     beforeEach(() => {
         const pinia = createPinia()
         setActivePinia(pinia)
-        vi.useFakeTimers()
         mockGet.mockReset()
         mockPost.mockReset()
         // Initialize session store to prevent null ref errors
         const session = useSessionStore()
         session.setIsActive(true)
-        // Ensure test environment reports online so polling starts
-        // Ensure navigator.onLine exists and is writable in test env
-        if (typeof global.navigator === "undefined") {
-            // @ts-ignore
-            global.navigator = { onLine: true } as any
-        } else {
-            try {
-                Object.defineProperty(global.navigator, "onLine", { value: true, configurable: true })
-            } catch (e) {
-                // ignore if cannot redefine
-            }
-        }
     })
 
-    afterEach(() => {
-        vi.useRealTimers()
-    })
-
-    it("starts polling after setOrderCreated and stops when order becomes completed", async () => {
+    it("setOrderCreated appends initial round and marks hasPlacedOrder", async () => {
         const order = useOrderStore()
 
-        // Arrange: first interval tick remains live (confirmed), second tick transitions to terminal.
-        mockGet
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "confirmed" } } })
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "completed" } } })
+        // Seed draft items before submit
+        ;(order as any).draft = [
+            { id: 10, name: "Beef Brisket", quantity: 2, price: 5, category: "meats", isUnlimited: false, img_url: null },
+        ]
 
-        // Act: simulate order creation response
-        await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561" } })
+        await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561", order_id: 19561 } } as any)
 
-        // Polling starts without an immediate tick so review handoff can activate the session first.
-        expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBeUndefined()
+        expect(order.hasPlacedOrder).toBe(true)
+        expect((order as any).rounds).toHaveLength(1)
+        expect((order as any).rounds[0].kind).toBe("initial")
+        expect((order as any).rounds[0].serverOrderId).toBe(19561)
+        // draft is cleared after round appended
+        expect((order as any).draft).toEqual([])
+    })
 
-        // Advance past the 5 s interval to fire the second tick (completed)
-        vi.advanceTimersByTime(6000)
-        // Allow the async tick chain to resolve
-        await Promise.resolve()
-        await Promise.resolve()
-        await Promise.resolve()
-        await Promise.resolve()
+    it("updateOrderStatus updates serverStatus without affecting rounds", async () => {
+        const order = useOrderStore()
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 19561, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 19561
+        ;(order as any).serverStatus = "pending"
 
-        expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
+        order.updateOrderStatus("completed")
 
-        // Advance past the next interval to fire the terminal tick.
-        vi.advanceTimersByTime(6000)
-        await Promise.resolve()
-        await Promise.resolve()
-        await Promise.resolve()
-        await Promise.resolve()
-
-        // Terminal polling now routes through useSessionEndFlow("polling"),
-        // which ends the session and clears transactional order state.
-        expect(order.getCurrentOrder()).toBeNull()
-        expect(order.getIsPolling()).toBe(false)
-        expect(order.getPollTimerId()).toBeNull()
+        expect(order.serverStatus).toBe("completed")
+        expect((order as any).rounds).toHaveLength(1)
     })
 
     it("initializeFromSession fetches canonical order and prevents new order submission", async () => {
@@ -106,12 +79,11 @@ describe("order polling fallback", () => {
         await order.initializeFromSession()
 
         expect(order.hasPlacedOrder).toBe(true)
-        expect(order.getCurrentOrder()).toBeTruthy()
-        expect(order.getCurrentOrder()?.order?.id).toBe(19561)
+        expect(order.serverOrderId).toBe(19561)
 
-        // Attempt to submit a new order should throw due to hasPlacedOrder guard
+        // Attempt to submit a new order should throw due to serverOrderId guard
         order.setPackage({ id: 1, price: 100 } as Package)
-        order.setCartItems([{ id: 10, name: "Extra", price: 5, quantity: 1 } as CartItem])
+        ;(order as any).draft = [{ id: 10, name: "Extra", price: 5, quantity: 1 } as CartItem]
         order.setGuestCount(1)
 
         await expect(order.submitOrder()).rejects.toThrow("An initial order has already been placed")
@@ -125,38 +97,17 @@ describe("order polling fallback", () => {
         session.setOrderId(null)
         order.setGuestCount(6)
         order.setPackage({ id: 99, name: "Stale Package", price: 100 } as Package)
-        order.setCartItems([{ id: 88, name: "Stale Item", price: 12, quantity: 2 } as CartItem])
-        order.setHasPlacedOrder(true)
-        order.setCurrentOrder({ order: { id: 1234, status: "pending" } } as any)
+        ;(order as any).draft = [{ id: 88, name: "Stale Item", price: 12, quantity: 2 } as CartItem]
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 1234, serverTotal: 0 }]
+        ;(order as any).serverOrderId = 1234
 
         await order.initializeFromSession()
 
         expect(mockGet).not.toHaveBeenCalled()
         expect(order.hasPlacedOrder).toBe(false)
-        expect(order.getCurrentOrder()).toBeNull()
-        expect(order.getCartItems()).toEqual([])
+        expect(order.serverOrderId).toBeNull()
+        expect((order as any).draft).toEqual([])
         expect(order.guestCount).toBe(2)
         expect(order.package).toBeNull()
-    })
-
-    it("does not crash when polling receives an empty response body", async () => {
-        const order = useOrderStore()
-
-        // Use "confirmed" (live status) for first tick so polling continues;
-        // "preparing" is now terminal per POS Payment Sync spec.
-        mockGet
-            .mockResolvedValueOnce({ data: { order: { id: 19561, status: "confirmed" } } })
-            .mockResolvedValueOnce(undefined as any)
-
-        await order.setOrderCreated({ order: { id: 19561, order_number: "ORD-19561" } })
-
-        expect(order.getIsPolling()).toBe(true)
-
-        vi.advanceTimersByTime(6000)
-        await Promise.resolve()
-        await Promise.resolve()
-
-        expect(order.getIsPolling()).toBe(true)
-        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
     })
 })

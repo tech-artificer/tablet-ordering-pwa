@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, unref } from "vue"
 import { ElBadge, ElEmpty } from "element-plus"
 import { RefreshCw, Clock, ChefHat, CheckCircle, AlertCircle, Flame, X } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
@@ -40,10 +40,7 @@ const hasPackage = computed(() => Boolean(
     (props.selectedPackage && (props.selectedPackage as any).id) ||
   ((orderStore.package as any)?.id)
 ))
-const hasLiveOrderReference = computed(() => {
-    const currentOrder = (orderStore.getCurrentOrder() as any)?.order || orderStore.getCurrentOrder()
-    return Boolean(sessionStore.orderId || currentOrder?.order_id || currentOrder?.id)
-})
+const hasLiveOrderReference = computed(() => Boolean(sessionStore.orderId || orderStore.serverOrderId))
 const hasSubmittedOrder = computed(() => Boolean(props.hasPlacedOrder && hasLiveOrderReference.value))
 const hasCartItems = computed(() => Array.isArray(props.cartItems) && props.cartItems.length > 0 && props.cartItems.some((i: any) => Number(i.quantity) > 0))
 const hasMeatSelection = computed(() => Array.isArray(props.cartItems) && props.cartItems.some((i: any) => {
@@ -90,10 +87,7 @@ const submitBlockers = computed(() => {
 const canSubmit = computed(() => submitBlockers.value.length === 0)
 
 // Order status helpers
-const orderStatus = computed(() => {
-    const status = orderStore.getCurrentOrderStatus() || (orderStore.getCurrentOrder() as any)?.status
-    return status?.toLowerCase() || "pending"
-})
+const orderStatus = computed(() => String(orderStore.serverStatus || "pending").toLowerCase())
 
 const statusConfig = computed(() => {
     const configs: Record<string, { label: string; color: string; bgColor: string; icon: any }> = {
@@ -109,64 +103,20 @@ const statusConfig = computed(() => {
     return configs[orderStatus.value] || configs.pending
 })
 
-// Get ordered items from server response, fallback to submittedItems (local copy with names)
-const orderedItems = computed(() => {
-    const currentOrder = orderStore.getCurrentOrder() as any
-    const order = currentOrder?.order || currentOrder
-    const serverItems = order?.items || order?.order_items || []
-    const submittedItems = ((orderStore.submittedItems as any)?.value ?? orderStore.submittedItems ?? []) as any[]
+// Get ordered items from rounds ledger (all submitted rounds)
+const orderedItems = computed(() => unref(orderStore.allOrderedItems) as any[])
 
-    // If server items exist and have any displayable name fields, use them
-    if (serverItems.length > 0 && serverItems.some((it: any) => it?.name || it?.menu?.name || it?.menu_item?.name || it?.menu_name)) {
-        logger.debug("[CartSidebar] Using server order_items:", serverItems.length)
-        return serverItems
-    }
-
-    // Otherwise, use our locally stored submittedItems (which have names)
-    if (submittedItems.length > 0) {
-        logger.debug("[CartSidebar] Using submittedItems fallback:", submittedItems.length)
-        return submittedItems
-    }
-
-    // Last resort: try to merge server items with names by mapping menu_id to local menu data
-    logger.debug("[CartSidebar] No named items available, returning server items:", serverItems.length)
-    return serverItems
-})
-
-// Get order totals from server response (used after order is placed)
-const orderSubtotal = computed(() => {
-    const currentOrder = orderStore.getCurrentOrder() as any
-    const order = currentOrder?.order || currentOrder
-    return Number(order?.subtotal || 0)
-})
-
-const orderTax = computed(() => {
-    const currentOrder = orderStore.getCurrentOrder() as any
-    const order = currentOrder?.order || currentOrder
-    return Number(order?.tax || 0)
-})
-
-const orderTotal = computed(() => {
-    const currentOrder = orderStore.getCurrentOrder() as any
-    const order = currentOrder?.order || currentOrder
-    return Number(order?.total || 0)
-})
-
-const orderGuestCount = computed(() => {
-    const currentOrder = orderStore.getCurrentOrder() as any
-    const order = currentOrder?.order || currentOrder
-    return Number(order?.guest_count || props.guestCount)
-})
+// Get order totals from store (used after order is placed)
+const orderSubtotal = computed(() => 0) // not tracked separately in new model
+const orderTax = computed(() => 0) // not tracked separately in new model
+const orderTotal = computed(() => Number(unref(orderStore.serverTotal) || 0))
+const orderGuestCount = computed(() => Number(props.guestCount))
 
 const displayedGuestCount = computed(() => {
     return hasSubmittedOrder.value ? orderGuestCount.value : Number(props.guestCount)
 })
 
-const displayOrderId = computed(() => {
-    const currentOrder = orderStore.getCurrentOrder() as any
-    const order = currentOrder?.order || currentOrder
-    return order?.order_id || order?.id || sessionStore.orderId || "-"
-})
+const displayOrderId = computed(() => unref(orderStore.serverOrderId) || sessionStore.orderId || "-")
 
 const updateQuantity = (itemId: number, quantity: number) => {
     emit("updateQuantity", itemId, quantity)

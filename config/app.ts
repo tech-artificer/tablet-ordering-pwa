@@ -4,9 +4,9 @@
  */
 
 // App metadata
-export const APP_NAME = "Wooserve KBBQ Ordering"
-export const APP_SHORT_NAME = "Wooserve"
-export const APP_VERSION = "1.0.0"
+export const APP_NAME = "Woosoo Grillpad"
+export const APP_SHORT_NAME = "Grillpad"
+export const APP_VERSION = "1.10.5"
 
 // UI configuration
 export const UI_CONFIG = {

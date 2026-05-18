@@ -1,19 +1,20 @@
-import { readFileSync } from "fs"
-import { resolve } from "path"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 function readAppSource (): string {
-    return readFileSync(resolve(__dirname, "../app.vue"), "utf-8")
+    return readFileSync(resolve(PROJECT_ROOT, "app.vue"), "utf-8")
 }
 
 describe("app update wiring", () => {
-    it("mounts the update banner and app update flow methods", () => {
+    it("wires useAppUpdate composable in app.vue", () => {
         const source = readAppSource()
 
-        expect(source).toContain("<UpdateBanner")
         expect(source).toContain("useAppUpdate")
         expect(source).toContain("initializeAppUpdate")
-        expect(source).toContain("applyUpdate")
         expect(source).toContain("disposeAppUpdate")
     })
 })

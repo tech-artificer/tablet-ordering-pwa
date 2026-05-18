@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue"
-import { ArrowLeft, Inbox } from "lucide-vue-next"
-import type { Package } from "../../types"
+import { ArrowLeft, ChevronLeft, ChevronRight, Inbox, UtensilsCrossed, X } from "lucide-vue-next"
+import type { Modifier, Package } from "../../types"
 import { useMenuStore } from "../../stores/Menu"
 import { useOrderStore } from "../../stores/Order"
-import { useSessionStore } from "../../stores/Session"
-import { useDeviceStore } from "../../stores/Device"
-import { logger } from "../../utils/logger"
-import { recoverActiveOrderState, shouldAttemptActiveOrderRecovery } from "../../composables/useActiveOrderRecovery"
 import PackageCard from "../../components/PackageCard.vue"
+import { displayMeatGroupLabel, groupPackageModifiers } from "../../utils/packageModifierGroups"
 
 definePageMeta({
     layout: "kiosk"
@@ -17,45 +14,12 @@ definePageMeta({
 const nuxtApp = useNuxtApp()
 const menuStore = useMenuStore()
 const orderStore = useOrderStore()
-const sessionStore = useSessionStore()
-const deviceStore = useDeviceStore()
 
 // Load packages on mount
-onMounted(async () => {
+onMounted(() => {
     if (typeof window !== "undefined") {
         window.addEventListener("resize", onResize)
         document.addEventListener("keydown", handleKeydown)
-    }
-
-    const timestamp = new Date().toISOString()
-    console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
-
-    if (shouldAttemptActiveOrderRecovery()) {
-        try {
-            const recovery = await recoverActiveOrderState("package-selection")
-            if (recovery.hasActiveOrder) {
-                console.log(`[↩️ Active Order Recovered] order_id=${recovery.orderId} status=${recovery.status || "active"} at ${timestamp}`)
-                await nuxtApp.$router.replace({
-                    path: "/menu",
-                    query: recovery.packageId ? { packageId: String(recovery.packageId), resumeMenu: "1" } : { resumeMenu: "1" }
-                })
-                return
-            }
-        } catch (recoveryError: unknown) {
-            logger.error("[PackageSelection] Active order recovery failed — continuing with normal mount", recoveryError)
-        }
-    }
-
-    logger.info("[PackageSelection] Loading packages from API...")
-    try {
-    // Respect cache — only fetch if stale or empty (welcome screen already preloads).
-    // Pass forceRefresh=false so a warm cache from index.vue is used immediately.
-        await menuStore.loadAllMenus(false)
-        console.log(`[✅ Packages Loaded] ${menuStore.packages.length} packages available at ${timestamp}`)
-        logger.info("[PackageSelection] Packages loaded:", menuStore.packages.length)
-    } catch (error: any) {
-        console.error(`[❌ Package Load Failed] ${error?.message} at ${timestamp}`)
-        logger.error("[PackageSelection] Failed to load packages:", error)
     }
 })
 
@@ -64,10 +28,12 @@ const currentIndex = ref(0)
 const packages = computed(() => menuStore.packages)
 const guestCount = computed(() => Number(orderStore.guestCount))
 
-// Responsive layout
-type PackageRowMode = "three" | "peek" | "portrait"
+// Responsive layout - optimized for 4-column grid on tablet
+type PackageRowMode = "four" | "three" | "peek" | "portrait"
 const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1280)
 const packageRowMode = computed<PackageRowMode>(() => {
+    if (packages.value.length <= 3 && viewportWidth.value >= 900) { return "three" }
+    if (viewportWidth.value >= 1400) { return "four" }
     if (viewportWidth.value >= 1200) { return "three" }
     if (viewportWidth.value >= 900) { return "peek" }
     return "portrait"
@@ -79,6 +45,7 @@ function onResize () {
 // Card focus and modifier inspector
 const focusedPackageId = ref<number | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
+const featuredModifierId = ref<number | null>(null)
 
 function handleCardFocus (pkg: Package) {
     focusedPackageId.value = pkg.id
@@ -86,10 +53,12 @@ function handleCardFocus (pkg: Package) {
 
 function openModifierInspector (pkg: Package) {
     activeInspectorPackage.value = pkg
+    featuredModifierId.value = ((pkg.modifiers || []) as Modifier[])[0]?.id ?? null
 }
 
 function closeInspector () {
     activeInspectorPackage.value = null
+    featuredModifierId.value = null
 }
 
 function handleKeydown (event: KeyboardEvent) {
@@ -107,78 +76,68 @@ const formatCurrency = (value: number | string) => {
     return phpCurrencyFormatter.format(Number.isFinite(amount) ? amount : 0)
 }
 
-const handlePackageSelection = async (packageData: Package) => {
+const proceedToMenuForPackage = async (packageData: Package): Promise<void> => {
     // Persist selected package to order store for downstream flows
-    const timestamp = new Date().toISOString()
-    console.log(`[📦 Package Selected] package_id=${packageData.id} package_name='${packageData.name}' at ${timestamp}`)
-    logger.debug("Selected package:", packageData)
-
-    try {
-        orderStore.setPackage(packageData)
-    } catch (err) {
-        logger.warn("Failed to persist package to order store", err)
-    }
-
-    // Start session if not already active and ensure token/menu ready
-    try {
-        console.log(`[🔄 Session Start Attempt] Starting session before navigating to menu at ${timestamp}`)
-        const started = await sessionStore.start({ preserveSelection: true })
-        if (!started) {
-            console.log(`[⚠️ Session Start Failed] But proceeding with device credentials check at ${timestamp}`)
-            logger.warn("Session start failed — device may require registration")
-
-            // Only show registration if device truly lacks credentials
-            const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
-
-            if (needsRegistration) {
-                console.log(`[🔐 Device Registration Required] Redirecting to Settings at ${timestamp}`)
-                // Redirect staff to Settings (PIN-protected) to register device there
-                try {
-                    await nuxtApp.$router.push("/settings")
-                } catch (e) {
-                    logger.error("Failed to navigate to Settings for registration", e)
-                }
-                // Stop further navigation to menu
-                return
-            }
-
-            // If device appears registered (token/table present), log and continue gracefully
-            console.log(`[✅ Device Has Credentials] Continuing to menu at ${timestamp}`)
-            logger.warn("Session start failed but device appears registered; proceeding.")
-        } else {
-            console.log(`[✅ Session Started] Ready for menu at ${timestamp}`)
-        }
-    } catch (err: any) {
-        console.error(`[❌ Session Start Error] ${err?.message} at ${timestamp}`)
-        logger.warn("Session store start failed or unavailable", err)
-    }
+    orderStore.setPackage(packageData)
 
     // Navigate to the menu page with package ID in query for downstream flows
-    try {
-    // Ensure menus are loaded (session.start already attempts this, but double-check)
-        try { await menuStore.loadAllMenus() } catch (e) { /* non-fatal */ }
-
-        console.log(`[📍 Navigation] Going to menu with package_id=${packageData.id} at ${timestamp}`)
-        await nuxtApp.$router.push({
-            path: "/menu",
-            query: { packageId: packageData.id }
-        })
-    } catch (navErr: any) {
-    // Prevent uncaught promise rejections from bubbling to the global handler
-        console.error(`[❌ Navigation Failed] ${navErr?.message} at ${timestamp}`)
-        logger.error("Navigation to /menu failed:", navErr)
-
-        // If the navigation failed due to asset/chunk fetch, show a helpful registration UI
-        // or remain on the package selection page so the user can retry.
-        // If device looks unregistered, surface the registration modal.
-        const needsRegistration = !deviceStore.token || !(deviceStore.table && (deviceStore.table as any).id)
-        if (needsRegistration) {
-            try { await nuxtApp.$router.push("/settings") } catch (e) { logger.error(e) }
-        }
-    }
+    // Session, auth, and menus were already loaded at welcome screen via sessionStore.start()
+    await nuxtApp.$router.push({
+        path: "/menu",
+        query: { packageId: packageData.id }
+    })
 }
 
-// Cards handle inline preview directly
+const inspectorGroups = computed(() => {
+    return groupPackageModifiers(((activeInspectorPackage.value?.modifiers || []) as Modifier[]))
+})
+
+const inspectorModifiers = computed(() => inspectorGroups.value.flatMap(group => group.items))
+
+const featuredModifier = computed<Modifier | null>(() => {
+    if (!inspectorModifiers.value.length) { return null }
+    return inspectorModifiers.value.find(item => item.id === featuredModifierId.value) ?? inspectorModifiers.value[0]
+})
+
+const featuredIndex = computed(() => {
+    if (!featuredModifier.value) { return 0 }
+    return inspectorModifiers.value.findIndex(item => item.id === featuredModifier.value?.id)
+})
+
+const inspectorSummary = computed(() => {
+    const total = inspectorModifiers.value.length
+    const parts = inspectorGroups.value.map(group => `${group.items.length} ${displayMeatGroupLabel(group.label).toLowerCase()}`)
+    return `${total} unlimited meats${parts.length ? ` · ${parts.join(" · ")}` : ""}`
+})
+
+const featuredGroupLabel = computed(() => {
+    const selected = featuredModifier.value
+    if (!selected) { return "" }
+    const group = inspectorGroups.value.find(item => item.items.some(modifier => modifier.id === selected.id))
+    return group ? displayMeatGroupLabel(group.label) : ""
+})
+
+const featuredDescription = computed(() => {
+    return String((featuredModifier.value as any)?.description || "Classic cut, lightly seasoned and grilled at your table.")
+})
+
+function selectFeaturedModifier (modifier: Modifier) {
+    featuredModifierId.value = modifier.id
+}
+
+function shiftFeaturedModifier (direction: -1 | 1) {
+    if (!inspectorModifiers.value.length) { return }
+    const current = featuredIndex.value >= 0 ? featuredIndex.value : 0
+    const next = (current + direction + inspectorModifiers.value.length) % inspectorModifiers.value.length
+    featuredModifierId.value = inspectorModifiers.value[next]?.id ?? null
+}
+
+async function chooseActiveInspectorPackage () {
+    if (!activeInspectorPackage.value) { return }
+    const packageData = activeInspectorPackage.value
+    closeInspector()
+    await proceedToMenuForPackage(packageData)
+}
 
 onUnmounted(() => {
     if (typeof window !== "undefined") {
@@ -188,7 +147,6 @@ onUnmounted(() => {
 })
 
 const goBack = () => {
-    console.log(`[↩️ Package Selection Cancelled] User returned to guest counter at ${new Date().toISOString()}`)
     nuxtApp.$router.push("/order/start")
 }
 
@@ -210,7 +168,7 @@ const touchDeltaY = ref(0)
 const swipeThreshold = 50
 const verticalSwipeThreshold = 30
 
-function handleTouchStart (e: TouchEvent) {
+function _handleTouchStart (e: TouchEvent) {
     // Don't interfere with button clicks or scrollable areas
     const target = e.target as HTMLElement
     if (
@@ -229,7 +187,7 @@ function handleTouchStart (e: TouchEvent) {
     touchDeltaY.value = 0
 }
 
-function handleTouchMove (e: TouchEvent) {
+function _handleTouchMove (e: TouchEvent) {
     if (touchStartX.value === null || touchStartY.value === null) { return }
     const x = e.touches?.[0]?.clientX ?? 0
     const y = e.touches?.[0]?.clientY ?? 0
@@ -262,7 +220,8 @@ function handleTouchEnd () {
 </script>
 
 <template>
-    <div class="min-h-dvh w-full bg-[#0a0a0a] overflow-hidden">
+    <div class="relative min-h-dvh w-full overflow-hidden bg-grill-table">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_50%_45%,rgba(255,181,109,0.08),transparent_68%)]" aria-hidden="true" />
         <div class="relative z-10 h-dvh p-3 sm:p-4 md:p-5 pkg-safe-shell">
             <div class="w-full max-w-7xl mx-auto h-full flex flex-col gap-4">
                 <!-- Header row -->
@@ -325,24 +284,48 @@ function handleTouchEnd () {
                 <!-- Package Row Display -->
                 <div
                     v-else
-                    class="flex-1 min-h-0 overflow-x-auto overflow-y-visible pt-3 pkg-row-scroll"
+                    class="flex-1 min-h-0 pt-3"
+                    :class="(packageRowMode === 'three' || packageRowMode === 'four')
+                        ? 'overflow-hidden'
+                        : 'overflow-x-auto overflow-y-visible pkg-row-scroll'"
                 >
-                    <!-- Three-up grid mode (≥1200px) -->
+                    <!-- Four-up grid mode (≥1400px) -->
                     <div
-                        v-if="packageRowMode === 'three'"
-                        class="grid grid-cols-3 gap-5 xl:gap-6 h-full pb-2"
+                        v-if="packageRowMode === 'four'"
+                        class="grid grid-cols-4 gap-4 h-full pb-2"
                     >
                         <div
                             v-for="pkg in packages"
                             :key="pkg.id"
-                            class="flex h-full min-w-[330px] flex-1"
+                            class="flex h-full min-w-[280px] flex-1"
                         >
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @select="handlePackageSelection"
+                                @focus="handleCardFocus"
+                                @view-modifiers="openModifierInspector"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Three-up grid mode (≥1200px) -->
+                    <div
+                        v-else-if="packageRowMode === 'three'"
+                        class="grid gap-4 xl:gap-5 h-full pb-2"
+                        :class="packages.length === 1 ? 'grid-cols-1' : (packages.length === 2 ? 'grid-cols-2' : 'grid-cols-3')"
+                    >
+                        <div
+                            v-for="pkg in packages"
+                            :key="pkg.id"
+                            class="flex h-full min-w-0 flex-1"
+                        >
+                            <PackageCard
+                                :pkg="pkg"
+                                :guest-count="guestCount"
+                                :format-currency="formatCurrency"
+                                class="w-full"
                                 @focus="handleCardFocus"
                                 @view-modifiers="openModifierInspector"
                             />
@@ -364,7 +347,6 @@ function handleTouchEnd () {
                                 :guest-count="guestCount"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @select="handlePackageSelection"
                                 @focus="handleCardFocus"
                                 @view-modifiers="openModifierInspector"
                             />
@@ -386,7 +368,6 @@ function handleTouchEnd () {
                                 :guest-count="guestCount"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @select="handlePackageSelection"
                                 @focus="handleCardFocus"
                                 @view-modifiers="openModifierInspector"
                             />
@@ -395,17 +376,179 @@ function handleTouchEnd () {
                 </div>
 
                 <!-- Modifier inspector overlay -->
-                <div v-if="activeInspectorPackage" class="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeInspector">
-                    <div class="max-w-lg w-full mx-4 bg-[#1a1a1a] rounded-2xl p-6 border border-white/10">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-bold text-white">
-                                {{ activeInspectorPackage.name }}
-                            </h3>
-                            <button class="text-white/50 hover:text-white transition" @click="closeInspector">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                <div
+                    v-if="activeInspectorPackage"
+                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-3 backdrop-blur-md"
+                    @click.self="closeInspector"
+                >
+                    <section
+                        class="package-meat-browser grid h-[88dvh] w-full max-w-[76.5rem] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[1.35rem] border border-[#8f622f]/75 bg-[linear-gradient(180deg,#17110d_0%,#100c09_100%)] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
+                        role="dialog"
+                        aria-modal="true"
+                        :aria-label="`${activeInspectorPackage.name} meat preview`"
+                    >
+                        <header class="flex min-h-[4.5rem] items-center justify-between border-b border-[#4a3320]/70 px-7">
+                            <div class="flex min-w-0 items-center gap-4">
+                                <span class="rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
+                                    {{ activeInspectorPackage.name }}
+                                </span>
+                                <span class="truncate text-sm font-bold text-white/58">
+                                    {{ inspectorSummary }}
+                                </span>
+                            </div>
+
+                            <button
+                                type="button"
+                                aria-label="Close meat browser"
+                                class="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/70 transition hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
+                                @click="closeInspector"
+                            >
+                                <X :size="20" />
                             </button>
+                        </header>
+
+                        <div class="grid min-h-0 grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] divide-x divide-[#3a2819]/80">
+                            <section class="featured-meat-pane min-h-0 px-7 py-6">
+                                <div class="relative h-[45vh] min-h-[18rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
+                                    <span
+                                        v-if="featuredModifier?.receipt_name"
+                                        class="absolute left-4 top-4 z-10 rounded-md border border-[#9c6832] bg-black/75 px-3 py-1 text-[11px] font-black text-[#ffbd72]"
+                                    >
+                                        {{ featuredModifier.receipt_name }}
+                                    </span>
+
+                                    <NuxtImg
+                                        v-if="featuredModifier?.img_url"
+                                        :src="featuredModifier.img_url"
+                                        :alt="featuredModifier.name || 'Featured meat cut'"
+                                        class="h-full w-full object-contain"
+                                        sizes="560px"
+                                        format="webp"
+                                    />
+                                    <div v-else class="flex h-full w-full items-center justify-center text-[#ffbd72]/45">
+                                        <UtensilsCrossed :size="76" :stroke-width="1.35" />
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        aria-label="Previous meat"
+                                        class="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/68 text-white transition hover:border-[#ffbd72]/50 hover:text-[#ffbd72]"
+                                        @click="shiftFeaturedModifier(-1)"
+                                    >
+                                        <ChevronLeft :size="20" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label="Next meat"
+                                        class="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/68 text-white transition hover:border-[#ffbd72]/50 hover:text-[#ffbd72]"
+                                        @click="shiftFeaturedModifier(1)"
+                                    >
+                                        <ChevronRight :size="20" />
+                                    </button>
+
+                                    <span class="absolute bottom-4 right-4 rounded-full bg-black/75 px-3 py-1 text-xs font-black text-white">
+                                        {{ featuredIndex + 1 }} / {{ inspectorModifiers.length }}
+                                    </span>
+                                </div>
+
+                                <div class="mt-5">
+                                    <p class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-[#ffbd72]">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-[#ffbd72]" />
+                                        {{ featuredGroupLabel }}
+                                    </p>
+                                    <h2 class="mt-2 font-raleway text-[1.75rem] font-extrabold leading-tight text-white">
+                                        {{ featuredModifier?.name || "No meat selected" }}
+                                    </h2>
+                                    <p class="mt-2 text-sm leading-relaxed text-white/58">
+                                        {{ featuredDescription }}
+                                    </p>
+                                    <div class="mt-4 flex flex-wrap gap-2">
+                                        <span class="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">
+                                            Unlimited refills
+                                        </span>
+                                        <span class="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/62">
+                                            Grilled at your table
+                                        </span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="meat-grid-pane min-h-0 overflow-y-auto px-6 py-6">
+                                <div
+                                    v-for="group in inspectorGroups"
+                                    :key="group.label"
+                                    class="mb-7 last:mb-0"
+                                >
+                                    <div class="mb-4 flex items-center gap-3">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-[#ffbd72]" />
+                                        <h3 class="text-lg font-extrabold text-white">
+                                            {{ displayMeatGroupLabel(group.label) }}
+                                        </h3>
+                                        <span class="text-[11px] font-black uppercase tracking-[0.14em] text-white/40">
+                                            {{ group.items.length }} cuts
+                                        </span>
+                                        <span class="h-px flex-1 bg-[#3a2819]" />
+                                    </div>
+
+                                    <div class="grid grid-cols-3 gap-3">
+                                        <button
+                                            v-for="modifier in group.items"
+                                            :key="modifier.id"
+                                            type="button"
+                                            class="meat-browser-card min-h-[10.5rem] overflow-hidden rounded-xl border bg-[#120d0a] text-left transition hover:border-[#ffbd72]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
+                                            :class="featuredModifier?.id === modifier.id ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.35),0_10px_32px_rgba(0,0,0,0.45)]' : 'border-white/10'"
+                                            @click="selectFeaturedModifier(modifier)"
+                                        >
+                                            <div class="relative h-28 bg-black">
+                                                <span
+                                                    v-if="modifier.receipt_name"
+                                                    class="absolute left-2 top-2 z-10 rounded bg-black/72 px-2 py-0.5 text-[10px] font-black text-[#ffbd72]"
+                                                >
+                                                    {{ modifier.receipt_name }}
+                                                </span>
+                                                <NuxtImg
+                                                    v-if="modifier.img_url"
+                                                    :src="modifier.img_url"
+                                                    :alt="modifier.name || 'Meat cut'"
+                                                    class="h-full w-full object-contain"
+                                                    loading="lazy"
+                                                    sizes="180px"
+                                                    format="webp"
+                                                />
+                                                <div v-else class="flex h-full w-full items-center justify-center text-[#ffbd72]/38">
+                                                    <UtensilsCrossed :size="34" :stroke-width="1.35" />
+                                                </div>
+                                            </div>
+                                            <p class="line-clamp-2 px-3 py-3 text-xs font-bold leading-tight text-white/82">
+                                                {{ modifier.name }}
+                                            </p>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div v-if="!inspectorGroups.length" class="flex h-full items-center justify-center text-center text-white/55">
+                                    No meat inclusions are configured for this package.
+                                </div>
+                            </section>
                         </div>
-                    </div>
+
+                        <footer class="flex min-h-[4.75rem] items-center justify-end gap-3 border-t border-[#4a3320]/70 bg-black/18 px-7">
+                            <button
+                                type="button"
+                                class="h-12 min-w-[9.5rem] rounded-full border border-white/14 bg-white/6 px-6 text-sm font-extrabold text-white/82 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                @click="closeInspector"
+                            >
+                                Keep Browsing
+                            </button>
+                            <button
+                                type="button"
+                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                @click="chooseActiveInspectorPackage"
+                            >
+                                Choose {{ activeInspectorPackage.name }} →
+                            </button>
+                        </footer>
+                    </section>
                 </div>
             </div>
         </div>
@@ -441,6 +584,35 @@ function handleTouchEnd () {
 .pkg-row-scroll::-webkit-scrollbar-thumb {
     background: rgba(246, 181, 109, 0.45);
     border-radius: 999px;
+}
+
+.package-meat-browser {
+    color-scheme: dark;
+}
+
+.meat-grid-pane {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 189, 114, 0.75) rgba(255, 255, 255, 0.05);
+    overscroll-behavior: contain;
+}
+
+.meat-grid-pane::-webkit-scrollbar {
+    width: 8px;
+}
+
+.meat-grid-pane::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+}
+
+.meat-grid-pane::-webkit-scrollbar-thumb {
+    background: rgba(255, 189, 114, 0.75);
+    border-radius: 999px;
+}
+
+.meat-browser-card {
+    transform: translateZ(0);
+    -webkit-tap-highlight-color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -21,30 +21,31 @@ describe("shouldAttemptActiveOrderRecovery", () => {
         expect(shouldAttemptActiveOrderRecovery()).toBe(true)
     })
 
-    it("returns true when orderStore.hasPlacedOrder is true", () => {
+    it("returns true when orderStore has placed rounds (hasPlacedOrder)", () => {
         const order = useOrderStore()
-        order.setHasPlacedOrder(true)
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 1, serverTotal: 0 }]
 
         expect(shouldAttemptActiveOrderRecovery()).toBe(true)
     })
 
-    it("returns true when isRefillMode is true", () => {
+    it("returns true when mode is refill", () => {
         const order = useOrderStore()
-        order.setIsRefillMode(true)
+        ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 1, serverTotal: 0 }]
+        ;(order as any).mode = "refill"
 
         expect(shouldAttemptActiveOrderRecovery()).toBe(true)
     })
 
-    it("returns true when currentOrder carries an order_id (nested shape)", () => {
+    it("returns true when serverOrderId is set (nested order_id)", () => {
         const order = useOrderStore()
-        order.setCurrentOrder({ order: { order_id: 99 } } as any)
+        ;(order as any).serverOrderId = 99
 
         expect(shouldAttemptActiveOrderRecovery()).toBe(true)
     })
 
-    it("returns true when currentOrder carries an id (flat shape)", () => {
+    it("returns true when serverOrderId is set (flat id)", () => {
         const order = useOrderStore()
-        order.setCurrentOrder({ id: 77 } as any)
+        ;(order as any).serverOrderId = 77
 
         expect(shouldAttemptActiveOrderRecovery()).toBe(true)
     })

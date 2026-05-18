@@ -25,6 +25,7 @@ export const ERROR_DEVICE_NOT_ASSIGNED = "DEVICE_NOT_ASSIGNED" as const
 export const ERROR_SESSION_NOT_FOUND = "SESSION_NOT_FOUND" as const
 export const ERROR_PRINT_EVENT_NOT_FOUND = "PRINT_EVENT_NOT_FOUND" as const
 export const ERROR_DEVICE_INACTIVE = "DEVICE_INACTIVE" as const
+export const ERROR_MENU_ITEM_UNAVAILABLE = "MENU_ITEM_UNAVAILABLE" as const
 
 // ── Union type ─────────────────────────────────────────────────────────────
 export type ApiErrorCode =
@@ -45,3 +46,4 @@ export type ApiErrorCode =
   | typeof ERROR_SESSION_NOT_FOUND
   | typeof ERROR_PRINT_EVENT_NOT_FOUND
   | typeof ERROR_DEVICE_INACTIVE
+  | typeof ERROR_MENU_ITEM_UNAVAILABLE

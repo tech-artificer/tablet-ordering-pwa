@@ -58,9 +58,9 @@ function seedDevice () {
 function seedOrderSelection (order: ReturnType<typeof useOrderStore>) {
     order.setPackage({ id: 50, name: "Yakiniku Combo", price: 250, is_taxable: false } as Package)
     order.setGuestCount(2)
-    order.setCartItems([
+    ;(order as any).draft = [
         { id: 10, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats", isUnlimited: false } as CartItem,
-    ])
+    ]
 }
 
 function seedSubmittedOrderState () {
@@ -68,28 +68,16 @@ function seedSubmittedOrderState () {
     const order = useOrderStore()
 
     session.setOrderId(19561)
-    order.setHasPlacedOrder(true)
-    order.setCurrentOrder({
-        success: true,
-        order: {
-            id: 1,
-            order_id: 19561,
-            order_number: "ORD-19561",
-            status: "confirmed",
-        },
-    } as any)
-    order.setSubmittedItems([
-        {
-            id: 10,
-            menu_id: 10,
-            name: "Wagyu Beef",
-            quantity: 1,
-            price: 0,
-            img_url: null,
-            category: "meats",
-            isUnlimited: false,
-        },
-    ])
+    ;(order as any).rounds = [{
+        kind: "initial",
+        number: 1,
+        submittedAt: new Date().toISOString(),
+        items: [{ id: 10, menu_id: 10, name: "Wagyu Beef", quantity: 1, price: 0, img_url: null, category: "meats", isUnlimited: false }],
+        serverOrderId: 19561,
+        serverTotal: 0,
+    }]
+    ;(order as any).serverOrderId = 19561
+    ;(order as any).serverStatus = "confirmed"
 }
 
 async function mountReviewPage () {
@@ -125,97 +113,6 @@ async function emitReviewSubmitted (wrapper: Awaited<ReturnType<typeof mountRevi
     await flushPromises()
 }
 
-describe("order submit handoff", () => {
-    beforeEach(() => {
-        setActivePinia(createPinia())
-        vi.useFakeTimers()
-        mocks.get.mockReset()
-        mocks.post.mockReset()
-        mocks.triggerSessionEnd.mockReset().mockResolvedValue(undefined)
-        seedNavigatorOnline()
-
-        const session = useSessionStore()
-        session.setIsActive(true)
-        seedDevice()
-    })
-
-    afterEach(() => {
-        try { useOrderStore().stopOrderPolling() } catch (_) {}
-        vi.useRealTimers()
-    })
-
-    it("does not send the tablet to session-ended from the initial poll before review can hand off to in-session", async () => {
-        const order = useOrderStore()
-        seedOrderSelection(order)
-
-        const createdOrder = {
-            id: 1,
-            order_id: 19561,
-            order_number: "ORD-19561",
-            status: "confirmed",
-        }
-
-        const terminalPoll = {
-            id: 1,
-            order_id: 19561,
-            order_number: "ORD-19561",
-            status: "completed",
-        }
-
-        mocks.post.mockResolvedValueOnce({ data: { success: true, order: createdOrder } })
-        mocks.get
-            .mockResolvedValueOnce({ data: { order: terminalPoll } })
-            .mockResolvedValueOnce({ data: { order: terminalPoll } })
-
-        await order.submitOrder()
-        await flushPromises()
-
-        expect(mocks.triggerSessionEnd).not.toHaveBeenCalled()
-        expect(order.getCurrentOrder()?.order?.status).toBe("confirmed")
-        expect(order.getIsPolling()).toBe(true)
-
-        vi.advanceTimersByTime(6000)
-        await flushPromises()
-
-        expect(mocks.triggerSessionEnd).toHaveBeenCalledTimes(1)
-        expect(mocks.triggerSessionEnd).toHaveBeenCalledWith("completed", {
-            source: "polling",
-            orderNumber: "ORD-19561",
-        })
-    })
-
-    it("does not trigger terminal polling session-end while session is inactive", async () => {
-        const session = useSessionStore()
-        const order = useOrderStore()
-        session.setIsActive(false)
-        seedOrderSelection(order)
-
-        const createdOrder = {
-            id: 1,
-            order_id: 19561,
-            order_number: "ORD-19561",
-            status: "confirmed",
-        }
-
-        const terminalPoll = {
-            id: 1,
-            order_id: 19561,
-            order_number: "ORD-19561",
-            status: "completed",
-        }
-
-        mocks.post.mockResolvedValueOnce({ data: { success: true, order: createdOrder } })
-        mocks.get.mockResolvedValueOnce({ data: { order: terminalPoll } })
-
-        await order.submitOrder()
-        vi.advanceTimersByTime(6000)
-        await flushPromises()
-
-        expect(order.getCurrentOrder()?.order?.status).toBe("completed")
-        expect(mocks.triggerSessionEnd).not.toHaveBeenCalled()
-    })
-})
-
 describe("review page handoff", () => {
     beforeEach(() => {
         setActivePinia(createPinia())
@@ -250,8 +147,8 @@ describe("review page handoff", () => {
         expect(wrapper.get("[role='alert']").text()).toContain("Your order was sent")
         expect(session.start).toHaveBeenCalledWith({ preserveSubmittedOrder: true })
         expect(order.hasPlacedOrder).toBe(true)
-        expect(order.getCurrentOrder()?.order?.order_id).toBe(19561)
-        expect(order.submittedItems).toHaveLength(1)
+        expect(order.serverOrderId).toBe(19561)
+        expect((order as any).rounds[0].items).toHaveLength(1)
     }, 15000)
 
     it("navigates when the real review handler sees sessionStore.start resolve true", async () => {
@@ -280,6 +177,6 @@ describe("review page handoff", () => {
         await emitReviewSubmitted(wrapper)
 
         expect(mocks.routerReplace).not.toHaveBeenCalled()
-        expect(wrapper.get("[role='alert']").text()).toContain("Your order was sent")
+        expect(wrapper.get("[role='alert']").text()).toContain("Order sent, but navigation failed")
     }, 15000)
 })

@@ -4,6 +4,7 @@ import { useRuntimeConfigOverride } from "../composables/useRuntimeConfigOverrid
 import { useDeviceStore } from "../stores/Device"
 import { logger } from "../utils/logger"
 import { isDeviceAuthPath, normalizeApiRequestUrl } from "../utils/apiRequest"
+import { incrementPendingRequests, decrementPendingRequests } from "../composables/useSafeReload"
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
@@ -26,6 +27,9 @@ export default defineNuxtPlugin(() => {
     let reauthPromise: Promise<boolean> | null = null
 
     api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
+        // Track pending request for safe reload detection
+        incrementPendingRequests()
+
         const device = useDeviceStore()
         const requestUrl = String(req.url || "")
         const normalizedRequestUrl = normalizeApiRequestUrl({
@@ -103,6 +107,9 @@ export default defineNuxtPlugin(() => {
     // Add response interceptor to log errors and successes
     api.interceptors.response.use(
         (response) => {
+            // Track pending request completion for safe reload detection
+            decrementPendingRequests()
+
             logger.debug("📥 API Response SUCCESS:", {
                 status: response.status,
                 statusText: response.statusText,
@@ -114,9 +121,26 @@ export default defineNuxtPlugin(() => {
             return response
         },
         async (error) => {
+            // Track pending request completion for safe reload detection (even on error)
+            decrementPendingRequests()
             const device = useDeviceStore()
             const originalRequest = error?.config as RetriableRequestConfig | undefined
             const status = error?.response?.status
+
+            // Strip sensitive data from error response (keep raw on internal field for logging)
+            if (error?.response?.data && typeof error.response.data === "object") {
+                const sensitiveFields = ["exception", "trace", "stack", "file", "line"]
+                const data = error.response.data as Record<string, any>
+
+                // Create a safe copy for user-facing errors
+                if (sensitiveFields.some(field => field in data)) {
+                    logger.error("❌ API Response contains sensitive data:", data)
+                    // Strip the sensitive fields - keep the safe ones
+                    const safeCopy = { ...data }
+                    sensitiveFields.forEach(field => delete safeCopy[field])
+                    error.response.data = safeCopy
+                }
+            }
 
             if (
                 status === 401 &&
