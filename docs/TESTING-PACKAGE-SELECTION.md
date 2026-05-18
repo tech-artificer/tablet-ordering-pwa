@@ -19,6 +19,14 @@ Package cards must not directly select a package.
 
 ### 1. Start Dev Server
 
+macOS / Linux / Git Bash:
+
+```bash
+npm run dev
+```
+
+Windows PowerShell / Command Prompt:
+
 ```powershell
 npm.cmd run dev
 ```
