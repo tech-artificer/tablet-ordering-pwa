@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
-const bootGlobalPath = resolve(__dirname, "../middleware/boot.global.ts")
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+const bootGlobalPath = resolve(PROJECT_ROOT, "middleware/boot.global.ts")
 
 describe("boot.global.ts unified middleware — consolidated routing", () => {
     const source = readFileSync(bootGlobalPath, "utf8")

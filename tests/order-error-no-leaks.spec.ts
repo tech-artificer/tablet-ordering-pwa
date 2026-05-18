@@ -3,6 +3,9 @@ import { setActivePinia, createPinia } from "pinia"
 import { useOrderStore } from "~/stores/Order"
 import { logger } from "~/utils/logger"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 // Mock logger to capture what would be logged
 vi.mock("~/utils/logger", () => ({
     logger: {
@@ -23,9 +26,7 @@ describe("Order.ts error handling - no sensitive data leaks", () => {
         const orderStore = useOrderStore()
 
         // Simulate internal error with laravel.log path
-        const sensitiveError = new Error(
-            "Check Laravel logs (storage/logs/laravel.log)"
-        )
+        const sensitiveError = new Error("Check Laravel logs (storage/logs/laravel.log)")
 
         // The error handling in Order.ts should sanitize this
         // This test verifies that such raw errors don't propagate to users
@@ -107,7 +108,7 @@ describe("Order.ts error handling - no sensitive data leaks", () => {
     it("stores/Order.ts must import and invoke classifyError (structural guard)", async () => {
         const { readFileSync } = await import("node:fs")
         const { resolve } = await import("node:path")
-        const content = readFileSync(resolve(__dirname, "../stores/Order.ts"), "utf-8")
+        const content = readFileSync(resolve(PROJECT_ROOT, "stores/Order.ts"), "utf-8")
         expect(content).toMatch(/import\s*\{[^}]*classifyError[^}]*\}\s*from/)
         expect(content).toContain("classifyError(error)")
     })

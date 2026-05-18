@@ -32,8 +32,7 @@ describe("useNetworkStatus lifecycle", () => {
             Object.defineProperty(window.navigator, "onLine", originalNavigatorOnLineDescriptor)
         } else {
             // If no original descriptor, delete the mocked property
-            // @ts-ignore
-            delete window.navigator.onLine
+            delete (window.navigator as unknown as { onLine?: boolean }).onLine
         }
     })
 

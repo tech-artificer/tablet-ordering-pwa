@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, it, expect } from "vitest"
 
-const menuPagePath = resolve(__dirname, "../pages/menu.vue")
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+const menuPagePath = resolve(PROJECT_ROOT, "pages/menu.vue")
 
 describe("menu page category tabs binding", () => {
     it("binds the category tabs to the page category list", () => {

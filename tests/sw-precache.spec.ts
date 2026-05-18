@@ -1,9 +1,12 @@
-import { readFileSync } from "fs"
-import { resolve } from "path"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 function readServiceWorkerSource (): string {
-    return readFileSync(resolve(__dirname, "../public/sw.ts"), "utf-8")
+    return readFileSync(resolve(PROJECT_ROOT, "public/sw.ts"), "utf-8")
 }
 
 describe("service worker navigation fallback", () => {

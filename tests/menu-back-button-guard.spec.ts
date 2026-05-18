@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
-const menuPagePath = resolve(__dirname, "../pages/menu.vue")
-const menuHeaderPath = resolve(__dirname, "../components/menu/MenuHeader.vue")
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+const menuPagePath = resolve(PROJECT_ROOT, "pages/menu.vue")
+const menuHeaderPath = resolve(PROJECT_ROOT, "components/menu/MenuHeader.vue")
 
 describe("menu page back button guard", () => {
     it("disables the back button while an order session is ongoing", () => {
