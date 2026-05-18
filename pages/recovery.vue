@@ -22,8 +22,26 @@ const errorCount = computed(() => parseInt(route.query.count as string || "0", 1
 const isRecovering = ref(false)
 const recoveryStatus = ref("")
 const recoveryError = ref("")
-const autoRetryCount = ref(0)
 const MAX_AUTO_RETRIES = 2
+const AUTO_RETRY_STORAGE_KEY = "pwa-auto-retry-count"
+
+function readAutoRetryCount (): number {
+    try {
+        return parseInt(sessionStorage.getItem(AUTO_RETRY_STORAGE_KEY) ?? "0", 10) || 0
+    } catch {
+        return 0
+    }
+}
+
+function writeAutoRetryCount (value: number): void {
+    try {
+        sessionStorage.setItem(AUTO_RETRY_STORAGE_KEY, String(value))
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+const autoRetryCount = ref(0)
 
 interface BuildMismatch {
     stored: string
@@ -44,9 +62,13 @@ onMounted(() => {
         // Ignore parse errors
     }
 
+    // Restore persisted retry count so the guard survives page reloads
+    autoRetryCount.value = readAutoRetryCount()
+
     // Auto-retry once if this is first recovery attempt
     if (errorCount.value <= 1 && autoRetryCount.value < MAX_AUTO_RETRIES) {
         autoRetryCount.value++
+        writeAutoRetryCount(autoRetryCount.value)
         setTimeout(() => {
             handleSoftReload()
         }, 2000)

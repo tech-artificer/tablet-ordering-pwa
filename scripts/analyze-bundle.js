@@ -4,7 +4,7 @@ import { readFileSync } from "fs"
 import { join } from "path"
 import { fileURLToPath } from "url"
 
-const __dirname = fileURLToPath(new URL(".", import.meta.meta))
+const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
 // Simple bundle analyzer for PWA performance monitoring
 function analyzeBundle () {

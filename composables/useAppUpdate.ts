@@ -167,6 +167,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
             registration.value.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
             // Wait a moment for the controller change to trigger
             await new Promise(resolve => setTimeout(resolve, 100))
+            isApplyingUpdate.value = false
         } catch (error) {
             isApplyingUpdate.value = false
             updateError.value = "Failed to apply update. Please try again."

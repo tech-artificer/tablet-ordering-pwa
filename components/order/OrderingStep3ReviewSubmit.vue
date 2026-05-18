@@ -48,55 +48,6 @@ const hasConfirmedInitialOrder = computed(() =>
     orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
 )
 
-const fallbackServerItems = computed<ReviewItem[]>(() => {
-    const rawItems = currentOrderSnapshot.value?.items ?? currentOrderSnapshot.value?.order_items
-    if (!Array.isArray(rawItems) || rawItems.length === 0) {
-        logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: No items available", {
-            hasItems: !!rawItems,
-            isArray: Array.isArray(rawItems),
-            length: rawItems?.length || 0,
-        })
-        return []
-    }
-
-    logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: Processing " + rawItems.length + " items")
-
-    const normalized: ReviewItem[] = []
-
-    rawItems.forEach((item: any, index: number) => {
-        const packageModifiers = Array.isArray(item?.modifiers) ? item.modifiers : []
-        const isPackage = Boolean(item?.is_package)
-
-        if (isPackage && packageModifiers.length > 0) {
-            packageModifiers.forEach((modifier: any, modifierIndex: number) => {
-                normalized.push({
-                    id: Number(modifier?.menu_id ?? modifier?.id ?? -(index * 1000 + modifierIndex + 1)),
-                    name: String(modifier?.name || modifier?.receipt_name || `Inclusion ${modifierIndex + 1}`),
-                    quantity: Number(modifier?.quantity || 1),
-                    category: String(modifier?.category || "meats"),
-                    price: Number(modifier?.price || 0),
-                    img_url: modifier?.img_url || null,
-                    description: modifier?.description || null,
-                })
-            })
-            return
-        }
-
-        normalized.push({
-            id: Number(item?.menu_id ?? item?.id ?? -(index + 1)),
-            name: String(item?.name || item?.receipt_name || `Item ${index + 1}`),
-            quantity: Number(item?.quantity || 1),
-            category: String(item?.category || (isPackage ? "meats" : "side")),
-            price: Number(item?.price || 0),
-            img_url: item?.img_url || null,
-            description: item?.description || null,
-        })
-    })
-
-    logger.debug("[OrderingStep3ReviewSubmit] fallbackServerItems: Normalized " + normalized.length + " items")
-    return normalized
-})
-
 const displayItems = computed<any[]>(() => {
     // Always show only the items currently being submitted (activeCart)
     // Do NOT show previously submitted items when reviewing a new refill

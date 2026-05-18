@@ -228,7 +228,6 @@ import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
-import { useMenuStore } from "~/stores/Menu"
 import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
@@ -240,7 +239,6 @@ definePageMeta({
 
 const deviceStore = useDeviceStore()
 const sessionStore = useSessionStore()
-const menuStore = useMenuStore()
 const router = useRouter()
 const route = useRoute()
 const { isOnline } = useNetworkStatus()

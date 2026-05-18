@@ -261,7 +261,7 @@ function handleTouchEnd () {
                     v-else
                     class="flex-1 min-h-0 pt-3"
                     :class="(packageRowMode === 'three' || packageRowMode === 'four')
-                        ? 'overflow-hidden'
+                        ? 'overflow-y-auto'
                         : 'overflow-x-auto overflow-y-visible pkg-row-scroll'"
                 >
                     <!-- Four-up grid mode (≥1400px) -->

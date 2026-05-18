@@ -68,8 +68,8 @@ export function useRefillSubmit () {
 
             // 419: Laravel CSRF/session protection triggered — backend middleware misconfiguration
             if (status === 419) {
-                logger.error("[RefillSubmit] 419 CSRF error — backend treating device API as web/session route")
-                const message = "Refill submit hit Laravel CSRF/session protection. Move API route to Sanctum middleware or exclude from CSRF."
+                logger.error("[RefillSubmit] 419 CSRF error — backend treating device API as web/session route. Move API route to Sanctum middleware or exclude from CSRF.")
+                const message = "We could not send your order yet. Please ask a staff member for assistance."
                 submitState.setFailed(message)
                 throw new Error(message)
             }

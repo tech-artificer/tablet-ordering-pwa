@@ -1,5 +1,30 @@
+---
+status: canonical
+last_reviewed: 2026-05-17
+scope: tablet-ordering-pwa
+---
+
 <!-- Repository-specific Copilot instructions for AI coding agents -->
 # Tablet Ordering PWA — AI Coding Instructions
+
+> ## Agent Operating System & Resume (read first — binding)
+>
+> This file is **app-specific onboarding**, subordinate to the ecosystem source of truth in
+> `../../AGENTS.md`. Where this file diverges from `../../AGENTS.md`, the four 2026-05-14 audit
+> docs, or `../../contracts/*.md`, the canonical ecosystem docs win.
+>
+> - The Lite 4-agent operating system (Contrarian → Specialist → Verifier → Executioner) with
+>   triage tiers applies to all work here. Copilot is a runner of that system, not an exception.
+> - **Specialist for this app:** `chuya-frontend` (see `../../.claude/agents/chuya-frontend.md`).
+>   Scope is `tablet-ordering-pwa/**` only; cross-app work is `SPLIT_REQUIRED`.
+> - **Resume, do not restart:** before any task, check `../../docs/cases/<task-slug>.md`. If
+>   `status: IN_PROGRESS`/`BLOCKED`, read its `## Run State`/`## Handoff`, adopt the
+>   `next_agent` role by reading `../../.claude/agents/<role>.md`, and continue the chain with
+>   the recorded tier/branch. Checkpoint your output + `## Run State` to the case file before
+>   handing off. Full rules: `../../docs/RESUME_PROTOCOL.md`.
+> - Tablet sends intent only: `{ guest_count, package_id, items:[{menu_id,quantity}] }` — never
+>   pricing/tax/modifiers/totals/POS/state, never invented backend states, never raw technical
+>   errors to customers. A task is complete only when the Executioner records `APPROVED`.
 
 This repository is the standalone tablet client for Woosoo. It is a Nuxt SPA/PWA used on restaurant tablets in landscape/kiosk mode.
 
