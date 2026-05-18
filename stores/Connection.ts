@@ -27,8 +27,8 @@ export const useConnectionStore = defineStore("connection", () => {
    */
     const blocking = computed(() => {
         // Track reactive dependencies; debouncedBlockingState itself is non-reactive.
-        void online.value
-        void reverbState.value
+        // _shouldBlock is intentionally unused — its purpose is to register reactive deps.
+        const _shouldBlock = !online.value || reverbState.value !== "connected"
         return debouncedBlockingState
     })
 
