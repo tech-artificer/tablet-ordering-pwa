@@ -2,6 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ref, nextTick } from "vue"
 import { useAppUpdate } from "../composables/useAppUpdate"
 
+vi.mock("../composables/useSafeReload", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../composables/useSafeReload")>()
+    return {
+        ...actual,
+        recordReloadTimestamp: vi.fn(),
+    }
+})
+
 function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
     const serviceWorkerContainer = new EventTarget() as EventTarget & {
         ready: Promise<ServiceWorkerRegistration>
@@ -36,6 +44,8 @@ function createServiceWorkerMocks (options?: { hasWaiting?: boolean }) {
 describe("useAppUpdate", () => {
     beforeEach(() => {
         vi.restoreAllMocks()
+        // Clear session storage to ensure fresh auto-reload state for each test
+        sessionStorage.clear()
     })
 
     afterEach(() => {
@@ -121,5 +131,36 @@ describe("useAppUpdate", () => {
                 value: originalLocation,
             })
         }
+    })
+
+    it("auto-reload disabled by default without debug=pwa flag", async () => {
+        // Ensure no debug flag
+        const originalLocation = window.location
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: {
+                ...originalLocation,
+                href: "http://localhost/", // No debug=pwa
+            },
+        })
+
+        const { serviceWorkerContainer } = createServiceWorkerMocks({ hasWaiting: true })
+        const update = useAppUpdate()
+
+        await update.initializeAppUpdate()
+
+        // Trigger update available - auto-reload should not be enabled
+        serviceWorkerContainer.dispatchEvent(new MessageEvent("message", { data: { type: "UPDATE_AVAILABLE" } }))
+        await nextTick()
+
+        // isAutoReloadDeferred should remain false because auto-reload is disabled
+        expect(update.isAutoReloadDeferred.value).toBe(false)
+
+        update.disposeAppUpdate()
+
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: originalLocation,
+        })
     })
 })

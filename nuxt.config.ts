@@ -169,6 +169,11 @@ export default defineNuxtConfig({
         injectManifest: {
             maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
             globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+            // Exclude files that must always be fresh (not precached)
+            globIgnores: [
+                "**/build-info.json",
+                "**/runtime-config.js",
+            ],
         },
 
         client: {
