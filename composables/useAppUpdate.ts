@@ -1,6 +1,6 @@
 import { computed, ref, watch } from "vue"
 import type { MaybeRefOrGetter } from "vue"
-import { useSafeReload, isSafeToReload, recordReloadTimestamp } from "./useSafeReload"
+import { isSafeToReload, recordReloadTimestamp } from "./useSafeReload"
 import { logger } from "~/utils/logger"
 
 const SKIP_WAITING_MESSAGE_TYPE = "SKIP_WAITING" as const
