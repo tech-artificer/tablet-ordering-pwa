@@ -31,12 +31,27 @@ describe("package selection responsive layout contract", () => {
         expect(page).toContain("event.key === \"Escape\"")
     })
 
-    it("requires a confirmation step before proceeding to menu", () => {
+    it("renders the split-pane meat browser modal as the package choose surface", () => {
         const page = readProjectFile("pages/order/packageSelection.vue")
 
-        expect(page).toContain("pendingPackageSelection")
-        expect(page).toContain("Confirm package")
-        expect(page).toContain("@click=\"confirmPackageSelection\"")
-        expect(page).toContain("Continue to Menu")
+        expect(page).toContain("package-meat-browser")
+        expect(page).toContain("featured-meat-pane")
+        expect(page).toContain("meat-grid-pane")
+        expect(page).toContain("Keep Browsing")
+        expect(page).toContain("Choose {{ activeInspectorPackage.name }}")
+        expect(page).toContain("@click=\"chooseActiveInspectorPackage\"")
+        expect(page).not.toContain("Confirm package")
+        expect(page).not.toContain("pendingPackageSelection")
+    })
+
+    it("keeps the grill-table background scoped to package selection", () => {
+        const page = readProjectFile("pages/order/packageSelection.vue")
+        const welcome = readProjectFile("pages/index.vue")
+        const css = readProjectFile("assets/css/main.css")
+
+        expect(page).toContain("bg-grill-table")
+        expect(welcome).toContain("bg-grill-table")
+        expect(welcome).toContain("flameSrc")
+        expect(css).toContain(".bg-grill-table")
     })
 })

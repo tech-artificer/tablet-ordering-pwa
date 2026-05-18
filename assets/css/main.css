@@ -435,6 +435,18 @@ body {
     linear-gradient(to bottom right, #0F0F0F, #1A1A1A, #3D3530);
 }
 
+/* Warm charcoal grill-table surface (welcome + package selection only) */
+.bg-grill-table {
+  background-color: #080604;
+  background-image:
+    radial-gradient(ellipse 78% 58% at 50% 38%, rgba(255, 181, 109, 0.12) 0%, rgba(255, 181, 109, 0.035) 38%, transparent 72%),
+    radial-gradient(ellipse 120% 92% at 50% 110%, rgba(139, 78, 33, 0.22) 0%, transparent 64%),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(140deg, #080604 0%, #130d09 50%, #26180f 100%);
+  background-size: auto, auto, 40px 40px, 40px 40px, auto;
+}
+
 /* ============================================
    SAFE AREA PADDING (for notched devices)
    ============================================ */

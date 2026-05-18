@@ -2,6 +2,7 @@
 import { computed } from "vue"
 import { Clock, ChevronRight, Star, UtensilsCrossed } from "lucide-vue-next"
 import type { Package, Modifier } from "../types"
+import { displayMeatGroupLabel, groupPackageModifierPreviews } from "../utils/packageModifierGroups"
 
 const props = defineProps<{
   pkg: Package
@@ -10,7 +11,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [pkg: Package]
+  "view-modifiers": [pkg: Package]
+  focus: [pkg: Package]
 }>()
 
 const packageDuration = computed(() => {
@@ -39,166 +41,140 @@ const packageDuration = computed(() => {
     return normalized
 })
 
-type ModifierGroup = { label: string; items: Modifier[] }
-
-const PRIORITY_ORDER = ["PORK", "BEEF", "CHICKEN", "SEAFOOD", "OTHER"]
-
-const modifierGroups = computed<ModifierGroup[]>(() => {
-    const mods = (props.pkg?.modifiers || []) as Modifier[]
-    if (!mods.length) { return [] }
-
-    const buckets = new Map<string, Modifier[]>()
-
-    for (const m of mods) {
-        const name = String(m.name || "").toUpperCase()
-        const group = String(m.group || "").toUpperCase()
-        let label = "OTHER"
-
-        if (/PORK|SAMGYUPSAL|LIEMPO|BELLY|PIG/.test(name) || /PORK/.test(group)) {
-            label = "PORK"
-        } else if (/BEEF|BRISKET|RIBEYE|SIRLOIN/.test(name) || /BEEF/.test(group)) {
-            label = "BEEF"
-        } else if (/CHICKEN/.test(name) || /CHICKEN|POULTRY/.test(group)) {
-            label = "CHICKEN"
-        } else if (/SEAFOOD|SHRIMP|FISH|CRAB|LOBSTER|SQUID/.test(name) || /SEAFOOD/.test(group)) {
-            label = "SEAFOOD"
-        }
-
-        pushTo(buckets, label, m)
-    }
-
-    const ordered: ModifierGroup[] = []
-    const seen = new Set<string>()
-
-    for (const label of PRIORITY_ORDER) {
-        const items = buckets.get(label)
-        if (items?.length) {
-            ordered.push({ label, items })
-            seen.add(label)
-        }
-    }
-    for (const [label, items] of buckets) {
-        if (!seen.has(label) && items.length) {
-            ordered.push({ label, items })
-        }
-    }
-
-    return ordered
+const modifierGroups = computed(() => {
+    return groupPackageModifierPreviews((props.pkg?.modifiers || []) as Modifier[], 4)
 })
 
-function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
-    const existing = map.get(key)
-    if (existing) { existing.push(value) } else { map.set(key, [value]) }
-}
+const totalModifierCount = computed(() => modifierGroups.value.reduce((total, group) => total + group.items.length, 0))
+const previewItems = computed(() => modifierGroups.value.flatMap(group => group.previewItems).slice(0, 4))
+const hiddenPreviewCount = computed(() => Math.max(totalModifierCount.value - previewItems.value.length, 0))
+
+const packageSubtitle = computed(() => {
+    const groups = modifierGroups.value.map(group => displayMeatGroupLabel(group.label).toLowerCase())
+    return groups.length ? `${groups.join(" + ")} lineup` : "Unlimited Korean BBQ spread"
+})
+
+const packageDescription = computed(() => {
+    const description = String((props.pkg as any)?.description || "").trim()
+    if (description) { return description }
+    if (modifierGroups.value.length) {
+        return `A curated unlimited spread with ${totalModifierCount.value} meat cuts, refillable sides, and grill-table service.`
+    }
+    return "A complete Korean BBQ package prepared for a smooth table-service experience."
+})
+
+const inclusionChecklist = computed(() => {
+    const groupItems = modifierGroups.value.map(group => `${group.items.length} unlimited ${displayMeatGroupLabel(group.label).toLowerCase()} cuts`)
+    return [
+        ...groupItems.slice(0, 3),
+        "Standard banchan set",
+        "Steamed rice and lettuce wraps",
+        "Refillable Korean iced tea",
+    ].slice(0, 4)
+})
 </script>
 
 <template>
     <article
-        class="group relative flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#151517] shadow-[0_16px_48px_rgba(0,0,0,0.45)] transition-[border-color,transform,box-shadow] duration-300 hover:-translate-y-1 hover:border-[#f6b56d]/40 hover:shadow-[0_20px_64px_rgba(0,0,0,0.6)]"
+        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border border-[#4b3826]/80 bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-6 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)]"
+        tabindex="0"
+        @focusin="emit('focus', pkg)"
     >
         <div
             v-if="pkg.is_popular"
-            class="absolute -top-2.5 left-4 z-10 flex items-center gap-1 rounded-full bg-[#f6b56d] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-black shadow-[0_8px_20px_rgba(246,181,109,0.18)]"
+            class="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full bg-[#ffbd72] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#140c06] shadow-[0_10px_24px_rgba(255,189,114,0.28)]"
         >
             <Star :size="10" stroke-width="0" fill="currentColor" />
             Most Popular
         </div>
 
         <!-- Header -->
-        <header class="flex-none px-4 pt-5">
-            <h2 class="font-raleway text-lg font-extrabold tracking-tight text-white">
+        <header class="min-w-0">
+            <h2 class="font-raleway text-[1.65rem] font-extrabold tracking-normal text-[#ffbd72] leading-tight">
                 {{ pkg.name }}
             </h2>
 
-            <p
-                v-if="pkg.description"
-                class="mt-1.5 line-clamp-2 text-xs leading-snug text-white/45"
-            >
-                {{ pkg.description }}
+            <p class="mt-1 text-sm font-bold text-white/52">
+                {{ packageSubtitle }}
             </p>
 
-            <div class="mt-2.5 flex items-end gap-2">
-                <div class="font-kanit text-[1.75rem] font-extrabold leading-none text-[#ffad63]">
-                    {{ formatCurrency(pkg.price) }}
-                </div>
-                <div class="pb-0.5 font-kanit text-xs text-white/65">
-                    per person
-                </div>
-            </div>
-
-            <p class="mt-1 text-[10px] text-white/35">
-                × {{ guestCount }} {{ guestCount === 1 ? 'guest' : 'guests' }}
-                <span class="text-white/55">
-                    = {{ formatCurrency(Number(pkg.price) * guestCount) }}
-                </span>
+            <p class="mt-3 line-clamp-4 max-w-[34rem] text-sm leading-relaxed text-white/58">
+                {{ packageDescription }}
             </p>
 
-            <div
-                v-if="packageDuration"
-                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-bold text-white"
-            >
-                <Clock :size="12" class="text-[#f6b56d]" />
-                {{ packageDuration }}
+            <div class="mt-6 flex items-end gap-3">
+                <div class="font-kanit text-[2.35rem] font-extrabold leading-none text-white">
+                    {{ formatCurrency(Number(pkg.price) * guestCount) }}
+                </div>
+                <div class="pb-1.5 font-kanit text-xs font-bold text-white/42">
+                    {{ formatCurrency(pkg.price) }}/guest
+                    <span v-if="packageDuration" class="mx-1">·</span>
+                    <span v-if="packageDuration">{{ packageDuration }}</span>
+                </div>
             </div>
         </header>
 
-        <!-- Modifier groups (image tiles, horizontally scrollable) -->
-        <section
-            v-if="modifierGroups.length"
-            class="mt-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden px-4"
-        >
-            <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pkg-groups-scroll">
-                <div
-                    v-for="group in modifierGroups"
-                    :key="group.label"
-                    class="flex flex-col gap-1"
+        <section class="mt-5 min-h-0 border-t border-white/10 pt-4">
+            <ul class="space-y-2.5">
+                <li
+                    v-for="item in inclusionChecklist"
+                    :key="item"
+                    class="flex items-start gap-3 text-sm leading-tight text-white/72"
                 >
-                    <div
-                        class="flex gap-1.5 overflow-x-auto snap-x snap-mandatory pkg-modifier-row"
-                    >
-                        <div
-                            v-for="item in group.items"
-                            :key="item.id"
-                            class="flex w-[64px] flex-none snap-start flex-col gap-1"
-                        >
-                            <div class="h-[52px] w-[64px] overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br from-gray-800 to-gray-900">
-                                <NuxtImg
-                                    v-if="item.img_url"
-                                    :src="item.img_url"
-                                    :alt="item.name || 'Modifier'"
-                                    class="h-full w-full object-cover"
-                                    loading="lazy"
-                                    sizes="65px"
-                                    format="webp"
-                                />
-                                <div
-                                    v-else
-                                    class="flex h-full w-full items-center justify-center text-white/40"
-                                >
-                                    <UtensilsCrossed :size="18" :stroke-width="1.5" />
-                                </div>
-                            </div>
-                            <p
-                                class="line-clamp-2 text-center font-kanit text-[9px] leading-tight text-white/85"
-                                :title="item.name"
-                            >
-                                {{ item.name }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                    <span class="mt-0.5 text-[#22c986]" aria-hidden="true">✓</span>
+                    <span>{{ item }}</span>
+                </li>
+            </ul>
+
+            <div
+                v-if="packageDuration"
+                class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/70"
+            >
+                <Clock :size="12" class="text-[#f6b56d]" />
+                Table time included
             </div>
         </section>
 
         <!-- Footer / CTA -->
-        <footer class="mt-auto flex-none px-4 pb-4 pt-3">
+        <footer class="mt-5">
             <button
                 type="button"
-                class="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#f6b56d] to-[#ffa040] font-kanit text-sm font-extrabold text-black shadow-[0_4px_16px_rgba(246,181,109,0.35)] transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6b56d]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                @click.stop="emit('select', pkg)"
+                class="package-meat-rail grid min-h-[3.8rem] w-full grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-[#9c6832]/65 bg-[#23170f]/82 px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_12px_34px_rgba(0,0,0,0.34)] transition-[border-color,background-color,transform] duration-150 hover:border-[#ffbd72] hover:bg-[#2a1a10] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                @click.stop="emit('view-modifiers', pkg)"
             >
-                Choose package
-                <ChevronRight :size="18" />
+                <span class="flex min-w-[5.6rem] items-center">
+                    <span
+                        v-for="item in previewItems"
+                        :key="item.id"
+                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)]"
+                    >
+                        <NuxtImg
+                            v-if="item.img_url"
+                            :src="item.img_url"
+                            :alt="item.name || 'Meat cut'"
+                            class="h-full w-full object-cover"
+                            loading="lazy"
+                            sizes="36px"
+                            format="webp"
+                        />
+                        <UtensilsCrossed v-else :size="15" class="text-[#ffbd72]/65" :stroke-width="1.6" />
+                    </span>
+                    <span
+                        v-if="hiddenPreviewCount > 0"
+                        class="-ml-2 flex h-9 w-9 items-center justify-center rounded-full border border-black/30 bg-[#1b120c] text-[10px] font-black text-[#ffbd72]"
+                    >
+                        +{{ hiddenPreviewCount }}
+                    </span>
+                </span>
+
+                <span class="min-w-0">
+                    <span class="block text-sm font-extrabold text-white">Preview the meats</span>
+                    <span class="block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
+                        {{ totalModifierCount }} cuts · unlimited
+                    </span>
+                </span>
+
+                <ChevronRight :size="18" class="text-[#ffbd72]" />
             </button>
         </footer>
     </article>
@@ -213,61 +189,17 @@ function pushTo (map: Map<string, Modifier[]>, key: string, value: Modifier) {
   overflow: hidden;
 }
 
-.pkg-modifier-row {
-  touch-action: pan-x;
-  scrollbar-width: none;
-}
-.pkg-modifier-row::-webkit-scrollbar {
-  display: none;
-}
-
-.pkg-groups-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(246, 181, 109, 0.3) transparent;
-}
-.pkg-groups-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-.pkg-groups-scroll::-webkit-scrollbar-thumb {
-  background: rgba(246, 181, 109, 0.3);
-  border-radius: 999px;
-}
-
-/* Enhanced hover effects */
-article {
+.package-editorial-card,
+.package-meat-rail {
   transform: translateZ(0);
   -webkit-tap-highlight-color: transparent;
-}
-
-article:hover {
-  transform: translateY(-2px);
 }
 
 article:active {
   transform: translateY(0) scale(0.98);
 }
 
-/* Button hover enhancement */
 footer button {
   transition: all 0.200s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-footer button:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 8px 28px rgba(246, 181, 109, 0.45);
-}
-
-footer button:active {
-  transform: scale(0.97);
-}
-
-/* Modifier tile hover effects */
-.pkg-modifier-row > div:hover {
-  transform: scale(1.05);
-  transition: transform 0.150s ease-out;
-}
-
-.pkg-modifier-row > div:active {
-  transform: scale(0.95);
 }
 </style>
