@@ -1,7 +1,7 @@
 # Package Selection Responsive Spec (Authoritative)
 
 **Status:** Active (authoritative)
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-18
 **Applies to:** `tablet-ordering-pwa` package selection UX on Samsung Galaxy Tab A9 (`SM-X110`) and equivalent small-tablet viewports
 **Supersedes:** `docs/SPLIT-LAYOUT-IMPLEMENTATION.md`
 
@@ -38,37 +38,36 @@ This rule is intentionally CSS-viewport based (not physical pixel assumptions) t
 Each card must prioritize fast comparison:
 - Package name
 - Price + duration + guest math
-- Fixed-height modifier preview strip (show 4–6 thumbnails max)
+- Inclusion checklist for quick package comparison
+- Bottom meat preview rail (show up to 4 overlapping thumbnails)
 - `+N more` affordance when modifiers exceed preview limit
-- Explicit actions
+- Explicit `Preview the meats` action
 
 **Commit model:**
-- `Select Package` is the **only commit action**.
+- Package cards do not directly commit a package.
+- `Preview the meats` opens the split-pane meat browser.
+- `Choose [Package Name]` inside the meat browser is the **only commit action**.
 - Card body tap may highlight/focus card but must not silently commit unless explicitly approved in a separate UX decision.
 
 ---
 
 ## 4) Modifier details behavior
 
-Use on-demand details while preserving comparison context:
-- Landscape: optional **docked inspector** (page-level panel)
-- Portrait/narrow: bottom drawer fallback
-
-For docked inspector:
-- Do **not** use modal focus trap
-- Use normal tab order
-- Move focus intentionally on open
-- Provide visible close control
-- Support `Esc` to close
+Use the on-demand split-pane meat browser while preserving the comparison-first package screen:
+- Left pane: featured meat image, receipt code, group label, name, description, and service tags
+- Right pane: grouped Pork, Beef, and Chicken meat grid
+- Footer: `Keep Browsing` and `Choose [Package Name]`
+- Only the right meat-grid pane may scroll when the package contains many cuts
+- Provide visible close control, backdrop close, and `Esc` to close
 
 ---
 
 ## 5) Interaction safety (required)
 
-Current risk in live tree: both card container and CTA can emit package select.
+Current risk to avoid: previewing package details must never silently select a package.
 
 Required guardrails:
-- `View cuts` / details action must not trigger selection
+- `Preview the meats` / details action must not trigger selection
 - Event propagation must be explicit (`stop`/handler separation)
 - Selection state and commit state must be visually distinct
 
@@ -79,7 +78,7 @@ Required guardrails:
 - Replace emoji-only group markers with icon + text labels
 - Ensure clear focus-visible states for all interactive controls
 - Ensure keyboard reachable details open/close flow
-- Ensure selection semantics are explicit (radio-like or equivalent announced state)
+- Ensure the final package commit action is explicit and announced by button text
 
 ---
 
@@ -90,6 +89,8 @@ Required guardrails:
 - CTA remains consistently visible and non-jumping
 - Density tuned for 8.7" small-tablet readability
 - Comparison-first visual hierarchy over decorative motion
+- Shared `bg-grill-table` surface is allowed on package selection and welcome
+- `flame.gif` remains welcome-only and must not move into shared package/layout surfaces
 
 ---
 
@@ -98,10 +99,11 @@ Required guardrails:
 1. On SM-X110 landscape, cards are readable and comparable without forcing narrow 3-column compression.
 2. System chooses 3-column only when CSS viewport supports readable card width.
 3. If viewport is tighter, UI falls back to 2.5-card peek (landscape) or portrait fallback.
-4. `Select Package` is the only commit action.
+4. `Choose [Package Name]` inside the meat browser is the only commit action.
 5. Opening details never auto-selects a package.
-6. Modifier preview is capped and consistent (4–6 + `+N more`).
-7. Docked inspector behaves as page UI (no modal trap), with keyboard-close support.
+6. Modifier preview is capped and consistent (up to 4 thumbnails + `+N`).
+7. Meat browser uses featured pane + grouped grid, with scroll contained to the right pane.
+8. Welcome and package selection may share `bg-grill-table`; `flame.gif` stays welcome-only.
 
 ---
 

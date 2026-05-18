@@ -287,7 +287,7 @@ curl -G "https://192.168.100.7/api/menus/course" --data-urlencode "course=starte
 
 Example cURL:
 ```bash
-curl -G "https://192.168.100.7/api/menus/category" --data-urlencode "category=beverage"
+curl -G "https://192.168.100.7/api/menus/category" --data-urlencode "category=drinks"
 ```
 
 ---

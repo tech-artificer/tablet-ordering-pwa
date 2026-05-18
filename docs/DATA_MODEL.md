@@ -40,7 +40,7 @@ menuStore = {
   packages:  Package[],     // each Package carries .modifiers[] = meats for that package
   sides:     MenuItem[],
   desserts:  MenuItem[],
-  beverages: MenuItem[],
+  drinks:    MenuItem[],
   lastFetched: number,      // cache invalidation timestamp
 }
 
@@ -108,7 +108,7 @@ CartItem = {
   id:           number,
   menu_id:      number,
   name:         string,
-  category:     'meats' | 'sides' | 'desserts' | 'beverages',
+  category:     'meats' | 'sides' | 'desserts' | 'drinks',
   quantity:     number,
   is_unlimited: boolean,
   price:        number,
@@ -140,7 +140,7 @@ OrderStatus = 'building' | 'in-progress' | 'completed' | 'cancelled' | 'voided'
 | **Guest counter** (`/order/start`) | `deviceStore.table` | `orderStore.guestCount` |
 | **Package selection** (`/order/packageSelection`) | `menuStore.packages` | `orderStore.package` |
 | **Menu** (`/menu`) — meats | `orderStore.package.modifiers` | `orderStore.draft` |
-| **Menu** — sides / desserts / beverages | `menuStore.sides` / `.desserts` / `.beverages` | `orderStore.draft` |
+| **Menu** — sides / desserts / drinks | `menuStore.sides` / `.desserts` / `.drinks` | `orderStore.draft` |
 | **Review** (`/order/review`) | `orderStore.draft`, `package`, `guestCount` | submit → updates `rounds`, `draft`, server-mirror |
 | **In-session** (`/order/in-session`) | `orderStore.rounds`, `serverStatus`, `serverTotal` | refill toggle: `mode = 'refill'` then user builds `draft` again |
 | **Session end** | terminal `serverStatus` (via WS) or explicit | `orderStore` reset, `sessionStore.end()` |

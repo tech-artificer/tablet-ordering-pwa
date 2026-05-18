@@ -212,7 +212,7 @@ c) **hasPlacedOrder flag set in two places:**
 // For each item, validate:
 1. Menu item exists in POS system
 2. Item category is 'meats' or 'sides'
-3. Reject if category is 'desserts', 'beverages', etc.
+3. Reject if category is 'desserts', 'drinks', etc.
 ```
 
 **Error Responses:**
