@@ -26,7 +26,9 @@ export const useConnectionStore = defineStore("connection", () => {
    * Returns true if offline OR Reverb is not connected
    */
     const blocking = computed(() => {
-        const shouldBlock = !online.value || reverbState.value !== "connected"
+        // Track reactive dependencies; debouncedBlockingState itself is non-reactive.
+        online.value
+        reverbState.value
         return debouncedBlockingState
     })
 
