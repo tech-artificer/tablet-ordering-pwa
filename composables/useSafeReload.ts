@@ -14,7 +14,6 @@
  */
 
 import { readonly, ref } from "vue"
-import type { Ref } from "vue"
 import { logger } from "~/utils/logger"
 import { useOrderStore } from "~/stores/Order"
 

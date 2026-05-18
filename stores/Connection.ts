@@ -27,8 +27,8 @@ export const useConnectionStore = defineStore("connection", () => {
    */
     const blocking = computed(() => {
         // Track reactive dependencies; debouncedBlockingState itself is non-reactive.
-        online.value
-        reverbState.value
+        void online.value
+        void reverbState.value
         return debouncedBlockingState
     })
 

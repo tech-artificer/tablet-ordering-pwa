@@ -16,18 +16,11 @@ const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 
 // Load packages on mount
-onMounted(async () => {
+onMounted(() => {
     if (typeof window !== "undefined") {
         window.addEventListener("resize", onResize)
         document.addEventListener("keydown", handleKeydown)
     }
-
-    const timestamp = new Date().toISOString()
-    console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
-
-    // Packages are now preloaded at the welcome screen via AppBootstrap.preloadForOrdering()
-    // No need to fetch here - just use the cached data from MenuStore
-    console.log(`[✅ Packages Ready] ${menuStore.packages.length} packages available at ${timestamp}`)
 })
 
 // Carousel state retained intentionally so existing script behavior is preserved.
@@ -154,7 +147,6 @@ onUnmounted(() => {
 })
 
 const goBack = () => {
-    console.log(`[↩️ Package Selection Cancelled] User returned to guest counter at ${new Date().toISOString()}`)
     nuxtApp.$router.push("/order/start")
 }
 
@@ -176,7 +168,7 @@ const touchDeltaY = ref(0)
 const swipeThreshold = 50
 const verticalSwipeThreshold = 30
 
-function handleTouchStart (e: TouchEvent) {
+function _handleTouchStart (e: TouchEvent) {
     // Don't interfere with button clicks or scrollable areas
     const target = e.target as HTMLElement
     if (
@@ -195,7 +187,7 @@ function handleTouchStart (e: TouchEvent) {
     touchDeltaY.value = 0
 }
 
-function handleTouchMove (e: TouchEvent) {
+function _handleTouchMove (e: TouchEvent) {
     if (touchStartX.value === null || touchStartY.value === null) { return }
     const x = e.touches?.[0]?.clientX ?? 0
     const y = e.touches?.[0]?.clientY ?? 0

@@ -69,7 +69,7 @@ describe("packageSelection.vue — loading behaviour", () => {
     const page = src("pages/order/packageSelection.vue")
 
     it("loads packages on mount (preloaded from welcome screen)", () => {
-        expect(page).toContain("onMounted(async")
+        expect(page).toContain("onMounted(")
         expect(page).toContain("menuStore.packages")
     })
 

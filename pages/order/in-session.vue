@@ -25,7 +25,7 @@ const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as
 
 type OrderedItem = SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string; is_unlimited?: boolean; unit_price?: number }
 
-function normalizeHistoryItem (item: any, sourceRound: "initial" | "refill", sourceRoundLabel: string): OrderedItem {
+function _normalizeHistoryItem (item: any, sourceRound: "initial" | "refill", sourceRoundLabel: string): OrderedItem {
     return {
         id: Number(item?.menu_id ?? item?.id ?? 0),
         menu_id: Number(item?.menu_id ?? item?.id ?? 0),
@@ -118,10 +118,6 @@ function getStatusDotStyle (status: string): string {
         voided: "background:#f87171",
     }
     return m[status] ?? "background:#9ca3af"
-}
-
-function itemCategory (item: any): string {
-    return String(item?.category ?? "").toLowerCase()
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
