@@ -83,8 +83,8 @@ flowchart TD
 | M1 | `menuStore.fetchPackages()` | `GET` | `/api/v2/tablet/packages` | `auth:device` | `TabletApiController@packages` | ✅ route exists | Package carousel source. |
 | M2 | `menuStore.fetchPackageDetails(id)` | `GET` | `/api/v2/tablet/packages/{id}` | `auth:device` | `TabletApiController@packageDetails` | ✅ route exists | Includes package detail + meat selection context. |
 | M3 | `menuStore.fetchMeatCategories()` | `GET` | `/api/v2/tablet/meat-categories` | `auth:device` | `TabletApiController@meatCategories` | ✅ route exists | Meat tab data source. |
-| M4 | `menuStore.fetchTabletCategories()` | `GET` | `/api/v2/tablet/categories` | `auth:device` | `TabletApiController@categories` | ✅ route exists | Drives sides / desserts / beverages category resolution. |
-| M5 | `menuStore.fetchDesserts()` / `fetchSides()` / `fetchBeverages()` | `GET` | `/api/v2/tablet/categories/{slug}/menus` | `auth:device` | `TabletApiController@categoryMenus` | ✅ route exists | Category-specific menu list. |
+| M4 | `menuStore.fetchTabletCategories()` | `GET` | `/api/v2/tablet/categories` | `auth:device` | `TabletApiController@categories` | ✅ route exists | Drives sides / desserts / drinks category resolution. |
+| M5 | `menuStore.fetchDesserts()` / `fetchSides()` / `fetchDrinks()` | `GET` | `/api/v2/tablet/categories/{slug}/menus` | `auth:device` | `TabletApiController@categoryMenus` | ✅ route exists | Category-specific menu list. |
 
 ---
 
