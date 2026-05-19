@@ -15,6 +15,9 @@ const normalizePrice = <T extends { price?: unknown }>(item: T): T => ({
     price: toNumber(item.price),
 })
 
+/** Active AbortController for the current loadAllMenus call. Cancelled on re-entry. */
+let menuFetchController: AbortController | null = null
+
 const extractPayload = <T = any>(responseData: any): T | null => {
     if (responseData == null) { return null }
     return (responseData?.data ?? responseData) as T
@@ -79,18 +82,22 @@ export const useMenuStore = defineStore("menu", {
     },
 
     actions: {
-        async fetchPackages (this: any) {
+        async fetchPackages (this: any, signal?: AbortSignal) {
             this.loading.packages = true
             this.errors.packages = null
             const api = useApi()
 
             try {
-                const response = await api.get("/api/v2/tablet/packages")
+                const response = await api.get("/api/v2/tablet/packages", { signal })
                 const packages = extractArrayPayload<Package>(response?.data)
                 this.packages = packages.map(normalizePackage)
                 logger.debug("✅ Packages loaded:", this.packages.length)
                 return { success: true }
             } catch (error) {
+                if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
+                    logger.debug("⏹ Packages fetch aborted")
+                    return { success: false, aborted: true }
+                }
                 const errorMessage = (error as Error).message || "Failed to fetch packages"
                 this.errors.packages = errorMessage
                 logger.error("❌ Packages error:", error)
@@ -131,12 +138,12 @@ export const useMenuStore = defineStore("menu", {
             }
         },
 
-        async fetchDesserts (this: any) {
+        async fetchDesserts (this: any, signal?: AbortSignal) {
             this.loading.desserts = true
             this.errors.desserts = null
             const api = useApi()
             try {
-                const response = await api.get("/api/v2/tablet/categories/dessert/menus")
+                const response = await api.get("/api/v2/tablet/categories/dessert/menus", { signal })
                 const payload = extractPayload<any>(response?.data)
 
                 if (!Array.isArray(payload)) {
@@ -157,6 +164,10 @@ export const useMenuStore = defineStore("menu", {
                 logger.debug("✅ Desserts loaded:", this.desserts.length)
                 return { success: true }
             } catch (error) {
+                if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
+                    logger.debug("⏹ Desserts fetch aborted")
+                    return { success: false, aborted: true }
+                }
                 const errorMessage = (error as Error).message || "Failed to fetch desserts"
                 this.errors.desserts = errorMessage
                 logger.error("❌ Desserts error:", error)
@@ -167,16 +178,20 @@ export const useMenuStore = defineStore("menu", {
             }
         },
 
-        async fetchSides (this: any) {
+        async fetchSides (this: any, signal?: AbortSignal) {
             this.loading.sides = true
             this.errors.sides = null
             const api = useApi()
             try {
-                const response = await api.get("/api/v2/tablet/categories/sides/menus")
+                const response = await api.get("/api/v2/tablet/categories/sides/menus", { signal })
                 this.sides = extractArrayPayload<MenuItem>(response?.data).map(normalizePrice)
                 logger.debug("✅ Sides loaded:", this.sides.length)
                 return { success: true }
             } catch (error) {
+                if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
+                    logger.debug("⏹ Sides fetch aborted")
+                    return { success: false, aborted: true }
+                }
                 const errorMessage = (error as Error).message || "Failed to fetch sides"
                 this.errors.sides = errorMessage
                 logger.error("❌ Sides error:", error)
@@ -186,16 +201,20 @@ export const useMenuStore = defineStore("menu", {
             }
         },
 
-        async fetchMeats (this: any) {
+        async fetchMeats (this: any, signal?: AbortSignal) {
             this.loading.meats = true
             this.errors.meats = null
             const api = useApi()
             try {
-                const response = await api.get("/api/v2/tablet/categories/meats/menus")
+                const response = await api.get("/api/v2/tablet/categories/meats/menus", { signal })
                 this.meats = extractArrayPayload<MenuItem>(response?.data).map(normalizePrice)
                 logger.debug("✅ Meats loaded:", this.meats.length)
                 return { success: true }
             } catch (error) {
+                if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
+                    logger.debug("⏹ Meats fetch aborted")
+                    return { success: false, aborted: true }
+                }
                 const errorMessage = (error as Error).message || "Failed to fetch meats"
                 this.errors.meats = errorMessage
                 logger.error("❌ Meats error:", error)
@@ -205,12 +224,12 @@ export const useMenuStore = defineStore("menu", {
             }
         },
 
-        async fetchDrinks (this: any) {
+        async fetchDrinks (this: any, signal?: AbortSignal) {
             this.loading.drinks = true
             this.errors.drinks = null
             const api = useApi()
             try {
-                const response = await api.get("/api/v2/tablet/categories/drinks/menus")
+                const response = await api.get("/api/v2/tablet/categories/drinks/menus", { signal })
                 const payload = extractPayload<any>(response?.data)
 
                 if (!Array.isArray(payload)) {
@@ -231,6 +250,10 @@ export const useMenuStore = defineStore("menu", {
                 logger.debug("✅ Drinks loaded:", this.drinks.length)
                 return { success: true }
             } catch (error) {
+                if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
+                    logger.debug("⏹ Drinks fetch aborted")
+                    return { success: false, aborted: true }
+                }
                 const errorMessage = (error as Error).message || "Failed to fetch drinks"
                 this.errors.drinks = errorMessage
                 logger.error("❌ Drinks error:", error)
@@ -247,18 +270,32 @@ export const useMenuStore = defineStore("menu", {
                 return { success: true, fromCache: true }
             }
 
+            // Cancel any in-flight loadAllMenus call before starting a new one
+            if (menuFetchController) {
+                menuFetchController.abort()
+            }
+            menuFetchController = new AbortController()
+            const { signal } = menuFetchController
+
             logger.debug("🔄 Fetching fresh menu data...")
 
             // Load all menu data in parallel
             const fetches = [
-                this.fetchPackages(),
-                this.fetchMeats(),
-                this.fetchDesserts(),
-                this.fetchSides(),
-                this.fetchDrinks(),
+                this.fetchPackages(signal),
+                this.fetchMeats(signal),
+                this.fetchDesserts(signal),
+                this.fetchSides(signal),
+                this.fetchDrinks(signal),
             ]
 
             const results = await Promise.allSettled(fetches)
+
+            // Ignore results from an aborted request set
+            if (signal.aborted) {
+                return { success: false, fromCache: false, errors: [], aborted: true }
+            }
+
+            menuFetchController = null
             const allSucceeded = results.every(r => r.status === "fulfilled")
 
             if (allSucceeded) {

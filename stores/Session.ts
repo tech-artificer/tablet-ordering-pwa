@@ -339,6 +339,7 @@ export const useSessionStore = defineStore("session", () => {
             // If the session is already active (e.g. called again from packageSelection as an
             // auth-guard), skip the reset so the guest count and package the user already
             // set are not wiped out.
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const orderStore = useOrderStore()
             if (!state.isActive) {
                 state.terminalHandled = false
@@ -382,6 +383,7 @@ export const useSessionStore = defineStore("session", () => {
     // Must return promise to maintain async contract
         return sessionMutex.runExclusive(async () => {
             const timestamp = new Date().toISOString()
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const orderStore = useOrderStore()
             const currentOrderId = state.orderId
             const finalStatus = orderStore.serverStatus || "unknown"
@@ -409,6 +411,7 @@ export const useSessionStore = defineStore("session", () => {
         _unregisterVisibilitySync()
 
         // Reset order state when session ends
+        // Cross-store: called inside action body only (lazy, Pinia-safe)
         const orderStore = useOrderStore()
         orderStore.resetOrderState()
 
@@ -452,6 +455,7 @@ export const useSessionStore = defineStore("session", () => {
             stopSyncResyncTimer()
             _unregisterVisibilitySync()
 
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const orderStore = useOrderStore()
             orderStore.resetOrderState()
 
