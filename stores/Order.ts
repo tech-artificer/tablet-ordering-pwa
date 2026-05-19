@@ -46,6 +46,28 @@ const normalizeCartCategory = (category?: string | null): string | null => {
     return normalized
 }
 
+/**
+ * Minimal shape of a server response that appendRound can consume.
+ * Both initial-order and refill responses match this shape; fields are
+ * optional because the two endpoints use slightly different keys.
+ */
+type AppendRoundResponseData = {
+    order?: {
+        order_id?: number | string | null
+        refill_id?: number | null
+        total_amount?: number | string | null
+        total?: number | string | null
+        status?: string
+        created_at?: string
+    }
+    order_id?: number | string | null
+    refill_id?: number | null
+    total_amount?: number | string | null
+    total?: number | string | null
+    status?: string
+    created_at?: string
+}
+
 type SubmitOrderOptions = {
     headers?: Record<string, string>
     clientSubmissionId?: string
@@ -87,7 +109,7 @@ export const useOrderStore = defineStore("order", () => {
     function appendRound (
         kind: OrderRoundKind,
         sourceItems: CartItem[],
-        respData: any
+        respData: AppendRoundResponseData
     ): void {
         try {
             const orderObj = respData?.order ?? respData ?? {}

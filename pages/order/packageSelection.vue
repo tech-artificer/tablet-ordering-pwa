@@ -51,6 +51,10 @@ function handleCardSelect (pkg: Package) {
     selectedPackage.value = pkg
 }
 
+function handleCardFocus (pkg: Package) {
+    selectedPackage.value = pkg
+}
+
 function openModifierInspector (pkg: Package) {
     activeInspectorPackage.value = pkg
     featuredModifierId.value = ((pkg.modifiers || []) as Modifier[])[0]?.id ?? null
@@ -305,6 +309,7 @@ function handleTouchEnd () {
                                 :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
+                                @focus="handleCardFocus"
                                 @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
@@ -328,6 +333,7 @@ function handleTouchEnd () {
                                 :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
+                                @focus="handleCardFocus"
                                 @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
@@ -350,6 +356,7 @@ function handleTouchEnd () {
                                 :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
+                                @focus="handleCardFocus"
                                 @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
@@ -372,6 +379,7 @@ function handleTouchEnd () {
                                 :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
+                                @focus="handleCardFocus"
                                 @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />

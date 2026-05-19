@@ -14,6 +14,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "view-modifiers": [pkg: Package]
   select: [pkg: Package]
+  focus: [pkg: Package]
 }>()
 
 const packageDuration = computed(() => {
@@ -80,7 +81,8 @@ const inclusionChecklist = computed(() => {
             ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.45),0_22px_60px_rgba(0,0,0,0.52),0_0_40px_rgba(255,189,114,0.12)]'
             : 'border-[#4b3826]/80'"
         tabindex="0"
-        @click="emit('select', pkg)"
+        @click="emit('view-modifiers', pkg)"
+        @focus="emit('focus', pkg)"
     >
         <div
             v-if="pkg.is_popular"
@@ -170,7 +172,7 @@ const inclusionChecklist = computed(() => {
                 </span>
 
                 <span class="min-w-0">
-                    <span class="block text-sm font-extrabold text-white">View</span>
+                    <span class="block text-sm font-extrabold text-white">Preview the meats</span>
                     <span class="block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
                         {{ totalModifierCount }} cuts · unlimited
                     </span>
