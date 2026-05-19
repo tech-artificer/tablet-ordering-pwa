@@ -179,7 +179,9 @@ watch(submitBlockers, () => {
 
 const canSubmit = computed(() => submitBlockers.value.length === 0)
 const isButtonDisabled = computed(() =>
-    (!canSubmit.value && !(hasConfirmedInitialOrder.value && !orderStore.isRefillMode)) || submitState.shouldDisableSubmit.value
+    !isOnline.value ||
+    (!canSubmit.value && !(hasConfirmedInitialOrder.value && !orderStore.isRefillMode)) ||
+    submitState.shouldDisableSubmit.value
 )
 
 const buttonLabel = computed(() => {
@@ -340,6 +342,14 @@ async function submit (): Promise<void> {
                     </div>
                 </div>
 
+                <!-- Offline warning -->
+                <div
+                    v-if="!isOnline"
+                    class="rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error font-semibold text-center"
+                >
+                    No connection — ordering requires a live server
+                </div>
+
                 <!-- CTA -->
                 <button
                     type="button"
@@ -347,7 +357,8 @@ async function submit (): Promise<void> {
                     :disabled="isButtonDisabled"
                     @click="submit"
                 >
-                    <span v-if="orderStore.isSubmitting">Submitting…</span>
+                    <span v-if="!isOnline">No Connection</span>
+                    <span v-else-if="orderStore.isSubmitting">Submitting…</span>
                     <span v-else>{{ buttonLabel }} →</span>
                 </button>
 

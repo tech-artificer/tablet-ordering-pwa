@@ -35,18 +35,16 @@ describe("service worker navigation fallback", () => {
         expect(source).not.toMatch(/self\.addEventListener\(['"]install['"]/)
     })
 
-    it("queues initial orders but never background-syncs refill posts", () => {
+    it("order submission is live-only — no BackgroundSyncPlugin on any order route", () => {
         const source = readServiceWorkerSource()
 
+        // Both order routes must be registered
         expect(source).toContain("/\\/api\\/devices\\/create-order$/")
-        expect(source).toContain("plugins: [bgSyncPlugin]")
         expect(source).toContain("/\\/api\\/order\\/\\d+\\/refill$/")
 
-        const refillRouteBlock = source.slice(
-            source.indexOf("/\\/api\\/order\\/\\d+\\/refill$/"),
-            source.indexOf(")", source.indexOf("/\\/api\\/order\\/\\d+\\/refill$/"))
-        )
-
-        expect(refillRouteBlock).not.toContain("bgSyncPlugin")
+        // Neither route nor the file may reference BackgroundSyncPlugin or bgSyncPlugin
+        expect(source).not.toContain("bgSyncPlugin")
+        expect(source).not.toContain("BackgroundSyncPlugin")
+        expect(source).not.toContain("workbox-background-sync")
     })
 })
