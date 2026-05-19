@@ -42,13 +42,13 @@ function onResize () {
     viewportWidth.value = window.innerWidth
 }
 
-// Card focus and modifier inspector
-const focusedPackageId = ref<number | null>(null)
+// Card selection and modifier inspector
+const selectedPackage = ref<Package | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
 const featuredModifierId = ref<number | null>(null)
 
-function handleCardFocus (pkg: Package) {
-    focusedPackageId.value = pkg.id
+function handleCardSelect (pkg: Package) {
+    selectedPackage.value = pkg
 }
 
 function openModifierInspector (pkg: Package) {
@@ -243,8 +243,8 @@ function handleTouchEnd () {
                         <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold text-white font-raleway leading-tight text-balance">
                             Choose Your <span class="text-[#f6b56d]">Package</span>
                         </h1>
-                        <p class="text-xs tracking-widest uppercase text-white/55 mt-2 text-pretty">
-                            {{ guestCount }} {{ guestCount === 1 ? 'Guest' : 'Guests' }} &middot; Select Dining Package
+                        <p class="text-sm text-white/55 mt-2 text-pretty font-kanit">
+                            For <strong class="text-white font-bold">{{ guestCount }}</strong> {{ guestCount === 1 ? 'guest' : 'guests' }} &middot; tap a package to preview the meats inside
                         </p>
                     </div>
 
@@ -302,9 +302,10 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -324,9 +325,10 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -345,9 +347,10 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -366,14 +369,31 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
-                                @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
                     </div>
                 </div>
+
+                <!-- Floating CTA: appears when a package is selected -->
+                <Transition name="slide-cta">
+                    <div
+                        v-if="selectedPackage && !activeInspectorPackage"
+                        class="absolute bottom-6 left-1/2 z-20 -translate-x-1/2"
+                    >
+                        <button
+                            type="button"
+                            class="flex h-14 min-w-[18rem] items-center justify-center rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-10 text-base font-black tracking-wide text-[#140c06] shadow-[0_16px_48px_rgba(255,189,114,0.35)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black font-raleway"
+                            @click="proceedToMenuForPackage(selectedPackage!)"
+                        >
+                            Continue to Menu →
+                        </button>
+                    </div>
+                </Transition>
 
                 <!-- Modifier inspector overlay -->
                 <div
@@ -470,6 +490,9 @@ function handleTouchEnd () {
                                             Grilled at your table
                                         </span>
                                     </div>
+                                    <p class="mt-4 text-[11px] text-white/35 tracking-wide font-kanit">
+                                        ← → browse cuts &middot; all sides included &middot; unlimited refills
+                                    </p>
                                 </div>
                             </section>
 
@@ -615,9 +638,30 @@ function handleTouchEnd () {
     -webkit-tap-highlight-color: transparent;
 }
 
+.slide-cta-enter-active {
+    transition: opacity 200ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.slide-cta-leave-active {
+    transition: opacity 160ms ease, transform 200ms cubic-bezier(0.4, 0, 1, 1);
+}
+.slide-cta-enter-from,
+.slide-cta-leave-to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+}
+.slide-cta-enter-to,
+.slide-cta-leave-from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .animate-spin {
         animation: none;
+    }
+    .slide-cta-enter-active,
+    .slide-cta-leave-active {
+        transition: none;
     }
 }
 </style>
