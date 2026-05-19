@@ -193,6 +193,7 @@ export const useOrderStore = defineStore("order", () => {
 
     function getServerOrderId (): number | null {
         if (state.serverOrderId !== null) { return state.serverOrderId }
+        // Cross-store: called inside action body only (lazy, Pinia-safe)
         const sessionStore = useSessionStore()
         const id = sessionStore.getOrderId()
         return (id !== null && id !== undefined) ? Number(id) : null
@@ -638,6 +639,7 @@ export const useOrderStore = defineStore("order", () => {
             }
 
             const api = useApi()
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const sessionStore = useSessionStore()
             const terminalStatuses = new Set(["completed", "voided", "cancelled"])
 
@@ -725,6 +727,7 @@ export const useOrderStore = defineStore("order", () => {
             throw new Error("Cannot mark order created from empty response")
         }
 
+        // Cross-store: called inside action body only (lazy, Pinia-safe)
         const sessionStore = useSessionStore()
 
         const orderNumber = respData?.order?.order_number || respData?.order_number || respData?.order?.id
@@ -740,6 +743,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     async function initializeFromSession () {
+        // Cross-store: called inside action body only (lazy, Pinia-safe)
         const sessionStore = useSessionStore()
         const deviceStore = useDeviceStore()
 
@@ -825,6 +829,7 @@ export const useOrderStore = defineStore("order", () => {
             if (shouldClearStaleState) {
                 logger.info("No session.orderId found, resetting stale order state (with grace)")
                 await new Promise(resolve => setTimeout(resolve, 1500))
+                // Cross-store: called inside action body only (lazy, Pinia-safe)
                 const refreshed = useSessionStore()
                 if (!refreshed.getOrderId()) {
                     state.rounds = []
@@ -886,6 +891,7 @@ export const useOrderStore = defineStore("order", () => {
     const isRefillMode = computed(() => state.mode === "refill")
     // hasPlacedOrder is true when rounds exist OR when serverOrderId is recovered (e.g. via initializeFromSession)
     const hasPlacedOrder = computed(() => {
+        // Cross-store: called inside computed callback only (lazy, Pinia-safe)
         const sessionStore = useSessionStore()
         return state.rounds.length > 0 ||
             state.serverOrderId !== null ||

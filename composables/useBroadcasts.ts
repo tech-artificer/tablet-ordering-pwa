@@ -1,5 +1,6 @@
 import { ref, unref, watch } from "vue"
 import { ElNotification, ElMessage } from "element-plus"
+import type { Channel } from "laravel-echo"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
@@ -8,10 +9,26 @@ import { extractOrderId } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 
+/** Echo channel with the concrete `name` property exposed by all Pusher-backed channels */
+type EchoChannel = Channel & { name: string }
+
 // ─── WebSocket event interfaces ────────────────────────────────────────────
 // Shapes MUST stay in sync with woosoo-nexus broadcast events.
 // Reference: docs/websocket-events.md
 // Note: backend does NOT send `eventId` — removed from all interfaces.
+
+/** Single service request embedded in order events */
+interface ServiceRequest {
+  id: number
+  order_id: string
+  table_id: number
+  device_id: number
+  type: string
+  message?: string
+  status: "pending" | "acknowledged" | "completed"
+  created_at: string
+  updated_at: string
+}
 
 interface OrderCreatedEvent {
   order: {
@@ -40,7 +57,7 @@ interface OrderCreatedEvent {
     is_printed: boolean
     device: { id: number; name: string }
     table: { id: number; name: string }
-    serviceRequests: any[]
+    serviceRequests: ServiceRequest[]
   }
 }
 
@@ -86,7 +103,7 @@ interface OrderCompletedEvent {
     is_printed: boolean
     device: { id: number; name: string }
     table: { id: number; name: string }
-    serviceRequests: any[]
+    serviceRequests: ServiceRequest[]
   }
 }
 
@@ -101,17 +118,7 @@ interface OrderCancelledEvent {
 }
 
 interface ServiceRequestEvent {
-  service_request: {
-    id: number
-    order_id: string
-    table_id: number
-    device_id: number
-    type: string
-    message?: string
-    status: "pending" | "acknowledged" | "completed"
-    created_at: string
-    updated_at: string
-  }
+  service_request: ServiceRequest
 }
 
 interface DeviceControlEvent {
@@ -121,7 +128,7 @@ interface DeviceControlEvent {
     volume?: number
     url?: string
     duration?: number
-    [key: string]: any
+    [key: string]: unknown
   }
   deviceId: number
 }
@@ -133,13 +140,13 @@ export const useBroadcasts = () => {
     const { triggerSessionEnd } = useSessionEndFlow()
 
     const getCurrentOrderId = (): string | number | null => unref(orderStore.serverOrderId)
-    const getEventOrderId = (payload: { order?: Record<string, any> }): string | number | null => extractOrderId(payload?.order ?? payload)
+    const getEventOrderId = (payload: { order?: Record<string, unknown> }): string | number | null => extractOrderId(payload?.order ?? payload)
 
-    let deviceChannel: any = null
-    let orderChannel: any = null
-    let serviceRequestChannel: any = null
-    let deviceControlChannel: any = null
-    let sessionChannel: any = null
+    let deviceChannel: EchoChannel | null = null
+    let orderChannel: EchoChannel | null = null
+    let serviceRequestChannel: EchoChannel | null = null
+    let deviceControlChannel: EchoChannel | null = null
+    let sessionChannel: EchoChannel | null = null
     let subscribedSessionId: number | string | null = null
     let stopSessionIdWatcher: (() => void) | null = null
     let reloadTimeoutId: number | null = null
@@ -147,8 +154,8 @@ export const useBroadcasts = () => {
     // BUG-7 Fix: Exponential backoff for WebSocket reconnection
     let reconnectAttempts = 0
     let reconnectTimer: number | null = null
-    let boundPusherConnection: any = null
-    let boundStateChangeHandler: ((states: any) => void) | null = null
+    let boundPusherConnection: unknown = null
+    let boundStateChangeHandler: ((states: { current: string; previous: string }) => void) | null = null
     const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30] // seconds, max 30s
     const MAX_RECONNECTION_ATTEMPTS = 10
 
@@ -233,7 +240,7 @@ export const useBroadcasts = () => {
         const { order } = event
         logger.debug("[📨 .order.updated]", { order_id: order.order_id, status: order.status })
 
-        const statusMessages: Record<string, { title: string; message: string; type: any }> = {
+        const statusMessages: Record<string, { title: string; message: string; type: "success" | "warning" | "info" | "error" }> = {
             preparing: {
                 title: "Order in Progress",
                 message: "Your order is being prepared by our kitchen!",
@@ -588,9 +595,10 @@ export const useBroadcasts = () => {
     }
 
     const unbindConnectionStateHandler = () => {
-        if (boundPusherConnection && boundStateChangeHandler && typeof boundPusherConnection.unbind === "function") {
+        const conn = boundPusherConnection as Record<string, unknown> | null
+        if (conn && boundStateChangeHandler && typeof conn.unbind === "function") {
             try {
-                boundPusherConnection.unbind("state_change", boundStateChangeHandler)
+                (conn.unbind as (event: string, handler: unknown) => void)("state_change", boundStateChangeHandler)
             } catch (e) {
                 logger.debug("[Broadcasts] unbind state_change failed", e)
             }
@@ -611,7 +619,7 @@ export const useBroadcasts = () => {
 
         unbindConnectionStateHandler()
 
-        boundStateChangeHandler = (states: any) => {
+        boundStateChangeHandler = (states: { current: string; previous: string }) => {
             const connectionStore = useConnectionStore()
             const timestamp = new Date().toISOString()
             logger.debug(`[🔗 WebSocket State Change] ${states.previous || "?"} → ${states.current} at ${timestamp}`)
