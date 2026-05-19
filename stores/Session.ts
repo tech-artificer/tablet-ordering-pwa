@@ -370,12 +370,6 @@ export const useSessionStore = defineStore("session", () => {
                 _registerVisibilitySync()
             }
 
-            // Centralized lightweight flag to signal session is active for simple pages
-            // Avoid direct localStorage writes from pages/components — use this store instead
-            if (typeof window !== "undefined" && window.localStorage) {
-                try { window.localStorage.setItem("session_active", "1") } catch (e) { logger.warn("[SessionStore] failed to set session_active", e) }
-            }
-
             logger.info("[Session Started] Ready for guest ordering flow")
             logger.info("[SessionStore] Session started")
 
@@ -420,22 +414,6 @@ export const useSessionStore = defineStore("session", () => {
 
         logger.info(`[Session] State cleared at ${timestamp}`)
 
-        // Force persist to localStorage immediately to avoid hydration issues
-        if (typeof window !== "undefined" && window.localStorage) {
-            try {
-                // Re-save session store with cleared values
-                window.localStorage.setItem("session-store", JSON.stringify({
-                    sessionId: null,
-                    orderId: null,
-                    isActive: false
-                }))
-
-                logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
-                logger.debug("✅ Session and order stores cleared and persisted")
-            } catch (e) {
-                logger.warn("Failed to persist cleared stores:", e)
-            }
-        }
         // Remove lightweight active flag from localStorage (SSR-safe)
         if (typeof window !== "undefined" && window.localStorage) {
             try { window.localStorage.removeItem("session_active") } catch (e) { logger.debug("[SessionStore] failed to remove session_active", e) }
@@ -443,10 +421,6 @@ export const useSessionStore = defineStore("session", () => {
         // Clear persisted idempotency key — prevents previous-session key leaking into next order attempt
         if (typeof sessionStorage !== "undefined") {
             try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { logger.debug("[SessionStore] failed to clear idempotency key", e) }
-        }
-        // Clear offline order queue — queued orders must not survive session end (session boundary safety)
-        if (typeof localStorage !== "undefined") {
-            try { localStorage.removeItem("woosoo_order_queue") } catch (e) { logger.debug("[SessionStore] failed to clear offline order queue", e) }
         }
     }
 
@@ -481,25 +455,8 @@ export const useSessionStore = defineStore("session", () => {
             const orderStore = useOrderStore()
             orderStore.resetOrderState()
 
-            // Force persist to localStorage immediately
-            if (typeof window !== "undefined" && window.localStorage) {
-                try {
-                    window.localStorage.setItem("session-store", JSON.stringify({
-                        sessionId: null,
-                        orderId: null,
-                        isActive: false
-                    }))
-
-                    logger.debug("✅ Session and order stores fully reset and persisted")
-                } catch (e) {
-                    logger.warn("Failed to persist reset stores:", e)
-                }
-            }
             if (typeof window !== "undefined" && window.localStorage) {
                 try { window.localStorage.removeItem("session_active") } catch (e) { logger.debug("[SessionStore] failed to remove session_active", e) }
-                // Reset is also a session boundary (e.g., device reset/end-of-day):
-                // clear any stale offline queued orders.
-                try { window.localStorage.removeItem("woosoo_order_queue") } catch (e) { logger.debug("[SessionStore] failed to clear offline order queue on reset", e) }
             }
             if (typeof sessionStorage !== "undefined") {
                 try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { logger.debug("[SessionStore] failed to clear idempotency key on reset", e) }

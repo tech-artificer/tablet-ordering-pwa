@@ -32,7 +32,7 @@ export async function recoverActiveOrderState (source: string = "unknown") {
     const orderId = unref(orderStore.serverOrderId) || sessionStore.getOrderId()
     const packageId = Number(orderStore.getPackage?.value?.id || 0) || null
     const status = String(unref(orderStore.serverStatus) || "").toLowerCase()
-    const hasSessionFlag = sessionStore.getIsActive() || (typeof window !== "undefined" && window.localStorage?.getItem("session_active") === "1")
+    const hasSessionFlag = sessionStore.getIsActive()
 
     if (!orderId) {
         return {

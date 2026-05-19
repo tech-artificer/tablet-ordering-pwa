@@ -787,9 +787,6 @@ export const useOrderStore = defineStore("order", () => {
 
                     sessionStore.setOrderId(Number(activeOrderId))
                     sessionStore.setIsActive(true)
-                    if (typeof window !== "undefined" && window.localStorage) {
-                        try { window.localStorage.setItem("session_active", "1") } catch (e) { /* ignore */ }
-                    }
 
                     state.serverOrderId = Number(activeOrderId)
                     state.serverStatus = activeStatus
