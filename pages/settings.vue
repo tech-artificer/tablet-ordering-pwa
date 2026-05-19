@@ -6,6 +6,7 @@ import { logger } from "../utils/logger"
 import { deleteTabletPwaCaches, unregisterCurrentAppServiceWorkers } from "../utils/pwaReset"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { useAppUpdate } from "~/composables/useAppUpdate"
+import { useRuntimeConfigOverride } from "~/composables/useRuntimeConfigOverride"
 
 // @ts-ignore - Nuxt auto-imports
 definePageMeta({
@@ -14,6 +15,7 @@ definePageMeta({
 
 const deviceStore = useDeviceStore()
 const config = useRuntimeConfig()
+const runtimeOverride = useRuntimeConfigOverride()
 const router = useRouter()
 
 // App update - staff controlled only
@@ -1056,23 +1058,23 @@ onMounted(async () => {
                     </div>
                     <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                         <label class="text-sm text-white/50">API Base URL</label>
-                        <span class="font-mono text-sm break-all text-right">{{ config.public.apiBaseUrl || "unknown" }}</span>
+                        <span class="font-mono text-sm break-all text-right">{{ runtimeOverride.apiBaseUrl || "unknown" }}</span>
                     </div>
                     <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                         <label class="text-sm text-white/50">Reverb Host</label>
-                        <span class="font-mono text-sm">{{ config.public.reverb?.host || "unknown" }}</span>
+                        <span class="font-mono text-sm">{{ runtimeOverride.reverb.host || "unknown" }}</span>
                     </div>
                     <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                         <label class="text-sm text-white/50">Reverb Port</label>
-                        <span class="font-mono text-sm">{{ config.public.reverb?.port || "unknown" }}</span>
+                        <span class="font-mono text-sm">{{ runtimeOverride.reverb.port > 0 ? runtimeOverride.reverb.port : "unknown" }}</span>
                     </div>
                     <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                         <label class="text-sm text-white/50">Reverb Scheme</label>
-                        <span class="font-mono text-sm">{{ config.public.reverb?.scheme || "unknown" }}</span>
+                        <span class="font-mono text-sm">{{ runtimeOverride.reverb.scheme || "unknown" }}</span>
                     </div>
                     <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                         <label class="text-sm text-white/50">Reverb Path</label>
-                        <span class="font-mono text-sm">{{ config.public.reverb?.path || "unknown" }}</span>
+                        <span class="font-mono text-sm">{{ runtimeOverride.reverb.path || "unknown" }}</span>
                     </div>
                 </div>
             </div>

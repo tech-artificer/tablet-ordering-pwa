@@ -192,6 +192,13 @@ onMounted(async () => {
         if (authenticated) {
             scheduleBroadcastInitialization()
         }
+    } catch (err) {
+        logger.error("[App] Bootstrap failed unexpectedly", err)
+        try {
+            await router.replace("/settings")
+        } catch {
+            // router unavailable — app.vue will render in unauthenticated state
+        }
     } finally {
         isLoading.value = false
     }
