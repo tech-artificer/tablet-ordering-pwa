@@ -420,7 +420,7 @@ function handleTouchEnd () {
                                 <span class="rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
                                     {{ activeInspectorPackage.name }}
                                 </span>
-                                <span class="truncate text-sm font-bold text-white/75">
+                                <span class="truncate text-sm font-bold text-white">
                                     {{ inspectorSummary }}
                                 </span>
                             </div>
@@ -487,7 +487,7 @@ function handleTouchEnd () {
                                     <h2 class="mt-2 font-raleway text-[1.75rem] font-extrabold leading-tight text-white">
                                         {{ featuredModifier?.name || "No meat selected" }}
                                     </h2>
-                                    <p class="mt-2 text-sm leading-relaxed text-white/75">
+                                    <p class="mt-2 text-sm leading-relaxed text-white/90">
                                         {{ featuredDescription }}
                                     </p>
                                     <div class="mt-4 flex flex-wrap gap-2">
@@ -550,7 +550,7 @@ function handleTouchEnd () {
                                                     <UtensilsCrossed :size="34" :stroke-width="1.35" />
                                                 </div>
                                             </div>
-                                            <p class="line-clamp-2 px-3 py-3 text-xs font-bold leading-tight text-white/82">
+                                            <p class="line-clamp-2 px-3 py-3 text-xs font-bold leading-tight text-white">
                                                 {{ modifier.name }}
                                             </p>
                                         </button>

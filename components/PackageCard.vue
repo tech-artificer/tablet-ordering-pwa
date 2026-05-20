@@ -156,12 +156,7 @@ const inclusionChecklist = computed(() => {
                     </span>
                 </span>
 
-                <span class="min-w-0 overflow-hidden">
-                    <span class="block text-sm font-extrabold text-white">View</span>
-                    <span class="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
-                        {{ totalModifierCount }} cuts · unlimited
-                    </span>
-                </span>
+                <span class="text-sm font-extrabold text-white">View</span>
 
                 <ChevronRight :size="18" class="text-[#ffbd72]" />
             </button>
