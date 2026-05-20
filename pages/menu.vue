@@ -457,7 +457,7 @@ const categoryError = computed(() => {
                         <!-- Meats View (Grouped by Category) -->
                         <div v-else-if="activeCategory === 'meats'">
                             <grouped-meats-list
-                                :meats="meats"
+                                :meats="decorateMeats"
                                 :get-item-quantity="getItemQuantity"
                                 :max-quantity="UNLIMITED_ITEM_CAP"
                                 @add-item="addToOrder"

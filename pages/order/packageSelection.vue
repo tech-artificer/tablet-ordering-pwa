@@ -245,7 +245,7 @@ function handleTouchEnd () {
                             Package Selection
                         </p>
                         <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold text-white font-raleway leading-tight text-balance">
-                            Choose Your <span class="text-[#f6b56d]">Package</span>
+                            Choose Your <span class="text-[#f6b56d] italic">Package</span>
                         </h1>
                         <p class="text-sm text-white/55 mt-2 text-pretty font-kanit">
                             For <strong class="text-white font-bold">{{ guestCount }}</strong> {{ guestCount === 1 ? 'guest' : 'guests' }} &middot; tap a package to preview the meats inside
@@ -420,7 +420,7 @@ function handleTouchEnd () {
                                 <span class="rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
                                     {{ activeInspectorPackage.name }}
                                 </span>
-                                <span class="truncate text-sm font-bold text-white/58">
+                                <span class="truncate text-sm font-bold text-white/75">
                                     {{ inspectorSummary }}
                                 </span>
                             </div>
@@ -487,7 +487,7 @@ function handleTouchEnd () {
                                     <h2 class="mt-2 font-raleway text-[1.75rem] font-extrabold leading-tight text-white">
                                         {{ featuredModifier?.name || "No meat selected" }}
                                     </h2>
-                                    <p class="mt-2 text-sm leading-relaxed text-white/58">
+                                    <p class="mt-2 text-sm leading-relaxed text-white/75">
                                         {{ featuredDescription }}
                                     </p>
                                     <div class="mt-4 flex flex-wrap gap-2">
@@ -498,7 +498,7 @@ function handleTouchEnd () {
                                             Grilled at your table
                                         </span>
                                     </div>
-                                    <p class="mt-4 text-[11px] text-white/35 tracking-wide font-kanit">
+                                    <p class="mt-4 text-xs text-white/55 tracking-wide font-kanit">
                                         ← → browse cuts &middot; all sides included &middot; unlimited refills
                                     </p>
                                 </div>
@@ -573,7 +573,7 @@ function handleTouchEnd () {
                             </button>
                             <button
                                 type="button"
-                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black uppercase text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                                 @click="chooseActiveInspectorPackage"
                             >
                                 Choose {{ activeInspectorPackage.name }} →
