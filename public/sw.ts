@@ -41,12 +41,35 @@ self.addEventListener('message', (event) => {
   }
 })
 
-// Navigation fallback: bind to the revisioned root app shell.
-// The prerendered "/" entry is revisioned by Nuxt, so this avoids the stale
-// unrevisioned "/index.html" path staying alive across deployments.
+// Navigation strategy: NETWORK-FIRST with offline fallback to the precached
+// app shell.
+//
+// Why network-first (not precache-bound): kiosk tablets never close the tab,
+// so a precache-bound shell keeps serving stale UI across deploys forever.
+// A reachable tablet (these run on the venue LAN) must always get the freshest
+// index.html so a new build is picked up on the next controlled reload. When
+// the network is unavailable we fall back to the revisioned precached "/" so
+// the app still boots offline.
+const offlineShellHandler = createHandlerBoundToURL('/')
+
 registerRoute(
   new NavigationRoute(
-    createHandlerBoundToURL('/'),
+    async (options) => {
+      try {
+        // Always try the live document first (LAN is fast; this is what makes
+        // a new deployment actually reflect on the tablet).
+        const networkResponse = await fetch(options.request)
+        if (networkResponse && networkResponse.ok) {
+          return networkResponse
+        }
+        // Non-OK (5xx/HTML error) — fall back to the cached shell rather than
+        // showing a server error page on a customer-facing kiosk.
+        return await offlineShellHandler(options)
+      } catch {
+        // Offline / network failure — serve the precached app shell.
+        return offlineShellHandler(options)
+      }
+    },
     {
       denylist: [
         /^\/api/,

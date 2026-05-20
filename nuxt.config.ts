@@ -112,6 +112,10 @@ export default defineNuxtConfig({
     nitro: {
         prerender: {
             crawlLinks: false,
+            // "/build-info.json" MUST be prerendered so `nuxi generate` emits it
+            // as a static file stamped with THIS build's sha. useBuildVersion
+            // fetches it (no-store, not precached) to detect a stale tablet —
+            // without this it 404s in the static output and detection no-ops.
             routes: ["/", "/build-info.json"],
         },
     },
@@ -178,7 +182,9 @@ export default defineNuxtConfig({
 
         client: {
             installPrompt: true,
-            periodicSyncForUpdates: 3600,
+            // Secondary timer (vite-pwa built-in). Primary update polling is the
+            // explicit 60s loop in useAppUpdate.ts; 600s here is a safety backup.
+            periodicSyncForUpdates: 600,
         },
     },
 
