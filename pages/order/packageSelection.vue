@@ -436,7 +436,7 @@ function handleTouchEnd () {
                         </header>
 
                         <div class="grid min-h-0 grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] divide-x divide-[#3a2819]/80">
-                            <section class="featured-meat-pane min-h-0 px-7 py-6">
+                            <section class="featured-meat-pane min-h-0 overflow-y-auto px-7 py-6">
                                 <div class="relative h-[45vh] min-h-[18rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
                                     <span
                                         v-if="featuredModifier?.receipt_name"
@@ -494,7 +494,7 @@ function handleTouchEnd () {
                                         <span class="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">
                                             Unlimited refills
                                         </span>
-                                        <span class="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/62">
+                                        <span class="rounded-full border border-white/20 bg-white/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white">
                                             Grilled at your table
                                         </span>
                                     </div>
@@ -566,7 +566,7 @@ function handleTouchEnd () {
                         <footer class="flex min-h-[4.75rem] items-center justify-end gap-3 border-t border-[#4a3320]/70 bg-black/18 px-7">
                             <button
                                 type="button"
-                                class="h-12 min-w-[9.5rem] rounded-full border border-white/14 bg-white/6 px-6 text-sm font-extrabold text-white/82 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                class="h-12 min-w-[9.5rem] rounded-full border border-white/20 bg-white/6 px-6 text-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                                 @click="closeInspector"
                             >
                                 Keep Browsing
