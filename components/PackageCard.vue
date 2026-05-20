@@ -7,11 +7,13 @@ import { displayMeatGroupLabel, groupPackageModifierPreviews } from "../utils/pa
 const props = defineProps<{
   pkg: Package
   guestCount: number
+  isSelected: boolean
   formatCurrency:(value: number | string) => string
 }>()
 
 const emit = defineEmits<{
   "view-modifiers": [pkg: Package]
+  select: [pkg: Package]
   focus: [pkg: Package]
 }>()
 
@@ -54,31 +56,24 @@ const packageSubtitle = computed(() => {
     return groups.length ? `${groups.join(" + ")} lineup` : "Unlimited Korean BBQ spread"
 })
 
-const packageDescription = computed(() => {
-    const description = String((props.pkg as any)?.description || "").trim()
-    if (description) { return description }
-    if (modifierGroups.value.length) {
-        return `A curated unlimited spread with ${totalModifierCount.value} meat cuts, refillable sides, and grill-table service.`
-    }
-    return "A complete Korean BBQ package prepared for a smooth table-service experience."
-})
-
 const inclusionChecklist = computed(() => {
     const groupItems = modifierGroups.value.map(group => `${group.items.length} unlimited ${displayMeatGroupLabel(group.label).toLowerCase()} cuts`)
     return [
         ...groupItems.slice(0, 3),
         "Standard banchan set",
-        "Steamed rice and lettuce wraps",
-        "Refillable Korean iced tea",
     ].slice(0, 4)
 })
 </script>
 
 <template>
     <article
-        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border border-[#4b3826]/80 bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-6 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)]"
+        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-6 py-6 text-white shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)] cursor-pointer"
+        :class="isSelected
+            ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.45),0_22px_60px_rgba(0,0,0,0.52),0_0_40px_rgba(255,189,114,0.12)]'
+            : 'border-[#4b3826]/80'"
         tabindex="0"
-        @focusin="emit('focus', pkg)"
+        @click="emit('select', pkg)"
+        @focus="emit('focus', pkg)"
     >
         <div
             v-if="pkg.is_popular"
@@ -90,31 +85,25 @@ const inclusionChecklist = computed(() => {
 
         <!-- Header -->
         <header class="min-w-0">
-            <h2 class="font-raleway text-[1.65rem] font-extrabold tracking-normal text-[#ffbd72] leading-tight">
+            <h2 class="font-raleway text-[1.65rem] font-extrabold tracking-normal text-white leading-tight">
                 {{ pkg.name }}
             </h2>
 
-            <p class="mt-1 text-sm font-bold text-white/52">
-                {{ packageSubtitle }}
-            </p>
-
-            <p class="mt-3 line-clamp-4 max-w-[34rem] text-sm leading-relaxed text-white/58">
-                {{ packageDescription }}
+            <p class="mt-1 line-clamp-2 text-sm font-bold text-white/52">
+                {{ (pkg as any).description || packageSubtitle }}
             </p>
 
             <div class="mt-6 flex items-end gap-3">
                 <div class="font-kanit text-[2.35rem] font-extrabold leading-none text-white">
                     {{ formatCurrency(Number(pkg.price) * guestCount) }}
                 </div>
-                <div class="pb-1.5 font-kanit text-xs font-bold text-white/42">
-                    {{ formatCurrency(pkg.price) }}/guest
-                    <span v-if="packageDuration" class="mx-1">·</span>
-                    <span v-if="packageDuration">{{ packageDuration }}</span>
+                <div class="min-w-0 overflow-hidden pb-1.5 font-kanit text-xs font-bold text-white/42">
+                    <span class="block truncate">{{ formatCurrency(pkg.price) }}/guest<span v-if="packageDuration"> · {{ packageDuration }}</span></span>
                 </div>
             </div>
         </header>
 
-        <section class="mt-5 min-h-0 border-t border-white/10 pt-4">
+        <section class="mt-5 min-h-0 overflow-hidden border-t border-white/10 pt-4">
             <ul class="space-y-2.5">
                 <li
                     v-for="item in inclusionChecklist"
@@ -167,9 +156,9 @@ const inclusionChecklist = computed(() => {
                     </span>
                 </span>
 
-                <span class="min-w-0">
-                    <span class="block text-sm font-extrabold text-white">Preview the meats</span>
-                    <span class="block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
+                <span class="min-w-0 overflow-hidden">
+                    <span class="block text-sm font-extrabold text-white">View</span>
+                    <span class="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
                         {{ totalModifierCount }} cuts · unlimited
                     </span>
                 </span>

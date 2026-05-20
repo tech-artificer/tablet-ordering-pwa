@@ -2,8 +2,40 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, it, expect } from "vitest"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 function src (relativePath: string): string {
-    return readFileSync(resolve(__dirname, "..", relativePath), "utf-8")
+    return readFileSync(resolve(PROJECT_ROOT, relativePath), "utf-8")
+}
+
+/**
+ * Extract the full function body for a const function declaration.
+ * Uses brace counting to handle nested functions/objects correctly.
+ */
+function extractFunctionBody (source: string, functionName: string): string | null {
+    // Find the start of the function declaration
+    const declPattern = new RegExp(`const\\s+${functionName}\\s*=\\s*async`)
+    const match = source.match(declPattern)
+    if (!match || match.index === undefined) { return null }
+
+    let pos = match.index
+    // Move to opening brace of function body
+    const openBrace = source.indexOf("{", pos)
+    if (openBrace === -1) { return null }
+
+    let braceCount = 1
+    pos = openBrace + 1
+    while (braceCount > 0 && pos < source.length) {
+        if (source[pos] === "{") {
+            braceCount++
+        } else if (source[pos] === "}") {
+            braceCount--
+        }
+        pos++
+    }
+
+    return source.slice(openBrace, pos)
 }
 
 // ---------------------------------------------------------------------------
@@ -37,7 +69,7 @@ describe("packageSelection.vue — loading behaviour", () => {
     const page = src("pages/order/packageSelection.vue")
 
     it("loads packages on mount (preloaded from welcome screen)", () => {
-        expect(page).toContain("onMounted(async")
+        expect(page).toContain("onMounted(")
         expect(page).toContain("menuStore.packages")
     })
 
@@ -65,6 +97,13 @@ describe("packageSelection.vue — package selection flow", () => {
     it("proceedToMenuForPackage exists and handles navigation", () => {
         expect(page).toContain("const proceedToMenuForPackage")
         expect(page).toContain("nuxtApp.$router.push")
+    })
+
+    it("proceedToMenuForPackage body does not contain loadAllMenus (uses preloaded data)", () => {
+        // Use brace-counting extraction to get full function body
+        const functionBody = extractFunctionBody(page, "proceedToMenuForPackage")
+        expect(functionBody).not.toBeNull()
+        expect(functionBody).not.toMatch(/loadAllMenus/)
     })
 })
 

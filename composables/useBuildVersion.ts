@@ -2,7 +2,10 @@
  * Build Version Check Composable
  *
  * Monitors for build mismatches between deployed version and running app.
- * Triggers recovery flow if stale chunks are detected.
+ * Triggers SW update check if stale shell is detected (safety net for kiosk auto-update).
+ *
+ * This is a secondary safety net - the primary update mechanism is the SW lifecycle
+ * managed by useAppUpdate. This catches cases where the SW itself might be stale.
  */
 
 import { readonly, ref } from "vue"
@@ -11,6 +14,10 @@ import { logger } from "~/utils/logger"
 const BUILD_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 const BUILD_CHECK_KEY = "pwa-last-build-check"
 const BUILD_MISMATCH_THRESHOLD = 2 // Require 2 consecutive mismatches
+
+// Debounce between triggering SW update checks
+const SW_UPDATE_CHECK_COOLDOWN_MS = 60 * 1000 // 1 minute
+let lastSwUpdateCheck = 0
 
 interface BuildInfo {
     sha: string
@@ -103,13 +110,35 @@ export function useBuildVersion () {
                 if (mismatchCount.value >= BUILD_MISMATCH_THRESHOLD) {
                     hasMismatch.value = true
 
-                    // Store for recovery page
-                    sessionStorage.setItem("pwa-build-mismatch", JSON.stringify({
-                        stored: result.current.sha,
-                        current: result.server?.sha,
-                        timestamp: Date.now(),
-                    }))
+                    // Store for recovery page (used if user manually navigates there)
+                    try {
+                        sessionStorage.setItem("pwa-build-mismatch", JSON.stringify({
+                            stored: result.current.sha,
+                            current: result.server?.sha,
+                            timestamp: Date.now(),
+                        }))
+                    } catch { /* ignore storage errors */ }
 
+                    // Trigger SW update check to activate the new version
+                    // This is the primary auto-update mechanism - useAppUpdate will handle the guarded reload
+                    const now = Date.now()
+                    if (now - lastSwUpdateCheck >= SW_UPDATE_CHECK_COOLDOWN_MS) {
+                        lastSwUpdateCheck = now
+                        logger.info("[BuildVersion] Build mismatch confirmed, triggering SW update check")
+
+                        // Trigger SW registration update check
+                        if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+                            navigator.serviceWorker.getRegistration().then((reg) => {
+                                if (reg) {
+                                    reg.update().catch((err) => {
+                                        logger.debug("[BuildVersion] SW update check failed:", err)
+                                    })
+                                }
+                            }).catch(() => { /* ignore */ })
+                        }
+                    }
+
+                    // Only redirect to recovery if explicitly requested (legacy behavior)
                     if (redirectOnMismatch) {
                         window.location.href = "/recovery?type=chunk-load&source=build-check"
                         return false

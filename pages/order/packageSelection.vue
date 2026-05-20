@@ -16,18 +16,11 @@ const menuStore = useMenuStore()
 const orderStore = useOrderStore()
 
 // Load packages on mount
-onMounted(async () => {
+onMounted(() => {
     if (typeof window !== "undefined") {
         window.addEventListener("resize", onResize)
         document.addEventListener("keydown", handleKeydown)
     }
-
-    const timestamp = new Date().toISOString()
-    console.log(`[📦 Package Selection] Page loaded at ${timestamp}`)
-
-    // Packages are now preloaded at the welcome screen via AppBootstrap.preloadForOrdering()
-    // No need to fetch here - just use the cached data from MenuStore
-    console.log(`[✅ Packages Ready] ${menuStore.packages.length} packages available at ${timestamp}`)
 })
 
 // Carousel state retained intentionally so existing script behavior is preserved.
@@ -49,13 +42,17 @@ function onResize () {
     viewportWidth.value = window.innerWidth
 }
 
-// Card focus and modifier inspector
-const focusedPackageId = ref<number | null>(null)
+// Card selection and modifier inspector
+const selectedPackage = ref<Package | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
 const featuredModifierId = ref<number | null>(null)
 
+function handleCardSelect (pkg: Package) {
+    selectedPackage.value = pkg
+}
+
 function handleCardFocus (pkg: Package) {
-    focusedPackageId.value = pkg.id
+    selectedPackage.value = pkg
 }
 
 function openModifierInspector (pkg: Package) {
@@ -154,7 +151,6 @@ onUnmounted(() => {
 })
 
 const goBack = () => {
-    console.log(`[↩️ Package Selection Cancelled] User returned to guest counter at ${new Date().toISOString()}`)
     nuxtApp.$router.push("/order/start")
 }
 
@@ -176,7 +172,7 @@ const touchDeltaY = ref(0)
 const swipeThreshold = 50
 const verticalSwipeThreshold = 30
 
-function handleTouchStart (e: TouchEvent) {
+function _handleTouchStart (e: TouchEvent) {
     // Don't interfere with button clicks or scrollable areas
     const target = e.target as HTMLElement
     if (
@@ -195,7 +191,7 @@ function handleTouchStart (e: TouchEvent) {
     touchDeltaY.value = 0
 }
 
-function handleTouchMove (e: TouchEvent) {
+function _handleTouchMove (e: TouchEvent) {
     if (touchStartX.value === null || touchStartY.value === null) { return }
     const x = e.touches?.[0]?.clientX ?? 0
     const y = e.touches?.[0]?.clientY ?? 0
@@ -249,10 +245,10 @@ function handleTouchEnd () {
                             Package Selection
                         </p>
                         <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold text-white font-raleway leading-tight text-balance">
-                            Choose Your <span class="text-[#f6b56d]">Package</span>
+                            Choose Your <span class="text-[#f6b56d] italic">Package</span>
                         </h1>
-                        <p class="text-xs tracking-widest uppercase text-white/55 mt-2 text-pretty">
-                            {{ guestCount }} {{ guestCount === 1 ? 'Guest' : 'Guests' }} &middot; Select Dining Package
+                        <p class="text-sm text-white/55 mt-2 text-pretty font-kanit">
+                            For <strong class="text-white font-bold">{{ guestCount }}</strong> {{ guestCount === 1 ? 'guest' : 'guests' }} &middot; tap a package to preview the meats inside
                         </p>
                     </div>
 
@@ -310,9 +306,11 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -332,9 +330,11 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -353,9 +353,11 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -374,14 +376,32 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
                     </div>
                 </div>
+
+                <!-- Floating CTA: appears when a package is selected -->
+                <Transition name="slide-cta">
+                    <div
+                        v-if="selectedPackage && !activeInspectorPackage"
+                        class="absolute bottom-6 left-1/2 z-20 -translate-x-1/2"
+                    >
+                        <button
+                            type="button"
+                            class="flex h-14 min-w-[18rem] items-center justify-center rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-10 text-base font-black tracking-wide text-[#140c06] shadow-[0_16px_48px_rgba(255,189,114,0.35)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black font-raleway"
+                            @click="proceedToMenuForPackage(selectedPackage!)"
+                        >
+                            Continue to Menu →
+                        </button>
+                    </div>
+                </Transition>
 
                 <!-- Modifier inspector overlay -->
                 <div
@@ -400,7 +420,7 @@ function handleTouchEnd () {
                                 <span class="rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
                                     {{ activeInspectorPackage.name }}
                                 </span>
-                                <span class="truncate text-sm font-bold text-white/58">
+                                <span class="truncate text-sm font-bold text-white/75">
                                     {{ inspectorSummary }}
                                 </span>
                             </div>
@@ -467,7 +487,7 @@ function handleTouchEnd () {
                                     <h2 class="mt-2 font-raleway text-[1.75rem] font-extrabold leading-tight text-white">
                                         {{ featuredModifier?.name || "No meat selected" }}
                                     </h2>
-                                    <p class="mt-2 text-sm leading-relaxed text-white/58">
+                                    <p class="mt-2 text-sm leading-relaxed text-white/75">
                                         {{ featuredDescription }}
                                     </p>
                                     <div class="mt-4 flex flex-wrap gap-2">
@@ -478,6 +498,9 @@ function handleTouchEnd () {
                                             Grilled at your table
                                         </span>
                                     </div>
+                                    <p class="mt-4 text-xs text-white/55 tracking-wide font-kanit">
+                                        ← → browse cuts &middot; all sides included &middot; unlimited refills
+                                    </p>
                                 </div>
                             </section>
 
@@ -550,7 +573,7 @@ function handleTouchEnd () {
                             </button>
                             <button
                                 type="button"
-                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black uppercase text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                                 @click="chooseActiveInspectorPackage"
                             >
                                 Choose {{ activeInspectorPackage.name }} →
@@ -623,9 +646,30 @@ function handleTouchEnd () {
     -webkit-tap-highlight-color: transparent;
 }
 
+.slide-cta-enter-active {
+    transition: opacity 200ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.slide-cta-leave-active {
+    transition: opacity 160ms ease, transform 200ms cubic-bezier(0.4, 0, 1, 1);
+}
+.slide-cta-enter-from,
+.slide-cta-leave-to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+}
+.slide-cta-enter-to,
+.slide-cta-leave-from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .animate-spin {
         animation: none;
+    }
+    .slide-cta-enter-active,
+    .slide-cta-leave-active {
+        transition: none;
     }
 }
 </style>

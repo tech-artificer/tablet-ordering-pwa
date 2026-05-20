@@ -30,13 +30,23 @@
             <div
                 v-if="showPinModal"
                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity"
+                aria-hidden="true"
             >
-                <div class="bg-gradient-to-br from-secondary to-secondary-dark text-white shadow-2xl ring-1 ring-primary/30 rounded-2xl p-8 w-full max-w-xs space-y-6 border-t-2 border-primary animate-modal-enter">
+                <div
+                    ref="pinModalRef"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="pin-modal-title"
+                    aria-describedby="pin-modal-prompt"
+                    tabindex="-1"
+                    class="bg-gradient-to-br from-secondary to-secondary-dark text-white shadow-2xl ring-1 ring-primary/30 rounded-2xl p-8 w-full max-w-xs space-y-6 border-t-2 border-primary animate-modal-enter focus:outline-none"
+                    @keydown.esc.prevent="closePinModal"
+                >
                     <div class="text-center">
-                        <h3 class="text-2xl font-bold text-primary">
+                        <h3 id="pin-modal-title" class="text-2xl font-bold text-primary">
                             Settings
                         </h3>
-                        <p class="text-sm text-white/60 mt-2">
+                        <p id="pin-modal-prompt" class="text-sm text-white/60 mt-2">
                             {{ pinPrompt }}
                         </p>
                         <p v-if="pinNotice" class="text-xs text-primary/80 mt-2">
@@ -223,7 +233,7 @@
 
 <script setup lang="ts">
 import { Settings, RefreshCw } from "lucide-vue-next"
-import { unref } from "vue"
+import { unref, nextTick } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
 import { useDeviceStore } from "~/stores/Device"
@@ -264,6 +274,7 @@ onMounted(() => {
 })
 
 // PIN modal state
+const pinModalRef = ref<HTMLElement | null>(null)
 const showPinModal = ref(false)
 const pinInput = ref("")
 const pinError = ref("")
@@ -337,7 +348,7 @@ const start = async () => {
     }
 }
 
-const openSettings = (noticeOrEvent?: string | PointerEvent) => {
+const openSettings = async (noticeOrEvent?: string | PointerEvent) => {
     pinNotice.value = typeof noticeOrEvent === "string" ? noticeOrEvent : ""
     pinError.value = ""
     storedPin.value = typeof localStorage !== "undefined" ? localStorage.getItem(PIN_STORAGE_KEY) : null
@@ -348,6 +359,9 @@ const openSettings = (noticeOrEvent?: string | PointerEvent) => {
         pinNotice.value = "Create a settings PIN before opening tablet settings."
     }
     showPinModal.value = true
+    // Move focus into the dialog so screen readers and keyboard users land inside it
+    await nextTick()
+    pinModalRef.value?.focus()
 }
 
 const closePinModal = () => {

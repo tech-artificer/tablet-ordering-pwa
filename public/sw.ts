@@ -5,14 +5,19 @@
 // Responsibilities:
 //   1. Precache all build assets (injected by Workbox)
 //   2. Runtime cache menus (NetworkFirst) and images (CacheFirst)
-//   3. Queue POST /api/devices/create-order with BackgroundSyncPlugin (2-hour max)
-//   4. Bridge Background Sync lifecycle events back to window clients via postMessage
+//
+// Order submission model: LIVE-ONLY.
+// POST /api/devices/create-order and refill routes use plain NetworkOnly — no
+// background sync plugin. If the network is unavailable, the request fails
+// immediately and useOrderSubmit.ts surfaces "Ordering is unavailable. Please
+// call staff." to the user. Silent background retry is intentionally disabled
+// to prevent duplicate orders when staff manually re-creates an order during
+// an outage and the service worker later replays the queued request.
 
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst, NetworkOnly } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
-import { BackgroundSyncPlugin } from 'workbox-background-sync'
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>
@@ -120,78 +125,13 @@ registerRoute(
 )
 
 // ---------------------------------------------------------------------------
-// 4. Background Sync — order submission queue (2-hour max retention)
+// 4. Order submission — live-only (no background sync)
 // ---------------------------------------------------------------------------
-
-const ORDER_QUEUE_NAME = 'order-sync-queue' as const
-const ORDER_MAX_RETENTION_MS = 2 * 60 * 60 * 1000 // 2 hours
-
-async function notifyClients(message: Record<string, unknown>): Promise<void> {
-  const clients = await self.clients.matchAll({ type: 'window' })
-  for (const client of clients) {
-    client.postMessage(message)
-  }
-}
-
-const bgSyncPlugin = new BackgroundSyncPlugin(ORDER_QUEUE_NAME, {
-  maxRetentionTime: ORDER_MAX_RETENTION_MS / 60 / 1000, // Workbox expects minutes
-  async onSync({ queue }) {
-    await notifyClients({ type: 'orders-sync-start' })
-    let entry = await queue.shiftRequest()
-    while (entry) {
-      try {
-        const response = await fetch(entry.request.clone())
-        if (response.ok || response.status === 409 || response.status === 201) {
-          const body = await response.clone().json().catch(() => null)
-          if (response.status === 409) {
-            await notifyClients({ type: 'orders-sync-409', order: body?.order ?? body })
-          } else {
-            await notifyClients({ type: 'orders-sync-success', order: body?.order ?? body })
-          }
-        } else if (response.status === 401) {
-          // Auth error — put back and notify; do not retry indefinitely
-          await queue.unshiftRequest(entry)
-          await notifyClients({ type: 'orders-sync-error', message: 'auth_error: 401 — device token expired' })
-          break
-        } else if (response.status === 429 || response.status >= 500) {
-          // Retryable server/rate-limit error — re-queue and stop so Workbox retries later
-          await queue.unshiftRequest(entry)
-          await notifyClients({
-            type: 'orders-sync-error',
-            message: `Retryable server response ${response.status}`,
-          })
-          throw new Error(`Retryable server response ${response.status}`)
-        } else {
-          // Non-retriable client/server response
-          await notifyClients({
-            type: 'orders-sync-error',
-            message: `Server responded ${response.status}`,
-          })
-        }
-      } catch (err) {
-        // Network failure — re-queue and stop (Workbox will retry on next sync event)
-        await queue.unshiftRequest(entry)
-        await notifyClients({
-          type: 'orders-sync-error',
-          message: err instanceof Error ? err.message : 'Network error',
-        })
-        throw err
-      }
-      entry = await queue.shiftRequest()
-    }
-  },
-})
 
 registerRoute(
   ({ url, request }: { url: URL; request: Request }) =>
     /\/api\/devices\/create-order$/.test(url.pathname) && request.method === 'POST',
-  new NetworkOnly({
-    // Only bgSyncPlugin — it handles queueing on failure AND all replay notifications
-    // via onSync. syncBridgePlugin was removed: it fired orders-sync-start/success
-    // for every live request, causing spurious UI banner flashes and duplicate
-    // setOrderCreated calls for normal online orders.
-    plugins: [bgSyncPlugin],
-  }),
+  new NetworkOnly(),
   'POST',
 )
 

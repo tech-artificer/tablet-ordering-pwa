@@ -1,9 +1,12 @@
-import { readFileSync } from "fs"
-import { resolve } from "path"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 function readProjectFile (relativePath: string): string {
-    return readFileSync(resolve(__dirname, "..", relativePath), "utf-8")
+    return readFileSync(resolve(PROJECT_ROOT, relativePath), "utf-8")
 }
 
 describe("order review page component wiring", () => {

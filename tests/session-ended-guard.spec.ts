@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { vi, describe, it, expect, beforeEach } from "vitest"
 import { setActivePinia, createPinia } from "pinia"
 
@@ -11,10 +12,13 @@ import { recoverActiveOrderState } from "../composables/useActiveOrderRecovery"
 // Mock useApi
 vi.mock("../composables/useApi", () => ({ useApi: () => ({ get: vi.fn(), post: vi.fn() }) }))
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 describe("session-ended route — middleware guard", () => {
     it("/order/session-ended is in publicRoutes (no auth required)", () => {
         // Verify boot.global.ts includes /order/session-ended in PUBLIC_ROUTES
-        const middlewarePath = resolve(__dirname, "../middleware/boot.global.ts")
+        const middlewarePath = resolve(PROJECT_ROOT, "middleware/boot.global.ts")
         const src = readFileSync(middlewarePath, "utf8")
         expect(src).toContain("/order/session-ended")
         expect(src).toContain("PUBLIC_ROUTES")

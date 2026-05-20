@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 const readText = (relativePath: string) =>
-    readFileSync(resolve(__dirname, "..", relativePath), "utf-8")
+    readFileSync(resolve(PROJECT_ROOT, relativePath), "utf-8")
 
 describe("build metadata visibility wiring", () => {
     it("declares build metadata in Nuxt public runtime config", () => {
@@ -37,5 +40,23 @@ describe("build metadata visibility wiring", () => {
         expect(settings).toContain("Reverb Port")
         expect(settings).toContain("Reverb Scheme")
         expect(settings).toContain("Reverb Path")
+    })
+
+    it("uses useRuntimeConfigOverride for Reverb display rows — not raw build-time config", () => {
+        const settings = readText("pages/settings.vue")
+
+        expect(settings).toContain("useRuntimeConfigOverride")
+
+        // Reverb rows must reference the runtime override, not config.public.reverb
+        expect(settings).toContain("runtimeOverride.reverb.host")
+        expect(settings).toContain("runtimeOverride.reverb.port")
+        expect(settings).toContain("runtimeOverride.reverb.scheme")
+        expect(settings).toContain("runtimeOverride.reverb.path")
+
+        // Must NOT fall back to raw build-time reverb in the display rows
+        expect(settings).not.toContain("config.public.reverb?.host")
+        expect(settings).not.toContain("config.public.reverb?.port")
+        expect(settings).not.toContain("config.public.reverb?.scheme")
+        expect(settings).not.toContain("config.public.reverb?.path")
     })
 })

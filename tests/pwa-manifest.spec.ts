@@ -2,9 +2,9 @@
 // Validates the PWA manifest config shape to ensure kiosk-critical settings
 // are not accidentally changed (display: fullscreen, required icons, start_url).
 
-import { readFileSync } from "fs"
-import { resolve } from "path"
-import { pathToFileURL } from "url"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 import { afterAll, describe, it, expect } from "vitest"
 
 // ---------------------------------------------------------------------------
@@ -13,12 +13,15 @@ import { afterAll, describe, it, expect } from "vitest"
 // manifest file is a build artifact and not committed.
 // ---------------------------------------------------------------------------
 
+// Resolve from project root (tests run from project directory)
+const PROJECT_ROOT = process.cwd()
+
 function readNuxtConfig (): string {
-    return readFileSync(resolve(__dirname, "../nuxt.config.ts"), "utf-8")
+    return readFileSync(resolve(PROJECT_ROOT, "nuxt.config.ts"), "utf-8")
 }
 
 async function readNuxtConfigObject (): Promise<any> {
-    const moduleUrl = pathToFileURL(resolve(__dirname, "../nuxt.config.ts")).href
+    const moduleUrl = pathToFileURL(resolve(PROJECT_ROOT, "nuxt.config.ts")).href
     const globalAny = globalThis as any
     globalAny.defineNuxtConfig = (config: any) => config
     const configModule = await import(moduleUrl)

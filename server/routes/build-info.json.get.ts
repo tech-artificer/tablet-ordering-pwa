@@ -1,6 +1,11 @@
-import { defineEventHandler } from "h3"
+import { defineEventHandler, setResponseHeader } from "h3"
 
-export default defineEventHandler(() => {
+export default defineEventHandler((event) => {
+    // Prevent any caching - this must always reflect the currently deployed build
+    setResponseHeader(event, "Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+    setResponseHeader(event, "Pragma", "no-cache")
+    setResponseHeader(event, "Expires", "0")
+
     const config = useRuntimeConfig()
 
     return {
