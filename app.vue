@@ -199,7 +199,11 @@ onMounted(async () => {
     startPeriodicCheck(true)
 
     try {
-        const authenticated = await resolveAuthenticationState()
+        // Cap bootstrap at 10s so a downed server never leaves the splash screen permanently.
+        const bootstrapTimeout = new Promise<boolean>(resolve =>
+            setTimeout(() => resolve(false), 10_000)
+        )
+        const authenticated = await Promise.race([resolveAuthenticationState(), bootstrapTimeout])
         await nuxtApp.callHook("app:auth-ready", { authenticated })
 
         if (authenticated) {
