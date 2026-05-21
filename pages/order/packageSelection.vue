@@ -403,10 +403,16 @@ function handleTouchEnd () {
                     </div>
                 </Transition>
 
-                <!-- Modifier inspector overlay -->
+                <!-- Modifier inspector overlay
+                     NOTE: no horizontal padding on this wrapper — the inner
+                     section's `max-w-[76.5rem]` already constrains width on
+                     wider viewports, and on the 1340×800 tablet the wrapper
+                     padding was clipping the right-column meat cards
+                     (visible as "Hyangcho [cut off]"). Sections inside the
+                     modal carry their own px-6/px-7 padding. -->
                 <div
                     v-if="activeInspectorPackage"
-                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-3 backdrop-blur-md"
+                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-md"
                     @click.self="closeInspector"
                 >
                     <section

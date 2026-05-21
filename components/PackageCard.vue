@@ -1,8 +1,18 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, reactive } from "vue"
 import { Clock, ChevronRight, Star, UtensilsCrossed } from "lucide-vue-next"
 import type { Package, Modifier } from "../types"
 import { displayMeatGroupLabel, groupPackageModifierPreviews } from "../utils/packageModifierGroups"
+
+// Tracks preview-circle images that 404'd. When an image fails to load,
+// NuxtImg renders a broken-image placeholder + alt text — and even with
+// overflow-hidden on the parent circle, the alt text leaks visually
+// (the "PlaiKajuVanCitru" stack seen in production was four broken alts).
+// We swap to the UtensilsCrossed icon fallback instead.
+const brokenPreviewSrcs = reactive(new Set<string>())
+const markPreviewBroken = (src: string | null | undefined) => {
+    if (src) { brokenPreviewSrcs.add(src) }
+}
 
 const props = defineProps<{
   pkg: Package
@@ -135,16 +145,17 @@ const inclusionChecklist = computed(() => {
                     <span
                         v-for="item in previewItems"
                         :key="item.id"
-                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)]"
+                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)] text-[0px] leading-none"
                     >
                         <NuxtImg
-                            v-if="item.img_url"
+                            v-if="item.img_url && !brokenPreviewSrcs.has(item.img_url)"
                             :src="item.img_url"
                             :alt="item.name || 'Meat cut'"
                             class="h-full w-full object-cover"
                             loading="lazy"
                             sizes="36px"
                             format="webp"
+                            @error="markPreviewBroken(item.img_url)"
                         />
                         <UtensilsCrossed v-else :size="15" class="text-[#ffbd72]/65" :stroke-width="1.6" />
                     </span>
