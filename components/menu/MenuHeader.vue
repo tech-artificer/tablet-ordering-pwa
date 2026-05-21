@@ -46,23 +46,12 @@ const emit = defineEmits<{
             </div>
         </div>
 
-        <!-- Right: Table pill + package name + live badge -->
+        <!-- Right: package name + live badge + cart
+             Note: the table-name pill that used to live here was removed
+             2026-05-21 — the left side already shows the table name
+             prominently, and rendering it twice in the header is noise.
+             Package name remains on the right as the contextual badge. -->
         <div class="flex items-center gap-2 flex-shrink-0">
-            <div class="hidden sm:flex items-center gap-1.5 bg-white/[0.05] rounded-full px-3 py-1 border border-white/[0.07]">
-                <svg
-                    class="w-3 h-3 text-white/35"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                >
-                    <rect x="2" y="7" width="20" height="14" rx="2" />
-                    <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
-                </svg>
-                <span class="text-white/55 text-[11px] font-medium">{{ tableName }}</span>
-            </div>
-
             <div v-if="selectedPackage" class="flex flex-col items-end">
                 <span class="text-white/30 text-[9px] uppercase tracking-[0.18em] font-bold leading-none mb-0.5">Package</span>
                 <span class="text-primary font-bold text-sm leading-tight truncate max-w-[130px]">{{ selectedPackage.name }}</span>

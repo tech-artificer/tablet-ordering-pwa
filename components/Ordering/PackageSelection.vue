@@ -54,7 +54,7 @@ const confirmAndProceed = () => {
     </section> -->
 
         <!-- PackageCard removed — use pages/order/packageSelection.vue -->
-        <!-- <QuickButtons /> -->
+        <!-- QuickButtons component deleted 2026-05-21 (was dead; "Happy Feasting, Table 4!" placeholder text) -->
 
         <!-- Bottom Navigation -->
         <div class="bg-white border-t  px-6 w-full py-4">

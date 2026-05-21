@@ -197,9 +197,8 @@ const isAvailable = (item: any) => {
                         <!-- <svg v-if="!isAddDisabled(item) && isAvailable(item) && !isLocked()" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> -->
                         <span>
                             <span v-if="isLocked()">Locked</span>
-                            <span v-else-if="!isAvailable(item)">N/A</span>
-                            <span v-else-if="isAddDisabled(item)">Max</span>
-                            <!-- <span v-else-if="isUnlimitedCategory">ADD</span> -->
+                            <span v-else-if="!isAvailable(item)">Unavailable</span>
+                            <span v-else-if="isAddDisabled(item)">Max&nbsp;✓</span>
                             <span v-else>Add</span>
                         </span>
                     </button>
