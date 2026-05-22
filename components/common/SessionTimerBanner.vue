@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue"
 import { useSessionStore } from "~/stores/Session"
+import { useConnectionStore } from "~/stores/Connection"
 
 const sessionStore = useSessionStore()
+const connectionStore = useConnectionStore()
+
+const wsIndicator = computed(() => {
+    const state = (connectionStore.reverbState as unknown) as string
+    switch (state) {
+    case "connected": return { color: "bg-green-400", label: "Live" }
+    case "disconnected": return { color: "bg-yellow-400 animate-pulse", label: "Reconnecting" }
+    default: return { color: "bg-red-500 animate-pulse", label: "Offline" }
+    }
+})
 
 // remainingMs stores elapsed ms since session start (session ends via order status, not timer)
 const elapsedMs = computed(() => Number(sessionStore.remainingMs || 0))
@@ -45,6 +56,10 @@ watch(() => sessionStore.isActive, (active) => {
                         {{ formattedElapsed }}
                     </p>
                 </div>
+            </div>
+            <div class="flex items-center gap-1.5" :title="wsIndicator.label">
+                <span class="w-2 h-2 rounded-full" :class="wsIndicator.color" />
+                <span class="text-xs text-white/50">{{ wsIndicator.label }}</span>
             </div>
         </div>
         <div class="mt-2 h-2 w-full rounded-full bg-white/10 overflow-hidden">
