@@ -143,7 +143,7 @@ export const useMenuStore = defineStore("menu", {
             this.errors.desserts = null
             const api = useApi()
             try {
-                const response = await api.get("/api/v2/tablet/categories/dessert/menus", { signal })
+                const response = await api.get("/api/v2/tablet/categories/desserts/menus", { signal })
                 const payload = extractPayload<any>(response?.data)
 
                 if (!Array.isArray(payload)) {
