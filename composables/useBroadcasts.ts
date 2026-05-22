@@ -149,6 +149,7 @@ export const useBroadcasts = () => {
     let sessionChannel: EchoChannel | null = null
     let subscribedSessionId: number | string | null = null
     let stopSessionIdWatcher: (() => void) | null = null
+    let stopOrderIdWatcher: (() => void) | null = null
     let reloadTimeoutId: number | null = null
 
     // BUG-7 Fix: Exponential backoff for WebSocket reconnection
@@ -582,6 +583,26 @@ export const useBroadcasts = () => {
         )
     }
 
+    const ensureOrderChannelAutoSubscription = () => {
+        if (stopOrderIdWatcher) { return }
+
+        // Mirrors ensureSessionChannelAutoSubscription: watches for an orderId to
+        // appear (e.g. after order placement mid-session) and subscribes to
+        // orders.{id} immediately. Without this, the order channel is only
+        // subscribed at initializeBroadcasts time — before any order exists.
+        stopOrderIdWatcher = watch(
+            () => sessionStore.getOrderId() ?? orderStore.serverOrderId,
+            (orderId) => {
+                if (!orderId) {
+                    unsubscribeFromOrderChannel()
+                    return
+                }
+                subscribeToOrderChannel(String(orderId))
+            },
+            { immediate: true }
+        )
+    }
+
     const resubscribeChannels = () => {
         subscribeToDeviceChannel()
         const currentOrderId = sessionStore.getOrderId()
@@ -673,11 +694,9 @@ export const useBroadcasts = () => {
         // Subscribe to device channels
         subscribeToDeviceChannel()
 
-        // Subscribe to current order if exists
-        const currentOrderId = sessionStore.getOrderId()
-        if (currentOrderId) {
-            subscribeToOrderChannel(currentOrderId.toString())
-        }
+        // Reactively subscribe to order channel whenever an orderId appears
+        // (covers order placed mid-session, reconnects, and page reload recovery).
+        ensureOrderChannelAutoSubscription()
 
         // Keep session.{id} subscription in sync with session lifecycle.
         ensureSessionChannelAutoSubscription()
@@ -701,6 +720,10 @@ export const useBroadcasts = () => {
 
         unsubscribeFromOrderChannel()
         unsubscribeFromSessionChannel()
+        if (stopOrderIdWatcher) {
+            stopOrderIdWatcher()
+            stopOrderIdWatcher = null
+        }
         if (stopSessionIdWatcher) {
             stopSessionIdWatcher()
             stopSessionIdWatcher = null

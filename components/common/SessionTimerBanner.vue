@@ -4,24 +4,21 @@ import { useSessionStore } from "~/stores/Session"
 
 const sessionStore = useSessionStore()
 
-const totalMs = computed(() => {
-    if (sessionStore.sessionEndsAt && sessionStore.sessionStartedAt) {
-        return Math.max(1, Number(sessionStore.sessionEndsAt) - Number(sessionStore.sessionStartedAt))
-    }
-    return 60 * 60 * 1000
-})
+// remainingMs stores elapsed ms since session start (session ends via order status, not timer)
+const elapsedMs = computed(() => Number(sessionStore.remainingMs || 0))
 
-const remainingMs = computed(() => Number(sessionStore.remainingMs || 0))
+// Progress bar fills as time passes; reference = 2 h so the bar reaches full at 2 h
+const REFERENCE_MS = 2 * 60 * 60 * 1000
+const progress = computed(() => Math.min(100, (elapsedMs.value / REFERENCE_MS) * 100))
 
-const progress = computed(() => {
-    if (!totalMs.value) { return 0 }
-    return Math.max(0, Math.min(100, (remainingMs.value / totalMs.value) * 100))
-})
-
-const formattedRemaining = computed(() => {
-    const totalSeconds = Math.max(0, Math.floor(remainingMs.value / 1000))
-    const minutes = Math.floor(totalSeconds / 60)
+const formattedElapsed = computed(() => {
+    const totalSeconds = Math.floor(elapsedMs.value / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
     const seconds = totalSeconds % 60
+    if (hours > 0) {
+        return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    }
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 })
 
@@ -42,15 +39,12 @@ watch(() => sessionStore.isActive, (active) => {
                 <span class="text-lg">⏳</span>
                 <div>
                     <p class="text-sm text-white/70">
-                        Session ends in
+                        Time dining
                     </p>
                     <p class="text-lg font-bold text-white tabular-nums">
-                        {{ formattedRemaining }}
+                        {{ formattedElapsed }}
                     </p>
                 </div>
-            </div>
-            <div class="text-xs text-white/60">
-                60-minute session
             </div>
         </div>
         <div class="mt-2 h-2 w-full rounded-full bg-white/10 overflow-hidden">
