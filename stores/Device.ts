@@ -306,9 +306,9 @@ export const useDeviceStore = defineStore("device", () => {
             }
 
             try {
-                let ok = state.token ? await refresh() : await authenticate()
+                const ok = state.token ? await refresh() : await authenticate()
                 if (!ok && state.token) {
-                    ok = await authenticate()
+                    await authenticate()
                 }
                 if (state.table && (state.table.id || state.table.name)) {
                     state.waitingForTable = false
@@ -406,9 +406,9 @@ export const useDeviceStore = defineStore("device", () => {
         if (!state.device && !state.token) { return false }
 
         try {
-            let ok = state.token ? await refresh() : await authenticate()
+            const ok = state.token ? await refresh() : await authenticate()
             if (!ok && state.token) {
-                ok = await authenticate()
+                await authenticate()
             }
             if (state.table && (state.table.id || state.table.name)) {
                 state.waitingForTable = false
