@@ -283,6 +283,10 @@ export const useDeviceStore = defineStore("device", () => {
             logger.warn("[DeviceStore] startTablePolling: window unavailable (SSR)")
             return
         }
+        if (state.table && (state.table.id || state.table.name)) {
+            state.waitingForTable = false
+            return
+        }
 
         state.isPollingForTable = true
         state.waitingForTable = true
@@ -302,8 +306,11 @@ export const useDeviceStore = defineStore("device", () => {
             }
 
             try {
-                const ok = state.token ? await refresh() : await authenticate()
-                if (ok && state.table && (state.table.id || state.table.name)) {
+                let ok = state.token ? await refresh() : await authenticate()
+                if (!ok && state.token) {
+                    ok = await authenticate()
+                }
+                if (state.table && (state.table.id || state.table.name)) {
                     state.waitingForTable = false
                     logger.debug("[DeviceStore] table assigned during polling", state.table)
                     stopTablePolling()
@@ -399,8 +406,11 @@ export const useDeviceStore = defineStore("device", () => {
         if (!state.device && !state.token) { return false }
 
         try {
-            const ok = state.token ? await refresh() : await authenticate()
-            if (ok && state.table && (state.table.id || state.table.name)) {
+            let ok = state.token ? await refresh() : await authenticate()
+            if (!ok && state.token) {
+                ok = await authenticate()
+            }
+            if (state.table && (state.table.id || state.table.name)) {
                 state.waitingForTable = false
                 return true
             }
