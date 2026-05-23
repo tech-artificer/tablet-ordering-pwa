@@ -1,27 +1,15 @@
 <template>
-    <div class="relative h-screen w-screen flex flex-col overflow-hidden">
-        <!-- Warm gradient background -->
-        <div class="absolute inset-0 bg-grill-table" />
-
-        <!-- Radial glow at center -->
-        <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(246,181,109,0.06) 0%, transparent 70%)" />
-
-        <!-- Welcome-screen flame layer (lazy: loads after first paint, hidden on error) -->
-        <div v-if="showFlame" class="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
+    <div class="relative h-screen w-screen flex flex-col overflow-hidden bg-[#080706]">
+        <!-- Bottom flame (bottom 38% only) -->
+        <div v-if="showFlame" class="absolute bottom-0 left-0 right-0 h-[38%] pointer-events-none z-0" aria-hidden="true">
             <img
                 :src="flameSrc"
                 alt=""
-                class="absolute opacity-20 p-0 m-0 w-full h-full object-cover mix-blend-screen"
+                width="1920"
+                height="480"
+                class="w-full h-full object-cover object-top mix-blend-screen"
                 @error="showFlame = false"
             >
-        </div>
-
-        <!-- CSS atmospheric glow (fallback + base layer beneath flame) -->
-        <div class="absolute inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
-            <!-- Warm amber pulse at bottom-center -->
-            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60vw] h-[40vh] rounded-full bg-primary/10 blur-3xl animate-pulse-glow" />
-            <!-- Subtle cool-dark vignette at corners -->
-            <div class="absolute inset-0" style="background: radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, rgba(0,0,0,0.45) 100%)" />
         </div>
 
         <!-- Content Layer -->
@@ -104,53 +92,58 @@
                 </div>
             </div>
 
-            <!-- Status Bar - Top -->
-            <div class="absolute top-6 left-6 right-6 flex items-center justify-between z-20">
-                <!-- Connection Status -->
-                <div class="flex items-center gap-3 bg-surface-20 backdrop-blur-md ring-1 ring-white/10 rounded-full px-4 py-2 transition-all">
-                    <div
-                        :class="[
-                            'w-2.5 h-2.5 rounded-full transition-all',
-                            isWebSocketConnected ? 'bg-success animate-pulse' : 'bg-error'
-                        ]"
-                    />
-                </div>
-
-                <!-- Settings Button -->
+            <!-- Settings trigger / connection indicator (top-right dot) -->
+            <div class="absolute top-5 right-5 z-20" style="padding-top: env(safe-area-inset-top)">
                 <button
-                    class="flex items-center justify-center w-12 h-12 rounded-full bg-surface-20 hover:bg-surface-10 ring-1 ring-white/10 hover:ring-primary/60 text-white/70 hover:text-primary transition-all focus:outline-none focus:ring-2 focus:ring-primary hover:shadow-lg"
-                    title="Settings"
+                    class="flex items-center justify-center w-8 h-8 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                    style="touch-action: manipulation"
                     aria-label="Open settings"
+                    title="Settings"
                     :class="{ 'animate-spin-slow': showPinModal }"
                     @click="openSettings"
                 >
-                    <Settings :size="22" stroke-width="1.5" />
+                    <span
+                        :class="[
+                            'w-2.5 h-2.5 rounded-full transition-colors duration-300',
+                            isWebSocketConnected ? 'bg-success' : 'bg-error'
+                        ]"
+                        aria-hidden="true"
+                    />
                 </button>
             </div>
 
             <!-- Main Content -->
-            <div class="flex flex-col items-center gap-10 text-center">
+            <div class="flex flex-col items-center gap-7 text-center">
                 <!-- Logo & Welcome -->
-                <div class="space-y-6 animate-fade-in">
+                <div class="space-y-5 animate-fade-in">
                     <div class="flex justify-center">
-                        <div class="relative animate-float-slow">
-                            <div class="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/5 rounded-full blur-2xl" />
-                            <WoosooLogo />
-                        </div>
+                        <WoosooLogo />
                     </div>
 
-                    <div class="space-y-2 animate-fade-in-delayed">
-                        <p class="text-xs tracking-[0.3em] uppercase font-semibold text-primary/80">
-                            Authentic Korean BBQ
+                    <div class="space-y-3 animate-fade-in-delayed">
+                        <p class="text-[11px] tracking-[0.28em] uppercase font-semibold text-white/40" translate="no">
+                            Woosoo Korean BBQ Restaurant
                         </p>
-                        <h1 class="text-5xl font-bold font-raleway text-white leading-tight">
+                        <h1 class="text-7xl font-bold font-raleway text-white leading-[1.05]">
                             <span class="block">Your Table,</span>
                             <span class="block">Your Grill.</span>
                         </h1>
-                        <p class="text-white/60 font-kanit text-lg tracking-wide mt-4">
-                            gather • grill • savor
+                        <p class="text-white/40 font-kanit text-base tracking-wider mt-2">
+                            gather · grill · savor
                         </p>
                     </div>
+                </div>
+
+                <!-- Table badge -->
+                <div
+                    v-if="deviceStore.table"
+                    class="flex items-center gap-2 animate-fade-in-delayed"
+                    aria-label="Assigned table"
+                >
+                    <span class="w-2 h-2 rounded-full bg-success flex-shrink-0" aria-hidden="true" />
+                    <span class="text-xs font-bold tracking-[0.2em] text-white uppercase">
+                        {{ deviceStore.getTableName() }}
+                    </span>
                 </div>
 
                 <!-- CTA Button (disabled while preloading) -->
@@ -158,19 +151,20 @@
                     <div class="relative inline-block group">
                         <!-- Glow layer — contained, no bleed -->
                         <div
-                            class="absolute -inset-2 rounded-2xl bg-primary/25 blur-xl transition-opacity duration-300 pointer-events-none"
+                            class="absolute -inset-2 rounded-full bg-primary/25 blur-xl transition-opacity duration-300 pointer-events-none"
                             :class="isStartingSession ? 'opacity-40' : 'opacity-80 group-hover:opacity-100 group-active:opacity-100'"
                         />
 
                         <button
-                            class="relative flex items-center justify-center gap-2.5 rounded-2xl font-bold tracking-wide transition-all duration-200
+                            class="relative flex items-center justify-center gap-2.5 rounded-full font-bold tracking-wide transition-colors duration-200
                      bg-gradient-to-br from-primary via-primary to-primary-dark text-secondary
                      shadow-[0_4px_24px_rgba(246,181,109,0.30)]
-                     hover:shadow-[0_6px_32px_rgba(246,181,109,0.50)] hover:brightness-110
-                     active:scale-[0.97] active:shadow-none
+                     hover:brightness-110
+                     active:scale-[0.97]
                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black
-                     min-h-[56px] px-10 text-base
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100"
+                     min-h-[56px] px-12 text-base
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                            style="touch-action: manipulation"
                             aria-label="Begin your order"
                             :disabled="!canStartOrder"
                             @click="start"
@@ -228,11 +222,20 @@
                 </div>
             </div>
         </div>
+
+        <!-- App version (bottom center) -->
+        <p
+            class="absolute bottom-4 left-0 right-0 text-center text-[10px] tracking-[0.2em] text-white/20 uppercase font-semibold pointer-events-none select-none"
+            style="padding-bottom: env(safe-area-inset-bottom)"
+            translate="no"
+        >
+            Woosoo · GrillPad v{{ appVersion }}
+        </p>
     </div>
 </template>
 
 <script setup lang="ts">
-import { Settings, RefreshCw } from "lucide-vue-next"
+import { RefreshCw } from "lucide-vue-next"
 import { unref, nextTick } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
@@ -242,6 +245,8 @@ import { useAppUpdate } from "~/composables/useAppUpdate"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { recoverActiveOrderState } from "~/composables/useActiveOrderRecovery"
 import { logger } from "~/utils/logger"
+
+const appVersion = useRuntimeConfig().public.appVersion
 
 definePageMeta({
     layout: "kiosk"
@@ -543,5 +548,21 @@ const backspace = () => {
 
 .animate-shake {
   animation: shake 0.4s ease-in-out;
+}
+
+/* Respect reduced-motion preference (WCAG 2.3) */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-enter-active,
+  .fade-in-leave-active {
+    transition: none;
+  }
+  .animate-fade-in-delayed-2,
+  .animate-slide-up,
+  .animate-pulse-glow,
+  .animate-spin-slow,
+  .animate-modal-enter,
+  .animate-shake {
+    animation: none;
+  }
 }
 </style>
