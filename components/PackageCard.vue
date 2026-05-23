@@ -78,6 +78,7 @@ const inclusionChecklist = computed(() => {
 <template>
     <article
         class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-5 py-5 text-white shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)] cursor-pointer"
+        style="touch-action: manipulation"
         :class="isSelected
             ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.5),0_22px_60px_rgba(0,0,0,0.52),0_0_64px_rgba(255,189,114,0.22)]'
             : 'border-[#4b3826]/80'"
@@ -87,20 +88,24 @@ const inclusionChecklist = computed(() => {
     >
         <!-- Header -->
         <header class="min-w-0">
-            <!-- Badge flows above title — no overlap -->
-            <div
-                v-if="pkg.is_popular"
-                class="mb-2 inline-flex items-center gap-1 rounded-full bg-[#ffbd72] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#140c06] shadow-[0_6px_16px_rgba(255,189,114,0.28)]"
-            >
-                <Star :size="10" stroke-width="0" fill="currentColor" />
-                Most Popular
+            <!-- Title row: name + badge inline on same row -->
+            <div class="flex min-w-0 items-start gap-2">
+                <h2
+                    class="font-raleway text-2xl font-extrabold tracking-normal leading-tight flex-1 min-w-0 transition-colors duration-200"
+                    :class="isSelected ? 'text-[#ffbd72]' : 'text-white'"
+                >
+                    {{ pkg.name }}
+                </h2>
+                <div
+                    v-if="pkg.is_popular"
+                    class="mt-1 flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-[#ffbd72] px-2.5 py-0.5 font-raleway text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#140c06] shadow-[0_4px_12px_rgba(255,189,114,0.25)]"
+                >
+                    <Star :size="8" stroke-width="0" fill="currentColor" />
+                    Most Popular
+                </div>
             </div>
 
-            <h2 class="font-raleway text-2xl font-extrabold tracking-normal text-white leading-tight">
-                {{ pkg.name }}
-            </h2>
-
-            <p class="mt-1 line-clamp-2 text-sm font-medium text-white/50">
+            <p class="mt-1 line-clamp-2 font-kanit text-sm font-normal text-white/50">
                 {{ (pkg as any).description || packageSubtitle }}
             </p>
 
@@ -108,7 +113,7 @@ const inclusionChecklist = computed(() => {
                 <div class="font-kanit text-[2rem] font-extrabold leading-none text-white">
                     {{ formatCurrency(Number(pkg.price) * guestCount) }}
                 </div>
-                <div class="min-w-0 overflow-hidden pb-1 font-kanit text-xs font-bold text-white/42">
+                <div class="min-w-0 overflow-hidden pb-1 font-kanit text-xs font-medium text-[#ffbd72]/60">
                     <span class="block truncate">{{ formatCurrency(pkg.price) }}/guest<span v-if="packageDuration"> · {{ packageDuration }}</span></span>
                 </div>
             </div>
@@ -119,7 +124,7 @@ const inclusionChecklist = computed(() => {
                 <li
                     v-for="item in inclusionChecklist"
                     :key="item"
-                    class="flex items-start gap-2.5 text-sm leading-tight text-white/70"
+                    class="flex items-start gap-2.5 font-kanit text-sm leading-tight text-white/70"
                 >
                     <span class="mt-0.5 text-[#22c986] flex-shrink-0" aria-hidden="true">✓</span>
                     <span>{{ item }}</span>
@@ -128,7 +133,7 @@ const inclusionChecklist = computed(() => {
 
             <div
                 v-if="packageDuration"
-                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/60"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 font-kanit text-[10px] font-bold uppercase tracking-[0.08em] text-white/60"
             >
                 <Clock :size="11" class="text-[#f6b56d]" />
                 Table time included
@@ -168,7 +173,7 @@ const inclusionChecklist = computed(() => {
                     </span>
                 </span>
 
-                <span class="text-sm font-extrabold text-white">View</span>
+                <span class="font-raleway text-sm font-extrabold text-white">View</span>
 
                 <ChevronRight :size="18" class="text-[#ffbd72]" />
             </button>
@@ -196,6 +201,14 @@ article:active {
 }
 
 footer button {
-  transition: all 0.200s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  article:active {
+    transform: none;
+  }
 }
 </style>
