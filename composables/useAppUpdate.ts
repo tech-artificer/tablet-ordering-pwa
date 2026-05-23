@@ -117,6 +117,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     const isSafeToReloadOption = (): boolean =>
         options?.isSafeToReload === undefined ? true : Boolean(toValue(options.isSafeToReload))
     let updatePollTimer: ReturnType<typeof setInterval> | null = null
+    let stopSafeToReloadWatch: (() => void) | null = null
     let skipWaitingSent = false
 
     // Post SKIP_WAITING to the waiting worker. Idempotent per waiting worker;
@@ -325,8 +326,8 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
             }
 
             // The moment ordering finishes (safe), apply any held update.
-            if (options?.isSafeToReload !== undefined) {
-                watch(
+            if (options?.isSafeToReload !== undefined && !stopSafeToReloadWatch) {
+                stopSafeToReloadWatch = watch(
                     () => isSafeToReloadOption(),
                     (safe) => { if (safe) { maybeAutoApply() } }
                 )
@@ -387,6 +388,8 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
             clearInterval(updatePollTimer)
             updatePollTimer = null
         }
+        stopSafeToReloadWatch?.()
+        stopSafeToReloadWatch = null
         stopDeferredCheck()
         isApplyingUpdate.value = false
     }
