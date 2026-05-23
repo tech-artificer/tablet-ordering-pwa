@@ -421,14 +421,15 @@ function handleTouchEnd () {
                     @click.self="closeInspector"
                 >
                     <section
-                        class="package-meat-browser grid h-[88dvh] w-full max-w-[76.5rem] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[1.35rem] border border-[#8f622f]/75 bg-[linear-gradient(180deg,#17110d_0%,#100c09_100%)] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
+                        class="package-meat-browser grid h-[88dvh] w-full max-w-[76.5rem] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.35rem] border border-[#8f622f]/75 bg-[linear-gradient(180deg,#17110d_0%,#100c09_100%)] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
                         role="dialog"
                         aria-modal="true"
                         :aria-label="`${activeInspectorPackage.name} meat preview`"
                     >
-                        <header class="flex min-h-[4.5rem] items-center justify-between border-b border-[#4a3320]/70 px-7">
-                            <div class="flex min-w-0 items-center gap-4">
-                                <span class="rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
+                        <header class="flex min-h-[4.5rem] items-center gap-4 border-b border-[#4a3320]/70 px-7">
+                            <!-- Package info -->
+                            <div class="flex min-w-0 flex-1 items-center gap-3">
+                                <span class="flex-shrink-0 rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
                                     {{ activeInspectorPackage.name }}
                                 </span>
                                 <span class="truncate text-sm font-bold text-white">
@@ -436,19 +437,36 @@ function handleTouchEnd () {
                                 </span>
                             </div>
 
-                            <button
-                                type="button"
-                                aria-label="Close meat browser"
-                                class="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/70 transition hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
-                                @click="closeInspector"
-                            >
-                                <X :size="20" />
-                            </button>
+                            <!-- Actions -->
+                            <div class="flex flex-shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    class="h-9 rounded-full border border-white/20 bg-white/6 px-4 text-xs font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                    @click="closeInspector"
+                                >
+                                    Keep Browsing
+                                </button>
+                                <button
+                                    type="button"
+                                    class="h-9 rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-5 text-xs font-black uppercase text-[#140c06] shadow-[0_8px_20px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                    @click="chooseActiveInspectorPackage"
+                                >
+                                    Choose Package →
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Close meat browser"
+                                    class="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/70 transition hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
+                                    @click="closeInspector"
+                                >
+                                    <X :size="18" />
+                                </button>
+                            </div>
                         </header>
 
                         <div class="grid min-h-0 grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] divide-x divide-[#3a2819]/80">
-                            <section class="featured-meat-pane min-h-0 overflow-y-auto px-7 py-6">
-                                <div class="relative h-[45vh] min-h-[18rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
+                            <section class="featured-meat-pane min-h-0 overflow-y-auto px-7 py-4">
+                                <div class="relative h-[36vh] min-h-[13rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
                                     <span
                                         v-if="featuredModifier?.receipt_name"
                                         class="absolute left-4 top-4 z-10 rounded-md border border-[#9c6832] bg-black/75 px-3 py-1 text-[11px] font-black text-[#ffbd72]"
@@ -490,26 +508,26 @@ function handleTouchEnd () {
                                     </span>
                                 </div>
 
-                                <div class="mt-5">
+                                <div class="mt-3">
                                     <p class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-[#ffbd72]">
                                         <span class="h-1.5 w-1.5 rounded-full bg-[#ffbd72]" />
                                         {{ featuredGroupLabel }}
                                     </p>
-                                    <h2 class="mt-2 font-raleway text-[1.75rem] font-extrabold leading-tight text-white">
+                                    <h2 class="mt-1 font-raleway text-2xl font-extrabold leading-tight text-white">
                                         {{ featuredModifier?.name || "No meat selected" }}
                                     </h2>
-                                    <p class="mt-2 text-sm leading-relaxed text-white/90">
+                                    <p class="mt-1 text-xs leading-snug text-white/85">
                                         {{ featuredDescription }}
                                     </p>
-                                    <div class="mt-4 flex flex-wrap gap-2">
-                                        <span class="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <span class="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">
                                             Unlimited refills
                                         </span>
-                                        <span class="rounded-full border border-white/20 bg-white/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white">
+                                        <span class="rounded-full border border-white/20 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
                                             Grilled at your table
                                         </span>
                                     </div>
-                                    <p class="mt-4 text-xs text-white/55 tracking-wide font-kanit">
+                                    <p class="mt-2 text-xs text-white/55 tracking-wide font-kanit">
                                         ← → browse cuts &middot; all sides included &middot; unlimited refills
                                     </p>
                                 </div>
@@ -573,23 +591,6 @@ function handleTouchEnd () {
                                 </div>
                             </section>
                         </div>
-
-                        <footer class="flex min-h-[4.75rem] items-center justify-end gap-3 border-t border-[#4a3320]/70 bg-black/18 px-7">
-                            <button
-                                type="button"
-                                class="h-12 min-w-[9.5rem] rounded-full border border-white/20 bg-white/6 px-6 text-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                                @click="closeInspector"
-                            >
-                                Keep Browsing
-                            </button>
-                            <button
-                                type="button"
-                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black uppercase text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                                @click="chooseActiveInspectorPackage"
-                            >
-                                Choose {{ activeInspectorPackage.name }} →
-                            </button>
-                        </footer>
                     </section>
                 </div>
             </div>
