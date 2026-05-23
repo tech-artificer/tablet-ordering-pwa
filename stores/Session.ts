@@ -269,6 +269,12 @@ export const useSessionStore = defineStore("session", () => {
                 logger.info("[Token Refreshed] Valid token obtained")
             }
 
+            const hasCurrentTableAssignment = await deviceStore.checkTableAssignment()
+            if (!hasCurrentTableAssignment) {
+                logger.warn("[SessionStore] start blocked: device has no current table assignment")
+                return false
+            }
+
             // Fetch latest session id from server to keep local state in-sync
             try {
                 await fetchLatestSession()

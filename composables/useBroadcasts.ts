@@ -122,7 +122,7 @@ interface ServiceRequestEvent {
 }
 
 interface DeviceControlEvent {
-  action: "restart" | "lock" | "unlock" | "update" | "reload" | "message" | "volume"
+  action: "restart" | "lock" | "unlock" | "update" | "reload" | "message" | "volume" | "table_changed"
   payload: {
     message?: string
     volume?: number
@@ -402,6 +402,22 @@ export const useBroadcasts = () => {
         case "update":
             ElMessage.info("Checking for updates...")
             // Implement update check
+            break
+
+        case "table_changed":
+            logger.info("[Broadcasts] table_changed received — device store refreshed")
+            deviceStore.refresh().then(() => {
+                if (deviceStore.getTableId() === null) {
+                    ElMessage.warning("Table assignment removed. Contact an administrator.")
+                } else {
+                    ElNotification({
+                        title: "Table Updated",
+                        message: `Table reassigned to ${deviceStore.getTableName() ?? "unknown"}`,
+                        type: "info",
+                        duration: 5000
+                    })
+                }
+            }).catch((err: unknown) => logger.warn("[Broadcasts] table_changed refresh failed", err))
             break
         }
     }
