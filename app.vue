@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { unref } from "vue"
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
 import { useAppUpdate } from "~/composables/useAppUpdate"
@@ -38,6 +39,10 @@ useNetworkStatus()
 
 const PUBLIC_ROUTES = ["/", "/settings", "/auth/register"]
 
+function isDeviceAuthenticated (): boolean {
+    return Boolean(unref(deviceStore.isAuthenticated))
+}
+
 async function checkAuthentication (): Promise<void> {
     const currentRoute = router.currentRoute.value.path
 
@@ -45,7 +50,7 @@ async function checkAuthentication (): Promise<void> {
         return
     }
 
-    if (deviceStore.isAuthenticated) {
+    if (isDeviceAuthenticated()) {
         logger.debug("[Auth] Already authenticated")
         return
     }
@@ -63,7 +68,7 @@ async function checkAuthentication (): Promise<void> {
 }
 
 async function silentlyAuthenticateWelcomeRoute (): Promise<boolean> {
-    if (deviceStore.isAuthenticated) {
+    if (isDeviceAuthenticated()) {
         logger.debug("[Auth] Welcome route already authenticated")
         return true
     }
@@ -72,7 +77,7 @@ async function silentlyAuthenticateWelcomeRoute (): Promise<boolean> {
         try {
             logger.debug("[Auth] Welcome route refresh attempt")
             const refreshed = await deviceStore.refresh()
-            if (refreshed && deviceStore.isAuthenticated) {
+            if (refreshed && isDeviceAuthenticated()) {
                 logger.debug("[Auth] Welcome route refresh successful")
                 return true
             }
@@ -84,7 +89,7 @@ async function silentlyAuthenticateWelcomeRoute (): Promise<boolean> {
     try {
         logger.debug("[Auth] Welcome route silent login attempt")
         const authenticated = await deviceStore.authenticate()
-        if (authenticated && deviceStore.isAuthenticated) {
+        if (authenticated && isDeviceAuthenticated()) {
             logger.debug("[Auth] Welcome route silent login successful")
             return true
         }
@@ -104,15 +109,15 @@ async function resolveAuthenticationState (): Promise<boolean> {
     }
 
     if (PUBLIC_ROUTES.includes(currentRoute)) {
-        return deviceStore.isAuthenticated.value
+        return isDeviceAuthenticated()
     }
 
     await checkAuthentication()
-    return deviceStore.isAuthenticated.value
+    return isDeviceAuthenticated()
 }
 
 function scheduleBroadcastInitialization (): void {
-    if (!deviceStore.isAuthenticated.value) {
+    if (!isDeviceAuthenticated()) {
         return
     }
 
@@ -172,7 +177,7 @@ function handleVisibilityChange (): void {
     // check immediately (auto-applies if safe).
     checkForUpdate().catch(() => {})
 
-    if (!deviceStore.isAuthenticated.value || !sessionStore.isActive) { return }
+    if (!isDeviceAuthenticated() || !sessionStore.isActive) { return }
 
     if (hiddenDurationMs >= FORCE_REINIT_THRESHOLD_MS) {
     // After long sleep, force a full Echo teardown and re-init so channels
