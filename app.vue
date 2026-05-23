@@ -22,7 +22,15 @@ const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
 // progress the update is held and applied the instant the session ends, so a
 // deployed UI change always reaches installed tablets without losing a cart
 // and without staff intervention. Staff can still force it from /settings.
-const { initializeAppUpdate, disposeAppUpdate, checkForUpdate } = useAppUpdate({
+const {
+    initializeAppUpdate,
+    disposeAppUpdate,
+    checkForUpdate,
+    needRefresh,
+    isApplyingUpdate,
+    updateError,
+    applyUpdate,
+} = useAppUpdate({
     isSafeToReload: () => !sessionStore.isActive,
     autoApply: true,
 })
@@ -255,6 +263,12 @@ onUnmounted(() => {
 
         <!-- Global connection and error overlays -->
         <ConnectionBlockingOverlay />
+        <UpdateBanner
+            :visible="needRefresh"
+            :is-applying="isApplyingUpdate"
+            :error-message="updateError"
+            @apply="applyUpdate"
+        />
 
         <NuxtLayout>
             <NuxtPage />
