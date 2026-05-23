@@ -1,16 +1,19 @@
 <template>
-    <div class="relative h-screen w-screen flex flex-col overflow-hidden bg-[#080706]">
-        <!-- Bottom flame (bottom 38% only) -->
-        <div v-if="showFlame" class="absolute bottom-0 left-0 right-0 h-[38%] pointer-events-none z-0" aria-hidden="true">
-            <img
-                :src="flameSrc"
-                alt=""
-                width="1920"
-                height="480"
-                class="w-full h-full object-cover object-top mix-blend-screen"
-                @error="showFlame = false"
-            >
-        </div>
+    <div class="relative h-screen w-screen flex flex-col overflow-hidden bg-grill-table">
+        <!-- Radial warm glow at center -->
+        <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(246,181,109,0.06) 0%, transparent 70%)" aria-hidden="true" />
+
+        <!-- Flame overlay — full screen, fades in after GIF loads, fades out on navigation -->
+        <Transition name="flame-fade">
+            <div v-if="showFlame" class="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
+                <img
+                    :src="flameSrc"
+                    alt=""
+                    class="absolute p-0 m-0 w-full h-full object-cover mix-blend-screen opacity-20"
+                    @error="showFlame = false"
+                >
+            </div>
+        </Transition>
 
         <!-- Content Layer -->
         <div class="relative z-10 flex flex-col h-full items-center justify-center px-6">
@@ -92,43 +95,37 @@
                 </div>
             </div>
 
-            <!-- Settings trigger / connection indicator (top-right dot) -->
-            <div class="absolute top-5 right-5 z-20" style="padding-top: env(safe-area-inset-top)">
+            <!-- Settings trigger (bottom-left, subtle gear) -->
+            <div class="absolute bottom-5 left-5 z-20" style="padding-bottom: env(safe-area-inset-bottom)">
                 <button
-                    class="flex items-center justify-center w-8 h-8 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                    class="flex items-center justify-center w-8 h-8 rounded-full text-white/15 hover:text-white/35 transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                     style="touch-action: manipulation"
                     aria-label="Open settings"
                     title="Settings"
-                    :class="{ 'animate-spin-slow': showPinModal }"
+                    :class="{ 'animate-spin-slow text-white/30': showPinModal }"
                     @click="openSettings"
                 >
-                    <span
-                        :class="[
-                            'w-2.5 h-2.5 rounded-full transition-colors duration-300',
-                            isWebSocketConnected ? 'bg-success' : 'bg-error'
-                        ]"
-                        aria-hidden="true"
-                    />
+                    <Settings :size="16" aria-hidden="true" />
                 </button>
             </div>
 
             <!-- Main Content -->
-            <div class="flex flex-col items-center gap-7 text-center">
+            <div class="flex flex-col items-center gap-4 text-center">
                 <!-- Logo & Welcome -->
-                <div class="space-y-5 animate-fade-in">
+                <div class="space-y-3 animate-fade-in">
                     <div class="flex justify-center">
                         <WoosooLogo />
                     </div>
 
-                    <div class="space-y-3 animate-fade-in-delayed">
-                        <p class="text-[11px] tracking-[0.28em] uppercase font-semibold text-white/40" translate="no">
+                    <div class="space-y-2 animate-fade-in-delayed">
+                        <p class="text-[11px] tracking-[0.28em] uppercase font-semibold text-primary/70" translate="no">
                             Woosoo Korean BBQ Restaurant
                         </p>
-                        <h1 class="text-7xl font-bold font-raleway text-white leading-[1.05]">
+                        <h1 class="text-5xl font-bold font-raleway text-white leading-[1.05]">
                             <span class="block">Your Table,</span>
                             <span class="block">Your Grill.</span>
                         </h1>
-                        <p class="text-white/40 font-kanit text-base tracking-wider mt-2">
+                        <p class="text-white/40 font-kanit text-base tracking-wider">
                             gather · grill · savor
                         </p>
                     </div>
@@ -147,7 +144,7 @@
                 </div>
 
                 <!-- CTA Button (disabled while preloading) -->
-                <div class="space-y-4 animate-fade-in-delayed-2">
+                <div class="space-y-3 animate-fade-in-delayed-2">
                     <div class="relative inline-block group">
                         <!-- Glow layer — contained, no bleed -->
                         <div
@@ -235,7 +232,7 @@
 </template>
 
 <script setup lang="ts">
-import { RefreshCw } from "lucide-vue-next"
+import { RefreshCw, Settings } from "lucide-vue-next"
 import { unref, nextTick } from "vue"
 import flameSrc from "~/assets/images/flame.gif"
 
@@ -550,10 +547,24 @@ const backspace = () => {
   animation: shake 0.4s ease-in-out;
 }
 
+/* Flame transition — slow fade-in (2s), quick fade-out (0.5s) */
+.flame-fade-enter-active {
+  transition: opacity 2s ease;
+}
+.flame-fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+.flame-fade-enter-from,
+.flame-fade-leave-to {
+  opacity: 0;
+}
+
 /* Respect reduced-motion preference (WCAG 2.3) */
 @media (prefers-reduced-motion: reduce) {
   .fade-in-enter-active,
-  .fade-in-leave-active {
+  .fade-in-leave-active,
+  .flame-fade-enter-active,
+  .flame-fade-leave-active {
     transition: none;
   }
   .animate-fade-in-delayed-2,
