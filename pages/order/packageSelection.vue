@@ -239,25 +239,30 @@ function handleTouchEnd () {
                         <ArrowLeft :size="22" class="text-white" aria-hidden="true" />
                     </button>
 
-                    <!-- Title block -->
+                    <!-- Title block with 2-step progress (no step 3) -->
                     <div class="text-center px-2 min-w-0">
-                        <p class="text-xs tracking-[0.3em] uppercase text-white/45 font-semibold mb-1">
-                            Package Selection
-                        </p>
+                        <!-- Step indicator: Guests → Package only -->
+                        <div class="mb-1.5 flex items-center justify-center gap-2" aria-label="Step 2 of 2: Package selection">
+                            <div class="flex items-center gap-1.5">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#ffbd72] text-[10px] font-black text-[#140c06]" aria-hidden="true">1</span>
+                                <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-[#ffbd72]/70">Guests</span>
+                            </div>
+                            <span class="h-px w-6 bg-white/20" aria-hidden="true" />
+                            <div class="flex items-center gap-1.5">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffbd72] text-[10px] font-bold text-[#ffbd72]" aria-hidden="true">2</span>
+                                <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-white">Package</span>
+                            </div>
+                        </div>
                         <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold text-white font-raleway leading-tight text-balance">
                             Choose Your <span class="text-[#f6b56d] italic">Package</span>
                         </h1>
-                        <p class="text-sm text-white/55 mt-2 text-pretty font-kanit">
+                        <p class="text-sm text-white/55 mt-1.5 text-pretty font-kanit">
                             For <strong class="text-white font-bold">{{ guestCount }}</strong> {{ guestCount === 1 ? 'guest' : 'guests' }} &middot; tap a package to preview the meats inside
                         </p>
                     </div>
 
-                    <!-- Package count -->
-                    <div class="hidden sm:flex items-center justify-center px-4 h-12 bg-white/10 rounded-xl border border-white/10">
-                        <span class="text-white/70 font-bold text-sm whitespace-nowrap">
-                            {{ packages.length }} Packages
-                        </span>
-                    </div>
+                    <!-- Spacer to balance the grid (matches back button width) -->
+                    <div class="w-12 h-12" aria-hidden="true" />
                 </div>
 
                 <!-- Loading State -->
