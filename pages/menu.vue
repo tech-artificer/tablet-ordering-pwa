@@ -11,6 +11,7 @@ import { notifyWarning, notifyInfo } from "../composables/useNotifier"
 import { useDeviceStore } from "../stores/Device"
 import { useMenuStore } from "../stores/Menu"
 import { useOrderStore } from "../stores/Order"
+import { formatCurrency } from "../utils/formats"
 
 definePageMeta({
     layout: "kiosk"
@@ -410,9 +411,8 @@ const categoryError = computed(() => {
                     :table-name="(deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill'"
                     :has-placed-order="hasConfirmedInitialOrder"
                     :is-back-disabled="isBackButtonDisabled()"
-                    :cart-count="unref(orderStore.activeCart).length"
                     @back="handleBackButtonClick"
-                    @open-cart="cartDrawerOpen = true"
+                    @toggle-refill-mode="toggleRefillMode"
                 />
 
                 <!-- Category Filter Tabs -->
@@ -548,15 +548,6 @@ const categoryError = computed(() => {
 
         <!-- Support FAB -->
         <support-fab @request-support="handleSupportRequest" />
-
-        <!-- Refill Toggle Button (floating, visible after order placed or recovered) -->
-        <div v-if="canRequestRefill && !orderStore.isRefillMode" class="fixed bottom-24 left-24 z-40">
-            <refill-button
-                :has-placed-order="canRequestRefill"
-                :is-refill-mode="orderStore.isRefillMode"
-                @toggle-refill-mode="toggleRefillMode"
-            />
-        </div>
 
         <template #error="{ error, clearError }">
             <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">

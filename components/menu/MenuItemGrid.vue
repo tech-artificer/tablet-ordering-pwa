@@ -164,21 +164,21 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
             <div class="px-2.5 pt-1.5 pb-2.5 bg-gradient-to-b from-[#1e1e1e] to-[#141414] rounded-b-2xl">
                 <!-- Item code + category row -->
                 <div class="flex items-center gap-2 mb-1">
-                    <span class="text-white/25 text-[9px] font-bold tracking-wider uppercase">
-                        M{{ (item as any).id }}
+                    <span class="text-primary/50 text-[9px] font-black tracking-wider uppercase font-kanit">
+                        {{ (item as any).receipt_name || 'M' + (item as any).id }}
                     </span>
                     <span
-                        class="text-[9px] font-bold uppercase tracking-wider"
+                        class="text-[9px] font-bold uppercase tracking-wider font-kanit"
                         :class="{
                             'text-primary/60': categoryType === 'meats',
                             'text-primary-light/60': categoryType === 'sides' || categoryType === 'desserts',
                             'text-white/35': categoryType === 'drinks',
                         }"
-                    >{{ isUnlimitedCategory ? 'UNLIMITED' : categoryType }}</span>
+                    >{{ categoryType }}</span>
                 </div>
                 <!-- Item name -->
-                <p class="text-white font-semibold text-xs leading-tight mb-1 line-clamp-2">
-                    {{ (item as any).name || (item as any).receipt_name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
+                <p class="text-white font-semibold text-xs leading-tight mb-1 line-clamp-2 font-kanit">
+                    {{ (item as any).name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
                 </p>
 
                 <div class="flex items-center justify-between gap-1.5 mt-2 min-h-[32px]">
@@ -268,6 +268,7 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
   gap: 5px;
   padding: 3px 9px;
   border-radius: 9999px;
+  font-family: 'Raleway', sans-serif;
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.07em;
