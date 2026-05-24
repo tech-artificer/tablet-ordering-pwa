@@ -178,9 +178,12 @@ watch(submitBlockers, () => {
 })
 
 const canSubmit = computed(() => submitBlockers.value.length === 0)
+const isContinueOnly = computed(() =>
+    hasConfirmedInitialOrder.value && !orderStore.isRefillMode
+)
 const isButtonDisabled = computed(() =>
-    !isOnline.value ||
-    (!canSubmit.value && !(hasConfirmedInitialOrder.value && !orderStore.isRefillMode)) ||
+    (!isContinueOnly.value && !isOnline.value) ||
+    (!canSubmit.value && !isContinueOnly.value) ||
     submitState.shouldDisableSubmit.value
 )
 
@@ -357,7 +360,7 @@ async function submit (): Promise<void> {
                     :disabled="isButtonDisabled"
                     @click="submit"
                 >
-                    <span v-if="!isOnline">No Connection</span>
+                    <span v-if="!isOnline && !isContinueOnly">No Connection</span>
                     <span v-else-if="orderStore.isSubmitting">Submitting…</span>
                     <span v-else>{{ buttonLabel }} →</span>
                 </button>

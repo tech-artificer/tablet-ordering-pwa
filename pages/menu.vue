@@ -10,6 +10,7 @@ import { notifyWarning, notifyInfo } from "../composables/useNotifier"
 import { useDeviceStore } from "../stores/Device"
 import { useMenuStore } from "../stores/Menu"
 import { useOrderStore } from "../stores/Order"
+import { formatCurrency } from "../utils/formats"
 
 definePageMeta({
     layout: "kiosk"
@@ -401,9 +402,8 @@ const categoryError = computed(() => {
                     :table-name="(deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill'"
                     :has-placed-order="hasConfirmedInitialOrder"
                     :is-back-disabled="isBackButtonDisabled()"
-                    :cart-count="unref(orderStore.activeCart).length"
                     @back="handleBackButtonClick"
-                    @open-cart="cartDrawerOpen = true"
+                    @toggle-refill-mode="toggleRefillMode"
                 />
 
                 <!-- Category Filter Tabs -->
@@ -511,39 +511,22 @@ const categoryError = computed(() => {
             />
         </el-drawer>
 
-        <!-- Floating cart FAB — stays visible while scrolling -->
+        <!-- Floating VIEW ORDER pill — appears when cart has items -->
         <button
-            class="fixed bottom-36 right-5 z-40 flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-secondary shadow-glow hover:opacity-90 active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            aria-label="Open order summary"
+            v-if="unref(orderStore.activeCart).length > 0"
+            class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-primary text-secondary shadow-glow hover:opacity-90 active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label="View order"
             @click="cartDrawerOpen = true"
         >
-            <svg
-                class="w-6 h-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-            >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span
-                v-if="unref(orderStore.activeCart).length > 0"
-                class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-secondary text-primary text-[10px] font-black flex items-center justify-center tabular-nums leading-none border-2 border-primary"
-            >{{ unref(orderStore.activeCart).length }}</span>
+            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-primary text-sm font-black tabular-nums flex-shrink-0">
+                {{ unref(orderStore.activeCart).length }}
+            </span>
+            <span class="font-bold text-sm tracking-wide uppercase">View Order</span>
+            <span class="font-black text-sm tabular-nums">{{ formatCurrency(grandTotal.value) }}</span>
         </button>
 
         <!-- Support FAB -->
         <support-fab @request-support="handleSupportRequest" />
-
-        <!-- Refill Toggle Button (floating, visible after order placed or recovered) -->
-        <div v-if="canRequestRefill && !orderStore.isRefillMode" class="fixed bottom-24 left-24 z-40">
-            <refill-button
-                :has-placed-order="canRequestRefill"
-                :is-refill-mode="orderStore.isRefillMode"
-                @toggle-refill-mode="toggleRefillMode"
-            />
-        </div>
 
         <template #error="{ error, clearError }">
             <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">

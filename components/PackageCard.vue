@@ -77,65 +77,71 @@ const inclusionChecklist = computed(() => {
 
 <template>
     <article
-        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-6 py-6 text-white shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)] cursor-pointer"
+        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-5 py-5 text-white shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)] cursor-pointer"
+        style="touch-action: manipulation"
         :class="isSelected
-            ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.45),0_22px_60px_rgba(0,0,0,0.52),0_0_40px_rgba(255,189,114,0.12)]'
+            ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.5),0_22px_60px_rgba(0,0,0,0.52),0_0_64px_rgba(255,189,114,0.22)]'
             : 'border-[#4b3826]/80'"
         tabindex="0"
         @click="emit('select', pkg)"
         @focus="emit('focus', pkg)"
     >
-        <div
-            v-if="pkg.is_popular"
-            class="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full bg-[#ffbd72] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#140c06] shadow-[0_10px_24px_rgba(255,189,114,0.28)]"
-        >
-            <Star :size="10" stroke-width="0" fill="currentColor" />
-            Most Popular
-        </div>
-
         <!-- Header -->
         <header class="min-w-0">
-            <h2 class="font-raleway text-[1.65rem] font-extrabold tracking-normal text-white leading-tight">
-                {{ pkg.name }}
-            </h2>
+            <!-- Title row: name + badge inline on same row -->
+            <div class="flex min-w-0 items-start gap-2">
+                <h2
+                    class="font-raleway text-2xl font-extrabold tracking-normal leading-tight flex-1 min-w-0 transition-colors duration-200"
+                    :class="isSelected ? 'text-[#ffbd72]' : 'text-white'"
+                >
+                    {{ pkg.name }}
+                </h2>
+                <div
+                    v-if="pkg.is_popular"
+                    class="mt-1 flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-[#ffbd72] px-2.5 py-0.5 font-raleway text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#140c06] shadow-[0_4px_12px_rgba(255,189,114,0.25)]"
+                >
+                    <Star :size="8" stroke-width="0" fill="currentColor" />
+                    Most Popular
+                </div>
+            </div>
 
-            <p class="mt-1 line-clamp-2 text-sm font-bold text-white/52">
+            <p class="mt-1 line-clamp-2 font-kanit text-sm font-normal text-white/50">
                 {{ (pkg as any).description || packageSubtitle }}
             </p>
 
-            <div class="mt-6 flex items-end gap-3">
-                <div class="font-kanit text-[2.35rem] font-extrabold leading-none text-white">
+            <div class="mt-4 flex items-end gap-3">
+                <div class="font-kanit text-[2rem] font-extrabold leading-none text-white">
                     {{ formatCurrency(Number(pkg.price) * guestCount) }}
                 </div>
-                <div class="min-w-0 overflow-hidden pb-1.5 font-kanit text-xs font-bold text-white/42">
+                <div class="min-w-0 overflow-hidden pb-1 font-kanit text-xs font-medium text-[#ffbd72]/60">
                     <span class="block truncate">{{ formatCurrency(pkg.price) }}/guest<span v-if="packageDuration"> · {{ packageDuration }}</span></span>
                 </div>
             </div>
         </header>
 
-        <section class="mt-5 min-h-0 overflow-hidden border-t border-white/10 pt-4">
-            <ul class="space-y-2.5">
+        <section class="mt-4 min-h-0 overflow-hidden border-t border-white/10 pt-3">
+            <ul class="space-y-2">
                 <li
                     v-for="item in inclusionChecklist"
                     :key="item"
-                    class="flex items-start gap-3 text-sm leading-tight text-white/72"
+                    class="flex items-start gap-2.5 font-kanit text-sm leading-tight text-white/70"
                 >
-                    <span class="mt-0.5 text-[#22c986]" aria-hidden="true">✓</span>
+                    <span class="mt-0.5 text-[#22c986] flex-shrink-0" aria-hidden="true">✓</span>
                     <span>{{ item }}</span>
                 </li>
             </ul>
 
             <div
                 v-if="packageDuration"
-                class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/70"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 font-kanit text-[10px] font-bold uppercase tracking-[0.08em] text-white/60"
             >
-                <Clock :size="12" class="text-[#f6b56d]" />
+                <Clock :size="11" class="text-[#f6b56d]" />
                 Table time included
             </div>
         </section>
 
         <!-- Footer / CTA -->
-        <footer class="mt-5">
+        <footer class="mt-4">
             <button
                 type="button"
                 class="package-meat-rail grid min-h-[3.8rem] w-full grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-[#9c6832]/65 bg-[#23170f]/82 px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_12px_34px_rgba(0,0,0,0.34)] transition-[border-color,background-color,transform] duration-150 hover:border-[#ffbd72] hover:bg-[#2a1a10] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
@@ -167,7 +173,7 @@ const inclusionChecklist = computed(() => {
                     </span>
                 </span>
 
-                <span class="text-sm font-extrabold text-white">View</span>
+                <span class="font-raleway text-sm font-extrabold text-white">View</span>
 
                 <ChevronRight :size="18" class="text-[#ffbd72]" />
             </button>
@@ -195,6 +201,14 @@ article:active {
 }
 
 footer button {
-  transition: all 0.200s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  article:active {
+    transform: none;
+  }
 }
 </style>

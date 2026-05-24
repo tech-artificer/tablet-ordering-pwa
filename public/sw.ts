@@ -55,10 +55,16 @@ const offlineShellHandler = createHandlerBoundToURL('/')
 registerRoute(
   new NavigationRoute(
     async (options) => {
+      // 3 s matches the networkTimeoutSeconds used for menus; on a healthy LAN
+      // navigation responses arrive in <100 ms, so this only fires on hung/stalled
+      // connections that would otherwise block the app shell indefinitely.
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000)
       try {
         // Always try the live document first (LAN is fast; this is what makes
         // a new deployment actually reflect on the tablet).
-        const networkResponse = await fetch(options.request)
+        const networkResponse = await fetch(options.request, { signal: controller.signal })
+        clearTimeout(timeoutId)
         if (networkResponse && networkResponse.ok) {
           return networkResponse
         }
@@ -66,7 +72,8 @@ registerRoute(
         // showing a server error page on a customer-facing kiosk.
         return await offlineShellHandler(options)
       } catch {
-        // Offline / network failure — serve the precached app shell.
+        // Offline, network failure, or timeout — serve the precached app shell.
+        clearTimeout(timeoutId)
         return offlineShellHandler(options)
       }
     },
