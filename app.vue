@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { unref } from "vue"
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
 import { useAppUpdate } from "~/composables/useAppUpdate"
@@ -16,9 +17,15 @@ const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
 const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
 
-// Update system is now route-controlled (welcome screen + settings only)
-// See useAppUpdate.ts for new kiosk-safe API
-const { initializeAppUpdate, disposeAppUpdate } = useAppUpdate()
+// Kiosk auto-update: a pending PWA update is applied automatically, but ONLY
+// when no customer is mid-order (no active dining session). If an order is in
+// progress the update is held and applied the instant the session ends, so a
+// deployed UI change always reaches installed tablets without losing a cart
+// and without staff intervention. Staff can still force it from /settings.
+const { initializeAppUpdate, disposeAppUpdate, checkForUpdate } = useAppUpdate({
+    isSafeToReload: () => !sessionStore.isActive,
+    autoApply: true,
+})
 const isLoading = ref(true)
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null
 let gestureListenersAttached = false
@@ -32,6 +39,10 @@ useNetworkStatus()
 
 const PUBLIC_ROUTES = ["/", "/settings", "/auth/register"]
 
+function isDeviceAuthenticated (): boolean {
+    return Boolean(unref(deviceStore.isAuthenticated))
+}
+
 async function checkAuthentication (): Promise<void> {
     const currentRoute = router.currentRoute.value.path
 
@@ -39,7 +50,7 @@ async function checkAuthentication (): Promise<void> {
         return
     }
 
-    if (deviceStore.isAuthenticated) {
+    if (isDeviceAuthenticated()) {
         logger.debug("[Auth] Already authenticated")
         return
     }
@@ -57,7 +68,7 @@ async function checkAuthentication (): Promise<void> {
 }
 
 async function silentlyAuthenticateWelcomeRoute (): Promise<boolean> {
-    if (deviceStore.isAuthenticated) {
+    if (isDeviceAuthenticated()) {
         logger.debug("[Auth] Welcome route already authenticated")
         return true
     }
@@ -66,7 +77,7 @@ async function silentlyAuthenticateWelcomeRoute (): Promise<boolean> {
         try {
             logger.debug("[Auth] Welcome route refresh attempt")
             const refreshed = await deviceStore.refresh()
-            if (refreshed && deviceStore.isAuthenticated) {
+            if (refreshed && isDeviceAuthenticated()) {
                 logger.debug("[Auth] Welcome route refresh successful")
                 return true
             }
@@ -78,7 +89,7 @@ async function silentlyAuthenticateWelcomeRoute (): Promise<boolean> {
     try {
         logger.debug("[Auth] Welcome route silent login attempt")
         const authenticated = await deviceStore.authenticate()
-        if (authenticated && deviceStore.isAuthenticated) {
+        if (authenticated && isDeviceAuthenticated()) {
             logger.debug("[Auth] Welcome route silent login successful")
             return true
         }
@@ -98,15 +109,15 @@ async function resolveAuthenticationState (): Promise<boolean> {
     }
 
     if (PUBLIC_ROUTES.includes(currentRoute)) {
-        return deviceStore.isAuthenticated.value
+        return isDeviceAuthenticated()
     }
 
     await checkAuthentication()
-    return deviceStore.isAuthenticated.value
+    return isDeviceAuthenticated()
 }
 
 function scheduleBroadcastInitialization (): void {
-    if (!deviceStore.isAuthenticated.value) {
+    if (!isDeviceAuthenticated()) {
         return
     }
 
@@ -162,7 +173,11 @@ function handleVisibilityChange (): void {
 
     logger.info(`[App] Wake detected after ${Math.round(hiddenDurationMs / 1000)}s`)
 
-    if (!deviceStore.isAuthenticated.value || !sessionStore.isActive) { return }
+    // A tablet that just woke may have missed a deployment while asleep —
+    // check immediately (auto-applies if safe).
+    checkForUpdate().catch(() => {})
+
+    if (!isDeviceAuthenticated() || !sessionStore.isActive) { return }
 
     if (hiddenDurationMs >= FORCE_REINIT_THRESHOLD_MS) {
     // After long sleep, force a full Echo teardown and re-init so channels
@@ -182,15 +197,29 @@ onMounted(async () => {
     registerGestureFullscreenRecovery()
     await initializeAppUpdate()
 
-    // Start periodic build version checking (for stale chunk detection)
-    startPeriodicCheck(false)
+    // Start periodic build version checking. redirectOnMismatch=true is the
+    // safety-net backstop: if the service-worker auto-update path ever fails
+    // and a stale build is confirmed (2 consecutive mismatches over >5min),
+    // route to /recovery to force a clean reload instead of running stale.
+    startPeriodicCheck(true)
 
     try {
-        const authenticated = await resolveAuthenticationState()
+        // Cap bootstrap at 10s so a downed server never leaves the splash screen permanently.
+        const bootstrapTimeout = new Promise<boolean>(resolve =>
+            setTimeout(() => resolve(false), 10_000)
+        )
+        const authenticated = await Promise.race([resolveAuthenticationState(), bootstrapTimeout])
         await nuxtApp.callHook("app:auth-ready", { authenticated })
 
         if (authenticated) {
             scheduleBroadcastInitialization()
+        }
+    } catch (err) {
+        logger.error("[App] Bootstrap failed unexpectedly", err)
+        try {
+            await router.replace("/settings")
+        } catch {
+            // router unavailable — app.vue will render in unauthenticated state
         }
     } finally {
         isLoading.value = false

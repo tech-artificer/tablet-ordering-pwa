@@ -1,17 +1,29 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, reactive } from "vue"
 import { Clock, ChevronRight, Star, UtensilsCrossed } from "lucide-vue-next"
 import type { Package, Modifier } from "../types"
 import { displayMeatGroupLabel, groupPackageModifierPreviews } from "../utils/packageModifierGroups"
 
+// Tracks preview-circle images that 404'd. When an image fails to load,
+// NuxtImg renders a broken-image placeholder + alt text — and even with
+// overflow-hidden on the parent circle, the alt text leaks visually
+// (the "PlaiKajuVanCitru" stack seen in production was four broken alts).
+// We swap to the UtensilsCrossed icon fallback instead.
+const brokenPreviewSrcs = reactive(new Set<string>())
+const markPreviewBroken = (src: string | null | undefined) => {
+    if (src) { brokenPreviewSrcs.add(src) }
+}
+
 const props = defineProps<{
   pkg: Package
   guestCount: number
+  isSelected: boolean
   formatCurrency:(value: number | string) => string
 }>()
 
 const emit = defineEmits<{
   "view-modifiers": [pkg: Package]
+  select: [pkg: Package]
   focus: [pkg: Package]
 }>()
 
@@ -54,89 +66,82 @@ const packageSubtitle = computed(() => {
     return groups.length ? `${groups.join(" + ")} lineup` : "Unlimited Korean BBQ spread"
 })
 
-const packageDescription = computed(() => {
-    const description = String((props.pkg as any)?.description || "").trim()
-    if (description) { return description }
-    if (modifierGroups.value.length) {
-        return `A curated unlimited spread with ${totalModifierCount.value} meat cuts, refillable sides, and grill-table service.`
-    }
-    return "A complete Korean BBQ package prepared for a smooth table-service experience."
-})
-
 const inclusionChecklist = computed(() => {
     const groupItems = modifierGroups.value.map(group => `${group.items.length} unlimited ${displayMeatGroupLabel(group.label).toLowerCase()} cuts`)
     return [
         ...groupItems.slice(0, 3),
         "Standard banchan set",
-        "Steamed rice and lettuce wraps",
-        "Refillable Korean iced tea",
     ].slice(0, 4)
 })
 </script>
 
 <template>
     <article
-        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border border-[#4b3826]/80 bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-6 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)]"
+        class="package-editorial-card group relative grid h-full min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border bg-[radial-gradient(circle_at_50%_-12%,rgba(255,178,99,0.1),transparent_34%),linear-gradient(180deg,#1a1410_0%,#100d0a_100%)] px-5 py-5 text-white shadow-[0_22px_60px_rgba(0,0,0,0.52)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#ffbd72]/55 hover:shadow-[0_26px_70px_rgba(0,0,0,0.64)] cursor-pointer"
+        style="touch-action: manipulation"
+        :class="isSelected
+            ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.5),0_22px_60px_rgba(0,0,0,0.52),0_0_64px_rgba(255,189,114,0.22)]'
+            : 'border-[#4b3826]/80'"
         tabindex="0"
-        @focusin="emit('focus', pkg)"
+        @click="emit('select', pkg)"
+        @focus="emit('focus', pkg)"
     >
-        <div
-            v-if="pkg.is_popular"
-            class="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full bg-[#ffbd72] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#140c06] shadow-[0_10px_24px_rgba(255,189,114,0.28)]"
-        >
-            <Star :size="10" stroke-width="0" fill="currentColor" />
-            Most Popular
-        </div>
-
         <!-- Header -->
         <header class="min-w-0">
-            <h2 class="font-raleway text-[1.65rem] font-extrabold tracking-normal text-[#ffbd72] leading-tight">
-                {{ pkg.name }}
-            </h2>
+            <!-- Title row: name + badge inline on same row -->
+            <div class="flex min-w-0 items-start gap-2">
+                <h2
+                    class="font-raleway text-2xl font-extrabold tracking-normal leading-tight flex-1 min-w-0 transition-colors duration-200"
+                    :class="isSelected ? 'text-[#ffbd72]' : 'text-white'"
+                >
+                    {{ pkg.name }}
+                </h2>
+                <div
+                    v-if="pkg.is_popular"
+                    class="mt-1 flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-[#ffbd72] px-2.5 py-0.5 font-raleway text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#140c06] shadow-[0_4px_12px_rgba(255,189,114,0.25)]"
+                >
+                    <Star :size="8" stroke-width="0" fill="currentColor" />
+                    Most Popular
+                </div>
+            </div>
 
-            <p class="mt-1 text-sm font-bold text-white/52">
-                {{ packageSubtitle }}
+            <p class="mt-1 line-clamp-2 font-kanit text-sm font-normal text-white/50">
+                {{ (pkg as any).description || packageSubtitle }}
             </p>
 
-            <p class="mt-3 line-clamp-4 max-w-[34rem] text-sm leading-relaxed text-white/58">
-                {{ packageDescription }}
-            </p>
-
-            <div class="mt-6 flex items-end gap-3">
-                <div class="font-kanit text-[2.35rem] font-extrabold leading-none text-white">
+            <div class="mt-4 flex items-end gap-3">
+                <div class="font-kanit text-[2rem] font-extrabold leading-none text-white">
                     {{ formatCurrency(Number(pkg.price) * guestCount) }}
                 </div>
-                <div class="pb-1.5 font-kanit text-xs font-bold text-white/42">
-                    {{ formatCurrency(pkg.price) }}/guest
-                    <span v-if="packageDuration" class="mx-1">·</span>
-                    <span v-if="packageDuration">{{ packageDuration }}</span>
+                <div class="min-w-0 overflow-hidden pb-1 font-kanit text-xs font-medium text-[#ffbd72]/60">
+                    <span class="block truncate">{{ formatCurrency(pkg.price) }}/guest<span v-if="packageDuration"> · {{ packageDuration }}</span></span>
                 </div>
             </div>
         </header>
 
-        <section class="mt-5 min-h-0 border-t border-white/10 pt-4">
-            <ul class="space-y-2.5">
+        <section class="mt-4 min-h-0 overflow-hidden border-t border-white/10 pt-3">
+            <ul class="space-y-2">
                 <li
                     v-for="item in inclusionChecklist"
                     :key="item"
-                    class="flex items-start gap-3 text-sm leading-tight text-white/72"
+                    class="flex items-start gap-2.5 font-kanit text-sm leading-tight text-white/70"
                 >
-                    <span class="mt-0.5 text-[#22c986]" aria-hidden="true">✓</span>
+                    <span class="mt-0.5 text-[#22c986] flex-shrink-0" aria-hidden="true">✓</span>
                     <span>{{ item }}</span>
                 </li>
             </ul>
 
             <div
                 v-if="packageDuration"
-                class="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white/70"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 font-kanit text-[10px] font-bold uppercase tracking-[0.08em] text-white/60"
             >
-                <Clock :size="12" class="text-[#f6b56d]" />
+                <Clock :size="11" class="text-[#f6b56d]" />
                 Table time included
             </div>
         </section>
 
         <!-- Footer / CTA -->
-        <footer class="mt-5">
+        <footer class="mt-4">
             <button
                 type="button"
                 class="package-meat-rail grid min-h-[3.8rem] w-full grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-[#9c6832]/65 bg-[#23170f]/82 px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_12px_34px_rgba(0,0,0,0.34)] transition-[border-color,background-color,transform] duration-150 hover:border-[#ffbd72] hover:bg-[#2a1a10] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
@@ -146,16 +151,17 @@ const inclusionChecklist = computed(() => {
                     <span
                         v-for="item in previewItems"
                         :key="item.id"
-                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)]"
+                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)] text-[0px] leading-none"
                     >
                         <NuxtImg
-                            v-if="item.img_url"
+                            v-if="item.img_url && !brokenPreviewSrcs.has(item.img_url)"
                             :src="item.img_url"
                             :alt="item.name || 'Meat cut'"
                             class="h-full w-full object-cover"
                             loading="lazy"
                             sizes="36px"
                             format="webp"
+                            @error="markPreviewBroken(item.img_url)"
                         />
                         <UtensilsCrossed v-else :size="15" class="text-[#ffbd72]/65" :stroke-width="1.6" />
                     </span>
@@ -167,12 +173,7 @@ const inclusionChecklist = computed(() => {
                     </span>
                 </span>
 
-                <span class="min-w-0">
-                    <span class="block text-sm font-extrabold text-white">Preview the meats</span>
-                    <span class="block text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
-                        {{ totalModifierCount }} cuts · unlimited
-                    </span>
-                </span>
+                <span class="font-raleway text-sm font-extrabold text-white">View</span>
 
                 <ChevronRight :size="18" class="text-[#ffbd72]" />
             </button>
@@ -200,6 +201,14 @@ article:active {
 }
 
 footer button {
-  transition: all 0.200s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  article:active {
+    transform: none;
+  }
 }
 </style>

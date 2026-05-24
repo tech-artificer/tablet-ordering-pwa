@@ -132,7 +132,8 @@ const formatTime = (ms: number): string => {
 }
 
 const timeRemaining = computed<string>(() => formatTime((unref(sessionStore.remainingMs) ?? 0) as number))
-const isTimerCritical = computed<boolean>(() => ((unref(sessionStore.remainingMs) ?? 0) as number) < 5 * 60 * 1000)
+// Sessions end via order payment/void broadcast — not a countdown. Never show critical state.
+const isTimerCritical = computed<boolean>(() => false)
 
 // ── Wall clock (12-hour AM/PM) ────────────────────────────────────────────────
 const currentTime = ref<string>("")

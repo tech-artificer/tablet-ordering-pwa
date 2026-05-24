@@ -1,4 +1,15 @@
 /**
+ * Generates a unique idempotency key for order/refill submissions.
+ * Prefers crypto.randomUUID() when available; falls back to a timestamp + random suffix.
+ */
+export function generateIdempotencyKey (): string {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+        return (crypto as any).randomUUID() as string
+    }
+    return `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/**
  * Order ID Resolution Utilities
  *
  * Centralizes logic for extracting order IDs from various response shapes

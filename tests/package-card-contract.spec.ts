@@ -10,13 +10,16 @@ function readProjectFile (relativePath: string): string {
 }
 
 describe("package card interaction contract", () => {
-    it("opens the meat browser instead of selecting the package directly", () => {
+    it("opens the meat browser via the dedicated View action", () => {
         const component = readProjectFile("components/PackageCard.vue")
 
-        expect(component).toContain("Preview the meats")
+        // CTA label was renamed "Preview the meats" → "View" in the UX revamp.
+        // The card body has its own select handler (tap to focus/select that
+        // package); the View button (with .stop) opens the modifier inspector
+        // without bubbling the select. Both interactions are intentional.
+        expect(component).toContain(">View<")
         expect(component).toContain("@click.stop=\"emit('view-modifiers', pkg)\"")
         expect(component).not.toContain("Choose package")
-        expect(component).not.toContain("emit('select', pkg)")
     })
 
     it("uses the shared receipt-code modifier grouping helper", () => {

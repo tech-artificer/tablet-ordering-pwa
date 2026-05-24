@@ -11,6 +11,12 @@ const mockPost = vi.fn()
 const mockLoadAllMenus = vi.fn()
 let mockPackages: any[] = []
 
+function markDeviceReady (device: ReturnType<typeof useDeviceStore>) {
+    device.setToken("test-device-token")
+    device.setTable({ id: 1, name: "Test Table", status: "active", is_available: true, is_locked: false } as any)
+    ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+}
+
 vi.mock("../composables/useApi", () => ({
     useApi: () => ({
         get: mockGet,
@@ -43,8 +49,7 @@ describe("session start flow", () => {
         const order = useOrderStore()
         const device = useDeviceStore()
 
-        device.setToken("test-device-token")
-        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+        markDeviceReady(device)
 
         const pkg = {
             id: 101,
@@ -74,8 +79,7 @@ describe("session start flow", () => {
         const order = useOrderStore()
         const device = useDeviceStore()
 
-        device.setToken("test-device-token")
-        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+        markDeviceReady(device)
 
         order.setGuestCount(9)
         order.setPackage({
@@ -99,8 +103,7 @@ describe("session start flow", () => {
         const order = useOrderStore()
         const device = useDeviceStore()
 
-        device.setToken("test-device-token")
-        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+        markDeviceReady(device)
 
         // Seed transactional cart state that must be cleared on session start
         ;(order as any).draft = [{ id: 1, name: "Pre-existing Item", quantity: 2 }]
@@ -120,8 +123,7 @@ describe("session start flow", () => {
         const order = useOrderStore()
         const device = useDeviceStore()
 
-        device.setToken("test-device-token")
-        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+        markDeviceReady(device)
 
         session.setOrderId(19561)
         ;(order as any).rounds = [{
@@ -178,8 +180,7 @@ describe("session start flow", () => {
         const session = useSessionStore()
         const device = useDeviceStore()
 
-        device.setToken("test-device-token")
-        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+        markDeviceReady(device)
 
         // Mock menu loading to fail
         mockLoadAllMenus.mockRejectedValue(new Error("Menu load failed"))
@@ -195,8 +196,7 @@ describe("session start flow", () => {
         const session = useSessionStore()
         const device = useDeviceStore()
 
-        device.setToken("test-device-token")
-        ;(device as any).expiration = Date.now() + 60 * 60 * 1000
+        markDeviceReady(device)
 
         // Mock the /api/session/latest call to fail
         mockGet.mockRejectedValue(new Error("Session fetch failed"))
@@ -206,5 +206,26 @@ describe("session start flow", () => {
 
         expect(started).toBe(true)
         expect(session.isActive).toBe(true)
+    })
+
+    it("rejects stale persisted table state when refresh says the device has no table", async () => {
+        const session = useSessionStore()
+        const device = useDeviceStore()
+
+        markDeviceReady(device)
+        mockPost.mockResolvedValueOnce({
+            data: {
+                success: true,
+                token: "refreshed-token",
+                table: null,
+                expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            },
+        })
+
+        const started = await session.start()
+
+        expect(started).toBe(false)
+        expect(session.isActive).toBe(false)
+        expect(device.getTableId()).toBeNull()
     })
 })

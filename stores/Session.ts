@@ -78,15 +78,13 @@ export const useSessionStore = defineStore("session", () => {
     }
 
     const updateRemaining = () => {
-        if (!state.sessionEndsAt) {
+        if (!state.sessionStartedAt) {
             state.remainingMs = 0
             return
         }
-        const remaining = Math.max(0, Number(state.sessionEndsAt) - Date.now())
-        state.remainingMs = remaining
-        if (remaining <= 0 && state.isActive) {
-            expireSession()
-        }
+        // remainingMs repurposed as elapsed time — session ends only via order
+        // status broadcast (completed / voided / cancelled), never on a timer.
+        state.remainingMs = Date.now() - state.sessionStartedAt
     }
 
     const startTimerInterval = () => {
@@ -108,7 +106,7 @@ export const useSessionStore = defineStore("session", () => {
             stopTimerInterval()
             return
         }
-        if (!state.sessionEndsAt) {
+        if (!state.sessionStartedAt) {
             startTimer()
             return
         }
@@ -172,60 +170,14 @@ export const useSessionStore = defineStore("session", () => {
         if (!state.isActive) { return }
         const api = useApi()
         try {
+            // The POS session is used as a boolean gate only — is a session open?
+            // Its start time is irrelevant; we do not compute any timer from it.
+            // Tablet order session lifecycle (start/end) is driven entirely by
+            // order status broadcasts (OrderCompleted / OrderVoided / OrderCancelled).
             const response = await api.get("/api/session/latest")
             const responseData = response?.data ?? null
-            if (!responseData) { return }
-            const serverTime: string | undefined = responseData.server_time
-            const sessionStartedAt: string | undefined = responseData.session_started_at
-            const durationSeconds: number = responseData.session_duration_seconds ?? 14400
-            if (serverTime && sessionStartedAt) {
-                const serverNow = new Date(serverTime).getTime()
-                const sessionStart = new Date(sessionStartedAt).getTime()
-                const durationMs = durationSeconds * 1000
-                const serverEndAt = sessionStart + durationMs
-                // Correct for client/server clock skew
-                const localOffset = Date.now() - serverNow
-                const newSessionEndsAt = serverEndAt + localOffset
-
-                // Guard 1: session-start identity check.
-                // If the server returned a session that started BEFORE the one we know about
-                // locally (minus 5 s for rounding), it's data from a previous customer's session.
-                // Applying it would set sessionEndsAt to the past and trigger expireSession()
-                // even though the current session is still active. Skip to protect order state.
-                if (state.sessionStartedAt !== null && sessionStart < state.sessionStartedAt - 5_000) {
-                    logger.warn("[Session] syncFromServer: server returned an older session — skipping update to protect active order", {
-                        serverSessionStart: new Date(sessionStart).toISOString(),
-                        localSessionStart: new Date(state.sessionStartedAt).toISOString(),
-                    })
-                    return
-                }
-
-                // Guard 2: imminent-expiry check (original RC-3 fix).
-                // If the computed expiry is within 30 s but the server's own elapsed time is
-                // more than 30 s short of the session duration, the response is from a stale
-                // session whose start time happens to be close to ours. Skip to avoid premature expiry.
-                const clientNow = Date.now()
-                if (newSessionEndsAt < clientNow + 30_000) {
-                    const serverElapsedMs = serverNow - sessionStart
-                    if (serverElapsedMs < Math.max(0, durationMs - 30_000)) {
-                        logger.warn("[Session] syncFromServer: would cause premature expiry — stale session data returned, skipping sessionEndsAt update", {
-                            serverNow: new Date(serverNow).toISOString(),
-                            sessionStart: new Date(sessionStart).toISOString(),
-                            newSessionEndsAt: new Date(newSessionEndsAt).toISOString(),
-                            sessionEndsAt: state.sessionEndsAt ? new Date(state.sessionEndsAt).toISOString() : null,
-                            serverElapsedMs: Math.round(serverElapsedMs / 1000) + "s",
-                            durationMs: Math.round(durationMs / 1000) + "s",
-                        })
-                        return
-                    }
-                }
-
-                state.sessionEndsAt = newSessionEndsAt
-                logger.debug("[Session] syncFromServer: sessionEndsAt recalibrated", {
-                    serverNow: new Date(serverNow).toISOString(),
-                    sessionStart: new Date(sessionStart).toISOString(),
-                    sessionEndsAt: new Date(state.sessionEndsAt).toISOString(),
-                })
+            if (!responseData?.data) {
+                logger.warn("[Session] syncFromServer: no open POS session returned")
             }
         } catch (err: any) {
             logger.debug("[Session] syncFromServer failed (non-fatal):", err?.message)
@@ -317,6 +269,12 @@ export const useSessionStore = defineStore("session", () => {
                 logger.info("[Token Refreshed] Valid token obtained")
             }
 
+            const hasCurrentTableAssignment = await deviceStore.checkTableAssignment()
+            if (!hasCurrentTableAssignment) {
+                logger.warn("[SessionStore] start blocked: device has no current table assignment")
+                return false
+            }
+
             // Fetch latest session id from server to keep local state in-sync
             try {
                 await fetchLatestSession()
@@ -339,6 +297,7 @@ export const useSessionStore = defineStore("session", () => {
             // If the session is already active (e.g. called again from packageSelection as an
             // auth-guard), skip the reset so the guest count and package the user already
             // set are not wiped out.
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const orderStore = useOrderStore()
             if (!state.isActive) {
                 state.terminalHandled = false
@@ -370,12 +329,6 @@ export const useSessionStore = defineStore("session", () => {
                 _registerVisibilitySync()
             }
 
-            // Centralized lightweight flag to signal session is active for simple pages
-            // Avoid direct localStorage writes from pages/components — use this store instead
-            if (typeof window !== "undefined" && window.localStorage) {
-                try { window.localStorage.setItem("session_active", "1") } catch (e) { logger.warn("[SessionStore] failed to set session_active", e) }
-            }
-
             logger.info("[Session Started] Ready for guest ordering flow")
             logger.info("[SessionStore] Session started")
 
@@ -388,6 +341,7 @@ export const useSessionStore = defineStore("session", () => {
     // Must return promise to maintain async contract
         return sessionMutex.runExclusive(async () => {
             const timestamp = new Date().toISOString()
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const orderStore = useOrderStore()
             const currentOrderId = state.orderId
             const finalStatus = orderStore.serverStatus || "unknown"
@@ -415,27 +369,12 @@ export const useSessionStore = defineStore("session", () => {
         _unregisterVisibilitySync()
 
         // Reset order state when session ends
+        // Cross-store: called inside action body only (lazy, Pinia-safe)
         const orderStore = useOrderStore()
         orderStore.resetOrderState()
 
         logger.info(`[Session] State cleared at ${timestamp}`)
 
-        // Force persist to localStorage immediately to avoid hydration issues
-        if (typeof window !== "undefined" && window.localStorage) {
-            try {
-                // Re-save session store with cleared values
-                window.localStorage.setItem("session-store", JSON.stringify({
-                    sessionId: null,
-                    orderId: null,
-                    isActive: false
-                }))
-
-                logger.debug(`[Session] Cleared state persisted at ${timestamp}`)
-                logger.debug("✅ Session and order stores cleared and persisted")
-            } catch (e) {
-                logger.warn("Failed to persist cleared stores:", e)
-            }
-        }
         // Remove lightweight active flag from localStorage (SSR-safe)
         if (typeof window !== "undefined" && window.localStorage) {
             try { window.localStorage.removeItem("session_active") } catch (e) { logger.debug("[SessionStore] failed to remove session_active", e) }
@@ -443,10 +382,6 @@ export const useSessionStore = defineStore("session", () => {
         // Clear persisted idempotency key — prevents previous-session key leaking into next order attempt
         if (typeof sessionStorage !== "undefined") {
             try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { logger.debug("[SessionStore] failed to clear idempotency key", e) }
-        }
-        // Clear offline order queue — queued orders must not survive session end (session boundary safety)
-        if (typeof localStorage !== "undefined") {
-            try { localStorage.removeItem("woosoo_order_queue") } catch (e) { logger.debug("[SessionStore] failed to clear offline order queue", e) }
         }
     }
 
@@ -478,28 +413,12 @@ export const useSessionStore = defineStore("session", () => {
             stopSyncResyncTimer()
             _unregisterVisibilitySync()
 
+            // Cross-store: called inside action body only (lazy, Pinia-safe)
             const orderStore = useOrderStore()
             orderStore.resetOrderState()
 
-            // Force persist to localStorage immediately
-            if (typeof window !== "undefined" && window.localStorage) {
-                try {
-                    window.localStorage.setItem("session-store", JSON.stringify({
-                        sessionId: null,
-                        orderId: null,
-                        isActive: false
-                    }))
-
-                    logger.debug("✅ Session and order stores fully reset and persisted")
-                } catch (e) {
-                    logger.warn("Failed to persist reset stores:", e)
-                }
-            }
             if (typeof window !== "undefined" && window.localStorage) {
                 try { window.localStorage.removeItem("session_active") } catch (e) { logger.debug("[SessionStore] failed to remove session_active", e) }
-                // Reset is also a session boundary (e.g., device reset/end-of-day):
-                // clear any stale offline queued orders.
-                try { window.localStorage.removeItem("woosoo_order_queue") } catch (e) { logger.debug("[SessionStore] failed to clear offline order queue on reset", e) }
             }
             if (typeof sessionStorage !== "undefined") {
                 try { sessionStorage.removeItem("woosoo_order_idem_key") } catch (e) { logger.debug("[SessionStore] failed to clear idempotency key on reset", e) }

@@ -12,14 +12,8 @@
 
 import { useOrderStore } from "~/stores/Order"
 import { useSubmitState } from "~/composables/useSubmitState"
+import { generateIdempotencyKey } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
-
-function generateIdempotencyKey (): string {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-        return (crypto as any).randomUUID() as string
-    }
-    return `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
 
 export interface OrderSubmitResult {
   /** numeric order id if submission succeeded online */
