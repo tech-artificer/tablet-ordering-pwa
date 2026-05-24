@@ -71,6 +71,7 @@ type AppendRoundResponseData = {
 type SubmitOrderOptions = {
     headers?: Record<string, string>
     clientSubmissionId?: string
+    signal?: AbortSignal
 }
 
 type SubmitRefillOptions = {
@@ -487,7 +488,8 @@ export const useOrderStore = defineStore("order", () => {
                     headers: {
                         ...options?.headers,
                         "X-Idempotency-Key": idempotencyKey
-                    }
+                    },
+                    signal: options?.signal
                 })
                 const responseData = resp?.data ?? null
                 logger.info("Order submission SUCCESS")

@@ -33,7 +33,7 @@ export default {
                 "secondary-light": "#3D3D3D", // Lighter neutral
 
                 // Semantic colors
-                success: "#10B981",
+                success: "#F6B56D",
                 error: "#EF4444",
                 warning: "#F59E0B",
 

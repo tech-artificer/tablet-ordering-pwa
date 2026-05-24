@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch } from "vue"
-import { Beef, UtensilsCrossed, CakeSlice, Wine } from "lucide-vue-next"
+import { Beef, UtensilsCrossed, CakeSlice, Wine, ShoppingCart } from "lucide-vue-next"
+import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
 import { useSessionStore } from "../stores/Session"
@@ -30,9 +31,17 @@ const hasConfirmedInitialOrder = computed(() =>
     orderStore.hasPlacedOrder && unref(orderStore.serverOrderId) !== null
 )
 
-onMounted(async () => {
+onMounted(() => {
     // Menus and packages are already preloaded at welcome screen via AppBootstrap.preloadForOrdering()
     // No need to call loadAllMenus() here - data is already in Pinia state
+
+    // Refill-only guard: once the initial order is placed, the menu is reachable
+    // only via the in-session "Order Refills" CTA which pre-toggles refill mode.
+    // If a refresh or deep link lands here post-order without refill mode, force it on.
+    if (hasConfirmedInitialOrder.value && !orderStore.isRefillMode) {
+        logger.info("[Menu] post-order entry without refill mode — forcing refill mode")
+        orderStore.toggleRefillMode(true)
+    }
 })
 
 const resolveStoredPackageId = (): string | number | null => {
@@ -511,18 +520,30 @@ const categoryError = computed(() => {
             />
         </el-drawer>
 
-        <!-- Floating VIEW ORDER pill — appears when cart has items -->
+        <!-- Cart pill — shows running total, anchored bottom-right out of thumb zone.
+             unref() on grandTotal/refillTotal is required: vue-tsc does not infer
+             template-level unwrap when a ComputedRef is passed into a function call
+             inside an interpolation, so without unref() typecheck rejects the call. -->
         <button
-            v-if="unref(orderStore.activeCart).length > 0"
-            class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-primary text-secondary shadow-glow hover:opacity-90 active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            aria-label="View order"
+            class="cart-pill fixed bottom-6 right-6 z-40 inline-flex items-center gap-3 pl-3 pr-5 py-3 rounded-full bg-gradient-to-br from-primary to-primary-dark text-secondary shadow-2xl shadow-primary/40 hover:shadow-primary/55 active:scale-[0.97] transition-[transform,box-shadow] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :aria-label="`Open order summary, total ${formatCurrency(orderStore.isRefillMode ? unref(orderStore.refillTotal) : unref(grandTotal))}`"
             @click="cartDrawerOpen = true"
         >
-            <span class="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-primary text-sm font-black tabular-nums flex-shrink-0">
-                {{ unref(orderStore.activeCart).length }}
+            <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-secondary/15">
+                <ShoppingCart class="w-5 h-5" stroke-width="2.25" />
+                <span
+                    v-if="unref(orderStore.activeCart).length > 0"
+                    class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-secondary text-primary text-[10px] font-black flex items-center justify-center tabular-nums leading-none border-2 border-primary"
+                >{{ unref(orderStore.activeCart).length }}</span>
             </span>
-            <span class="font-bold text-sm tracking-wide uppercase">View Order</span>
-            <span class="font-black text-sm tabular-nums">{{ formatCurrency(grandTotal.value) }}</span>
+            <span class="flex flex-col items-start leading-none gap-0.5">
+                <span class="text-[10px] font-bold tracking-[0.18em] uppercase opacity-80">
+                    {{ unref(orderStore.activeCart).length > 0 ? 'View Cart' : 'Empty Cart' }}
+                </span>
+                <span class="text-base font-black tabular-nums">
+                    {{ formatCurrency(orderStore.isRefillMode ? unref(orderStore.refillTotal) : unref(grandTotal)) }}
+                </span>
+            </span>
         </button>
 
         <!-- Support FAB -->
