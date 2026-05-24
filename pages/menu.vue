@@ -523,7 +523,7 @@ const categoryError = computed(() => {
         <!-- Cart pill — shows running total, anchored bottom-right out of thumb zone -->
         <button
             class="cart-pill fixed bottom-6 right-6 z-40 inline-flex items-center gap-3 pl-3 pr-5 py-3 rounded-full bg-gradient-to-br from-primary to-primary-dark text-secondary shadow-2xl shadow-primary/40 hover:shadow-primary/55 active:scale-[0.97] transition-[transform,box-shadow] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            :aria-label="`Open order summary, total ${formatCurrency(orderStore.isRefillMode ? orderStore.refillTotal : grandTotal)}`"
+            :aria-label="`Open order summary, total ${formatCurrency(orderStore.isRefillMode ? unref(orderStore.refillTotal) : unref(grandTotal))}`"
             @click="cartDrawerOpen = true"
         >
             <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-secondary/15">
@@ -538,7 +538,7 @@ const categoryError = computed(() => {
                     {{ unref(orderStore.activeCart).length > 0 ? 'View Cart' : 'Empty Cart' }}
                 </span>
                 <span class="text-base font-black tabular-nums">
-                    {{ formatCurrency(orderStore.isRefillMode ? orderStore.refillTotal : grandTotal) }}
+                    {{ formatCurrency(orderStore.isRefillMode ? unref(orderStore.refillTotal) : unref(grandTotal)) }}
                 </span>
             </span>
         </button>
