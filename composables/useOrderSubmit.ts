@@ -20,10 +20,16 @@ export interface OrderSubmitResult {
   orderId?: number | string | null
   /** full server response data for online success */
   data?: unknown
+  /** true when the submission was aborted client-side before the server accepted it */
+  cancelled?: boolean
+}
+
+export interface OrderSubmitOptions {
+  signal?: AbortSignal
 }
 
 export function useOrderSubmit () {
-    async function submitOrder (payload: Record<string, unknown>): Promise<OrderSubmitResult> {
+    async function submitOrder (payload: Record<string, unknown>, opts: OrderSubmitOptions = {}): Promise<OrderSubmitResult> {
         const orderStore = useOrderStore()
         const submitState = useSubmitState()
 
@@ -32,6 +38,7 @@ export function useOrderSubmit () {
             headers: {
                 "X-Idempotency-Key": idempotencyKey,
             },
+            signal: opts.signal,
         }
 
         submitState.setSubmitting()
@@ -49,6 +56,16 @@ export function useOrderSubmit () {
             return { data: result }
         } catch (err: any) {
             const status: number | undefined = err?.response?.status
+
+            // Cancelled via AbortController: caller asked us to stop.
+            // If the server already accepted the POST, the kiosk will discover the
+            // order on next page load / broadcast — we do not strand it.
+            const isAbort = err?.name === "CanceledError" || err?.name === "AbortError" || err?.code === "ERR_CANCELED"
+            if (isAbort) {
+                logger.info("[OrderSubmit] Submission aborted by caller")
+                submitState.setFailed("Order cancelled.")
+                return { cancelled: true }
+            }
 
             // 409: active order already exists; order store already handles this
             // by calling setOrderCreated internally — treat result as success
