@@ -520,7 +520,10 @@ const categoryError = computed(() => {
             />
         </el-drawer>
 
-        <!-- Cart pill — shows running total, anchored bottom-right out of thumb zone -->
+        <!-- Cart pill — shows running total, anchored bottom-right out of thumb zone.
+             unref() on grandTotal/refillTotal is required: vue-tsc does not infer
+             template-level unwrap when a ComputedRef is passed into a function call
+             inside an interpolation, so without unref() typecheck rejects the call. -->
         <button
             class="cart-pill fixed bottom-6 right-6 z-40 inline-flex items-center gap-3 pl-3 pr-5 py-3 rounded-full bg-gradient-to-br from-primary to-primary-dark text-secondary shadow-2xl shadow-primary/40 hover:shadow-primary/55 active:scale-[0.97] transition-[transform,box-shadow] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             :aria-label="`Open order summary, total ${formatCurrency(orderStore.isRefillMode ? unref(orderStore.refillTotal) : unref(grandTotal))}`"

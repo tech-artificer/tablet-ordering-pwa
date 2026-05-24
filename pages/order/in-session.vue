@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, unref, watch } from "vue"
+import { computed, onMounted, ref, unref, watch } from "vue"
 import { ClipboardList, Receipt, RefreshCw, ShoppingBag, UtensilsCrossed } from "lucide-vue-next"
 import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
@@ -98,8 +98,6 @@ watch(orderStatus, (status) => {
 // Sessions only end when the order is paid/voided/cancelled (orderStatus watcher).
 
 // ── Navigation guards + lifecycle ─────────────────────────────────────────────
-let clockIntervalId: ReturnType<typeof setInterval> | null = null
-
 onMounted(() => {
     if (!sessionStore.isActive) {
         logger.warn("[in-session] No active session — redirecting to home")
@@ -109,18 +107,9 @@ onMounted(() => {
     if (!orderStore.hasPlacedOrder) {
         logger.warn("[in-session] No placed order — redirecting to menu")
         navigateTo("/menu")
-        return
     }
-    // Trigger a tick every minute so the timer pill stays fresh without spinning
-    // a per-second clock (the sidebar only displays minute-resolution remaining).
-    clockIntervalId = setInterval(() => { /* reactive refresh via remainingMs */ }, 30_000)
-})
-
-onUnmounted(() => {
-    if (clockIntervalId) {
-        clearInterval(clockIntervalId)
-        clockIntervalId = null
-    }
+    // sessionStore.remainingMs is reactive and updated by the store's own
+    // timer — no page-level interval needed for the timer pill to stay fresh.
 })
 
 // ── Refill navigation ─────────────────────────────────────────────────────────
@@ -134,7 +123,11 @@ const goToRefill = () => {
 }
 
 const endSession = () => {
-    triggerSessionEnd("completed", {
+    // Customer-initiated exit — we have no signal the order was paid via
+    // this kiosk, so "cancelled" is the honest SessionEndReason.
+    // If the server later confirms payment, the orderStatus watcher above
+    // will fire the correct terminal reason and override.
+    triggerSessionEnd("cancelled", {
         source: "in-session",
         orderNumber: orderNumber.value ?? undefined,
     })

@@ -3,14 +3,19 @@ import { PartyPopper } from "lucide-vue-next"
 import { computed } from "vue"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   icon: string
   title: string
   message: string
   orderNumber?: string | null
   countdown: number
   isFinalizing: boolean
-}>()
+  /** Initial countdown value, used to scale the progress bar fill. */
+  totalCountdown?: number
+}>(), {
+    orderNumber: null,
+    totalCountdown: 5,
+})
 
 defineEmits<{ returnHome: [] }>()
 
@@ -18,12 +23,18 @@ const { isFullscreen, recover } = useKioskFullscreen()
 
 const progressPercent = computed(() => {
     if (props.isFinalizing) { return 0 }
-    return Math.max(0, Math.min(100, (props.countdown / 5) * 100))
+    const total = props.totalCountdown > 0 ? props.totalCountdown : 5
+    return Math.max(0, Math.min(100, (props.countdown / total) * 100))
 })
 </script>
 
 <template>
     <div class="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8">
+        <span class="sr-only" aria-live="polite">
+            {{ isFinalizing
+                ? 'Finalizing session.'
+                : `Returning to the welcome screen in ${countdown} seconds.` }}
+        </span>
         <Transition name="fade-up" appear>
             <div class="flex flex-col items-center gap-8 max-w-2xl w-full text-center">
                 <!-- Circular gold disc with party popper -->

@@ -93,7 +93,7 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
 
             <!-- Unlimited / Locked badge -->
             <div class="absolute top-2.5 left-2.5 z-30 flex gap-1.5">
-                <div v-if="isUnlimitedCategory && !isLocked() && !isUpgradeLocked(item) && !isRuntimeUnavailable(item)" class="unlimited-badge">
+                <div v-if="isUnlimitedCategory && !isLocked() && !isRuntimeUnavailable(item)" class="unlimited-badge">
                     <span class="unlimited-dot" aria-hidden="true" />
                     UNLIMITED
                 </div>
