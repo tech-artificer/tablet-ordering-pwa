@@ -4,7 +4,7 @@
             v-if="showNotification"
             :class="[
                 'fixed top-0 left-0 right-0 z-50 p-4 text-white text-center transition-all duration-500',
-                isReallyOnline ? 'bg-green-500' : 'bg-red-500'
+                isReallyOnline ? 'bg-primary' : 'bg-red-500'
             ]"
         >
             {{ isReallyOnline ? '🟢 Connected to internet' : '🔴 No internet connection' }}

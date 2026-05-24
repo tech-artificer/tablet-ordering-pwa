@@ -231,7 +231,7 @@ const submitOrder = () => {
                             </div>
                             <span v-if="item.price > 0" class="text-primary text-xs font-medium">{{ formatCurrency(item.price *
                                 item.quantity) }}</span>
-                            <span v-else class="text-green-400 text-[10px]">Unlimited</span>
+                            <span v-else class="text-primary text-[10px]">Unlimited</span>
                         </div>
                     </div>
                 </div>
