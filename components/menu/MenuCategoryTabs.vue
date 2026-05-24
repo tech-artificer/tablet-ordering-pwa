@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import type { Component } from "vue"
-
 type MenuCategory = "meats" | "sides" | "alacartes" | "desserts" | "drinks";
 
 interface Category {
   id: MenuCategory;
   label: string;
-  icon: Component;
 }
 
 const props = defineProps<{
@@ -66,13 +63,6 @@ const selectCategory = (category: MenuCategory) => {
                         aria-hidden="true"
                     />
 
-                    <component
-                        :is="category.icon"
-                        :size="18"
-                        stroke-width="2.2"
-                        class="relative z-10 flex-shrink-0 transition-transform duration-200"
-                        :class="activeCategory === category.id ? 'text-secondary' : 'text-white/50 group-hover:text-white/80'"
-                    />
                     <span class="relative z-10">{{ category.label }}</span>
 
                     <!-- Lock icon for locked categories -->

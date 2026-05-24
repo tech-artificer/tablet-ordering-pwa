@@ -8,13 +8,13 @@ function readProjectFile (relativePath: string): string {
     return readFileSync(resolve(PROJECT_ROOT, relativePath), "utf-8")
 }
 
-// The customer-facing in-session screen was simplified to a header + Order
-// Summary sidebar (per the kiosk design reference). The per-item stream that
-// used to live in the middle column was intentionally removed — staff and
-// kitchen tickets carry that information, not the dining-table tablet.
+// The customer-facing in-session screen has:
+//   • A left column with header + per-item submitted stream (restored from
+//     c2b3774 after the b7da067 redesign accidentally dropped it).
+//   • A right Order Summary sidebar with totals + CTAs.
 //
-// These contract tests pin the new shape so a future "let's bring back the
-// item list" change is an explicit decision, not an accident.
+// These contract tests pin both halves so future redesigns don't silently
+// drop either the item list or the totals sidebar again.
 describe("in-session screen shape", () => {
     const page = readProjectFile("pages/order/in-session.vue")
 
@@ -30,11 +30,11 @@ describe("in-session screen shape", () => {
         expect(page).toContain("Order Refills")
     })
 
-    it("does not render a per-item ordered stream", () => {
-        // The removed feature relied on displaySubmittedItems — make sure no
-        // future revert silently reintroduces a customer-facing item list.
-        expect(page).not.toContain("displaySubmittedItems")
-        expect(page).not.toContain("No items submitted yet")
+    it("renders the per-item submitted stream from rounds[]", () => {
+        // Customer must be able to confirm what they've already sent to the
+        // kitchen. The list is fed by displaySubmittedItems (flattened rounds).
+        expect(page).toContain("displaySubmittedItems")
+        expect(page).toContain("No items submitted yet")
     })
 
     it("uses the gold Online indicator instead of a green Live Session pill", () => {

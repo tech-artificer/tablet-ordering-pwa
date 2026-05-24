@@ -21,6 +21,42 @@ const orderStatus = computed<string>(() => String(unref(orderStore.serverStatus)
 const orderNumber = computed<string | null>(() => null)
 const orderId = computed<number | null>(() => unref(orderStore.serverOrderId) ?? sessionStore.getOrderId() ?? null)
 
+// ── Submitted items (restored from c2b3774 — append-only ledger from rounds[]) ─
+type DisplayedItem = {
+    id: number
+    name: string
+    quantity: number
+    price: number
+    isUnlimited: boolean
+    sourceRound: "initial" | "refill"
+    sourceRoundLabel: string
+}
+
+const displaySubmittedItems = computed<DisplayedItem[]>(() => {
+    const rounds = (unref(orderStore.rounds) ?? []) as any[]
+    if (!Array.isArray(rounds) || rounds.length === 0) { return [] }
+    const out: DisplayedItem[] = []
+    for (const round of rounds) {
+        const isRefill = round?.kind === "refill"
+        const label = isRefill
+            ? `Refill #${Math.max(1, Number(round?.number ?? 1) - 1)}`
+            : "Initial Order"
+        const items = Array.isArray(round?.items) ? round.items : []
+        for (const item of items) {
+            out.push({
+                id: Number(item?.id ?? item?.menu_id ?? 0),
+                name: String(item?.name ?? "Item"),
+                quantity: Number(item?.quantity ?? 0),
+                price: Number(item?.price ?? 0),
+                isUnlimited: Boolean(item?.isUnlimited),
+                sourceRound: isRefill ? "refill" : "initial",
+                sourceRoundLabel: label,
+            })
+        }
+    }
+    return out
+})
+
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const tableShort = computed<string>(() => {
     const name = tableName.value
@@ -221,11 +257,54 @@ definePageMeta({ layout: "kiosk" })
                         </div>
                     </section>
 
-                    <!-- Decorative spacer (intentionally empty: the per-item stream
-                         and "Current Orders" empty state were removed — the Order
-                         Summary sidebar carries the totals; the customer doesn't
-                         need a duplicate item list here). -->
-                    <div class="flex-1 min-h-0" />
+                    <!-- Submitted items stream — flattened from orderStore.rounds.
+                         Restored from c2b3774 (the known-working tip); markup re-styled
+                         to the gold palette of the redesigned in-session screen. -->
+                    <section class="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
+                        <div
+                            v-for="(item, index) in displaySubmittedItems"
+                            :key="`ordered-${item.sourceRoundLabel}-${item.id}-${index}`"
+                            class="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.05] px-3.5 py-3"
+                        >
+                            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="truncate text-sm font-medium text-white/90">{{ item.name }}</span>
+                                    <span
+                                        v-if="item.isUnlimited"
+                                        class="flex-shrink-0 rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary"
+                                        aria-label="Unlimited"
+                                    >∞</span>
+                                    <span
+                                        v-if="item.sourceRound === 'refill'"
+                                        class="flex-shrink-0 rounded border border-white/15 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white/55"
+                                    >
+                                        {{ item.sourceRoundLabel }}
+                                    </span>
+                                </div>
+                                <span v-if="item.price > 0" class="text-xs text-white/40">
+                                    {{ formatPesoExact(item.price) }} each
+                                </span>
+                            </div>
+
+                            <span class="flex-shrink-0 rounded-lg bg-white/[0.05] px-2.5 py-1 text-sm font-semibold tabular-nums text-white/85">
+                                ×{{ item.quantity }}
+                            </span>
+
+                            <span
+                                v-if="item.price > 0"
+                                class="w-20 flex-shrink-0 text-right text-sm font-semibold tabular-nums text-primary"
+                            >
+                                {{ formatPesoExact(item.price * item.quantity) }}
+                            </span>
+                        </div>
+
+                        <p
+                            v-if="!displaySubmittedItems.length"
+                            class="py-8 text-center text-sm text-white/40"
+                        >
+                            No items submitted yet.
+                        </p>
+                    </section>
                 </div>
 
                 <!-- ══ RIGHT COLUMN — Order Summary ══════════════════════════════ -->

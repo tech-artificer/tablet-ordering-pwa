@@ -51,7 +51,7 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
 
 <template>
     <!-- Loading Skeleton -->
-    <div v-if="props.loading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div v-if="props.loading" class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div v-for="n in 8" :key="n" class="bg-surface-10 rounded-xl overflow-hidden animate-pulse">
             <div class="h-32 bg-gray-700" />
             <div class="p-3 space-y-2">
@@ -67,7 +67,7 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
         <el-empty description="No items available" />
     </div>
 
-    <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div v-else class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div
             v-for="item in items"
             :key="item.id"

@@ -36,11 +36,8 @@ const emit = defineEmits<{
                 </svg>
             </button>
             <div class="min-w-0">
-                <p class="text-white font-bold text-base leading-tight truncate font-raleway">
+                <p class="text-white font-bold text-lg leading-tight truncate font-raleway">
                     {{ tableName }}
-                </p>
-                <p class="text-white/35 text-[10px] uppercase tracking-[0.15em] font-semibold leading-tight font-kanit">
-                    {{ selectedPackage ? (selectedPackage as any).description || 'Korean BBQ Selection' : 'Korean BBQ' }}
                 </p>
             </div>
         </div>

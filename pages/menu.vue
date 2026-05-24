@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch } from "vue"
-import { Beef, UtensilsCrossed, CakeSlice, Wine, ShoppingCart } from "lucide-vue-next"
+import { ShoppingCart } from "lucide-vue-next"
 import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
@@ -11,7 +11,6 @@ import { notifyWarning, notifyInfo } from "../composables/useNotifier"
 import { useDeviceStore } from "../stores/Device"
 import { useMenuStore } from "../stores/Menu"
 import { useOrderStore } from "../stores/Order"
-import { formatCurrency } from "../utils/formats"
 
 definePageMeta({
     layout: "kiosk"
@@ -117,10 +116,10 @@ type MenuCategory = "meats" | "sides" | "desserts" | "drinks";
 const activeCategory = ref<MenuCategory>("meats")
 
 const categories = [
-    { id: "meats", label: "Meats", icon: Beef },
-    { id: "sides", label: "Sides", icon: UtensilsCrossed },
-    { id: "desserts", label: "Desserts", icon: CakeSlice },
-    { id: "drinks", label: "Drinks", icon: Wine }
+    { id: "meats", label: "Meats" },
+    { id: "sides", label: "Sides" },
+    { id: "desserts", label: "Desserts" },
+    { id: "drinks", label: "Drinks" }
 ] as const
 
 // Check if refills are available (order placed AND we have a valid order ID)
