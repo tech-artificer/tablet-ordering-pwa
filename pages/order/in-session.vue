@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, unref, watch } from "vue"
-import { Bell, Clock, ShoppingBag, Users, UtensilsCrossed } from "lucide-vue-next"
+import { ClipboardList, Receipt, RefreshCw, ShoppingBag, UtensilsCrossed } from "lucide-vue-next"
 import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
-import type { SubmittedItem } from "~/types"
 import { useApi } from "~/composables/useApi"
+import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
 import { logger } from "~/utils/logger"
 
@@ -14,6 +14,7 @@ import { logger } from "~/utils/logger"
 const sessionStore = useSessionStore()
 const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
+const { isOnline } = useNetworkStatus()
 
 // ── Derived state ─────────────────────────────────────────────────────────────
 const orderStatus = computed<string>(() => String(unref(orderStore.serverStatus) || "pending"))
@@ -21,140 +22,53 @@ const orderNumber = computed<string | null>(() => null)
 const orderId = computed<number | null>(() => unref(orderStore.serverOrderId) ?? sessionStore.getOrderId() ?? null)
 
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
-const guestCount = computed<number>(() => (unref(orderStore.guestCount) ?? 2) as number)
-
-type OrderedItem = SubmittedItem & { sourceRound?: "initial" | "refill"; sourceRoundLabel?: string; is_unlimited?: boolean; unit_price?: number }
-
-function _normalizeHistoryItem (item: any, sourceRound: "initial" | "refill", sourceRoundLabel: string): OrderedItem {
-    return {
-        id: Number(item?.menu_id ?? item?.id ?? 0),
-        menu_id: Number(item?.menu_id ?? item?.id ?? 0),
-        name: String(item?.name ?? item?.receipt_name ?? "Item"),
-        quantity: Number(item?.quantity ?? 0),
-        price: Number(item?.price ?? item?.unit_price ?? 0),
-        img_url: item?.img_url || null,
-        category: item?.category || null,
-        isUnlimited: Boolean(item?.isUnlimited || item?.is_unlimited),
-        sourceRound,
-        sourceRoundLabel,
-    }
-}
-
-const displaySubmittedItems = computed<OrderedItem[]>(() => {
-    // PRIMARY: rounds[] — append-only ledger written by appendRound() on every
-    // successful submission. Source of truth for "show every item the customer
-    // has ever ordered in this session, grouped by round". Survives refresh,
-    // recovery, and validator passes — it is never cleared mid-session.
-    const rounds = (unref(orderStore.rounds) ?? []) as any[]
-    if (Array.isArray(rounds) && rounds.length > 0) {
-        const out: OrderedItem[] = []
-        for (const round of rounds) {
-            const isRefill = round?.kind === "refill"
-            const label = isRefill
-                ? `Refill #${Math.max(1, Number(round?.number ?? 1) - 1)}`
-                : "Initial Order"
-            const items = Array.isArray(round?.items) ? round.items : []
-            for (const item of items) {
-                out.push({
-                    id: Number(item?.id ?? item?.menu_id ?? 0),
-                    menu_id: Number(item?.menu_id ?? item?.id ?? 0),
-                    name: String(item?.name ?? "Item"),
-                    quantity: Number(item?.quantity ?? 0),
-                    price: Number(item?.price ?? 0),
-                    img_url: item?.img_url || null,
-                    category: item?.category || null,
-                    isUnlimited: Boolean(item?.isUnlimited),
-                    sourceRound: isRefill ? "refill" : "initial",
-                    sourceRoundLabel: label,
-                })
-            }
-        }
-        if (out.length > 0) { return out }
-    }
-
-    return []
+const tableShort = computed<string>(() => {
+    const name = tableName.value
+    const match = name.match(/(\d+)/)
+    return match ? `T${match[1]}` : name.slice(0, 2).toUpperCase()
 })
 
-// ── Display helpers ───────────────────────────────────────────────────────────
-const packageName = computed(() =>
-    (orderStore.package as any)?.name ??
-    "Package"
-)
+const packageName = computed(() => (orderStore.package as any)?.name ?? "Package")
+const packageHeading = computed(() => {
+    const name = packageName.value
+    return name && name !== "Package" ? `${name} Selection`.toUpperCase() : "Korean BBQ Selection"
+})
 
-const totalItemsOrdered = computed(() =>
-    displaySubmittedItems.value.reduce((s: number, i: SubmittedItem) => s + Number(i?.quantity ?? 0), 0)
-)
-
-// Use server total from store (authoritative server-reported value)
-const displayTotal = computed<number>(() => {
+// ── Totals (gold figures in the Order Summary sidebar) ────────────────────────
+const packageTotal = computed<number>(() => Number(unref(orderStore.packageTotal) ?? 0))
+const addOnsTotal = computed<number>(() => Number(unref(orderStore.addOnsTotal) ?? 0))
+const taxAmount = computed<number>(() => Number(unref(orderStore.taxAmount) ?? 0))
+const grandTotalDisplay = computed<number>(() => {
     const serverTotal = Number(unref(orderStore.serverTotal) ?? 0)
     if (Number.isFinite(serverTotal) && serverTotal > 0) { return serverTotal }
-    const fallbackTotal = Number(unref(orderStore.grandTotal) ?? 0)
-    return Number.isFinite(fallbackTotal) ? fallbackTotal : 0
+    return Number(unref(orderStore.grandTotal) ?? 0)
 })
-const formattedDisplayTotal = computed<string>(() => displayTotal.value.toFixed(2))
 
-function getStatusDarkStyle (status: string): string {
-    const m: Record<string, string> = {
-        pending: "background:rgba(217,119,6,0.15);color:#d97706;border-color:rgba(217,119,6,0.3)",
-        confirmed: "background:rgba(59,130,246,0.15);color:#60a5fa;border-color:rgba(59,130,246,0.3)",
-        preparing: "background:rgba(167,139,250,0.15);color:#a78bfa;border-color:rgba(167,139,250,0.3)",
-        ready: "background:rgba(34,197,94,0.15);color:#4ade80;border-color:rgba(34,197,94,0.3)",
-        completed: "background:rgba(156,163,175,0.15);color:#9ca3af;border-color:rgba(156,163,175,0.3)",
-        cancelled: "background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)",
-        voided: "background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)",
-    }
-    return m[status] ?? "background:rgba(156,163,175,0.15);color:#9ca3af;border-color:rgba(156,163,175,0.3)"
+const taxRatePercent = computed<number>(() => {
+    const rate = Number((orderStore.package as any)?.tax?.percentage || 0)
+    return Number.isFinite(rate) && rate > 0 ? rate : 12
+})
+
+function formatPeso (value: number): string {
+    if (!Number.isFinite(value)) { return "₱0" }
+    return `₱${value.toLocaleString("en-PH", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`
 }
 
-function getStatusDotStyle (status: string): string {
-    const m: Record<string, string> = {
-        pending: "background:#d97706",
-        confirmed: "background:#60a5fa",
-        preparing: "background:#a78bfa",
-        ready: "background:#4ade80",
-        completed: "background:#9ca3af",
-        cancelled: "background:#f87171",
-        voided: "background:#f87171",
-    }
-    return m[status] ?? "background:#9ca3af"
+function formatPesoExact (value: number): string {
+    if (!Number.isFinite(value)) { return "₱0.00" }
+    return `₱${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
-const formatTime = (ms: number): string => {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1000))
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-    const mm = String(minutes).padStart(2, "0")
-    const ss = String(seconds).padStart(2, "0")
-    return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`
-}
+const remainingMinutes = computed<number>(() => {
+    const ms = Number(unref(sessionStore.remainingMs) ?? 0)
+    return Math.max(0, Math.round(ms / 60000))
+})
 
-const timeRemaining = computed<string>(() => formatTime((unref(sessionStore.remainingMs) ?? 0) as number))
-// Sessions end via order payment/void broadcast — not a countdown. Never show critical state.
-const isTimerCritical = computed<boolean>(() => false)
-
-// ── Wall clock (12-hour AM/PM) ────────────────────────────────────────────────
-const currentTime = ref<string>("")
-
-function updateCurrentTime () {
-    const now = new Date()
-    currentTime.value = now.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    })
-}
-
-let clockIntervalId: ReturnType<typeof setInterval> | null = null
-
-// ── Order round label (Initial Order / Refill #N) ─────────────────────────────
-const orderRound = computed<string>(() => {
-    const rounds = (unref(orderStore.rounds) ?? []) as any[] // unref needed for Pinia setup store
-    const refillCount = Math.max(0, rounds.length - 1)
-    if (refillCount === 0) { return "Initial Order" }
-    return `Refill #${refillCount}`
+const timerPillLabel = computed<string>(() => {
+    const mins = remainingMinutes.value
+    if (mins <= 0) { return "Active" }
+    return `Active · ~${mins} min remaining`
 })
 
 // ── Session-end ──────────────────────────────────────────────────────────────
@@ -181,10 +95,11 @@ watch(orderStatus, (status) => {
     }
 }, { immediate: true })
 
-// Note: Session only ends when order is paid/voided/cancelled (handled by orderStatus watcher)
-// No idle timeout - customers can stay in session indefinitely until order is terminal
+// Sessions only end when the order is paid/voided/cancelled (orderStatus watcher).
 
 // ── Navigation guards + lifecycle ─────────────────────────────────────────────
+let clockIntervalId: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
     if (!sessionStore.isActive) {
         logger.warn("[in-session] No active session — redirecting to home")
@@ -196,8 +111,9 @@ onMounted(() => {
         navigateTo("/menu")
         return
     }
-    updateCurrentTime()
-    clockIntervalId = setInterval(updateCurrentTime, 1000)
+    // Trigger a tick every minute so the timer pill stays fresh without spinning
+    // a per-second clock (the sidebar only displays minute-resolution remaining).
+    clockIntervalId = setInterval(() => { /* reactive refresh via remainingMs */ }, 30_000)
 })
 
 onUnmounted(() => {
@@ -217,7 +133,14 @@ const goToRefill = () => {
     navigateTo("/menu")
 }
 
-// ── Service request modal ─────────────────────────────────────────────────────
+const endSession = () => {
+    triggerSessionEnd("completed", {
+        source: "in-session",
+        orderNumber: orderNumber.value ?? undefined,
+    })
+}
+
+// ── Service request modal (kept for parity; not wired to header yet) ──────────
 const showServiceModal = ref(false)
 const isSubmittingService = ref(false)
 
@@ -244,19 +167,6 @@ const callForService = async (tableServiceId: number) => {
     }
 }
 
-// ── Status helpers ────────────────────────────────────────────────────────────
-const STATUS_LABELS: Record<string, string> = {
-    pending: "Order Received",
-    confirmed: "Confirmed",
-    preparing: "Preparing",
-    ready: "Ready",
-    completed: "Completed",
-    cancelled: "Cancelled",
-    voided: "Voided",
-}
-
-const statusLabel = computed(() => STATUS_LABELS[orderStatus.value] ?? orderStatus.value)
-
 definePageMeta({ layout: "kiosk" })
 </script>
 
@@ -266,208 +176,143 @@ definePageMeta({ layout: "kiosk" })
     >
         <template #default>
             <!-- ── Main In-Session Layout ──────────────────────────────────────── -->
-            <div class="flex h-dvh overflow-hidden bg-[#080706]">
-                <!-- ══ LEFT COLUMN — Order Stream ════════════════════════════════ -->
-                <div class="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-white/5">
-                    <!-- Header -->
-                    <header class="flex flex-shrink-0 items-center justify-between border-b border-white/5 px-6 py-4">
-                        <button
-                            class="inline-flex items-center gap-1.5 rounded-[10px] border border-white/[0.12] bg-transparent px-[14px] py-2 text-[0.8125rem] font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.3)] hover:text-[#e9d3aa] hover:bg-[rgba(233,211,170,0.05)]"
-                            @click="goToRefill"
-                        >
-                            <ShoppingBag class="h-4 w-4" />
-                            Add More Items
-                        </button>
-                        <div class="flex flex-col items-center gap-0.5">
-                            <h1 class="text-sm font-semibold uppercase tracking-widest text-[#9b9484]">
-                                {{ orderRound }}
-                            </h1>
-                            <span class="text-xs text-[#6b6760]">
-                                {{ currentTime }}
+            <div class="flex h-dvh overflow-hidden bg-[#080706] text-white">
+                <!-- ══ LEFT COLUMN — Status header + Order in Session band ═══════ -->
+                <div class="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-white/5 p-6 gap-5">
+                    <!-- Top header band -->
+                    <header class="flex flex-shrink-0 items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <span class="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-primary/45 bg-primary/15 text-primary font-bold text-xs tracking-wide tabular-nums">
+                                {{ tableShort }}
                             </span>
+                            <div class="min-w-0">
+                                <h1 class="text-sm font-bold uppercase tracking-[0.18em] text-white/90 truncate">
+                                    {{ packageHeading }}
+                                </h1>
+                                <p class="text-[10px] uppercase tracking-[0.2em] font-semibold text-white/30 truncate">
+                                    {{ tableName }}
+                                </p>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2 rounded-full border border-[#4ade80]/30 bg-[#4ade80]/10 px-3 py-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse-live" />
-                            <span class="text-xs font-medium text-[#4ade80]">Live Session</span>
-                        </div>
+
+                        <span
+                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider"
+                            :class="isOnline
+                                ? 'border-primary/30 bg-primary/10 text-primary'
+                                : 'border-error/40 bg-error/15 text-error'"
+                        >
+                            <span
+                                class="inline-block w-1.5 h-1.5 rounded-full"
+                                :class="isOnline ? 'bg-primary animate-pulse' : 'bg-error'"
+                            />
+                            {{ isOnline ? 'Online' : 'Offline' }}
+                        </span>
                     </header>
 
-                    <!-- Order meta row -->
-                    <div class="flex flex-shrink-0 items-center gap-4 border-b border-white/5 px-6 py-3">
-                        <span class="text-xs text-[#7a776f]">
-                            {{ orderNumber ? `#${orderNumber}` : 'Processing…' }}
-                        </span>
-                        <div
-                            class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                            :style="getStatusDarkStyle(orderStatus)"
-                        >
-                            <span class="h-1.5 w-1.5 rounded-full" :style="getStatusDotStyle(orderStatus)" />
-                            {{ statusLabel }}
-                        </div>
-                        <div
-                            class="ml-auto flex items-center gap-1.5 text-xs"
-                            :class="isTimerCritical ? 'text-red-400' : 'text-[#8a8578]'"
-                        >
-                            <Clock class="h-3.5 w-3.5" :class="isTimerCritical && 'animate-pulse'" />
-                            {{ timeRemaining }}
-                        </div>
-                    </div>
-
-                    <!-- Scrollable item stream -->
-                    <div class="scrollbar-warm flex-1 overflow-y-auto space-y-2 px-6 py-4">
-                        <div
-                            v-for="(item, index) in displaySubmittedItems"
-                            :key="`ordered-${item.sourceRoundLabel ?? 'order'}-${item.id ?? item.menu_id ?? index}-${index}`"
-                            class="flex items-center gap-3 rounded-xl bg-[#141210] border border-transparent p-[12px_14px] transition-[border-color,background] duration-150 hover:bg-[#1e1a16] hover:border-[rgba(233,211,170,0.1)]"
-                        >
-                            <!-- Item details -->
-                            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                                <div class="flex items-center gap-2">
-                                    <span class="truncate text-sm font-medium text-[#f0e6d2]">{{ item.name }}</span>
-                                    <span
-                                        v-if="item.isUnlimited || item.is_unlimited"
-                                        class="flex-shrink-0 rounded border border-[#e9d3aa]/30 bg-[#e9d3aa]/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#e9d3aa]"
-                                    >∞</span>
-                                    <span
-                                        v-if="item.sourceRound === 'refill'"
-                                        class="flex-shrink-0 rounded border border-[#7a776f]/30 bg-[#7a776f]/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#9b9484]"
-                                    >
-                                        {{ item.sourceRoundLabel }}
-                                    </span>
-                                </div>
-                                <span class="text-xs text-[#7a776f]">
-                                    ₱{{ Number(item.price ?? item.unit_price ?? 0).toFixed(2) }} each
+                    <!-- Order in Session band -->
+                    <section class="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-6 py-5">
+                        <div class="flex items-center justify-between gap-4 flex-wrap">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 text-primary">
+                                    <ClipboardList class="w-5 h-5" />
                                 </span>
+                                <h2 class="text-xl md:text-2xl font-extrabold font-raleway text-primary tracking-tight">
+                                    Order in Session
+                                </h2>
                             </div>
 
-                            <!-- Quantity badge -->
-                            <div class="flex flex-shrink-0 items-center">
-                                <span class="rounded-lg bg-[#1e1a16] px-3 py-1 text-sm font-semibold tabular-nums text-[#e8e2d4]">
-                                    ×{{ item.quantity }}
-                                </span>
-                            </div>
-
-                            <!-- Line total -->
-                            <div class="w-20 flex-shrink-0 text-right">
-                                <span class="text-sm font-semibold text-[#e9d3aa]">
-                                    ₱{{ (Number(item.price ?? item.unit_price ?? 0) * Number(item.quantity)).toFixed(2) }}
-                                </span>
-                            </div>
+                            <span class="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
+                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                {{ timerPillLabel }}
+                            </span>
                         </div>
+                    </section>
 
-                        <p
-                            v-if="!displaySubmittedItems.length"
-                            class="py-8 text-center text-sm text-[#7a776f]"
-                        >
-                            No items submitted yet.
-                        </p>
-                    </div>
+                    <!-- Decorative spacer (intentionally empty: the per-item stream
+                         and "Current Orders" empty state were removed — the Order
+                         Summary sidebar carries the totals; the customer doesn't
+                         need a duplicate item list here). -->
+                    <div class="flex-1 min-h-0" />
                 </div>
 
-                <!-- ══ RIGHT COLUMN — Billing Terminal ══════════════════════════ -->
-                <aside class="w-[300px] flex-shrink-0 flex flex-col bg-[#0f0e0c]">
-                    <!-- SUMMARY label -->
-                    <div class="flex-shrink-0 border-b border-white/5 px-6 py-4">
-                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#7a776f]">
-                            Summary
+                <!-- ══ RIGHT COLUMN — Order Summary ══════════════════════════════ -->
+                <aside class="w-[340px] flex-shrink-0 flex flex-col bg-[#0c0b0a] border-l border-white/5">
+                    <div class="flex-shrink-0 px-7 pt-7 pb-3">
+                        <h3 class="text-lg font-bold font-raleway text-white">
+                            Order Summary
+                        </h3>
+                    </div>
+
+                    <!-- Line items: package / subtotal / tax -->
+                    <div class="flex-shrink-0 px-7 py-2 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-white/65">Package</span>
+                            <span class="text-sm font-semibold text-white tabular-nums">{{ formatPeso(packageTotal) }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-white/65">Subtotal</span>
+                            <span class="text-sm font-semibold text-white tabular-nums">{{ formatPeso(addOnsTotal) }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-white/65">Tax ({{ taxRatePercent }}%)</span>
+                            <span class="text-sm font-semibold text-white tabular-nums">{{ formatPesoExact(taxAmount) }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Total -->
+                    <div class="flex-shrink-0 mx-7 mt-4 pt-4 border-t border-white/10 flex items-baseline justify-between">
+                        <span class="text-sm font-bold uppercase tracking-[0.18em] text-white">Total</span>
+                        <span class="text-2xl font-extrabold font-raleway text-primary tabular-nums">
+                            {{ formatPesoExact(grandTotalDisplay) }}
+                        </span>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex-shrink-0 px-7 pt-6 pb-3 space-y-3">
+                        <button
+                            type="button"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-primary-dark px-4 py-3.5 text-sm font-bold font-raleway text-secondary shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            @click="goToRefill"
+                        >
+                            <RefreshCw class="w-4 h-4" />
+                            Order Refills
+                        </button>
+                        <button
+                            type="button"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.07] hover:border-white/25 active:scale-[0.98] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            @click="goToRefill"
+                        >
+                            <ShoppingBag class="w-4 h-4" />
+                            + Add More Items
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="true"
+                            :aria-disabled="true"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-white/45 cursor-not-allowed"
+                        >
+                            <Receipt class="w-4 h-4" />
+                            Request Bill
+                        </button>
+                        <p class="text-[10px] text-center text-white/30 -mt-1 leading-tight">
+                            Ask a server to settle — touch billing coming soon
                         </p>
                     </div>
 
-                    <!-- Table / timer / clock mini-header -->
-                    <div class="flex flex-shrink-0 items-center justify-between border-b border-white/5 px-6 py-3">
-                        <span class="text-sm font-semibold text-[#f0e6d2]">{{ tableName }}</span>
-                        <div class="flex flex-col items-end gap-0.5">
-                            <div
-                                class="flex items-center gap-1.5 text-xs"
-                                :class="isTimerCritical ? 'text-red-400' : 'text-[#8a8578]'"
-                            >
-                                <Clock class="h-3 w-3" />
-                                {{ timeRemaining }}
-                            </div>
-                            <span class="text-[11px] text-[#6b6760]">{{ currentTime }}</span>
-                        </div>
-                    </div>
-
-                    <!-- Order detail rows -->
-                    <div class="flex-shrink-0 space-y-3 border-b border-white/5 px-6 py-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-[#8a8578]">Order ID</span>
-                            <span class="text-sm font-semibold tabular-nums text-[#e8e2d4]">
-                                {{ orderId ?? '—' }}
-                            </span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2 text-[#8a8578]">
-                                <Users class="h-3.5 w-3.5" />
-                                <span class="text-xs">Guests</span>
-                            </div>
-                            <span class="text-sm font-semibold text-[#e8e2d4]">{{ guestCount }}</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-[#8a8578]">Package</span>
-                            <span class="max-w-[140px] truncate text-right text-sm font-semibold text-[#e8e2d4]">
-                                {{ packageName }}
-                            </span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-[#8a8578]">Items Ordered</span>
-                            <span class="text-sm font-semibold text-[#e8e2d4]">{{ totalItemsOrdered }}</span>
-                        </div>
-                    </div>
-
-                    <!-- Total block -->
-                    <div class="flex-shrink-0 border-b border-white/5 px-6 py-5">
-                        <div class="flex items-end justify-between">
-                            <span class="text-xs font-medium uppercase tracking-wider text-[#7a776f]">Total</span>
-                            <span class="text-2xl font-bold text-[#e9d3aa]">
-                                ₱{{ formattedDisplayTotal }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Status pill -->
-                    <div class="flex-shrink-0 px-6 py-4">
-                        <div
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold"
-                            :style="getStatusDarkStyle(orderStatus)"
-                        >
-                            <span class="h-2 w-2 rounded-full" :style="getStatusDotStyle(orderStatus)" />
-                            {{ statusLabel }}
-                        </div>
-                    </div>
-
-                    <!-- Spacer -->
+                    <!-- Spacer pushing End Session link to the bottom -->
                     <div class="flex-1" />
 
-                    <!-- Action buttons -->
-                    <div class="flex-shrink-0 space-y-3 border-t border-white/5 px-6 py-5">
-                        <button
-                            class="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.25)] hover:text-[#e8e2d4] hover:bg-white/[0.03] w-full opacity-40 cursor-not-allowed"
-                            disabled
-                            title="Coming soon"
-                        >
-                            <Bell class="h-4 w-4" />
-                            Call Staff
-                        </button>
-                        <button
-                            class="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-[#9b9484] cursor-pointer transition-[border-color,color,background] duration-150 hover:border-[rgba(233,211,170,0.25)] hover:text-[#e8e2d4] hover:bg-white/[0.03] w-full"
-                            @click="goToRefill"
-                        >
-                            <ShoppingBag class="h-4 w-4" />
-                            Add More Items
-                        </button>
-                        <button
-                            class="flex items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-br from-[#e9d3aa] to-[#d1b883] px-4 py-[14px] text-sm font-bold text-[#0f0e0c] cursor-pointer transition-[opacity,transform] duration-150 hover:opacity-[0.92] active:scale-[0.98] w-full opacity-40 cursor-not-allowed"
-                            disabled
-                            title="Coming soon"
-                        >
-                            Request Bill
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        class="flex-shrink-0 mb-8 mx-auto text-xs font-semibold text-white/45 hover:text-white/70 underline-offset-4 hover:underline transition"
+                        @click="endSession"
+                    >
+                        End Session
+                    </button>
                 </aside>
             </div>
 
-            <!-- ── Service Request Modal ──────────────────────────────────────── -->
+            <!-- ── Service Request Modal (unchanged) ───────────────────────────── -->
             <ElDialog
                 v-model="showServiceModal"
                 title="Call for Staff"
@@ -522,7 +367,7 @@ definePageMeta({ layout: "kiosk" })
                 </p>
                 <div class="mt-2 flex gap-3">
                     <button
-                        class="flex items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-br from-[#e9d3aa] to-[#d1b883] px-4 py-[14px] text-sm font-bold text-[#0f0e0c] cursor-pointer transition-[opacity,transform] duration-150 hover:opacity-[0.92] active:scale-[0.98]"
+                        class="flex items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-br from-primary to-primary-dark px-4 py-[14px] text-sm font-bold text-secondary cursor-pointer transition-[opacity,transform] duration-150 hover:opacity-[0.92] active:scale-[0.98]"
                         @click="clearError()"
                     >
                         Try Again
@@ -538,3 +383,13 @@ definePageMeta({ layout: "kiosk" })
         </template>
     </NuxtErrorBoundary>
 </template>
+
+<style scoped>
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.animate-pulse-live {
+  animation: pulse-live 1.6s ease-in-out infinite;
+}
+</style>
