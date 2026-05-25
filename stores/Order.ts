@@ -523,6 +523,11 @@ export const useOrderStore = defineStore("order", () => {
                 return responseData
             } catch (error: any) {
                 logger.error("Order submission failed:", error.message)
+
+                // Abort: preserve identity so useOrderSubmit can detect cancel
+                const isAbort = error?.name === "CanceledError" || error?.name === "AbortError" || error?.code === "ERR_CANCELED"
+                if (isAbort) { throw error }
+
                 const errorResponse = extractErrorResponse(error)
 
                 // 401 - Session expired

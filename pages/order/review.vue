@@ -103,6 +103,7 @@ const handleOrderSubmitted = async () => {
 
         <OrderSubmittingOverlay
             v-if="orderStore.isSubmitting"
+            :cancellable="!orderStore.isRefillMode"
             @cancel="handleCancelSubmission"
         />
         <template #error="{ error, clearError }">
