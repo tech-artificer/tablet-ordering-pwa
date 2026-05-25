@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createPinia, setActivePinia } from "pinia"
 
 import { useDeviceStore } from "../stores/Device"
+import { useMenuStore } from "../stores/Menu"
 import { useOrderStore } from "../stores/Order"
 
 if (typeof globalThis.localStorage === "undefined") {
@@ -57,5 +58,15 @@ describe("store contract regressions", () => {
                 { menu_id: 42, quantity: 1 },
             ],
         })
+    })
+
+    it("fetches desserts with the canonical plural category slug", async () => {
+        mockGet.mockResolvedValueOnce({ data: { data: [] } })
+        const menuStore = useMenuStore()
+
+        await menuStore.fetchDesserts()
+
+        expect(mockGet).toHaveBeenCalledWith("/api/v2/tablet/categories/desserts/menus", { signal: undefined })
+        expect(mockGet).not.toHaveBeenCalledWith("/api/v2/tablet/categories/dessert/menus", expect.anything())
     })
 })

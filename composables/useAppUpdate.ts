@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue"
+import { computed, ref, toValue, watch } from "vue"
 import type { MaybeRefOrGetter } from "vue"
 import { isSafeToReload, recordReloadTimestamp } from "./useSafeReload"
 import { logger } from "~/utils/logger"
@@ -30,12 +30,19 @@ type UseAppUpdateOptions = {
     isUpdateApplyBlocked?: MaybeRefOrGetter<boolean>
     reload?: () => void
     /**
-     * Enable automatic reload when safe (kiosk mode).
-     * Staff manual control still available in settings.
-     * DEFAULT: false in production, true when ?debug=pwa query param is present (staged rollout)
+     * Returns true when it is SAFE to auto-apply a pending update and reload
+     * (i.e. no customer is mid-order). When false, the update is held and
+     * auto-applied the moment this becomes true again. If omitted, auto-apply
+     * is treated as always safe.
      */
+    isSafeToReload?: MaybeRefOrGetter<boolean>
+    /** Auto-apply pending updates when safe (default: true — kiosk behaviour). */
+    autoApply?: boolean
+    /** @deprecated Use isSafeToReload instead. Kept for backward compatibility. */
     autoReload?: boolean
 }
+
+const UPDATE_POLL_INTERVAL_MS = 60 * 1000
 
 type WorkerMessageData = {
     type?: string
@@ -105,6 +112,38 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
     const reload = options?.reload ?? (() => window.location.reload())
     // Staged rollout: auto-reload defaults to false unless explicitly enabled or debug=pwa flag is present
     const autoReloadEnabled = options?.autoReload ?? isDebugPwaEnabled()
+
+    const autoApplyEnabled = options?.autoApply !== false
+    const isSafeToReloadOption = (): boolean =>
+        options?.isSafeToReload === undefined ? true : Boolean(toValue(options.isSafeToReload))
+    let updatePollTimer: ReturnType<typeof setInterval> | null = null
+    let stopSafeToReloadWatch: (() => void) | null = null
+    let skipWaitingSent = false
+
+    // Post SKIP_WAITING to the waiting worker. Idempotent per waiting worker;
+    // controllerchange (bound below) performs the actual reload.
+    const postSkipWaiting = (): boolean => {
+        const waiting = registration.value?.waiting
+        if (!waiting) { return false }
+        bindControllerChangeReload()
+        waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
+        skipWaitingSent = true
+        return true
+    }
+
+    // Kiosk auto-apply: when a new worker is waiting AND no customer is
+    // mid-order, activate it immediately. If unsafe, do nothing now — the
+    // safety watcher / poll re-attempts the moment it becomes safe.
+    const maybeAutoApply = (): void => {
+        if (!autoApplyEnabled || skipWaitingSent) { return }
+        if (!registration.value?.waiting) { return }
+        if (!isSafeToReloadOption()) {
+            logger.info("[PWA] Update ready — deferring (order in progress)")
+            return
+        }
+        logger.info("[PWA] Update ready and safe — auto-applying")
+        postSkipWaiting()
+    }
 
     // Controller change always reloads - but only after staff applies update or auto-reload
     const bindControllerChangeReload = () => {
@@ -201,6 +240,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         const controlling = Boolean(registration.value?.active)
         needRefresh.value = waiting
         offlineReady.value = controlling
+        maybeAutoApply()
     }
 
     const attachUpdateFoundListener = () => {
@@ -275,24 +315,42 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
             attachUpdateFoundListener()
             updateStateFromRegistration()
 
-            // Watch for updates and auto-reload when safe (kiosk mode)
-            if (autoReloadEnabled) {
-                watch(needRefresh, (hasUpdate) => {
-                    if (hasUpdate) {
-                        logger.info("[AppUpdate] Update available, triggering guarded reload")
-                        performGuardedReload()
-                    } else {
-                        // Update no longer needed (e.g., SW claimed), stop deferred check
-                        stopDeferredCheck()
-                    }
-                }, { immediate: false })
+            // Ask the SW registration to look for a new worker now.
+            await registration.value?.update().catch(() => {})
+            updateStateFromRegistration()
+
+            // Poll for a new build regularly so an unattended kiosk picks up
+            // deployments without anyone touching the device.
+            if (!updatePollTimer) {
+                updatePollTimer = setInterval(() => { checkForUpdate().catch(() => {}) }, UPDATE_POLL_INTERVAL_MS)
             }
 
-            // Check for updates periodically (passive)
+            // The moment ordering finishes (safe), apply any held update.
+            if (options?.isSafeToReload !== undefined && !stopSafeToReloadWatch) {
+                stopSafeToReloadWatch = watch(
+                    () => isSafeToReloadOption(),
+                    (safe) => { if (safe) { maybeAutoApply() } }
+                )
+            }
+        } catch (error) {
+            logger.warn("[PWA] Unable to initialize update watcher", error)
+        }
+    }
+
+    /**
+     * Actively check the server for a new service worker. Safe to call often
+     * (on a timer, on wake/visibility). Auto-applies when safe.
+     */
+    const checkForUpdate = async (): Promise<void> => {
+        if (!hasServiceWorkerSupport()) { return }
+        try {
+            if (!registration.value) {
+                registration.value = (await navigator.serviceWorker.getRegistration()) ?? null
+            }
             await registration.value?.update().catch(() => {})
             updateStateFromRegistration()
         } catch (error) {
-            logger.warn("[PWA] Unable to initialize update watcher", error)
+            logger.warn("[PWA] checkForUpdate failed", error)
         }
     }
 
@@ -308,10 +366,9 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
 
         isApplyingUpdate.value = true
         updateError.value = null
-        bindControllerChangeReload()
 
         try {
-            registration.value.waiting.postMessage({ type: SKIP_WAITING_MESSAGE_TYPE })
+            postSkipWaiting()
             // Wait a moment for the controller change to trigger
             await new Promise(resolve => setTimeout(resolve, 100))
             isApplyingUpdate.value = false
@@ -327,6 +384,12 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         removeControllerChangeListener?.()
         removeServiceWorkerMessageListener?.()
         removeUpdateFoundListener?.()
+        if (updatePollTimer) {
+            clearInterval(updatePollTimer)
+            updatePollTimer = null
+        }
+        stopSafeToReloadWatch?.()
+        stopSafeToReloadWatch = null
         stopDeferredCheck()
         isApplyingUpdate.value = false
     }
@@ -343,6 +406,7 @@ export function useAppUpdate (options?: UseAppUpdateOptions) {
         updateError,
         initializeAppUpdate,
         disposeAppUpdate,
+        checkForUpdate,
 
         // Deprecated - kept for transition, always true now
         canApplyUpdate: computed(() => needRefresh.value && !isApplyingUpdate.value),

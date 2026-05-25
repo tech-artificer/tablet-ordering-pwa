@@ -41,7 +41,7 @@ describe("package selection responsive layout contract", () => {
         expect(page).toContain("featured-meat-pane")
         expect(page).toContain("meat-grid-pane")
         expect(page).toContain("Keep Browsing")
-        expect(page).toContain("Choose {{ activeInspectorPackage.name }}")
+        expect(page).toContain("Choose Package →")
         expect(page).toContain("@click=\"chooseActiveInspectorPackage\"")
         expect(page).not.toContain("Confirm package")
         expect(page).not.toContain("pendingPackageSelection")

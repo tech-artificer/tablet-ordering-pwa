@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { useRuntimeConfigOverride } from "~/composables/useRuntimeConfigOverride"
 
 // Mock useRuntimeConfig
@@ -71,5 +71,30 @@ describe("BuildInfoPanel visibility", () => {
         requiredFields.forEach((field) => {
             expect(config).toHaveProperty(field)
         })
+    })
+})
+
+describe("useRuntimeConfigOverride - window.__APP_CONFIG__ runtime override", () => {
+    afterEach(() => {
+        delete (window as any).__APP_CONFIG__
+    })
+
+    it("prefers __APP_CONFIG__ Reverb values when present — runtime overrides build-time", () => {
+        ;(window as any).__APP_CONFIG__ = {
+            apiBaseUrl: "https://192.168.100.7/api",
+            reverbHost: "192.168.100.7",
+            reverbAppKey: "prod-app-key",
+            reverbPort: "443",
+            reverbScheme: "https",
+            reverbPath: "/app",
+        }
+
+        const config = useRuntimeConfigOverride()
+
+        expect(config.reverb.host).toBe("192.168.100.7")
+        expect(config.reverb.port).toBe(443)
+        expect(config.reverb.scheme).toBe("https")
+        expect(config.reverb.path).toBe("/app")
+        expect(config.apiBaseUrl).toBe("https://192.168.100.7/api")
     })
 })

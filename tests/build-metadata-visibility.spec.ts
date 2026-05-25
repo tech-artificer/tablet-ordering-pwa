@@ -41,4 +41,22 @@ describe("build metadata visibility wiring", () => {
         expect(settings).toContain("Reverb Scheme")
         expect(settings).toContain("Reverb Path")
     })
+
+    it("uses useRuntimeConfigOverride for Reverb display rows — not raw build-time config", () => {
+        const settings = readText("pages/settings.vue")
+
+        expect(settings).toContain("useRuntimeConfigOverride")
+
+        // Reverb rows must reference the runtime override, not config.public.reverb
+        expect(settings).toContain("runtimeOverride.reverb.host")
+        expect(settings).toContain("runtimeOverride.reverb.port")
+        expect(settings).toContain("runtimeOverride.reverb.scheme")
+        expect(settings).toContain("runtimeOverride.reverb.path")
+
+        // Must NOT fall back to raw build-time reverb in the display rows
+        expect(settings).not.toContain("config.public.reverb?.host")
+        expect(settings).not.toContain("config.public.reverb?.port")
+        expect(settings).not.toContain("config.public.reverb?.scheme")
+        expect(settings).not.toContain("config.public.reverb?.path")
+    })
 })

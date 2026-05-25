@@ -42,13 +42,17 @@ function onResize () {
     viewportWidth.value = window.innerWidth
 }
 
-// Card focus and modifier inspector
-const focusedPackageId = ref<number | null>(null)
+// Card selection and modifier inspector
+const selectedPackage = ref<Package | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
 const featuredModifierId = ref<number | null>(null)
 
+function handleCardSelect (pkg: Package) {
+    selectedPackage.value = pkg
+}
+
 function handleCardFocus (pkg: Package) {
-    focusedPackageId.value = pkg.id
+    selectedPackage.value = pkg
 }
 
 function openModifierInspector (pkg: Package) {
@@ -235,25 +239,35 @@ function handleTouchEnd () {
                         <ArrowLeft :size="22" class="text-white" aria-hidden="true" />
                     </button>
 
-                    <!-- Title block -->
+                    <!-- Title block with 2-step progress (no step 3) -->
                     <div class="text-center px-2 min-w-0">
-                        <p class="text-xs tracking-[0.3em] uppercase text-white/45 font-semibold mb-1">
-                            Package Selection
-                        </p>
+                        <!-- Step indicator: 1 Guests → 2 Package → 3 Menu -->
+                        <div class="mb-1.5 flex items-center justify-center gap-2" aria-label="Step 2 of 3: Package selection">
+                            <div class="flex items-center gap-1.5">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#ffbd72] font-raleway text-[10px] font-black text-[#140c06]" aria-hidden="true">1</span>
+                                <span class="font-kanit text-[10px] font-bold uppercase tracking-[0.18em] text-[#ffbd72]/70">Guests</span>
+                            </div>
+                            <span class="h-px w-5 bg-white/25" aria-hidden="true" />
+                            <div class="flex items-center gap-1.5">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-full border border-[#ffbd72] font-raleway text-[10px] font-bold text-[#ffbd72]" aria-hidden="true">2</span>
+                                <span class="font-kanit text-[10px] font-bold uppercase tracking-[0.18em] text-white">Package</span>
+                            </div>
+                            <span class="h-px w-5 bg-white/15" aria-hidden="true" />
+                            <div class="flex items-center gap-1.5 opacity-35">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-full border border-white/30 font-raleway text-[10px] font-bold text-white/50" aria-hidden="true">3</span>
+                                <span class="font-kanit text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Menu</span>
+                            </div>
+                        </div>
                         <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold text-white font-raleway leading-tight text-balance">
-                            Choose Your <span class="text-[#f6b56d]">Package</span>
+                            Choose Your <span class="text-[#f6b56d] italic">Package</span>
                         </h1>
-                        <p class="text-xs tracking-widest uppercase text-white/55 mt-2 text-pretty">
-                            {{ guestCount }} {{ guestCount === 1 ? 'Guest' : 'Guests' }} &middot; Select Dining Package
+                        <p class="text-sm text-white/55 mt-1.5 text-pretty font-kanit">
+                            For <strong class="text-[#ffbd72] font-bold">{{ guestCount }}</strong> {{ guestCount === 1 ? 'guest' : 'guests' }} &middot; tap a package to preview the meats inside
                         </p>
                     </div>
 
-                    <!-- Package count -->
-                    <div class="hidden sm:flex items-center justify-center px-4 h-12 bg-white/10 rounded-xl border border-white/10">
-                        <span class="text-white/70 font-bold text-sm whitespace-nowrap">
-                            {{ packages.length }} Packages
-                        </span>
-                    </div>
+                    <!-- Spacer to balance the grid (matches back button width) -->
+                    <div class="w-12 h-12" aria-hidden="true" />
                 </div>
 
                 <!-- Loading State -->
@@ -271,10 +285,10 @@ function handleTouchEnd () {
                     <div class="text-center space-y-4">
                         <Inbox :size="48" stroke-width="1.5" class="text-white/40 mx-auto" />
                         <div>
-                            <h3 class="text-xl font-bold text-white mb-2">
+                            <h3 class="font-raleway text-xl font-bold text-white mb-2">
                                 No Packages Available
                             </h3>
-                            <p class="text-white/60 text-sm">
+                            <p class="font-kanit text-white/60 text-sm">
                                 Contact staff to check package availability.
                             </p>
                         </div>
@@ -302,9 +316,11 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -324,9 +340,11 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -345,9 +363,11 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
@@ -366,53 +386,95 @@ function handleTouchEnd () {
                             <PackageCard
                                 :pkg="pkg"
                                 :guest-count="guestCount"
+                                :is-selected="selectedPackage?.id === pkg.id"
                                 :format-currency="formatCurrency"
                                 class="w-full"
                                 @focus="handleCardFocus"
+                                @select="handleCardSelect"
                                 @view-modifiers="openModifierInspector"
                             />
                         </div>
                     </div>
                 </div>
 
-                <!-- Modifier inspector overlay -->
+                <!-- Floating CTA: appears when a package is selected -->
+                <Transition name="slide-cta">
+                    <div
+                        v-if="selectedPackage && !activeInspectorPackage"
+                        class="absolute bottom-6 left-1/2 z-20 -translate-x-1/2"
+                    >
+                        <button
+                            type="button"
+                            class="flex h-14 min-w-[18rem] items-center justify-center rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-10 text-base font-black tracking-wide text-[#140c06] shadow-[0_16px_48px_rgba(255,189,114,0.35)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black font-raleway"
+                            @click="proceedToMenuForPackage(selectedPackage!)"
+                        >
+                            Continue to Menu →
+                        </button>
+                    </div>
+                </Transition>
+
+                <!-- Modifier inspector overlay
+                     NOTE: no horizontal padding on this wrapper — the inner
+                     section's `max-w-[76.5rem]` already constrains width on
+                     wider viewports, and on the 1340×800 tablet the wrapper
+                     padding was clipping the right-column meat cards
+                     (visible as "Hyangcho [cut off]"). Sections inside the
+                     modal carry their own px-6/px-7 padding. -->
                 <div
                     v-if="activeInspectorPackage"
-                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/70 px-3 backdrop-blur-md"
+                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-md"
                     @click.self="closeInspector"
                 >
                     <section
-                        class="package-meat-browser grid h-[88dvh] w-full max-w-[76.5rem] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[1.35rem] border border-[#8f622f]/75 bg-[linear-gradient(180deg,#17110d_0%,#100c09_100%)] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
+                        class="package-meat-browser grid h-[88dvh] w-full max-w-[76.5rem] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[1.35rem] border border-[#8f622f]/75 bg-[linear-gradient(180deg,#17110d_0%,#100c09_100%)] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
                         role="dialog"
                         aria-modal="true"
                         :aria-label="`${activeInspectorPackage.name} meat preview`"
                     >
-                        <header class="flex min-h-[4.5rem] items-center justify-between border-b border-[#4a3320]/70 px-7">
-                            <div class="flex min-w-0 items-center gap-4">
-                                <span class="rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
+                        <header class="flex min-h-[4.5rem] items-center gap-4 border-b border-[#4a3320]/70 px-7">
+                            <!-- Package info -->
+                            <div class="flex min-w-0 flex-1 items-center gap-3">
+                                <span class="flex-shrink-0 rounded-full border border-[#9c6832] bg-[#2a1a10]/85 px-4 py-1.5 font-raleway text-[10px] font-black uppercase tracking-[0.18em] text-[#ffbd72]">
                                     {{ activeInspectorPackage.name }}
                                 </span>
-                                <span class="truncate text-sm font-bold text-white/58">
+                                <span class="truncate font-kanit text-sm font-bold text-white">
                                     {{ inspectorSummary }}
                                 </span>
                             </div>
 
-                            <button
-                                type="button"
-                                aria-label="Close meat browser"
-                                class="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/70 transition hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
-                                @click="closeInspector"
-                            >
-                                <X :size="20" />
-                            </button>
+                            <!-- Actions -->
+                            <div class="flex flex-shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    class="h-9 rounded-full border border-white/20 bg-white/6 px-4 font-raleway text-xs font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                    @click="closeInspector"
+                                >
+                                    Keep Browsing
+                                </button>
+                                <button
+                                    type="button"
+                                    class="h-9 rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-5 font-raleway text-xs font-black uppercase text-[#140c06] shadow-[0_8px_20px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                    @click="chooseActiveInspectorPackage"
+                                >
+                                    Choose Package →
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Close meat browser"
+                                    class="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/70 transition hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
+                                    @click="closeInspector"
+                                >
+                                    <X :size="18" />
+                                </button>
+                            </div>
                         </header>
 
                         <div class="grid min-h-0 grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] divide-x divide-[#3a2819]/80">
-                            <section class="featured-meat-pane min-h-0 px-7 py-6">
-                                <div class="relative h-[45vh] min-h-[18rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
+                            <section class="featured-meat-pane min-h-0 overflow-y-auto px-7 py-4">
+                                <div class="relative h-[36vh] min-h-[13rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
                                     <span
                                         v-if="featuredModifier?.receipt_name"
-                                        class="absolute left-4 top-4 z-10 rounded-md border border-[#9c6832] bg-black/75 px-3 py-1 text-[11px] font-black text-[#ffbd72]"
+                                        class="absolute left-4 top-4 z-10 rounded-md border border-[#9c6832] bg-black/75 px-3 py-1 font-kanit text-[11px] font-black text-[#ffbd72]"
                                     >
                                         {{ featuredModifier.receipt_name }}
                                     </span>
@@ -446,30 +508,33 @@ function handleTouchEnd () {
                                         <ChevronRight :size="20" />
                                     </button>
 
-                                    <span class="absolute bottom-4 right-4 rounded-full bg-black/75 px-3 py-1 text-xs font-black text-white">
+                                    <span class="absolute bottom-4 right-4 rounded-full bg-black/75 px-3 py-1 font-kanit text-xs font-black text-white">
                                         {{ featuredIndex + 1 }} / {{ inspectorModifiers.length }}
                                     </span>
                                 </div>
 
-                                <div class="mt-5">
-                                    <p class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-[#ffbd72]">
+                                <div class="mt-3">
+                                    <p class="font-kanit flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-[#ffbd72]">
                                         <span class="h-1.5 w-1.5 rounded-full bg-[#ffbd72]" />
                                         {{ featuredGroupLabel }}
                                     </p>
-                                    <h2 class="mt-2 font-raleway text-[1.75rem] font-extrabold leading-tight text-white">
+                                    <h2 class="mt-1 font-raleway text-2xl font-extrabold leading-tight text-white">
                                         {{ featuredModifier?.name || "No meat selected" }}
                                     </h2>
-                                    <p class="mt-2 text-sm leading-relaxed text-white/58">
+                                    <p class="font-kanit mt-1 text-xs leading-snug text-white/85">
                                         {{ featuredDescription }}
                                     </p>
-                                    <div class="mt-4 flex flex-wrap gap-2">
-                                        <span class="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <span class="font-kanit rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">
                                             Unlimited refills
                                         </span>
-                                        <span class="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/62">
+                                        <span class="font-kanit rounded-full border border-white/20 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
                                             Grilled at your table
                                         </span>
                                     </div>
+                                    <p class="mt-2 text-xs text-white/55 tracking-wide font-kanit">
+                                        ← → browse cuts &middot; all sides included &middot; unlimited refills
+                                    </p>
                                 </div>
                             </section>
 
@@ -481,10 +546,10 @@ function handleTouchEnd () {
                                 >
                                     <div class="mb-4 flex items-center gap-3">
                                         <span class="h-1.5 w-1.5 rounded-full bg-[#ffbd72]" />
-                                        <h3 class="text-lg font-extrabold text-white">
+                                        <h3 class="font-raleway text-lg font-extrabold text-white">
                                             {{ displayMeatGroupLabel(group.label) }}
                                         </h3>
-                                        <span class="text-[11px] font-black uppercase tracking-[0.14em] text-white/40">
+                                        <span class="font-kanit text-[11px] font-black uppercase tracking-[0.14em] text-white/40">
                                             {{ group.items.length }} cuts
                                         </span>
                                         <span class="h-px flex-1 bg-[#3a2819]" />
@@ -502,7 +567,7 @@ function handleTouchEnd () {
                                             <div class="relative h-28 bg-black">
                                                 <span
                                                     v-if="modifier.receipt_name"
-                                                    class="absolute left-2 top-2 z-10 rounded bg-black/72 px-2 py-0.5 text-[10px] font-black text-[#ffbd72]"
+                                                    class="absolute left-2 top-2 z-10 rounded bg-black/72 px-2 py-0.5 font-kanit text-[10px] font-black text-[#ffbd72]"
                                                 >
                                                     {{ modifier.receipt_name }}
                                                 </span>
@@ -519,7 +584,7 @@ function handleTouchEnd () {
                                                     <UtensilsCrossed :size="34" :stroke-width="1.35" />
                                                 </div>
                                             </div>
-                                            <p class="line-clamp-2 px-3 py-3 text-xs font-bold leading-tight text-white/82">
+                                            <p class="font-kanit line-clamp-2 px-3 py-3 text-xs font-bold leading-tight text-white">
                                                 {{ modifier.name }}
                                             </p>
                                         </button>
@@ -531,23 +596,6 @@ function handleTouchEnd () {
                                 </div>
                             </section>
                         </div>
-
-                        <footer class="flex min-h-[4.75rem] items-center justify-end gap-3 border-t border-[#4a3320]/70 bg-black/18 px-7">
-                            <button
-                                type="button"
-                                class="h-12 min-w-[9.5rem] rounded-full border border-white/14 bg-white/6 px-6 text-sm font-extrabold text-white/82 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                                @click="closeInspector"
-                            >
-                                Keep Browsing
-                            </button>
-                            <button
-                                type="button"
-                                class="h-12 min-w-[16.5rem] rounded-full bg-gradient-to-r from-[#ffbd72] to-[#f6a84d] px-8 text-sm font-black text-[#140c06] shadow-[0_12px_32px_rgba(255,189,114,0.2)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                                @click="chooseActiveInspectorPackage"
-                            >
-                                Choose {{ activeInspectorPackage.name }} →
-                            </button>
-                        </footer>
                     </section>
                 </div>
             </div>
@@ -615,9 +663,30 @@ function handleTouchEnd () {
     -webkit-tap-highlight-color: transparent;
 }
 
+.slide-cta-enter-active {
+    transition: opacity 200ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.slide-cta-leave-active {
+    transition: opacity 160ms ease, transform 200ms cubic-bezier(0.4, 0, 1, 1);
+}
+.slide-cta-enter-from,
+.slide-cta-leave-to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+}
+.slide-cta-enter-to,
+.slide-cta-leave-from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .animate-spin {
         animation: none;
+    }
+    .slide-cta-enter-active,
+    .slide-cta-leave-active {
+        transition: none;
     }
 }
 </style>
