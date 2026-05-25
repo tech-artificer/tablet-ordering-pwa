@@ -44,7 +44,6 @@ function maskToken (token: string | null): string {
 }
 
 async function copySnapshot () {
-    const rawToken = deviceStore.token
     const snapshot = {
         timestamp: new Date().toISOString(),
         build: {
@@ -56,7 +55,7 @@ async function copySnapshot () {
         },
         device: {
             id: deviceStore.getDeviceId(),
-            token: maskToken(rawToken),
+            token: maskToken(deviceStore.getToken()),
             table: deviceStore.getTableName(),
             tableId: deviceStore.getTableId(),
         },

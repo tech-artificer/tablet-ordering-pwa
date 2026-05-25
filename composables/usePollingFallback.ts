@@ -1,4 +1,5 @@
 import { ref, watch } from "vue"
+import { storeToRefs } from "pinia"
 import { useConnectionStore } from "~/stores/Connection"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
@@ -63,7 +64,7 @@ export function usePollingFallback () {
                 const orderNumber = String(liveOrder?.order_number || "")
                 await triggerSessionEnd(
                     liveStatus as "completed" | "voided" | "cancelled",
-                    { source: "polling_fallback", orderNumber: orderNumber || null }
+                    { source: "polling", orderNumber: orderNumber || null }
                 )
             }
         } catch (err) {
@@ -90,12 +91,15 @@ export function usePollingFallback () {
     }
 
     function initialize () {
+        const { phase } = storeToRefs(connectionStore)
+        const { isActive } = storeToRefs(sessionStore)
+
         watch(
-            () => connectionStore.phase,
-            (phase) => {
-                if (phase === "escalated") {
+            phase,
+            (newPhase) => {
+                if (newPhase === "escalated") {
                     startPolling()
-                } else if (phase === "ok") {
+                } else if (newPhase === "ok") {
                     if (activeIntervalId !== null) {
                         logger.info("[PollingFallback] Reverb recovered — stopping HTTP poll")
                         stopPolling()
@@ -106,14 +110,11 @@ export function usePollingFallback () {
         )
 
         // Also stop when session ends
-        watch(
-            () => sessionStore.isActive,
-            (active) => {
-                if (!active && activeIntervalId !== null) {
-                    stopPolling()
-                }
+        watch(isActive, (active) => {
+            if (!active && activeIntervalId !== null) {
+                stopPolling()
             }
-        )
+        })
     }
 
     return { isPolling, initialize, startPolling, stopPolling }
