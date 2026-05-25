@@ -96,15 +96,15 @@ function formatPesoExact (value: number): string {
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
-const remainingMinutes = computed<number>(() => {
+const sessionMinutes = computed<number>(() => {
     const ms = Number(unref(sessionStore.remainingMs) ?? 0)
     return Math.max(0, Math.round(ms / 60000))
 })
 
 const timerPillLabel = computed<string>(() => {
-    const mins = remainingMinutes.value
+    const mins = sessionMinutes.value
     if (mins <= 0) { return "Active" }
-    return `Active · ~${mins} min remaining`
+    return `Active · Session ~${mins} min`
 })
 
 // ── Session-end ──────────────────────────────────────────────────────────────
