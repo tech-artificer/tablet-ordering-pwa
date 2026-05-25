@@ -21,7 +21,15 @@ describe("menu page back button guard", () => {
         expect(guardBody).toContain("hasLiveOrderReference()")
         expect(guardBody).not.toContain("sessionStore.isActive")
         expect(liveOrderBody).toContain("sessionStore.orderId")
-        expect(headerSource).toContain(":disabled=\"isBackDisabled\"")
-        expect(headerSource).toContain("@click=\"emit('back')\"")
+        // MenuHeader's button now routes clicks through onBackClick, which
+        // preserves the original isBackDisabled guard when not in refill mode
+        // and emits "backToSession" when in refill mode (Plan 2, Fix 1).
+        // Both code paths still respect the isBackButtonDisabled() guard from
+        // the parent — the refill-mode override is intentional.
+        expect(headerSource).toContain("isBackInteractive")
+        expect(headerSource).toContain("isBackDisabled")
+        expect(headerSource).toContain("onBackClick")
+        expect(headerSource).toContain("emit(\"back\")")
+        expect(headerSource).toContain("emit(\"backToSession\")")
     })
 })

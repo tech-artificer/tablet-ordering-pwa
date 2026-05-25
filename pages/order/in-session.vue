@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, unref, watch } from "vue"
-import { ClipboardList, Receipt, RefreshCw, ShoppingBag, UtensilsCrossed } from "lucide-vue-next"
+import { ClipboardList, Receipt, RefreshCw, UtensilsCrossed } from "lucide-vue-next"
 import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
@@ -158,15 +158,49 @@ const goToRefill = () => {
     navigateTo("/menu")
 }
 
-const endSession = () => {
-    // Customer-initiated exit — we have no signal the order was paid via
-    // this kiosk, so "cancelled" is the honest SessionEndReason.
-    // If the server later confirms payment, the orderStatus watcher above
-    // will fire the correct terminal reason and override.
-    triggerSessionEnd("cancelled", {
-        source: "in-session",
-        orderNumber: orderNumber.value ?? undefined,
-    })
+const isEndingSession = ref(false)
+
+const endSession = async () => {
+    if (isEndingSession.value) { return }
+
+    const currentOrderId = orderId.value
+    if (!currentOrderId) {
+        logger.warn("[in-session] endSession: no order ID")
+        ElMessage.error("No active order found. Please ask staff for help.")
+        return
+    }
+
+    isEndingSession.value = true
+    try {
+        const api = useApi()
+        const resp = await api.get(`/api/device-order/by-order-id/${currentOrderId}`)
+        const data = resp?.data ?? null
+        const liveOrder = data?.order || data?.data || data
+        const liveStatus = String(liveOrder?.status || "").toLowerCase()
+
+        if (!liveOrder || !liveStatus) {
+            logger.warn("[in-session] endSession: verify returned no status", { resp })
+            ElMessage.error("Cannot verify order status. Please try again or ask staff.")
+            return
+        }
+
+        if (["completed", "voided", "cancelled"].includes(liveStatus)) {
+            logger.info("[in-session] endSession: terminal status confirmed", { liveStatus })
+            triggerSessionEnd(liveStatus as "completed" | "voided" | "cancelled", {
+                source: "in-session",
+                orderNumber: orderNumber.value ?? undefined,
+            })
+            return
+        }
+
+        logger.warn("[in-session] endSession: order still active — refusing", { liveStatus })
+        ElMessage.warning("Your order is still active. Please ask staff to settle the bill before ending the session.")
+    } catch (e: any) {
+        logger.error("[in-session] endSession: verify failed", e?.message)
+        ElMessage.error("Cannot verify order status. Please try again or ask staff.")
+    } finally {
+        isEndingSession.value = false
+    }
 }
 
 // ── Service request modal (kept for parity; not wired to header yet) ──────────
@@ -351,14 +385,6 @@ definePageMeta({ layout: "kiosk" })
                         </button>
                         <button
                             type="button"
-                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.07] hover:border-white/25 active:scale-[0.98] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                            @click="goToRefill"
-                        >
-                            <ShoppingBag class="w-4 h-4" />
-                            + Add More Items
-                        </button>
-                        <button
-                            type="button"
                             :disabled="true"
                             :aria-disabled="true"
                             class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-white/45 cursor-not-allowed"
@@ -376,10 +402,11 @@ definePageMeta({ layout: "kiosk" })
 
                     <button
                         type="button"
-                        class="flex-shrink-0 mb-8 mx-auto text-xs font-semibold text-white/45 hover:text-white/70 underline-offset-4 hover:underline transition"
+                        :disabled="isEndingSession"
+                        class="flex-shrink-0 mb-8 mx-auto text-xs font-semibold text-white/45 hover:text-white/70 underline-offset-4 hover:underline transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
                         @click="endSession"
                     >
-                        End Session
+                        {{ isEndingSession ? "Checking…" : "End Session" }}
                     </button>
                 </aside>
             </div>

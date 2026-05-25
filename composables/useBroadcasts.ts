@@ -276,16 +276,11 @@ export const useBroadcasts = () => {
         logger.debug("🔄 Order update check:", { currentOrderId, eventOrderId, status: order.status })
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
+            // Updating serverStatus is enough — the orderStatus watcher in
+            // pages/order/in-session.vue is the single source of triggerSessionEnd
+            // for terminal statuses (completed/voided/cancelled). Calling it here
+            // too would double-fire the navigation.
             orderStore.updateOrderStatus(order.status)
-
-            // End session only on genuine terminal statuses — in_progress, ready, served are intermediate
-            if (["completed", "voided", "cancelled"].includes(order.status)) {
-                logger.info("[Broadcasts] Terminal order status via broadcast — ending session", { status: order.status })
-                triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", {
-                    source: "broadcast",
-                    orderNumber: order.order_number,
-                })
-            }
         }
     }
 
@@ -306,12 +301,9 @@ export const useBroadcasts = () => {
         logger.debug("✅ Order completed check:", { currentOrderId, eventOrderId })
 
         if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
+            // Single-source navigation: status flip drives the in-session.vue
+            // watcher which calls triggerSessionEnd. Do not call it here too.
             orderStore.updateOrderStatus("completed")
-            logger.info("✅ Order completed via broadcast — ending session")
-            triggerSessionEnd("completed", {
-                source: "broadcast",
-                orderNumber: event.order.order_number,
-            })
         }
     }
 
@@ -329,12 +321,9 @@ export const useBroadcasts = () => {
         const currentId = getCurrentOrderId()
         const eventOrderId = getEventOrderId(event)
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
+            // Single-source navigation: status flip drives the in-session.vue
+            // watcher which calls triggerSessionEnd. Do not call it here too.
             orderStore.updateOrderStatus(event.order.status)
-            logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session")
-            triggerSessionEnd(event.order.status, {
-                source: "broadcast",
-                orderNumber: event.order.order_number,
-            })
         }
     }
 
