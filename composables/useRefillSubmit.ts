@@ -12,12 +12,13 @@
 
 import { useOrderStore } from "~/stores/Order"
 import { useSubmitState } from "~/composables/useSubmitState"
-import { generateIdempotencyKey } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 
 export interface RefillSubmitResult {
   /** full server response data for online success */
   data?: unknown
+  /** true when the call was dropped client-side without reaching the server */
+  cancelled?: boolean
 }
 
 export function useRefillSubmit () {
@@ -25,18 +26,20 @@ export function useRefillSubmit () {
         const orderStore = useOrderStore()
         const submitState = useSubmitState()
 
-        const idempotencyKey = generateIdempotencyKey()
+        if (submitState.isTransitioning.value) {
+            logger.warn("[RefillSubmit] Already in progress — duplicate call ignored")
+            return { cancelled: true }
+        }
 
         submitState.setSubmitting()
 
         // -----------------------------------------------------------------------
         // Submit via existing orderStore.submitRefill (handles validation + API call).
         // No offline fallback — if there is no server response the refill is rejected.
+        // Idempotency key is generated and persisted to sessionStorage by the store.
         // -----------------------------------------------------------------------
         try {
-            const result = await (orderStore.submitRefill as any)(payload, {
-                idempotencyKey
-            })
+            const result = await (orderStore.submitRefill as any)(payload)
             submitState.setConfirmed(
                 result?.order?.order_number ?? result?.order_number ?? null,
                 result?.order?.order_id ?? result?.order_id ?? null

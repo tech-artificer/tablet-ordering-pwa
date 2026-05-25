@@ -42,15 +42,10 @@ describe("composables/useRefillSubmit", () => {
         )
     })
 
-    it("network error passes idempotency key to orderStore.submitRefill", async () => {
+    it("composable does not pass idempotency key to orderStore.submitRefill — store owns it", async () => {
         mockSubmitRefill.mockRejectedValueOnce(new Error("Network Error"))
         const { submitRefill } = useRefillSubmit()
         await submitRefill(samplePayload).catch(() => {})
-        expect(mockSubmitRefill).toHaveBeenCalledWith(
-            samplePayload,
-            {
-                idempotencyKey: expect.any(String),
-            }
-        )
+        expect(mockSubmitRefill).toHaveBeenCalledWith(samplePayload)
     })
 })

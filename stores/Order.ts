@@ -916,6 +916,7 @@ export const useOrderStore = defineStore("order", () => {
         state.package = null
         state.guestCount = 2
         state.error = null
+        state.isSubmitting = false
     }
 
     return {
