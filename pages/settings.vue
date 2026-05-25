@@ -657,6 +657,12 @@ onMounted(async () => {
         logger.warn("[Settings] device/table lookup fallback error", e)
     }
 
+    // Auto-verify token so the diagnostic pill reflects reality on mount,
+    // instead of staying "Unknown" until the operator manually taps "Verify Token".
+    if (deviceStore.token) {
+        verifyToken().catch(err => logger.debug("[Settings] auto-verifyToken failed (non-fatal)", err))
+    }
+
     // Watch for device authentication: show a transient Element Plus notification when device becomes authenticated
     try {
         watch(() => deviceStore.isAuthenticated, (newVal, oldVal) => {

@@ -1,75 +1,97 @@
 <script setup lang="ts">
+import { PartyPopper } from "lucide-vue-next"
+import { computed } from "vue"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   icon: string
   title: string
   message: string
   orderNumber?: string | null
   countdown: number
   isFinalizing: boolean
-}>()
+  /** Initial countdown value, used to scale the progress bar fill. */
+  totalCountdown?: number
+}>(), {
+    orderNumber: null,
+    totalCountdown: 5,
+})
 
-const emit = defineEmits<{ returnHome: [] }>()
+defineEmits<{ returnHome: [] }>()
 
 const { isFullscreen, recover } = useKioskFullscreen()
+
+const progressPercent = computed(() => {
+    if (props.isFinalizing) { return 0 }
+    const total = props.totalCountdown > 0 ? props.totalCountdown : 5
+    // Fill 0% → 100% as countdown elapses (left-to-right progress to home),
+    // not 100% → 0% which reads as the bar "flowing backwards".
+    return Math.max(0, Math.min(100, ((total - props.countdown) / total) * 100))
+})
 </script>
 
 <template>
-    <div class="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white p-8">
+    <div class="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8">
+        <span class="sr-only" aria-live="polite">
+            {{ isFinalizing
+                ? 'Finalizing session.'
+                : `Returning to the welcome screen in ${countdown} seconds.` }}
+        </span>
         <Transition name="fade-up" appear>
-            <div class="flex flex-col items-center gap-6 max-w-lg w-full text-center">
-                <div class="text-7xl" aria-hidden="true">
-                    {{ icon }}
+            <div class="flex flex-col items-center gap-8 max-w-2xl w-full text-center">
+                <!-- Circular gold disc with party popper -->
+                <div class="flex items-center justify-center w-28 h-28 rounded-full bg-primary">
+                    <PartyPopper class="w-12 h-12 text-secondary" />
                 </div>
 
-                <h1 class="text-4xl font-bold tracking-tight font-raleway">
-                    {{ title }}
-                </h1>
-
-                <p v-if="orderNumber" class="text-lg text-white/60">
-                    Order {{ orderNumber }}
+                <!-- Caption -->
+                <p class="text-xs font-bold text-primary tracking-[0.3em] uppercase">
+                    Until Next Time
                 </p>
 
-                <p class="text-xl text-white/80 leading-relaxed">
-                    {{ message }}
-                </p>
-
-                <div v-if="isFinalizing" class="text-white/50 text-sm mt-2">
-                    Finalizing session...
-                </div>
-
-                <div v-else class="flex flex-col items-center gap-4 mt-4 w-full">
-                    <p class="text-white/50 text-sm">
-                        Returning to welcome screen in {{ countdown }}s
+                <!-- Hero text -->
+                <div class="space-y-2">
+                    <h1 class="text-6xl font-serif italic text-primary">
+                        {{ title }}
+                    </h1>
+                    <p class="text-5xl font-bold font-raleway text-white">
+                        {{ message }}
                     </p>
-
-                    <button
-                        class="w-full max-w-xs py-4 px-8 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 transition-transform text-white font-semibold text-lg border border-white/20 font-raleway"
-                        @click="emit('returnHome')"
-                    >
-                        Back to Welcome Now
-                    </button>
-
-                    <!-- Fullscreen recovery button (shown when not in fullscreen) -->
-                    <button
-                        v-if="!isFullscreen"
-                        class="w-full max-w-xs py-3 px-6 rounded-xl bg-primary/20 hover:bg-primary/30 active:scale-95 transition-transform text-primary font-medium text-base border border-primary/30 font-raleway flex items-center justify-center gap-2"
-                        @click="recover"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        >
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                        </svg>
-                        Restore Kiosk Mode
-                    </button>
                 </div>
+
+                <!-- Subtitle -->
+                <div class="text-white/55 text-sm leading-relaxed max-w-md">
+                    <p v-if="orderNumber" class="mb-2">
+                        Order #{{ orderNumber }}
+                    </p>
+                    <p v-if="!isFinalizing">
+                        Returning to the welcome screen…
+                    </p>
+                </div>
+
+                <!-- Progress bar or finalizing text -->
+                <div v-if="!isFinalizing" class="w-[280px]">
+                    <div class="h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                            class="h-full bg-primary rounded-full transition-all"
+                            :style="{ width: `${progressPercent}%` }"
+                            style="transition-duration: 1000ms; transition-timing-function: linear"
+                        />
+                    </div>
+                </div>
+
+                <p v-else class="text-white/40 text-sm">
+                    Finalizing…
+                </p>
+
+                <!-- Restore Kiosk Mode button (only when not fullscreen) -->
+                <button
+                    v-if="!isFullscreen"
+                    class="mt-8 py-3 px-8 rounded-lg border border-primary text-primary font-medium font-raleway hover:bg-primary/10 active:scale-95 transition-transform"
+                    @click="recover"
+                >
+                    Restore Kiosk Mode
+                </button>
             </div>
         </Transition>
     </div>

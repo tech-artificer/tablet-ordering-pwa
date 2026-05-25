@@ -71,6 +71,7 @@ type AppendRoundResponseData = {
 type SubmitOrderOptions = {
     headers?: Record<string, string>
     clientSubmissionId?: string
+    signal?: AbortSignal
 }
 
 type SubmitRefillOptions = {
@@ -487,7 +488,8 @@ export const useOrderStore = defineStore("order", () => {
                     headers: {
                         ...options?.headers,
                         "X-Idempotency-Key": idempotencyKey
-                    }
+                    },
+                    signal: options?.signal
                 })
                 const responseData = resp?.data ?? null
                 logger.info("Order submission SUCCESS")
@@ -521,6 +523,11 @@ export const useOrderStore = defineStore("order", () => {
                 return responseData
             } catch (error: any) {
                 logger.error("Order submission failed:", error.message)
+
+                // Abort: preserve identity so useOrderSubmit can detect cancel
+                const isAbort = error?.name === "CanceledError" || error?.name === "AbortError" || error?.code === "ERR_CANCELED"
+                if (isAbort) { throw error }
+
                 const errorResponse = extractErrorResponse(error)
 
                 // 401 - Session expired

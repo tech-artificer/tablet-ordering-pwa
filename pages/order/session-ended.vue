@@ -21,27 +21,27 @@ const copy = computed(() => {
     switch (reason.value) {
     case "completed":
         return {
-            icon: "✅",
-            title: "Thank you!",
-            message: "Your order is complete. We hope you enjoyed your meal!",
+            icon: "",
+            title: "Thank You",
+            message: "for dining with us.",
         }
     case "voided":
         return {
-            icon: "ℹ️",
-            title: "Order Ended",
-            message: "Your order was ended by staff. Please see our team if you need help.",
+            icon: "",
+            title: "All Settled",
+            message: "See you soon.",
         }
     case "cancelled":
         return {
-            icon: "🔄",
-            title: "Order Cancelled",
-            message: "Your order was cancelled. You can start a new order anytime.",
+            icon: "",
+            title: "No Worries",
+            message: "Come back anytime.",
         }
     default:
         return {
-            icon: "👋",
-            title: "Session Ended",
-            message: "Your session has ended. Thank you for visiting!",
+            icon: "",
+            title: "Until Next Time",
+            message: "Thank you for visiting.",
         }
     }
 })

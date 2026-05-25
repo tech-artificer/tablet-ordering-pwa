@@ -14,7 +14,7 @@ describe("order review page component wiring", () => {
         const page = readProjectFile("pages/order/review.vue")
 
         expect(page).toContain("import OrderingStep3ReviewSubmit from \"~/components/order/OrderingStep3ReviewSubmit.vue\"")
-        expect(page).toContain("<OrderingStep3ReviewSubmit @order-submitted=\"handleOrderSubmitted\" />")
+        expect(page).toMatch(/<OrderingStep3ReviewSubmit[\s\S]*?@order-submitted="handleOrderSubmitted"/)
         expect(page).not.toContain("<OrderOrderingStep3ReviewSubmit")
     })
 

@@ -159,7 +159,7 @@ describe("session start flow", () => {
         expect(session.isActive).toBe(false)
     })
 
-    it("returns false when token refresh fails", async () => {
+    it("starts when token refresh fails but IP auth fallback succeeds", async () => {
         const session = useSessionStore()
         const device = useDeviceStore()
 
@@ -167,8 +167,36 @@ describe("session start flow", () => {
         device.setToken("expired-token")
         ;(device as any).expiration = Date.now() - 1000 // Expired 1 second ago
 
-        // Mock refresh to fail
+        const authPayload = {
+            success: true,
+            token: "recovered-token",
+            device: { id: 1, name: "Recovered Tablet" },
+            table: { id: 1, name: "Test Table", status: "active", is_available: true, is_locked: false },
+            expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }
+
+        mockPost
+            .mockRejectedValueOnce(new Error("Token refresh failed"))
+            .mockResolvedValueOnce({ data: authPayload })
+        mockGet.mockResolvedValueOnce({ data: authPayload })
+
+        const started = await session.start()
+
+        expect(started).toBe(true)
+        expect(session.isActive).toBe(true)
+        expect(device.getToken()).toBe("recovered-token")
+        expect(device.getTableId()).toBe(1)
+    })
+
+    it("returns false when token refresh and IP auth fallback both fail", async () => {
+        const session = useSessionStore()
+        const device = useDeviceStore()
+
+        device.setToken("expired-token")
+        ;(device as any).expiration = Date.now() - 1000
+
         mockPost.mockRejectedValue(new Error("Token refresh failed"))
+        mockGet.mockRejectedValueOnce(new Error("IP auth failed"))
 
         const started = await session.start()
 

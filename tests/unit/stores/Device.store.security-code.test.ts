@@ -159,6 +159,20 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
     })
 
     describe("authenticate() action with optional client ip", () => {
+        it("should reject HTML shell responses instead of storing them as auth JSON", async () => {
+            const store = useDeviceStore()
+
+            mockGet.mockResolvedValueOnce({
+                data: "<!DOCTYPE html><html><body>Nuxt shell</body></html>"
+            })
+
+            const ok = await store.authenticate("192.168.100.7")
+
+            expect(ok).toBe(false)
+            expect(store.lastAuthResponse).toBeNull()
+            expect(store.errorMessage).toBe("Device authentication returned an invalid response")
+        })
+
         it("should call /api/devices/login with ip_address query when provided", async () => {
             const store = useDeviceStore()
 
