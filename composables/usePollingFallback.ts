@@ -92,12 +92,15 @@ export function usePollingFallback () {
 
     function initialize () {
         const { phase } = storeToRefs(connectionStore)
+        const { serverOrderId } = storeToRefs(orderStore)
         const { isActive } = storeToRefs(sessionStore)
 
+        // Watch both phase AND serverOrderId so that if phase is already "escalated"
+        // when an order is submitted, polling starts as soon as the orderId appears.
         watch(
-            phase,
-            (newPhase) => {
-                if (newPhase === "escalated") {
+            [phase, serverOrderId],
+            ([newPhase, newOrderId]) => {
+                if (newPhase === "escalated" && newOrderId !== null) {
                     startPolling()
                 } else if (newPhase === "ok") {
                     if (activeIntervalId !== null) {
