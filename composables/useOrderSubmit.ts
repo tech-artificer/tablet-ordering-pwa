@@ -34,7 +34,7 @@ export function useOrderSubmit () {
 
         if (submitState.isTransitioning.value) {
             logger.warn("[OrderSubmit] Already in progress — duplicate call ignored")
-            return {}
+            return { cancelled: true }
         }
 
         // signal is forwarded to the store so AbortController callers can cancel.

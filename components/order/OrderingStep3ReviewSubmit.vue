@@ -228,7 +228,10 @@ async function submit (): Promise<void> {
     try {
         if (orderStore.isRefillMode) {
             const refillPayload = orderStore.buildRefillPayload()
-            await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
+            const refillResult = await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
+            if (refillResult?.cancelled) {
+                return
+            }
             submitState.resetForNextTransaction() // Ready for next refill
         } else {
             const payload = orderStore.buildPayload()

@@ -53,13 +53,11 @@ describe("order hard-fail contract (no SW replay)", () => {
         await expect(submitOrder(samplePayload)).rejects.toThrow()
     })
 
-    it("idempotency key is still sent to orderStore on every attempt", async () => {
+    it("composable does not pass X-Idempotency-Key — store owns key generation", async () => {
         mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
         const { submitOrder } = useOrderSubmit()
         await submitOrder(samplePayload).catch(() => {})
-        expect(mockSubmitOrder).toHaveBeenCalledWith(
-            samplePayload,
-            { headers: { "X-Idempotency-Key": expect.any(String) } }
-        )
+        const [, opts] = mockSubmitOrder.mock.calls[0]
+        expect(opts?.headers?.["X-Idempotency-Key"]).toBeUndefined()
     })
 })

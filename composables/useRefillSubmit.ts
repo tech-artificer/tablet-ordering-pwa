@@ -17,6 +17,8 @@ import { logger } from "~/utils/logger"
 export interface RefillSubmitResult {
   /** full server response data for online success */
   data?: unknown
+  /** true when the call was dropped client-side without reaching the server */
+  cancelled?: boolean
 }
 
 export function useRefillSubmit () {
@@ -26,7 +28,7 @@ export function useRefillSubmit () {
 
         if (submitState.isTransitioning.value) {
             logger.warn("[RefillSubmit] Already in progress — duplicate call ignored")
-            return {}
+            return { cancelled: true }
         }
 
         submitState.setSubmitting()
