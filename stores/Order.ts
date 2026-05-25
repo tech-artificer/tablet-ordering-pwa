@@ -10,6 +10,7 @@ import { ERROR_MENU_ITEM_UNAVAILABLE } from "../utils/errorCodes"
 import { useDeviceStore } from "./Device"
 import { useMenuStore } from "./Menu"
 import { useSessionStore } from "./Session"
+import { safeValidate, OrderCreateResponseSchema } from "~/schemas/api"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA MODEL (see docs/DATA_MODEL.md)
@@ -113,6 +114,10 @@ export const useOrderStore = defineStore("order", () => {
         respData: AppendRoundResponseData
     ): void {
         try {
+            // Runtime schema validation — warns on contract drift, never throws.
+            // The ?? fallback chain below remains the authoritative data extraction.
+            safeValidate(OrderCreateResponseSchema, respData, "appendRound")
+
             const orderObj = respData?.order ?? respData ?? {}
             const parentOrderId = Number(
                 orderObj?.order_id ??
