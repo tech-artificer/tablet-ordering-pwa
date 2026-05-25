@@ -54,6 +54,10 @@ function normalizeTable (tbl: unknown): Table | null {
     return tbl as Table
 }
 
+function isObjectPayload (payload: unknown): payload is Record<string, any> {
+    return Boolean(payload && typeof payload === "object" && !Array.isArray(payload))
+}
+
 export const useDeviceStore = defineStore("device", () => {
     const state = reactive<DeviceStoreState>({
         device: null,
@@ -161,7 +165,16 @@ export const useDeviceStore = defineStore("device", () => {
         }
     }
 
-    function applyAuthPayload (payload: any) {
+    function applyAuthPayload (payload: any, source: string): boolean {
+        if (!isObjectPayload(payload)) {
+            state.lastAuthResponse = null
+            state.errorMessage = "Device authentication returned an invalid response"
+            logger.warn(`[DeviceStore] ${source}: expected JSON auth payload`, {
+                payloadType: typeof payload,
+            })
+            return false
+        }
+
         const authToken = payload?.token
         const authDevice = payload?.device
         const authTable = payload?.table
@@ -201,6 +214,7 @@ export const useDeviceStore = defineStore("device", () => {
         }
 
         applyBroadcastConfig(payload)
+        return true
     }
 
     function syncWaitingForTable () {
@@ -229,7 +243,9 @@ export const useDeviceStore = defineStore("device", () => {
         try {
             const api = useApi()
             const response = await api.post("/api/devices/refresh")
-            applyAuthPayload(response.data)
+            if (!applyAuthPayload(response.data, "refresh")) {
+                return false
+            }
             syncWaitingForTable()
             return Boolean(state.token)
         } catch (error: any) {
@@ -253,7 +269,9 @@ export const useDeviceStore = defineStore("device", () => {
             const response = params
                 ? await api.get("/api/devices/login", { params })
                 : await api.get("/api/devices/login")
-            applyAuthPayload(response.data)
+            if (!applyAuthPayload(response.data, "authenticate")) {
+                return false
+            }
             syncWaitingForTable()
 
             if (state.device && state.token && state.table) {
@@ -358,7 +376,9 @@ export const useDeviceStore = defineStore("device", () => {
         try {
             const api = useApi()
             const response = await api.post("/api/devices/register", payload)
-            applyAuthPayload(response.data)
+            if (!applyAuthPayload(response.data, "register")) {
+                throw new Error(state.errorMessage || "Device authentication returned an invalid response")
+            }
             syncWaitingForTable()
 
             if (state.waitingForTable) {
