@@ -17,18 +17,27 @@ import { logger } from "~/utils/logger"
 export interface RefillSubmitResult {
   /** full server response data for online success */
   data?: unknown
-  /** true when the call was dropped client-side without reaching the server */
+  /** true when the submission was aborted client-side before the server accepted it */
   cancelled?: boolean
+  /** true when a duplicate call was ignored because the first submission is still in flight */
+  suppressed?: boolean
+}
+
+export interface RefillSubmitOptions {
+  signal?: AbortSignal
 }
 
 export function useRefillSubmit () {
-    async function submitRefill (payload?: Record<string, unknown>): Promise<RefillSubmitResult> {
+    async function submitRefill (
+        payload?: Record<string, unknown>,
+        opts: RefillSubmitOptions = {}
+    ): Promise<RefillSubmitResult> {
         const orderStore = useOrderStore()
         const submitState = useSubmitState()
 
         if (submitState.isTransitioning.value) {
             logger.warn("[RefillSubmit] Already in progress — duplicate call ignored")
-            return { cancelled: true }
+            return { suppressed: true }
         }
 
         submitState.setSubmitting()
@@ -39,7 +48,7 @@ export function useRefillSubmit () {
         // Idempotency key is generated and persisted to sessionStorage by the store.
         // -----------------------------------------------------------------------
         try {
-            const result = await (orderStore.submitRefill as any)(payload)
+            const result = await (orderStore.submitRefill as any)(payload, { signal: opts.signal })
             submitState.setConfirmed(
                 result?.order?.order_number ?? result?.order_number ?? null,
                 result?.order?.order_id ?? result?.order_id ?? null
@@ -47,6 +56,17 @@ export function useRefillSubmit () {
             return { data: result }
         } catch (err: any) {
             const status: number | undefined = err?.response?.status
+
+            // Cancelled via AbortController: caller asked us to stop. Mirror
+            // useOrderSubmit so the CTA can re-enable cleanly. If the server
+            // already accepted the POST, the kiosk will discover the refill
+            // on next page load / broadcast — we do not strand it.
+            const isAbort = err?.name === "CanceledError" || err?.name === "AbortError" || err?.code === "ERR_CANCELED"
+            if (isAbort) {
+                logger.info("[RefillSubmit] Submission aborted by caller")
+                submitState.setFailed("Order cancelled.")
+                return { cancelled: true }
+            }
 
             // Network failure (no response): hard block — no queueing
             if (!err?.response) {

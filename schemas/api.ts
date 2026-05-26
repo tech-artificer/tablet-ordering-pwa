@@ -3,7 +3,9 @@ import { logger } from "~/utils/logger"
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
-const coercedNumber = z.union([z.number(), z.string()]).transform(v => Number(v))
+const coercedNumber = z.coerce.number().refine(Number.isFinite, {
+    error: "Expected a finite number",
+})
 const coercedString = z.union([z.string(), z.number(), z.null()]).transform(v => (v == null ? "" : String(v)))
 
 // ─── Order schemas ────────────────────────────────────────────────────────────

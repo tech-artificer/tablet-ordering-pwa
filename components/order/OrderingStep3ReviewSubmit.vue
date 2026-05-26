@@ -228,8 +228,18 @@ async function submit (): Promise<void> {
     try {
         if (orderStore.isRefillMode) {
             const refillPayload = orderStore.buildRefillPayload()
-            const refillResult = await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
+            const refillResult = await submitRefillOrder(
+                refillPayload as unknown as Record<string, unknown>,
+                { signal: activeAbortController.signal }
+            )
+            // Duplicate-call suppression: original POST is still in flight. Do
+            // not reset CTA state — let the in-flight request finish.
+            if (refillResult?.suppressed) {
+                return
+            }
             if (refillResult?.cancelled) {
+                submitError.value = "Order cancelled."
+                submitState.resetForNextTransaction()
                 return
             }
             submitState.resetForNextTransaction() // Ready for next refill
@@ -239,6 +249,11 @@ async function submit (): Promise<void> {
                 payload as unknown as Record<string, unknown>,
                 { signal: activeAbortController.signal }
             )
+            // Duplicate-call suppression: original POST is still in flight. Do
+            // not reset CTA state — let the in-flight request finish.
+            if (result?.suppressed) {
+                return
+            }
             if (result?.cancelled) {
                 submitError.value = "Order cancelled."
                 submitState.resetForNextTransaction()

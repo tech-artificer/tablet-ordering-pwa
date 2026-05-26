@@ -25,7 +25,7 @@ const emit = defineEmits<{
 const isLocked = () => Boolean(props.isRefillMode && props.isCategoryLocked)
 
 const addItem = (item: any) => {
-    if (isLocked() || item.disabled || !isAvailable(item)) { return }
+    if (isLocked() || isAddDisabled(item) || !isAvailable(item)) { return }
     emit("addItem", item)
 }
 
