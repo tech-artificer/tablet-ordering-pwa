@@ -262,9 +262,13 @@ export const useSessionStore = defineStore("session", () => {
                 logger.info("[Token Refresh] Token expired or missing, refreshing")
                 const refreshed = await deviceStore.refresh()
                 if (!refreshed) {
-                    // Refresh failed — require re-registration
-                    logger.warn("[Token Refresh Failed] Cannot refresh token")
-                    return false
+                    logger.warn("[Token Refresh Failed] Attempting IP auth fallback")
+                    const recovered = await deviceStore.authenticate()
+                    if (!recovered) {
+                        logger.warn("[Token Refresh Failed] Cannot refresh or re-authenticate token")
+                        return false
+                    }
+                    logger.info("[Token Refresh Fallback] Re-authenticated via IP")
                 }
                 logger.info("[Token Refreshed] Valid token obtained")
             }

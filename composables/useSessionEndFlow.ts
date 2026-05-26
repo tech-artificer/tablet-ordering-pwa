@@ -1,6 +1,7 @@
 import { useRouter } from "vue-router"
 import { useSessionEndStore, type SessionEndReason, type SessionEndSource } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
+import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "~/utils/logger"
 
 type RouterLike = {
@@ -22,34 +23,40 @@ function toNavigationUrl (to: unknown): string {
     return qs ? `${path}?${qs}` : path
 }
 
-function resolveRouter (): RouterLike {
-    // Use vue-router's useRouter() directly to match test mocks and avoid
-    // ReferenceError when useNuxtApp is not available in test contexts.
-    try {
-        const router = useRouter() as unknown as RouterLike
-        if (router && typeof router.replace === "function") {
-            return router
-        }
-    } catch (_) {
-        // ignore and use noop router below
-    }
-
-    // Fallback for non-component contexts without a mock.
-    return {
-        replace: (to: unknown) => {
-            const target = toNavigationUrl(to)
-            logger.error("[SessionEndFlow] Router unavailable; falling back to hard navigation", { target })
-            if (typeof window !== "undefined") {
-                window.location.assign(target)
-            }
-            return undefined
-        },
-    }
-}
-
 export function useSessionEndFlow () {
     const sessionEndStore = useSessionEndStore()
     const sessionStore = useSessionStore()
+
+    // Capture the router once during composable setup. Calling useRouter() lazily
+    // from inside setInterval/setTimeout callbacks (e.g. the session-ended countdown)
+    // fails because Vue's active instance is cleared after setup completes —
+    // inject(routerKey) returns undefined and we fall through to window.location.assign,
+    // which is a full document reload that exits fullscreen kiosk mode.
+    let capturedRouter: RouterLike | null = null
+    try {
+        const r = useRouter() as unknown as RouterLike
+        if (r && typeof r.replace === "function") {
+            capturedRouter = r
+        }
+    } catch (_) {
+        // useRouter() unavailable (e.g. test contexts with shouldThrow); fall through to noop.
+    }
+
+    function resolveRouter (): RouterLike {
+        if (capturedRouter) { return capturedRouter }
+
+        // Fallback for non-component contexts without a mock.
+        return {
+            replace: (to: unknown) => {
+                const target = toNavigationUrl(to)
+                logger.error("[SessionEndFlow] Router unavailable; falling back to hard navigation", { target })
+                if (typeof window !== "undefined") {
+                    window.location.assign(target)
+                }
+                return undefined
+            },
+        }
+    }
 
     async function triggerSessionEnd (
         reason: SessionEndReason,
@@ -88,6 +95,15 @@ export function useSessionEndFlow () {
         } catch (e) {
             logger.warn("[SessionEndFlow] Navigation to session-ended failed, falling back to /", e)
             try { await router.replace("/") } catch (_) {}
+        }
+
+        // Re-assert fullscreen after navigation — some browsers drop it on route change.
+        // This is idempotent: requestFullscreen() is a no-op if already fullscreen.
+        try {
+            const { requestFullscreen } = useKioskFullscreen()
+            await requestFullscreen()
+        } catch {
+            // Best-effort only; kiosk may not have a user gesture at this point
         }
     }
 

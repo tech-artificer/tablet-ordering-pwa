@@ -10,6 +10,7 @@ import { ERROR_MENU_ITEM_UNAVAILABLE } from "../utils/errorCodes"
 import { useDeviceStore } from "./Device"
 import { useMenuStore } from "./Menu"
 import { useSessionStore } from "./Session"
+import { safeValidate, OrderCreateResponseSchema } from "~/schemas/api"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA MODEL (see docs/DATA_MODEL.md)
@@ -71,12 +72,14 @@ type AppendRoundResponseData = {
 type SubmitOrderOptions = {
     headers?: Record<string, string>
     clientSubmissionId?: string
+    signal?: AbortSignal
 }
 
 type SubmitRefillOptions = {
     headers?: Record<string, string>
     idempotencyKey?: string
     clientSubmissionId?: string
+    signal?: AbortSignal
 }
 
 type MenuUnavailableError = Error & { code: string }
@@ -112,6 +115,10 @@ export const useOrderStore = defineStore("order", () => {
         respData: AppendRoundResponseData
     ): void {
         try {
+            // Runtime schema validation — warns on contract drift, never throws.
+            // The ?? fallback chain below remains the authoritative data extraction.
+            safeValidate(OrderCreateResponseSchema, respData, "appendRound")
+
             const orderObj = respData?.order ?? respData ?? {}
             const parentOrderId = Number(
                 orderObj?.order_id ??
@@ -487,7 +494,8 @@ export const useOrderStore = defineStore("order", () => {
                     headers: {
                         ...options?.headers,
                         "X-Idempotency-Key": idempotencyKey
-                    }
+                    },
+                    signal: options?.signal
                 })
                 const responseData = resp?.data ?? null
                 logger.info("Order submission SUCCESS")
@@ -521,6 +529,11 @@ export const useOrderStore = defineStore("order", () => {
                 return responseData
             } catch (error: any) {
                 logger.error("Order submission failed:", error.message)
+
+                // Abort: preserve identity so useOrderSubmit can detect cancel
+                const isAbort = error?.name === "CanceledError" || error?.name === "AbortError" || error?.code === "ERR_CANCELED"
+                if (isAbort) { throw error }
+
                 const errorResponse = extractErrorResponse(error)
 
                 // 401 - Session expired
@@ -700,7 +713,10 @@ export const useOrderStore = defineStore("order", () => {
                         try { sessionStorage.setItem(REFILL_IDEM_KEY_STORAGE, idempotencyKey) } catch (e) { logger.debug("Failed to persist refill idempotency key", e) }
                     }
                 }
-                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey } })
+                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, {
+                    headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey },
+                    signal: options?.signal,
+                })
                 const responseData = extractResponseData(resp)
                 if (!responseData) {
                     handleOrderError("Refill response missing body")
@@ -909,6 +925,7 @@ export const useOrderStore = defineStore("order", () => {
         state.package = null
         state.guestCount = 2
         state.error = null
+        state.isSubmitting = false
     }
 
     return {

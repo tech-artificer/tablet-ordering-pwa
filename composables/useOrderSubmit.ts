@@ -12,7 +12,6 @@
 
 import { useOrderStore } from "~/stores/Order"
 import { useSubmitState } from "~/composables/useSubmitState"
-import { generateIdempotencyKey } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 
 export interface OrderSubmitResult {
@@ -20,18 +19,30 @@ export interface OrderSubmitResult {
   orderId?: number | string | null
   /** full server response data for online success */
   data?: unknown
+  /** true when the submission was aborted client-side before the server accepted it */
+  cancelled?: boolean
+  /** true when a duplicate call was ignored because the first submission is still in flight */
+  suppressed?: boolean
+}
+
+export interface OrderSubmitOptions {
+  signal?: AbortSignal
 }
 
 export function useOrderSubmit () {
-    async function submitOrder (payload: Record<string, unknown>): Promise<OrderSubmitResult> {
+    async function submitOrder (payload: Record<string, unknown>, opts: OrderSubmitOptions = {}): Promise<OrderSubmitResult> {
         const orderStore = useOrderStore()
         const submitState = useSubmitState()
 
-        const idempotencyKey = generateIdempotencyKey()
+        if (submitState.isTransitioning.value) {
+            logger.warn("[OrderSubmit] Already in progress — duplicate call ignored")
+            return { suppressed: true }
+        }
+
+        // signal is forwarded to the store so AbortController callers can cancel.
+        // Idempotency key is generated and persisted to sessionStorage by the store.
         const submitOptions = {
-            headers: {
-                "X-Idempotency-Key": idempotencyKey,
-            },
+            signal: opts.signal,
         }
 
         submitState.setSubmitting()
@@ -49,6 +60,16 @@ export function useOrderSubmit () {
             return { data: result }
         } catch (err: any) {
             const status: number | undefined = err?.response?.status
+
+            // Cancelled via AbortController: caller asked us to stop.
+            // If the server already accepted the POST, the kiosk will discover the
+            // order on next page load / broadcast — we do not strand it.
+            const isAbort = err?.name === "CanceledError" || err?.name === "AbortError" || err?.code === "ERR_CANCELED"
+            if (isAbort) {
+                logger.info("[OrderSubmit] Submission aborted by caller")
+                submitState.setFailed("Order cancelled.")
+                return { cancelled: true }
+            }
 
             // 409: active order already exists; order store already handles this
             // by calling setOrderCreated internally — treat result as success

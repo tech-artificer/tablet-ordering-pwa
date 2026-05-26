@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ElEmpty } from "element-plus"
+import { Lock, EyeOff, Plus } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
 import type { MenuItem, Modifier } from "../../types"
 
@@ -24,7 +25,7 @@ const emit = defineEmits<{
 const isLocked = () => Boolean(props.isRefillMode && props.isCategoryLocked)
 
 const addItem = (item: any) => {
-    if (isLocked() || item.disabled) { return }
+    if (isLocked() || isAddDisabled(item) || !isAvailable(item)) { return }
     emit("addItem", item)
 }
 
@@ -42,11 +43,15 @@ const isAvailable = (item: any) => {
     if (!Object.prototype.hasOwnProperty.call(item, "is_available")) { return true }
     return Boolean(item.is_available)
 }
+
+// Distinguishes upgrade-locked (not in package) from runtime-unavailable
+const isUpgradeLocked = (item: any) => Boolean(item?.disabled) && isAvailable(item)
+const isRuntimeUnavailable = (item: any) => !isAvailable(item)
 </script>
 
 <template>
     <!-- Loading Skeleton -->
-    <div v-if="props.loading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div v-if="props.loading" class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div v-for="n in 8" :key="n" class="bg-surface-10 rounded-xl overflow-hidden animate-pulse">
             <div class="h-32 bg-gray-700" />
             <div class="p-3 space-y-2">
@@ -62,7 +67,7 @@ const isAvailable = (item: any) => {
         <el-empty description="No items available" />
     </div>
 
-    <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div v-else class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div
             v-for="item in items"
             :key="item.id"
@@ -70,10 +75,12 @@ const isAvailable = (item: any) => {
                 'menu-card group relative rounded-2xl overflow-hidden transition-all duration-200 shadow-xl border',
                 isAvailable(item) && !isLocked() && !item.disabled
                     ? 'border-white/10 cursor-pointer hover:border-primary/40 hover:shadow-primary/20 hover:shadow-2xl active:scale-[0.97]'
-                    : 'border-white/5 cursor-not-allowed opacity-55'
+                    : isRuntimeUnavailable(item)
+                        ? 'border-white/5 cursor-not-allowed opacity-40'
+                        : 'border-white/5 cursor-not-allowed opacity-65'
             ]"
-            :aria-disabled="item.disabled ? 'true' : undefined"
-            :title="item.disabled ? 'Not available for this package' : isLocked() ? (props.lockedReason || 'Locked during refill mode') : ''"
+            :aria-disabled="(item.disabled || isRuntimeUnavailable(item)) ? 'true' : undefined"
+            :title="isRuntimeUnavailable(item) ? 'Out of stock' : item.disabled ? 'Upgrade your package to add this item' : isLocked() ? (props.lockedReason || 'Locked during refill mode') : ''"
             @click="isAvailable(item) && !isLocked() && !item.disabled && addItem(item)"
         >
             <!-- Quantity Badge -->
@@ -86,12 +93,12 @@ const isAvailable = (item: any) => {
 
             <!-- Unlimited / Locked badge -->
             <div class="absolute top-2.5 left-2.5 z-30 flex gap-1.5">
-                <div v-if="isUnlimitedCategory && !isLocked()" class="unlimited-badge">
+                <div v-if="isUnlimitedCategory && !isLocked() && !isRuntimeUnavailable(item)" class="unlimited-badge">
                     <span class="unlimited-dot" aria-hidden="true" />
                     UNLIMITED
                 </div>
                 <div v-if="isLocked()" class="locked-badge">
-                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+                    <Lock class="w-2.5 h-2.5" />
                     LOCKED
                 </div>
             </div>
@@ -133,53 +140,53 @@ const isAvailable = (item: any) => {
                 <!-- Gradient overlay at bottom -->
                 <div class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
 
-                <!-- Unavailable overlay -->
-                <div v-if="!isAvailable(item)" class="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
-                    <span class="text-white/80 font-semibold text-sm tracking-wide uppercase">Unavailable</span>
+                <!-- Upgrade-locked overlay: subtle, image still visible -->
+                <div v-if="isUpgradeLocked(item)" class="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <span class="upgrade-pill">
+                        <Lock class="w-3 h-3" />
+                        UPGRADE
+                    </span>
                 </div>
 
-                <!-- Locked overlay -->
-                <div v-if="isLocked()" class="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
+                <!-- Runtime unavailable overlay: heavier, more obviously inactive -->
+                <div v-if="isRuntimeUnavailable(item)" class="absolute inset-0 bg-secondary/85 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1.5">
+                    <EyeOff class="w-5 h-5 text-white/55" />
+                    <span class="text-white/75 font-semibold text-[11px] tracking-[0.18em] uppercase">Unavailable</span>
+                </div>
+
+                <!-- Refill-mode locked overlay -->
+                <div v-if="isLocked() && !isUpgradeLocked(item) && !isRuntimeUnavailable(item)" class="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
                     <span class="text-white/70 font-semibold text-sm tracking-wide uppercase">Locked</span>
                 </div>
             </div>
 
-            <!-- Card footer: price + description chip + add button -->
+            <!-- Card footer: code/category + name + price + add button -->
             <div class="px-2.5 pt-1.5 pb-2.5 bg-gradient-to-b from-[#1e1e1e] to-[#141414] rounded-b-2xl">
                 <!-- Item code + category row -->
                 <div class="flex items-center gap-2 mb-1">
-                    <span class="text-white/25 text-[9px] font-bold tracking-wider uppercase">
-                        M{{ (item as any).id }}
+                    <span class="text-primary/50 text-[9px] font-black tracking-wider uppercase font-kanit">
+                        {{ (item as any).receipt_name || 'M' + (item as any).id }}
                     </span>
                     <span
-                        class="text-[9px] font-bold uppercase tracking-wider"
+                        class="text-[9px] font-bold uppercase tracking-wider font-kanit"
                         :class="{
                             'text-primary/60': categoryType === 'meats',
-                            'text-success/70': categoryType === 'sides',
-                            'text-primary-light/60': categoryType === 'desserts',
+                            'text-primary-light/60': categoryType === 'sides' || categoryType === 'desserts',
                             'text-white/35': categoryType === 'drinks',
                         }"
-                    >{{ isUnlimitedCategory ? 'UNLIMITED' : categoryType }}</span>
+                    >{{ categoryType }}</span>
                 </div>
                 <!-- Item name -->
-                <p class="text-white font-semibold text-xs leading-tight mb-1 line-clamp-2">
-                    {{ (item as any).name || (item as any).receipt_name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
-                </p>
-                <!-- Description (if available) -->
-                <p
-                    v-if="(item as any).description"
-                    class="text-white/40 text-[10px] leading-tight line-clamp-2 mb-2"
-                >
-                    {{ (item as any).description }}
+                <p class="text-white font-semibold text-xs leading-tight mb-1 line-clamp-2 font-kanit">
+                    {{ (item as any).name || (item as any).kitchen_name || (item as any).item_name || (item as any).label || '—' }}
                 </p>
 
-                <div class="flex items-center justify-between gap-1.5 mt-2">
-                    <!-- Price only -->
-                    <div>
+                <div class="flex items-center justify-between gap-1.5 mt-2 min-h-[32px]">
+                    <!-- Price (hidden when free; slot reserved so ADD doesn't shift) -->
+                    <div class="min-h-[18px]">
                         <span v-if="item.price > 0" class="text-primary font-black text-sm tabular-nums leading-tight">
                             {{ formatCurrency(item.price) }}
                         </span>
-                        <span v-else class="text-success text-[10px] font-bold uppercase tracking-wide leading-tight">Free</span>
                     </div>
 
                     <!-- Add button -->
@@ -187,20 +194,15 @@ const isAvailable = (item: any) => {
                         :disabled="isAddDisabled(item) || !isAvailable(item) || isLocked()"
                         :aria-disabled="isAddDisabled(item) || !isAvailable(item)"
                         :class="[
-                            'add-btn flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg font-bold text-xs transition-all duration-200 shadow-md min-h-[48px] min-w-[64px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.96]',
+                            'add-btn inline-flex items-center justify-center gap-1 px-3.5 py-1.5 rounded-full font-bold text-[11px] tracking-wide transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.96]',
                             isAddDisabled(item) || !isAvailable(item) || isLocked()
-                                ? 'bg-white/10 text-white/40 cursor-not-allowed'
-                                : 'bg-primary text-secondary hover:bg-primary-light hover:shadow-lg hover:shadow-primary/30'
+                                ? 'bg-white/8 text-white/35 cursor-not-allowed'
+                                : 'bg-primary text-secondary hover:bg-primary-light shadow-md hover:shadow-lg hover:shadow-primary/30'
                         ]"
                         @click.stop="addItem(item)"
                     >
-                        <!-- <svg v-if="!isAddDisabled(item) && isAvailable(item) && !isLocked()" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> -->
-                        <span>
-                            <span v-if="isLocked()">Locked</span>
-                            <span v-else-if="!isAvailable(item)">Unavailable</span>
-                            <span v-else-if="isAddDisabled(item)">Max&nbsp;✓</span>
-                            <span v-else>Add</span>
-                        </span>
+                        <Plus class="w-3 h-3" stroke-width="3" />
+                        <span>ADD</span>
                     </button>
                 </div>
             </div>
@@ -233,20 +235,31 @@ const isAvailable = (item: any) => {
   box-shadow: 0 4px 12px rgba(246, 181, 109, 0.5);
 }
 
-.locked-badge {
+.locked-badge,
+.upgrade-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
+  gap: 6px;
+  padding: 5px 11px;
   border-radius: 9999px;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 800;
-  letter-spacing: 0.07em;
-  color: #fff;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.15);
+  letter-spacing: 0.08em;
+  color: #F9D0A1;
+  background: rgba(20, 16, 12, 0.78);
+  border: 1px solid rgba(246, 181, 109, 0.35);
   backdrop-filter: blur(4px);
   text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.locked-badge {
+  padding: 3px 9px;
+  font-size: 0.65rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: none;
 }
 
 .unlimited-badge {
@@ -255,6 +268,7 @@ const isAvailable = (item: any) => {
   gap: 5px;
   padding: 3px 9px;
   border-radius: 9999px;
+  font-family: 'Raleway', sans-serif;
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.07em;

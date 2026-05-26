@@ -1,38 +1,28 @@
 <script setup lang="ts">
-import confetti from "canvas-confetti"
 import { ref } from "vue"
 import { useSessionStore } from "../../stores/Session"
+import { useOrderStore } from "../../stores/Order"
+import { useMenuStore } from "../../stores/Menu"
 import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
+import OrderSubmittingOverlay from "~/components/order/OrderSubmittingOverlay.vue"
 import { logger } from "~/utils/logger"
 
 definePageMeta({ layout: "kiosk" })
 
 const router = useRouter()
 const sessionStore = useSessionStore()
+const orderStore = useOrderStore()
+const menuStore = useMenuStore()
 const sessionStartError = ref<string | null>(null)
-
-const triggerCelebration = () => {
-    try {
-        const colors = ["#F6B56D", "#10B981", "#FFFFFF"]
-        if (typeof confetti === "function") {
-            confetti({
-                particleCount: 120,
-                spread: 80,
-                origin: { y: 0.5 },
-                colors,
-                duration: 2000
-            })
-        } else {
-            logger.warn("[Order Review] Confetti not available")
-        }
-    } catch (e) {
-        logger.warn("[Order Review] Confetti error (non-fatal):", e)
-    }
-}
+const submitFormRef = ref<{ cancelSubmission:() => void } | null>(null)
 
 const handleGoBack = () => {
     logger.info("[Order Review] Going back to menu")
     router.push("/menu")
+}
+
+const handleCancelSubmission = () => {
+    submitFormRef.value?.cancelSubmission()
 }
 
 const handleOrderSubmitted = async () => {
@@ -40,9 +30,11 @@ const handleOrderSubmitted = async () => {
     logger.info("[Order Review] Order confirmation received", { timestamp })
     sessionStartError.value = null
 
-    try {
-        triggerCelebration()
+    menuStore.refreshMenus().catch((e: unknown) => {
+        logger.warn("[Order Review] Background menu refresh failed (non-blocking)", e)
+    })
 
+    try {
         if (!sessionStore.isActive) {
             logger.info("[Order Review] Marking session active", { timestamp })
             const started = await sessionStore.start({ preserveSubmittedOrder: true })
@@ -108,9 +100,18 @@ const handleOrderSubmitted = async () => {
                 >
                     {{ sessionStartError }}
                 </div>
-                <OrderingStep3ReviewSubmit @order-submitted="handleOrderSubmitted" />
+                <OrderingStep3ReviewSubmit
+                    ref="submitFormRef"
+                    @order-submitted="handleOrderSubmitted"
+                />
             </div>
         </div>
+
+        <OrderSubmittingOverlay
+            v-if="orderStore.isSubmitting"
+            :cancellable="!orderStore.isRefillMode"
+            @cancel="handleCancelSubmission"
+        />
         <template #error="{ error, clearError }">
             <div class="flex h-screen items-center justify-center bg-gray-900 text-white flex-col gap-6 p-8">
                 <p class="text-xl font-bold text-red-400">

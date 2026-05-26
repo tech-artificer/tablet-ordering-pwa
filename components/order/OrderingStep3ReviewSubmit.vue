@@ -21,6 +21,15 @@ const { submitRefill: submitRefillOrder } = useRefillSubmit()
 const submitState = useSubmitState()
 const { isOnline } = useNetworkStatus()
 const submitError = ref<string | null>(null)
+let activeAbortController: AbortController | null = null
+
+function cancelSubmission () {
+    if (activeAbortController) {
+        logger.info("[OrderingStep3ReviewSubmit] Cancel requested by user")
+        activeAbortController.abort()
+    }
+}
+defineExpose({ cancelSubmission })
 
 onMounted(() => {
     submitState.setIdle()
@@ -215,14 +224,41 @@ async function submit (): Promise<void> {
     }
 
     submitError.value = null
+    activeAbortController = new AbortController()
     try {
         if (orderStore.isRefillMode) {
             const refillPayload = orderStore.buildRefillPayload()
-            await submitRefillOrder(refillPayload as unknown as Record<string, unknown>)
+            const refillResult = await submitRefillOrder(
+                refillPayload as unknown as Record<string, unknown>,
+                { signal: activeAbortController.signal }
+            )
+            // Duplicate-call suppression: original POST is still in flight. Do
+            // not reset CTA state — let the in-flight request finish.
+            if (refillResult?.suppressed) {
+                return
+            }
+            if (refillResult?.cancelled) {
+                submitError.value = "Order cancelled."
+                submitState.resetForNextTransaction()
+                return
+            }
             submitState.resetForNextTransaction() // Ready for next refill
         } else {
             const payload = orderStore.buildPayload()
-            await submitInitialOrder(payload as unknown as Record<string, unknown>)
+            const result = await submitInitialOrder(
+                payload as unknown as Record<string, unknown>,
+                { signal: activeAbortController.signal }
+            )
+            // Duplicate-call suppression: original POST is still in flight. Do
+            // not reset CTA state — let the in-flight request finish.
+            if (result?.suppressed) {
+                return
+            }
+            if (result?.cancelled) {
+                submitError.value = "Order cancelled."
+                submitState.resetForNextTransaction()
+                return
+            }
         }
         emit("order-submitted")
     } catch (error: any) {
@@ -233,6 +269,8 @@ async function submit (): Promise<void> {
             error: error?.message || error,
             category: classified.category,
         })
+    } finally {
+        activeAbortController = null
     }
 }
 </script>

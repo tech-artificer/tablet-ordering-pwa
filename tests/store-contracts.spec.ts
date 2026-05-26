@@ -35,6 +35,7 @@ describe("store contract regressions", () => {
 
         expect(deviceStore.authenticate).toBeTypeOf("function")
         expect(deviceStore.refresh).toBeTypeOf("function")
+        expect(deviceStore.checkTokenExpiry).toBeTypeOf("function")
         expect(deviceStore.getDeviceId).toBeTypeOf("function")
         expect(deviceStore.getTableId).toBeTypeOf("function")
         expect(deviceStore.getToken).toBeTypeOf("function")

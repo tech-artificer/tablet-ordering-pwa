@@ -33,16 +33,19 @@ describe("order submit source contract", () => {
         expect(reviewPage).not.toContain("submitOrderWithIdempotency")
     })
 
-    it("idempotency key generation is centralised in utils/orderHelpers", () => {
+    it("idempotency key lifecycle is owned by the store — composables do not touch it", () => {
         const orderHelpers = readProjectFile("utils/orderHelpers.ts")
         const orderSubmit = readProjectFile("composables/useOrderSubmit.ts")
         const refillSubmit = readProjectFile("composables/useRefillSubmit.ts")
+        const orderStore = readProjectFile("stores/Order.ts")
 
+        // Utility still exports the generator (used by the store internally)
         expect(orderHelpers).toContain("export function generateIdempotencyKey")
-        expect(orderSubmit).toContain("from \"~/utils/orderHelpers\"")
-        expect(refillSubmit).toContain("from \"~/utils/orderHelpers\"")
-        // Neither composable should define its own copy
-        expect(orderSubmit).not.toContain("function generateIdempotencyKey")
-        expect(refillSubmit).not.toContain("function generateIdempotencyKey")
+        // Store owns the key: generates, persists, and clears from sessionStorage
+        expect(orderStore).toContain("woosoo_order_idem_key")
+        expect(orderStore).toContain("woosoo_refill_idem_key")
+        // Composables must not import or invoke generateIdempotencyKey
+        expect(orderSubmit).not.toContain("generateIdempotencyKey")
+        expect(refillSubmit).not.toContain("generateIdempotencyKey")
     })
 })
