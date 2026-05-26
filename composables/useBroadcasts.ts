@@ -157,27 +157,12 @@ export const useBroadcasts = () => {
     let reconnectTimer: number | null = null
     let boundPusherConnection: unknown = null
     let boundStateChangeHandler: ((states: { current: string; previous: string }) => void) | null = null
-    const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30] // seconds, max 30s
-    const MAX_RECONNECTION_ATTEMPTS = 10
+    const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30, 60] // seconds, capped at 60s
 
     const scheduleReconnection = () => {
         const connectionStore = useConnectionStore()
 
         if (reconnectTimer) { return } // Already scheduled
-        if (reconnectAttempts >= MAX_RECONNECTION_ATTEMPTS) {
-            logger.warn(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
-            logger.warn("WebSocket max reconnection attempts reached")
-            connectionStore.setReverbState("failed")
-            connectionStore.setReconnectAttempt(reconnectAttempts)
-            ElNotification({
-                title: "⚠️ Connection Lost",
-                message: "Please reload the page to reconnect",
-                type: "warning",
-                duration: 0, // Persistent until dismissed
-                position: "bottom-right"
-            })
-            return
-        }
 
         reconnectAttempts++
         connectionStore.setReverbState("disconnected")
@@ -185,7 +170,7 @@ export const useBroadcasts = () => {
         const backoffIndex = Math.min(reconnectAttempts - 1, RECONNECTION_BACKOFF.length - 1)
         const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
 
-        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
+        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts})`)
 
         reconnectTimer = window.setTimeout(() => {
             reconnectTimer = null
