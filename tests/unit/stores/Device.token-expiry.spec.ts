@@ -34,8 +34,7 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
     it("calls refresh when token is already expired", async () => {
         mockPost.mockResolvedValueOnce(freshAuthResponse())
         const device = useDeviceStore()
-        ;(device as any).token = "stale-token"
-        ;(device as any).expiration = Date.now() - 1000
+        device.$patch({ token: "stale-token", expiration: Date.now() - 1000 })
 
         device.checkTokenExpiry()
 
@@ -46,8 +45,7 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
     it("calls refresh when token is within the 15-minute threshold", async () => {
         mockPost.mockResolvedValueOnce(freshAuthResponse())
         const device = useDeviceStore()
-        ;(device as any).token = "near-expiry-token"
-        ;(device as any).expiration = Date.now() + FIFTEEN_MIN_MS - 1000
+        device.$patch({ token: "near-expiry-token", expiration: Date.now() + FIFTEEN_MIN_MS - 1000 })
 
         device.checkTokenExpiry()
 
@@ -57,8 +55,7 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
 
     it("does not call refresh when token is fresh", () => {
         const device = useDeviceStore()
-        ;(device as any).token = "fresh-token"
-        ;(device as any).expiration = Date.now() + FIFTEEN_MIN_MS + 60_000
+        device.$patch({ token: "fresh-token", expiration: Date.now() + FIFTEEN_MIN_MS + 60_000 })
 
         device.checkTokenExpiry()
 
@@ -69,5 +66,23 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
         const device = useDeviceStore()
         device.checkTokenExpiry()
         expect(mockPost).not.toHaveBeenCalled()
+    })
+
+    it("does not issue a second refresh call when one is already in flight", async () => {
+        let resolveFirst!: () => void
+        const firstCall = new Promise<ReturnType<typeof freshAuthResponse>>((resolve) => { resolveFirst = () => resolve(freshAuthResponse()) })
+        mockPost.mockReturnValueOnce(firstCall).mockResolvedValueOnce(freshAuthResponse())
+
+        const device = useDeviceStore()
+        device.$patch({ token: "stale-token", expiration: Date.now() - 1000 })
+
+        device.checkTokenExpiry()
+        device.checkTokenExpiry()
+
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(mockPost).toHaveBeenCalledTimes(1)
+
+        resolveFirst()
+        await new Promise(resolve => setTimeout(resolve, 0))
     })
 })
