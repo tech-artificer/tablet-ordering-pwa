@@ -113,6 +113,17 @@ export const useDeviceStore = defineStore("device", () => {
         }
     }
 
+    function checkTokenExpiry () {
+        if (!state.token) { return }
+        const expiryMs = parseExpiryMs(state.expiration)
+        if (expiryMs !== null && expiryMs - Date.now() <= REFRESH_THRESHOLD_MS) {
+            logger.info("[DeviceStore] Token expired or near expiry on boot; triggering refresh")
+            refresh().catch((e: unknown) => {
+                logger.warn("[DeviceStore] Boot-time token refresh failed", e)
+            })
+        }
+    }
+
     async function resolveClientIpForAuth (): Promise<string | null> {
         const stateDevice = state.device as (Device & { ip_address?: string; last_ip_address?: string }) | null
 
@@ -516,6 +527,7 @@ export const useDeviceStore = defineStore("device", () => {
         setKioskUnlocked,
         startRefreshTimer,
         stopRefreshTimer,
+        checkTokenExpiry,
         clearError,
         setWaitingForTable,
     }
