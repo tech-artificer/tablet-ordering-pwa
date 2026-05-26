@@ -1,4 +1,4 @@
-import { ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { storeToRefs } from "pinia"
 import { useConnectionStore } from "~/stores/Connection"
 import { useOrderStore } from "~/stores/Order"
@@ -14,6 +14,9 @@ const TERMINAL_STATUSES = new Set(["completed", "voided", "cancelled"])
 
 // Singleton guard — only one polling loop at a time across all component instances
 let activeIntervalId: ReturnType<typeof setInterval> | null = null
+// Reentrancy guard — prevent setInterval from stacking concurrent requests when
+// a previous pollOnce() is still awaiting the API (e.g. on degraded connectivity).
+let pollInFlight = false
 
 export function usePollingFallback () {
     const isPolling = ref(false)
@@ -34,12 +37,14 @@ export function usePollingFallback () {
     }
 
     async function pollOnce () {
+        if (pollInFlight) { return }
         const orderId = orderStore.serverOrderId ?? sessionStore.getOrderId()
         if (!orderId) {
             stopPolling()
             return
         }
 
+        pollInFlight = true
         const startMs = Date.now()
         try {
             const api = useApi()
@@ -69,6 +74,8 @@ export function usePollingFallback () {
             }
         } catch (err) {
             logger.warn("[PollingFallback] Poll request failed", err)
+        } finally {
+            pollInFlight = false
         }
     }
 
@@ -92,13 +99,19 @@ export function usePollingFallback () {
 
     function initialize () {
         const { phase } = storeToRefs(connectionStore)
-        const { serverOrderId } = storeToRefs(orderStore)
         const { isActive } = storeToRefs(sessionStore)
 
-        // Watch both phase AND serverOrderId so that if phase is already "escalated"
-        // when an order is submitted, polling starts as soon as the orderId appears.
+        // Watch the effective order id (server-confirmed or session-restored),
+        // not just orderStore.serverOrderId. After a reload the session store
+        // may already hold the order id while the order store has yet to
+        // repopulate — polling would never start otherwise.
+        const effectiveOrderId = computed(() => orderStore.serverOrderId ?? sessionStore.getOrderId())
+
+        // Watch both phase AND effectiveOrderId so that if phase is already
+        // "escalated" when an order is submitted/restored, polling starts as
+        // soon as an order id appears.
         watch(
-            [phase, serverOrderId],
+            [phase, effectiveOrderId],
             ([newPhase, newOrderId]) => {
                 if (newPhase === "escalated" && newOrderId !== null) {
                     startPolling()
