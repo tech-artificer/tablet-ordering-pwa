@@ -81,6 +81,7 @@ export const useDeviceStore = defineStore("device", () => {
     let pollStartedAt: number | null = null
     let detectedClientIp: string | null | undefined
     let refreshTimerId: ReturnType<typeof setInterval> | null = null
+    let refreshInFlight = false
 
     const REFRESH_INTERVAL_MS = 10 * 60 * 1000 // check every 10 min
     const REFRESH_THRESHOLD_MS = 15 * 60 * 1000 // refresh if expiry < 15 min away
@@ -110,6 +111,21 @@ export const useDeviceStore = defineStore("device", () => {
         if (refreshTimerId !== null) {
             clearInterval(refreshTimerId)
             refreshTimerId = null
+        }
+    }
+
+    function checkTokenExpiry () {
+        if (!state.token) { return }
+        const expiryMs = parseExpiryMs(state.expiration)
+        if (expiryMs !== null && expiryMs - Date.now() <= REFRESH_THRESHOLD_MS) {
+            logger.info("[DeviceStore] Token expired or near expiry on boot; triggering refresh")
+            void refresh().then((ok) => {
+                if (!ok) {
+                    logger.warn("[DeviceStore] Boot-time token refresh failed; suppressing error banner")
+                    // Boot-time background checks should not surface errors to the user.
+                    state.errorMessage = null
+                }
+            })
         }
     }
 
@@ -237,6 +253,8 @@ export const useDeviceStore = defineStore("device", () => {
     }
 
     async function refresh (): Promise<boolean> {
+        if (refreshInFlight) { return Boolean(state.token) }
+        refreshInFlight = true
         state.isLoading = true
         state.errorMessage = null
 
@@ -254,6 +272,7 @@ export const useDeviceStore = defineStore("device", () => {
             return false
         } finally {
             state.isLoading = false
+            refreshInFlight = false
         }
     }
 
@@ -516,6 +535,7 @@ export const useDeviceStore = defineStore("device", () => {
         setKioskUnlocked,
         startRefreshTimer,
         stopRefreshTimer,
+        checkTokenExpiry,
         clearError,
         setWaitingForTable,
     }
