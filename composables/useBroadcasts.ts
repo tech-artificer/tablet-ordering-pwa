@@ -20,7 +20,7 @@ type EchoChannel = Channel & { name: string }
 /** Single service request embedded in order events */
 interface ServiceRequest {
   id: number
-  order_id: string
+  order_id: number | null
   table_id: number
   device_id: number
   type: string
@@ -33,7 +33,7 @@ interface ServiceRequest {
 interface OrderCreatedEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     table_id: number
@@ -50,7 +50,7 @@ interface OrderCreatedEvent {
     total: string
     tax: string
     discount: string | null
-    sub_total: string
+    subtotal: string
     guest_count: number
     created_at: string
     updated_at: string
@@ -65,7 +65,7 @@ interface OrderCreatedEvent {
 interface OrderUpdatedEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     table_id: number
@@ -85,7 +85,7 @@ interface OrderUpdatedEvent {
 interface OrderCompletedEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     table_id: number
@@ -96,7 +96,7 @@ interface OrderCompletedEvent {
     total: string
     tax: string
     discount: string | null
-    sub_total: string
+    subtotal: string
     guest_count: number
     created_at: string
     updated_at: string
@@ -110,7 +110,7 @@ interface OrderCompletedEvent {
 interface OrderCancelledEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     status: "cancelled" | "voided"
@@ -145,7 +145,6 @@ export const useBroadcasts = () => {
     let deviceChannel: EchoChannel | null = null
     let orderChannel: EchoChannel | null = null
     let serviceRequestChannel: EchoChannel | null = null
-    let deviceControlChannel: EchoChannel | null = null
     let sessionChannel: EchoChannel | null = null
     let subscribedSessionId: number | string | null = null
     let stopSessionIdWatcher: (() => void) | null = null
@@ -157,27 +156,12 @@ export const useBroadcasts = () => {
     let reconnectTimer: number | null = null
     let boundPusherConnection: unknown = null
     let boundStateChangeHandler: ((states: { current: string; previous: string }) => void) | null = null
-    const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30] // seconds, max 30s
-    const MAX_RECONNECTION_ATTEMPTS = 10
+    const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30, 60] // seconds, capped at 60s
 
     const scheduleReconnection = () => {
         const connectionStore = useConnectionStore()
 
         if (reconnectTimer) { return } // Already scheduled
-        if (reconnectAttempts >= MAX_RECONNECTION_ATTEMPTS) {
-            logger.warn(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
-            logger.warn("WebSocket max reconnection attempts reached")
-            connectionStore.setReverbState("failed")
-            connectionStore.setReconnectAttempt(reconnectAttempts)
-            ElNotification({
-                title: "⚠️ Connection Lost",
-                message: "Please reload the page to reconnect",
-                type: "warning",
-                duration: 0, // Persistent until dismissed
-                position: "bottom-right"
-            })
-            return
-        }
 
         reconnectAttempts++
         connectionStore.setReverbState("disconnected")
@@ -185,7 +169,7 @@ export const useBroadcasts = () => {
         const backoffIndex = Math.min(reconnectAttempts - 1, RECONNECTION_BACKOFF.length - 1)
         const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
 
-        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
+        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts})`)
 
         reconnectTimer = window.setTimeout(() => {
             reconnectTimer = null
@@ -276,11 +260,10 @@ export const useBroadcasts = () => {
         logger.debug("🔄 Order update check:", { currentOrderId, eventOrderId, status: order.status })
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
-            // Updating serverStatus is enough — the orderStatus watcher in
-            // pages/order/in-session.vue is the single source of triggerSessionEnd
-            // for terminal statuses (completed/voided/cancelled). Calling it here
-            // too would double-fire the navigation.
             orderStore.updateOrderStatus(order.status)
+            if (["completed", "voided", "cancelled"].includes(order.status)) {
+                triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", { source: "broadcast" })
+            }
         }
     }
 
@@ -301,9 +284,8 @@ export const useBroadcasts = () => {
         logger.debug("✅ Order completed check:", { currentOrderId, eventOrderId })
 
         if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
-            // Single-source navigation: status flip drives the in-session.vue
-            // watcher which calls triggerSessionEnd. Do not call it here too.
             orderStore.updateOrderStatus("completed")
+            triggerSessionEnd("completed", { source: "broadcast", orderNumber: event.order.order_number ?? null })
         }
     }
 
@@ -321,9 +303,8 @@ export const useBroadcasts = () => {
         const currentId = getCurrentOrderId()
         const eventOrderId = getEventOrderId(event)
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
-            // Single-source navigation: status flip drives the in-session.vue
-            // watcher which calls triggerSessionEnd. Do not call it here too.
             orderStore.updateOrderStatus(event.order.status)
+            triggerSessionEnd(event.order.status as "cancelled" | "voided", { source: "broadcast", orderNumber: event.order.order_number ?? null })
         }
     }
 
@@ -428,12 +409,6 @@ export const useBroadcasts = () => {
             }
             deviceChannel = null
             channelStatus.value.device = false
-        }
-        if (deviceControlChannel) {
-            if (canLeave) {
-                ;(window as any).Echo.leave(deviceControlChannel.name)
-            }
-            deviceControlChannel = null
             channelStatus.value.deviceControl = false
         }
     }
@@ -452,14 +427,18 @@ export const useBroadcasts = () => {
         // Tear down any existing subscriptions before creating new ones to prevent duplicate handlers
         unsubscribeDeviceChannels()
 
-        // Subscribe to device.{deviceId} for order updates
+        // Subscribe to device.{deviceId} for order updates and control events (single channel, chained listeners)
         logger.debug("[Echo] Subscribing to channel: device." + deviceId)
         deviceChannel = (window as any).Echo.channel(`device.${deviceId}`)
             .listen(".order.updated", (event: OrderUpdatedEvent) => {
                 handleOrderUpdated(event)
             })
+            .listen(".device.control", (event: DeviceControlEvent) => {
+                handleDeviceControl(event)
+            })
 
         channelStatus.value.device = true
+        channelStatus.value.deviceControl = true
         logger.debug("[Echo] ✅ Subscribed to channel: device." + deviceId)
         logger.debug(`✅ Subscribed to device.${deviceId}`)
 
@@ -470,16 +449,6 @@ export const useBroadcasts = () => {
             duration: 3000,
             position: "bottom-right"
         })
-
-        // Subscribe to device.{deviceId} for control events
-        logger.debug("[Echo] Subscribing to device." + deviceId)
-        deviceControlChannel = (window as any).Echo.channel(`device.${deviceId}`)
-            .listen(".device.control", (event: DeviceControlEvent) => {
-                handleDeviceControl(event)
-            })
-
-        channelStatus.value.deviceControl = true
-        logger.debug(`✅ Subscribed to device.${deviceId} (control)`)
     }
 
     // Subscribe to order-specific channels

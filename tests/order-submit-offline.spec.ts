@@ -64,18 +64,12 @@ describe("composables/useOrderSubmit", () => {
         expect(caught?.message).toBe("Ordering is unavailable. Please call staff.")
     })
 
-    it("network error passes idempotency key to orderStore.submitOrder", async () => {
+    it("composable does not pass idempotency key to orderStore.submitOrder — store owns it", async () => {
         mockSubmitOrder.mockRejectedValueOnce(new Error("Network Error"))
         const { submitOrder } = useOrderSubmit()
         await submitOrder(samplePayload).catch(() => {})
-        expect(mockSubmitOrder).toHaveBeenCalledWith(
-            samplePayload,
-            {
-                headers: {
-                    "X-Idempotency-Key": expect.any(String),
-                },
-            }
-        )
+        const [, opts] = mockSubmitOrder.mock.calls[0]
+        expect(opts?.headers?.["X-Idempotency-Key"]).toBeUndefined()
     })
 
     // -------------------------------------------------------------------------
@@ -86,14 +80,7 @@ describe("composables/useOrderSubmit", () => {
         mockSubmitOrder.mockResolvedValueOnce({ success: true, order: { order_id: 5, order_number: "W-001" } })
         const { submitOrder } = useOrderSubmit()
         const result = await submitOrder(samplePayload)
-        expect(mockSubmitOrder).toHaveBeenCalledWith(
-            samplePayload,
-            {
-                headers: {
-                    "X-Idempotency-Key": expect.any(String),
-                },
-            }
-        )
+        expect(mockSubmitOrder).toHaveBeenCalledWith(samplePayload, expect.any(Object))
         expect(result.data).toBeDefined()
     })
 

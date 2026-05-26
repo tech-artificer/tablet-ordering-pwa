@@ -1,6 +1,7 @@
 import { useRouter } from "vue-router"
 import { useSessionEndStore, type SessionEndReason, type SessionEndSource } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
+import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { logger } from "~/utils/logger"
 
 type RouterLike = {
@@ -94,6 +95,15 @@ export function useSessionEndFlow () {
         } catch (e) {
             logger.warn("[SessionEndFlow] Navigation to session-ended failed, falling back to /", e)
             try { await router.replace("/") } catch (_) {}
+        }
+
+        // Re-assert fullscreen after navigation — some browsers drop it on route change.
+        // This is idempotent: requestFullscreen() is a no-op if already fullscreen.
+        try {
+            const { requestFullscreen } = useKioskFullscreen()
+            await requestFullscreen()
+        } catch {
+            // Best-effort only; kiosk may not have a user gesture at this point
         }
     }
 

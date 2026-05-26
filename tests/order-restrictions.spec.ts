@@ -281,3 +281,94 @@ describe("Order Restrictions (Frontend)", () => {
         })
     })
 })
+
+describe("Cart invariant edge cases", () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+    })
+
+    describe("Quantity limits", () => {
+        it("clamps normal items to max 99", () => {
+            const store = useOrderStore()
+            store.addToCart({
+                id: 10,
+                name: "Beef",
+                price: 5,
+                quantity: 1,
+                category: "meats",
+                isUnlimited: false,
+                img_url: "",
+            } as any)
+            store.updateQuantity(10, 200)
+            const item = (store as any).draft.find((i: any) => i.id === 10)
+            expect(item?.quantity).toBe(99)
+        })
+
+        it("clamps unlimited items to max 5", () => {
+            const store = useOrderStore()
+            // isUnlimited must be passed via opts (second arg), not on the item object
+            store.addToCart({
+                id: 11,
+                name: "Wagyu",
+                price: 0,
+                quantity: 1,
+                category: "meats",
+                img_url: "",
+            } as any, { isUnlimited: true })
+            store.updateQuantity(11, 10)
+            const item = (store as any).draft.find((i: any) => i.id === 11)
+            expect(item?.quantity).toBe(5)
+        })
+
+        it("guest count min is 2 and max is 20", () => {
+            const store = useOrderStore()
+            store.setGuestCount(0)
+            expect(store.guestCount).toBe(2)
+            store.setGuestCount(99)
+            expect(store.guestCount).toBe(20)
+        })
+    })
+
+    describe("Duplicate-submit guard", () => {
+        it("throws if rounds already exist (duplicate initial submit)", async () => {
+            const store = useOrderStore()
+            ;(store as any).rounds = [{
+                kind: "initial",
+                number: 1,
+                submittedAt: new Date().toISOString(),
+                items: [],
+                serverOrderId: 100,
+                serverTotal: 0,
+            }]
+            await expect(store.submitOrder()).rejects.toThrow(
+                "An initial order has already been placed"
+            )
+        })
+
+        it("throws if serverOrderId is already set", async () => {
+            const store = useOrderStore()
+            ;(store as any).serverOrderId = 42
+            await expect(store.submitOrder()).rejects.toThrow(
+                "An initial order has already been placed"
+            )
+        })
+
+        it("isSubmitting flag blocks re-entry mid-flight", async () => {
+            const store = useOrderStore()
+            ;(store as any).isSubmitting = true
+            await expect(store.submitOrder()).rejects.toThrow(
+                "Order submission already in progress"
+            )
+        })
+    })
+
+    describe("Refill blocked without initial order", () => {
+        it("throws if serverOrderId is null", async () => {
+            const store = useOrderStore()
+            ;(store as any).serverOrderId = null
+            await expect(store.submitRefill()).rejects.toThrow(
+                "No existing order found"
+            )
+        })
+    })
+})

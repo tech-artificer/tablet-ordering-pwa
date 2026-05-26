@@ -50,6 +50,8 @@ export const useSubmitState = () => {
     const setFailed = (error: string) => {
         stateContext.state = "failed"
         stateContext.lastError = error
+        stateContext.confirmedOrderNumber = null
+        stateContext.confirmedOrderId = null
         logger.warn("[SubmitState] Transitioning to failed", { error })
     }
 
@@ -104,6 +106,8 @@ export const useSubmitState = () => {
     const resetForNextTransaction = () => {
         stateContext.state = "idle"
         stateContext.lastError = null
+        stateContext.confirmedOrderNumber = null
+        stateContext.confirmedOrderId = null
     }
 
     return {
