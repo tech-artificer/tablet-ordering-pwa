@@ -98,8 +98,9 @@ docker compose -f compose.prod.yaml up -d
 **Symptom:** File changes don't reload in browser
 ```bash
 # Check your dev machine IP
-ipconfig        # Windows
-ip addr         # Linux/Mac
+ipconfig                        # Windows
+ip addr                         # Linux
+ifconfig                        # macOS (or: ipconfig getifaddr en0)
 
 # Update compose.dev.yaml with the correct IP
 # NUXT_DEV_HMR_HOST: <your-actual-dev-ip>

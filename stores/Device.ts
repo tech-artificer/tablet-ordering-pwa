@@ -81,7 +81,7 @@ export const useDeviceStore = defineStore("device", () => {
     let pollStartedAt: number | null = null
     let detectedClientIp: string | null | undefined
     let refreshTimerId: ReturnType<typeof setInterval> | null = null
-    let refreshInFlight = false
+    let refreshInFlight: Promise<boolean> | null = null
 
     const REFRESH_INTERVAL_MS = 10 * 60 * 1000 // check every 10 min
     const REFRESH_THRESHOLD_MS = 15 * 60 * 1000 // refresh if expiry < 15 min away
@@ -253,27 +253,36 @@ export const useDeviceStore = defineStore("device", () => {
     }
 
     async function refresh (): Promise<boolean> {
-        if (refreshInFlight) { return Boolean(state.token) }
-        refreshInFlight = true
-        state.isLoading = true
-        state.errorMessage = null
+        // Share a single in-flight refresh promise across concurrent callers so
+        // every caller gets the actual outcome of the refresh, not the value of
+        // `state.token` at the moment the second call arrived. That stale-read
+        // could otherwise make callers skip auth fallbacks while the token was
+        // still being replaced.
+        if (refreshInFlight) { return refreshInFlight }
 
-        try {
-            const api = useApi()
-            const response = await api.post("/api/devices/refresh")
-            if (!applyAuthPayload(response.data, "refresh")) {
+        refreshInFlight = (async () => {
+            state.isLoading = true
+            state.errorMessage = null
+
+            try {
+                const api = useApi()
+                const response = await api.post("/api/devices/refresh")
+                if (!applyAuthPayload(response.data, "refresh")) {
+                    return false
+                }
+                syncWaitingForTable()
+                return Boolean(state.token)
+            } catch (error: any) {
+                logger.error("[DeviceStore] Token refresh failed:", error)
+                state.errorMessage = error?.response?.data?.message || "Token refresh failed"
                 return false
+            } finally {
+                state.isLoading = false
+                refreshInFlight = null
             }
-            syncWaitingForTable()
-            return Boolean(state.token)
-        } catch (error: any) {
-            logger.error("[DeviceStore] Token refresh failed:", error)
-            state.errorMessage = error?.response?.data?.message || "Token refresh failed"
-            return false
-        } finally {
-            state.isLoading = false
-            refreshInFlight = false
-        }
+        })()
+
+        return refreshInFlight
     }
 
     async function authenticate (clientIp?: string | null): Promise<boolean> {
