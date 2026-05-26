@@ -235,8 +235,13 @@ curl -I http://<pwa-host>:3000/sw.js
 NODE_ENV: development
 NUXT_DEV_HMR_HOST: <your-dev-machine-ip>
 NUXT_PUBLIC_REVERB_HOST: <nexus-host>
-NUXT_PUBLIC_API_BASE_URL: http://<nexus-host>/api
+NUXT_PUBLIC_API_BASE_URL: http://<your-dev-machine-ip>/api
 ```
+
+> **Note:** `NUXT_PUBLIC_API_BASE_URL` uses the **dev machine's own IP** (same host as the
+> PWA container), not the Nexus host. The dev nginx proxy on the same machine forwards
+> `/api` requests to the Nexus backend. Setting this to the Nexus host directly bypasses
+> the expected proxy path and can cause CORS or routing failures.
 
 ### Production Build Args
 ```bash
