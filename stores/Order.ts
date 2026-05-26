@@ -79,6 +79,7 @@ type SubmitRefillOptions = {
     headers?: Record<string, string>
     idempotencyKey?: string
     clientSubmissionId?: string
+    signal?: AbortSignal
 }
 
 type MenuUnavailableError = Error & { code: string }
@@ -712,7 +713,10 @@ export const useOrderStore = defineStore("order", () => {
                         try { sessionStorage.setItem(REFILL_IDEM_KEY_STORAGE, idempotencyKey) } catch (e) { logger.debug("Failed to persist refill idempotency key", e) }
                     }
                 }
-                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey } })
+                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, {
+                    headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey },
+                    signal: options?.signal,
+                })
                 const responseData = extractResponseData(resp)
                 if (!responseData) {
                     handleOrderError("Refill response missing body")

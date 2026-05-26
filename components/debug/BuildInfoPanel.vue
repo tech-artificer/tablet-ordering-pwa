@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue"
+import { computed, onUnmounted, ref } from "vue"
 import { useRuntimeConfigOverride } from "~/composables/useRuntimeConfigOverride"
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
@@ -16,6 +16,13 @@ const { hasMismatch } = useBuildVersion()
 
 const copyLabel = ref("Copy Snapshot")
 let copyResetTimer: ReturnType<typeof setTimeout> | null = null
+
+onUnmounted(() => {
+    if (copyResetTimer) {
+        clearTimeout(copyResetTimer)
+        copyResetTimer = null
+    }
+})
 
 const buildInfo = computed(() => [
     { label: "App Version", value: config.appVersion },

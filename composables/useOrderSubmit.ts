@@ -21,6 +21,8 @@ export interface OrderSubmitResult {
   data?: unknown
   /** true when the submission was aborted client-side before the server accepted it */
   cancelled?: boolean
+  /** true when a duplicate call was ignored because the first submission is still in flight */
+  suppressed?: boolean
 }
 
 export interface OrderSubmitOptions {
@@ -34,7 +36,7 @@ export function useOrderSubmit () {
 
         if (submitState.isTransitioning.value) {
             logger.warn("[OrderSubmit] Already in progress — duplicate call ignored")
-            return { cancelled: true }
+            return { suppressed: true }
         }
 
         // signal is forwarded to the store so AbortController callers can cancel.

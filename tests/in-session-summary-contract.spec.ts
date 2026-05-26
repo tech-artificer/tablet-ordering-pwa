@@ -22,7 +22,9 @@ describe("in-session screen shape", () => {
         expect(page).toContain("Order Summary")
         expect(page).toContain(">Package<")
         expect(page).toContain(">Subtotal<")
-        expect(page).toContain("Tax ({{ taxRatePercent }}%)")
+        // Tax label collapses to "Tax" (without "(N%)") when the package is
+        // non-taxable or has no positive rate — see taxRatePercent computed.
+        expect(page).toMatch(/Tax<span v-if="taxRatePercent !== null"> \(\{\{ taxRatePercent \}\}%\)<\/span>/)
         expect(page).toMatch(/>Total<\/span>[\s\S]{0,200}formatPesoExact\(grandTotalDisplay\)/)
     })
 

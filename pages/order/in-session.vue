@@ -71,18 +71,60 @@ const packageHeading = computed(() => {
 })
 
 // ── Totals (gold figures in the Order Summary sidebar) ────────────────────────
-const packageTotal = computed<number>(() => Number(unref(orderStore.packageTotal) ?? 0))
-const addOnsTotal = computed<number>(() => Number(unref(orderStore.addOnsTotal) ?? 0))
-const taxAmount = computed<number>(() => Number(unref(orderStore.taxAmount) ?? 0))
+// IMPORTANT: source from submitted rounds (orderStore.rounds), NOT from
+// orderStore.draft-backed getters. After appendRound() clears the draft,
+// store-level addOns/tax computeds collapse to 0 while the displayed Total
+// still comes from serverTotal — producing contradictory billing.
+const isMeatsCategory = (category: unknown): boolean => {
+    const normalized = String(category ?? "").trim().toLowerCase()
+    return normalized === "meat" || normalized === "meats"
+}
+
+const packageTotal = computed<number>(() => {
+    const price = Number((orderStore.package as any)?.price ?? 0)
+    const guests = Number(unref(orderStore.guestCount) ?? 1)
+    return Number.isFinite(price * guests) ? price * guests : 0
+})
+
+const addOnsTotal = computed<number>(() => {
+    const rounds = (unref(orderStore.rounds) ?? []) as any[]
+    if (!Array.isArray(rounds) || rounds.length === 0) { return 0 }
+    let sum = 0
+    for (const round of rounds) {
+        const items = Array.isArray(round?.items) ? round.items : []
+        for (const item of items) {
+            if (isMeatsCategory(item?.category)) { continue }
+            const price = Number(item?.price ?? 0)
+            const qty = Number(item?.quantity ?? 0)
+            if (Number.isFinite(price) && Number.isFinite(qty)) {
+                sum += price * qty
+            }
+        }
+    }
+    return sum
+})
+
+const taxAmount = computed<number>(() => {
+    const pkg = orderStore.package as any
+    if (!pkg?.is_taxable) { return 0 }
+    const rate = Number(pkg?.tax?.percentage ?? 0)
+    if (!Number.isFinite(rate) || rate <= 0) { return 0 }
+    const taxable = packageTotal.value + addOnsTotal.value
+    return (taxable * rate) / 100
+})
+
 const grandTotalDisplay = computed<number>(() => {
     const serverTotal = Number(unref(orderStore.serverTotal) ?? 0)
     if (Number.isFinite(serverTotal) && serverTotal > 0) { return serverTotal }
-    return Number(unref(orderStore.grandTotal) ?? 0)
+    return packageTotal.value + addOnsTotal.value + taxAmount.value
 })
 
-const taxRatePercent = computed<number>(() => {
-    const rate = Number((orderStore.package as any)?.tax?.percentage || 0)
-    return Number.isFinite(rate) && rate > 0 ? rate : 12
+const taxRatePercent = computed<number | null>(() => {
+    const pkg = orderStore.package as any
+    if (!pkg?.is_taxable) { return null }
+    const rate = Number(pkg?.tax?.percentage ?? 0)
+    if (!Number.isFinite(rate) || rate <= 0) { return null }
+    return rate
 })
 
 function formatPeso (value: number): string {
@@ -360,7 +402,9 @@ definePageMeta({ layout: "kiosk" })
                             <span class="text-sm font-semibold text-white tabular-nums">{{ formatPeso(addOnsTotal) }}</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-sm text-white/65">Tax ({{ taxRatePercent }}%)</span>
+                            <span class="text-sm text-white/65">
+                                Tax<span v-if="taxRatePercent !== null"> ({{ taxRatePercent }}%)</span>
+                            </span>
                             <span class="text-sm font-semibold text-white tabular-nums">{{ formatPesoExact(taxAmount) }}</span>
                         </div>
                     </div>
