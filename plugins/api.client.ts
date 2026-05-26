@@ -234,12 +234,18 @@ export default defineNuxtPlugin(() => {
     // Start proactive token refresh timer once a token is present.
     // watch is imported via Nuxt auto-imports.
     const device = useDeviceStore()
+
+    // One-time boot check: if a persisted token is stale (or near-expiry) on
+    // hydration, kick off a background refresh before the first API call.
+    if (device.token) {
+        device.checkTokenExpiry()
+    }
+
     watch(
         () => device.token,
         (token) => {
             if (token) {
                 device.startRefreshTimer()
-                device.checkTokenExpiry()
             } else {
                 device.stopRefreshTimer()
             }
