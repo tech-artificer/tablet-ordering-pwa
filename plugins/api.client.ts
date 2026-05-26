@@ -239,6 +239,7 @@ export default defineNuxtPlugin(() => {
         (token) => {
             if (token) {
                 device.startRefreshTimer()
+                device.checkTokenExpiry()
             } else {
                 device.stopRefreshTimer()
             }
