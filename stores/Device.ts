@@ -119,8 +119,12 @@ export const useDeviceStore = defineStore("device", () => {
         const expiryMs = parseExpiryMs(state.expiration)
         if (expiryMs !== null && expiryMs - Date.now() <= REFRESH_THRESHOLD_MS) {
             logger.info("[DeviceStore] Token expired or near expiry on boot; triggering refresh")
-            refresh().catch((e: unknown) => {
-                logger.warn("[DeviceStore] Boot-time token refresh failed", e)
+            void refresh().then((ok) => {
+                if (!ok) {
+                    logger.warn("[DeviceStore] Boot-time token refresh failed; suppressing error banner")
+                    // Boot-time background checks should not surface errors to the user.
+                    state.errorMessage = null
+                }
             })
         }
     }

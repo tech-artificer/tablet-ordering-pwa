@@ -34,7 +34,8 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
     it("calls refresh when token is already expired", async () => {
         mockPost.mockResolvedValueOnce(freshAuthResponse())
         const device = useDeviceStore()
-        device.$patch({ token: "stale-token", expiration: Date.now() - 1000 })
+        ;(device as any).token = "stale-token"
+        ;(device as any).expiration = Date.now() - 1000
 
         device.checkTokenExpiry()
 
@@ -45,7 +46,8 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
     it("calls refresh when token is within the 15-minute threshold", async () => {
         mockPost.mockResolvedValueOnce(freshAuthResponse())
         const device = useDeviceStore()
-        device.$patch({ token: "near-expiry-token", expiration: Date.now() + FIFTEEN_MIN_MS - 1000 })
+        ;(device as any).token = "near-expiry-token"
+        ;(device as any).expiration = Date.now() + FIFTEEN_MIN_MS - 1000
 
         device.checkTokenExpiry()
 
@@ -55,7 +57,8 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
 
     it("does not call refresh when token is fresh", () => {
         const device = useDeviceStore()
-        device.$patch({ token: "fresh-token", expiration: Date.now() + FIFTEEN_MIN_MS + 60_000 })
+        ;(device as any).token = "fresh-token"
+        ;(device as any).expiration = Date.now() + FIFTEEN_MIN_MS + 60_000
 
         device.checkTokenExpiry()
 
@@ -74,7 +77,8 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
         mockPost.mockReturnValueOnce(firstCall).mockResolvedValueOnce(freshAuthResponse())
 
         const device = useDeviceStore()
-        device.$patch({ token: "stale-token", expiration: Date.now() - 1000 })
+        ;(device as any).token = "stale-token"
+        ;(device as any).expiration = Date.now() - 1000
 
         device.checkTokenExpiry()
         device.checkTokenExpiry()
@@ -84,5 +88,17 @@ describe("Device store — checkTokenExpiry (P1: boot-time stale token)", () => 
 
         resolveFirst()
         await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    it("clears errorMessage after a failed boot-time refresh", async () => {
+        mockPost.mockRejectedValueOnce(new Error("Network error"))
+        const device = useDeviceStore()
+        ;(device as any).token = "stale-token"
+        ;(device as any).expiration = Date.now() - 1000
+
+        device.checkTokenExpiry()
+
+        await new Promise(resolve => setTimeout(resolve, 10))
+        expect(device.errorMessage).toBeNull()
     })
 })
