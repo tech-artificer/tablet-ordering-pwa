@@ -1,4 +1,17 @@
-# Quick Reference - Development & Production
+# Quick Reference — Development and Production
+
+> **IP address note:** This guide uses placeholder IPs from the standalone Docker setup for the
+> tablet PWA. In the restaurant production environment, the tablet PWA is served through the
+> Woosoo Nexus nginx stack at `https://192.168.1.31:4443` — not as a standalone container.
+> Replace any IP below with your actual environment values.
+>
+> | Context | Host |
+> |---|---|
+> | Restaurant Nexus/PWA server | `192.168.1.31` |
+> | Standalone PWA dev container | `192.168.1.100` (example, replace with your PC IP) |
+> | Nexus API backend (standalone dev) | `192.168.100.7` (example from docker compose env) |
+
+---
 
 ## Development Setup
 
@@ -6,15 +19,14 @@
 ```bash
 cd tablet-ordering-pwa
 docker compose -f compose.dev.yaml up
-# Visit http://192.168.1.100:3000
+# Visit http://<your-dev-machine-ip>:3000
 ```
 
 ### Verify HMR (Hot Module Reload)
 ```bash
-# Make a change to pages/index.vue
-# Save file
-# Expected: Browser reloads within 2-4 seconds
-# Check: Browser console shows "HMR updated"
+# Make a change to pages/index.vue and save
+# Expected: browser reloads within 2-4 seconds
+# Check: browser console shows "HMR updated"
 ```
 
 ### Check Container
@@ -31,12 +43,16 @@ docker compose -f compose.dev.yaml down
 
 ---
 
-## Production Build & Deployment
+## Production Build and Deployment (Standalone)
+
+> Use this section when deploying the tablet PWA as a standalone Docker container.
+> For the canonical restaurant deployment via the Nexus stack, see
+> `woosoo-nexus/docs/deployment/production-docker.md`.
 
 ### Build Production Image
 ```bash
 docker build -f Dockerfile.prod \
-  --build-arg NUXT_PUBLIC_REVERB_HOST=192.168.100.7 \
+  --build-arg NUXT_PUBLIC_REVERB_HOST=<your-server-ip> \
   --build-arg NUXT_PUBLIC_REVERB_PORT=443 \
   --build-arg NUXT_PUBLIC_REVERB_SCHEME=https \
   -t tablet-ordering-pwa:prod .
@@ -45,7 +61,7 @@ docker build -f Dockerfile.prod \
 ### Verify Image Size
 ```bash
 docker images tablet-ordering-pwa:prod
-# Should show ~50MB
+# Should show ~50 MB
 ```
 
 ### Test Production Image Locally
@@ -54,112 +70,94 @@ docker run -p 3000:3000 tablet-ordering-pwa:prod
 curl http://localhost:3000/
 ```
 
-### Deploy to Production
+### Deploy to Production (Standalone)
 ```bash
 docker compose -f compose.prod.yaml up -d
 ```
 
-### Verify Production
+### Verify
 ```bash
 docker compose -f compose.prod.yaml ps
 docker compose -f compose.prod.yaml logs --tail=50
 docker stats tablet-ordering-pwa
 ```
 
-### Test from Network
-```bash
-curl http://192.168.1.100:3000/
-# Should return index.html
-```
-
 ### Rollback (If Needed)
 ```bash
 docker compose -f compose.prod.yaml down
 docker rmi tablet-ordering-pwa:prod
-docker tag tablet-ordering-pwa:backup-2026-05-07 tablet-ordering-pwa:prod
+docker tag tablet-ordering-pwa:backup-<date> tablet-ordering-pwa:prod
 docker compose -f compose.prod.yaml up -d
 ```
 
 ---
 
-## Common Issues & Fixes
+## Common Issues and Fixes
 
 ### Issue: HMR Not Working (Dev)
-**Symptom**: File changes don't reload in browser
+**Symptom:** File changes don't reload in browser
 ```bash
-# Fix: Check dev machine IP
-ipconfig  # Windows
-ip addr   # Linux/Mac
+# Check your dev machine IP
+ipconfig        # Windows
+ip addr         # Linux/Mac
 
-# Update compose.dev.yaml with correct IP
-# NUXT_DEV_HMR_HOST: 192.168.X.X (your actual IP)
+# Update compose.dev.yaml with the correct IP
+# NUXT_DEV_HMR_HOST: <your-actual-dev-ip>
 
-# Restart container
+# Restart the container
 docker compose -f compose.dev.yaml down
 docker compose -f compose.dev.yaml up
 ```
 
 ### Issue: Container Won't Start (Dev)
-**Symptom**: `OOM killed` or `exit code 137`
+**Symptom:** `OOM killed` or `exit code 137`
 ```bash
-# Reason: Memory pressure from Vite polling
-# Fix: Restart and monitor
+# Fix: restart and monitor memory
 docker compose -f compose.dev.yaml restart
 docker stats tablet-ordering-pwa-nuxt-dev-1
 
-# If still failing: Increase Docker memory allocation
-# Docker Desktop → Preferences → Resources → Memory → +2GB
+# If still failing: increase Docker memory allocation
+# Docker Desktop → Preferences → Resources → Memory → +2 GB
 ```
 
 ### Issue: Port 3000 Already In Use
-**Symptom**: `bind: address already in use`
+**Symptom:** `bind: address already in use`
 ```bash
-# Find what's using port 3000
-netstat -ano | findstr 3000
+netstat -ano | findstr 3000   # Windows
+lsof -i :3000                 # Linux/Mac
 
-# Kill it or use different port
-docker compose -f compose.dev.yaml down
+# Kill the process or use a different port
 docker run -p 3001:3000 tablet-ordering-pwa:prod
 ```
 
 ### Issue: Tablets Show Stale Content (Prod)
-**Symptom**: App shows old version after deployment
+**Symptom:** App shows old version after deployment
 ```bash
-# Clear browser cache
-# On tablet: Settings → Safari → Clear History and Website Data
-# Or: Hard refresh (Ctrl+Shift+R)
+# Hard refresh on tablet
+# Android Chrome: tap three-dot menu → Reload
+# Or: Settings → Privacy → Clear browsing data
 
-# Force Service Worker update
-# Visit http://tablet-ip:3000/
-# DevTools → Application → Service Workers → Unregister + reload
+# Force service worker update (DevTools)
+# Application → Service Workers → Unregister → reload
 ```
 
 ### Issue: API Calls Failing (Prod)
-**Symptom**: Network errors in DevTools, data won't load
+**Symptom:** Network errors in DevTools, data won't load
 ```bash
-# Check backend connectivity
-docker exec tablet-ordering-pwa curl http://192.168.100.7/api/
-# Should not be "Connection refused"
-
-# Verify API_BASE_URL
-curl -I http://192.168.1.100:3000/
-# Should get 200 OK
+# Check backend connectivity from inside the container
+docker exec tablet-ordering-pwa curl http://<nexus-host>/api/
 
 # Check logs
 docker compose -f compose.prod.yaml logs | grep -i error
 ```
 
 ### Issue: High Memory Usage (Prod)
-**Symptom**: Memory >150MB, app slow
+**Symptom:** Memory >150 MB, app slow
 ```bash
-# Check current usage
 docker stats tablet-ordering-pwa
 
-# If >200MB:
+# If >200 MB, restart
 docker compose -f compose.prod.yaml restart
-
-# Check what's growing
-docker exec tablet-ordering-pwa top -b | head -10
 ```
 
 ---
@@ -174,153 +172,78 @@ docker stats tablet-ordering-pwa
 
 ### View Logs
 ```bash
-# Last 50 lines
-docker compose -f compose.prod.yaml logs --tail=50
-
-# Follow (live)
-docker compose -f compose.prod.yaml logs -f
-
-# Last 1 hour
-docker compose -f compose.prod.yaml logs --since 1h
+docker compose -f compose.prod.yaml logs --tail=50   # last 50 lines
+docker compose -f compose.prod.yaml logs -f           # follow (live)
+docker compose -f compose.prod.yaml logs --since 1h   # last 1 hour
 ```
 
 ### Check Health
 ```bash
-# Container health status
 docker compose -f compose.prod.yaml ps
-# Shows: "healthy" or "unhealthy"
-
-# Detailed health info
 docker inspect tablet-ordering-pwa | grep -A 10 Health
-```
-
-### Test Connectivity
-```bash
-# From container to backend
-docker exec tablet-ordering-pwa curl http://192.168.100.7/api/
-
-# From host to container
-curl http://192.168.1.100:3000/
-
-# From other device on network
-curl http://192.168.1.100:3000/
 ```
 
 ---
 
 ## Cache Header Verification
 
-### Check HTML Cache (Should be 60 seconds)
 ```bash
-curl -I http://192.168.1.100:3000/
+# HTML — should be short-lived (60 seconds)
+curl -I http://<pwa-host>:3000/
 # Look for: Cache-Control: public, max-age=60, must-revalidate
-```
 
-### Check Asset Cache (Should be 1 year)
-```bash
-curl -I http://192.168.1.100:3000/_nuxt/XXXX.js
+# Hashed assets — should be immutable (1 year)
+curl -I http://<pwa-host>:3000/_nuxt/<hash>.js
 # Look for: Cache-Control: public, max-age=31536000, immutable
-```
 
-### Check Service Worker Cache (Should be 0 seconds)
-```bash
-curl -I http://192.168.1.100:3000/sw.js
+# Service worker — should never be cached
+curl -I http://<pwa-host>:3000/sw.js
 # Look for: Cache-Control: public, max-age=0, must-revalidate
 ```
 
 ---
 
-## Performance Testing
+## Key Metrics
 
-### Lighthouse Score
-```bash
-# In Chrome DevTools
-# → Lighthouse
-# → Generate report
-# Target: >80 performance score
-```
-
-### Network Tab (DevTools)
-```bash
-# On tablet or laptop
-# → DevTools → Network tab
-# → Refresh page
-# Check:
-#   - Initial load time
-#   - Cache hit rate (Size column shows "from cache")
-#   - No 404 errors
-#   - No slow requests (>1s)
-```
-
-### Service Worker Status
-```bash
-# DevTools → Application → Service Workers
-# Should show:
-#   - Status: activated and running
-#   - Last update: <1 hour ago
-#   - Cache Storage: <5MB
-```
+| Metric | Dev | Prod | Alert threshold |
+|---|---|---|---|
+| Memory | <1 GB | <100 MB | >200 MB |
+| CPU | <10% | <2% | >50% |
+| Error rate | any | <1% | >5% |
+| Response time | <200 ms | <500 ms | >1000 ms |
+| Image size | 200 MB | ~50 MB | >100 MB |
 
 ---
 
-## File Locations Quick Reference
+## File Locations
 
-| File | Purpose | Environment |
-|------|---------|------------|
-| `nuxt.config.ts` | Dev config | Development |
-| `nuxt.config.prod.ts` | Prod config | Production |
-| `compose.dev.yaml` | Dev orchestration | Development |
-| `compose.prod.yaml` | Prod orchestration | Production |
-| `Dockerfile.dev` | Dev container | Development |
-| `Dockerfile.prod` | Prod container | Production |
-| `docker/nginx/tablet-pwa.conf` | nginx config | Production |
+| File | Purpose | Used in |
+|---|---|---|
+| `nuxt.config.ts` | Nuxt configuration | Development |
+| `compose.dev.yaml` | Dev container orchestration | Development |
+| `compose.prod.yaml` | Standalone prod orchestration | Standalone prod |
+| `Dockerfile.dev` | Dev container image | Development |
+| `Dockerfile.prod` | Prod container image | Standalone and Nexus-stack prod |
+| `docker/nginx/tablet-pwa.conf` | nginx config for standalone | Standalone prod |
 
 ---
 
 ## Environment Variables
 
-### Development (compose.dev.yaml)
+### Development (`compose.dev.yaml`)
 ```yaml
 NODE_ENV: development
-NUXT_DEV_HMR_HOST: 192.168.1.100
-NUXT_PUBLIC_REVERB_HOST: 192.168.100.7
-NUXT_PUBLIC_API_BASE_URL: http://192.168.1.100/api
+NUXT_DEV_HMR_HOST: <your-dev-machine-ip>
+NUXT_PUBLIC_REVERB_HOST: <nexus-host>
+NUXT_PUBLIC_API_BASE_URL: http://<nexus-host>/api
 ```
 
-### Production (compose.prod.yaml + build args)
+### Production Build Args
 ```bash
-# Build args
-NUXT_PUBLIC_REVERB_HOST=192.168.100.7
+NUXT_PUBLIC_REVERB_HOST=<your-server-ip>
 NUXT_PUBLIC_REVERB_PORT=443
 NUXT_PUBLIC_REVERB_SCHEME=https
-
-# Runtime env
-NODE_ENV=production
 ```
-
----
-
-## Key Metrics to Monitor
-
-| Metric | Dev | Prod | Alert |
-|--------|-----|------|-------|
-| Memory | <1GB | <100MB | >200MB |
-| CPU | <10% | <2% | >50% |
-| Error rate | any | <1% | >5% |
-| Response time | <200ms | <500ms | >1000ms |
-| Image size | 200MB | 50MB | >100MB |
-
----
-
-## Documentation Files
-
-| File | Purpose | Read Time |
-|------|---------|-----------|
-| `SETUP_SUMMARY.md` | This summary | 5 min |
-| `DEVELOPMENT_SETUP_DIAGNOSIS.md` | Dev analysis | 10 min |
-| `BLOATING_ANALYSIS_COMPLETE.md` | Build issues | 20 min |
-| `PRODUCTION_DEPLOYMENT_CHECKLIST.md` | Pre-deployment | 15 min |
-| `PRODUCTION_ARCHITECTURE_GUIDE.md` | Implementation | 20 min |
 
 ---
 
@@ -329,7 +252,6 @@ NODE_ENV=production
 ```
 Development          Testing            Production
 ─────────────        ────────────       ──────────
-
 code change          build image        docker build
    ↓                    ↓                   ↓
 compose.dev.yaml    docker run         compose.prod.yaml
@@ -345,41 +267,24 @@ repeat               approve            24h observation
 
 ## Emergency Commands
 
-### Stop Everything
 ```bash
+# Stop everything
 docker compose -f compose.dev.yaml down
 docker compose -f compose.prod.yaml down
-```
 
-### View All Docker Resources
-```bash
+# View all Docker resources
 docker ps -a
 docker images
 docker volume ls
-docker network ls
-```
 
-### Cleanup (Careful!)
-```bash
-# Remove unused images
+# Cleanup unused images and volumes (careful!)
 docker image prune -a
-
-# Remove unused volumes
 docker volume prune
 
-# Full cleanup (WARNING: removes everything)
-docker system prune -a
-```
-
-### Inspect Container Details
-```bash
-docker inspect tablet-ordering-pwa
-docker logs -f tablet-ordering-pwa
+# Shell into container for debugging
 docker exec -it tablet-ordering-pwa /bin/sh
 ```
 
 ---
 
-**Last Updated**: 2026-05-07
-**Version**: 1.0
-**Status**: ✓ Production Ready
+**Last Updated:** 2026-05-26
