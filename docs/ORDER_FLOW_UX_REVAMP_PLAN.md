@@ -90,7 +90,7 @@ Tagged ⚡ performance / 👆 ergonomics. All anchored to real lines.
 
 ## 3. Reference integrity — "no new dead code" gating
 
-Every deletion/refactor below is backed by a grep audit of the current tree.
+Every deletion/refactor below is backed by a grep audit of the current tree. **Audit scope must include `plugins/`, `middleware/`, and `layouts/`** — not just `pages/components/composables/stores` — since route navigation (e.g. the kiosk back-gesture guard) lives there too.
 
 ### ✅ Safe to delete outright — 0 real external refs, no orphaned deps
 - `components/order/OrderSummaryDrawer.vue`
@@ -115,7 +115,7 @@ Retiring a host UI must not orphan the logic it hosts:
 
 ### 🔗 Stale-reference cleanups when routes are removed
 - `/order/review` is also referenced by `components/common/SessionTracker.vue:15` (a progress step `path`) — update or it becomes a dead nav target.
-- `/order/in-session` is referenced by `menu.vue:415` (`@back-to-session`), `review.vue:50` (post-submit redirect), and a `"in-session"` literal in `stores/SessionEnd.ts:5` — repoint/remove all three.
+- `/order/in-session` is referenced by `menu.vue:415` (`@back-to-session`), `review.vue:50` (post-submit redirect), `plugins/kiosk-guard.client.ts:25` (`router.replace("/order/in-session")` on back/forward gestures **while an order is live**), and a `"in-session"` literal in `stores/SessionEnd.ts:5` — repoint/remove all four. The kiosk guard is the critical one: if it is missed, live-order back gestures would navigate to a deleted route.
 
 ### 🟢 Survivors confirmed multi-consumer (no orphan risk)
 - Order store (23 consumer files), Session (15), SessionEnd (2)
