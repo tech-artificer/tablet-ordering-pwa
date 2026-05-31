@@ -4,8 +4,10 @@ last_reviewed: 2026-05-17
 scope: tablet-ordering-pwa
 ---
 
-<!-- Repository-specific Copilot instructions for AI coding agents -->
-# Tablet Ordering PWA — AI Coding Instructions
+# Tablet Ordering PWA — AI Agent Onboarding
+
+App-specific onboarding for AI coding agents (Claude Code). Loaded on demand; the agent
+operating system lives in the root `../AGENTS.md`.
 
 > ## Agent Operating System & Resume (read first — binding)
 >
@@ -14,7 +16,7 @@ scope: tablet-ordering-pwa
 > docs, or `../../contracts/*.md`, the canonical ecosystem docs win.
 >
 > - The Lite 4-agent operating system (Contrarian → Specialist → Verifier → Executioner) with
->   triage tiers applies to all work here. Copilot is a runner of that system, not an exception.
+>   triage tiers applies to all work here. Claude Code is the runner of that system.
 > - **Specialist for this app:** `chuya-frontend` (see `../../.claude/agents/chuya-frontend.md`).
 >   Scope is `tablet-ordering-pwa/**` only; cross-app work is `SPLIT_REQUIRED`.
 > - **Resume, do not restart:** before any task, check `../../docs/cases/<task-slug>.md`. If
