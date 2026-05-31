@@ -4,10 +4,10 @@ last_reviewed: 2026-05-17
 scope: tablet-ordering-pwa
 ---
 
-# AGENTS.md — tablet-ordering-pwa (Codex per-app entrypoint)
+# AGENTS.md — tablet-ordering-pwa (per-app entrypoint)
 
-This is a **pointer**, not a duplicate. Codex CLI reads the nearest `AGENTS.md`; this scopes
-Codex when work happens inside `tablet-ordering-pwa/`.
+This is a **pointer**, not a duplicate. It scopes agent work that happens inside
+`tablet-ordering-pwa/`; the full operating system lives in the root `../AGENTS.md`.
 
 1. **Operating system:** follow the root `../AGENTS.md` — the Lite 4-agent sequence
    (Contrarian → Specialist → Verifier → Executioner) and triage tiers apply here.
