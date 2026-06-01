@@ -156,11 +156,15 @@ export const useBroadcasts = () => {
     let reconnectTimer: number | null = null
     let boundPusherConnection: unknown = null
     let boundStateChangeHandler: ((states: { current: string; previous: string }) => void) | null = null
+    let boundMessageHandler: (() => void) | null = null
     const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30, 60] // seconds, capped at 60s
 
     // Silent-death watchdog: fires every 30s and forces a disconnect when the socket
-    // reports "connected" but has delivered no events for 3 minutes. Catches zombie
-    // transports that Pusher's own keepalive misses (no state_change fired).
+    // reports "connected" but has seen no *transport* activity for 3 minutes. Activity
+    // is fed by the Pusher connection's raw "message" frames (data events plus the
+    // server's periodic ping/pong keepalive), NOT app-level broadcasts — so an
+    // ordinarily quiet tablet with a healthy socket is left alone, and only genuinely
+    // zombie transports (no frames at all, which Pusher's own keepalive can miss) trip it.
     const WATCHDOG_INTERVAL_MS = 30_000
     const WATCHDOG_SILENCE_THRESHOLD_MS = 180_000
     let watchdogTimer: number | null = null
@@ -634,15 +638,26 @@ export const useBroadcasts = () => {
 
     const unbindConnectionStateHandler = () => {
         const conn = boundPusherConnection as Record<string, unknown> | null
-        if (conn && boundStateChangeHandler && typeof conn.unbind === "function") {
-            try {
-                (conn.unbind as (event: string, handler: unknown) => void)("state_change", boundStateChangeHandler)
-            } catch (e) {
-                logger.debug("[Broadcasts] unbind state_change failed", e)
+        if (conn && typeof conn.unbind === "function") {
+            const unbind = conn.unbind as (event: string, handler: unknown) => void
+            if (boundStateChangeHandler) {
+                try {
+                    unbind("state_change", boundStateChangeHandler)
+                } catch (e) {
+                    logger.debug("[Broadcasts] unbind state_change failed", e)
+                }
+            }
+            if (boundMessageHandler) {
+                try {
+                    unbind("message", boundMessageHandler)
+                } catch (e) {
+                    logger.debug("[Broadcasts] unbind message failed", e)
+                }
             }
         }
         boundPusherConnection = null
         boundStateChangeHandler = null
+        boundMessageHandler = null
     }
 
     const bindConnectionStateHandler = () => {
@@ -698,6 +713,15 @@ export const useBroadcasts = () => {
         }
 
         connection.bind("state_change", boundStateChangeHandler)
+
+        // Feed the silent-death watchdog from transport-level traffic. Every frame the
+        // server sends — real data events and the protocol ping/pong keepalive — fires
+        // "message", so a healthy-but-idle socket keeps the watchdog satisfied without
+        // any business broadcast. Only a transport that stops emitting entirely (a true
+        // zombie) goes silent long enough to trip the disconnect.
+        boundMessageHandler = () => { touchLastEvent() }
+        connection.bind("message", boundMessageHandler)
+
         boundPusherConnection = connection
     }
 

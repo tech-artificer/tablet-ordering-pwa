@@ -30,10 +30,12 @@ const WATCHDOG_SILENCE_THRESHOLD_MS = 180_000
 // ─── Echo mock ───────────────────────────────────────────────────────────────
 
 let capturedListeners: Record<string, (...args: any[]) => unknown> = {}
+let capturedConnectionHandlers: Record<string, (...args: any[]) => unknown> = {}
 let mockDisconnect: ReturnType<typeof vi.fn>
 
 function setupEcho () {
     capturedListeners = {}
+    capturedConnectionHandlers = {}
     mockDisconnect = vi.fn()
     const makeChannel = () => {
         const ch: any = {
@@ -52,8 +54,12 @@ function setupEcho () {
             pusher: {
                 connection: {
                     disconnect: mockDisconnect,
-                    bind: vi.fn(),
-                    unbind: vi.fn(),
+                    bind: vi.fn((event: string, cb: (...args: any[]) => unknown) => {
+                        capturedConnectionHandlers[event] = cb
+                    }),
+                    unbind: vi.fn((event: string) => {
+                        delete capturedConnectionHandlers[event]
+                    }),
                 },
             },
         },
@@ -117,6 +123,45 @@ describe("useBroadcasts — silent-death watchdog", () => {
         expect(mockDisconnect).not.toHaveBeenCalled()
 
         cleanup()
+    })
+
+    it("does NOT disconnect a healthy idle socket kept alive by transport traffic only", () => {
+        // A quiet tablet receives zero app-level broadcasts but the transport stays
+        // healthy — the server's ping/pong keepalive surfaces as connection "message"
+        // frames. Those alone must satisfy the watchdog (regression guard for the
+        // false-positive where idle-but-connected sockets were force-disconnected).
+        const connectionStore = useConnectionStore()
+        connectionStore.setReverbState("connected")
+
+        const { initializeBroadcasts, cleanup } = useBroadcasts()
+        initializeBroadcasts()
+
+        // The composable binds touchLastEvent to the connection's "message" event.
+        expect(capturedConnectionHandlers.message).toBeTypeOf("function")
+
+        // Emit a transport frame every 2 minutes — no business events at all.
+        const TICK_MS = 120_000
+        const iterations = Math.ceil((WATCHDOG_SILENCE_THRESHOLD_MS + WATCHDOG_INTERVAL_MS) / TICK_MS) + 1
+        for (let i = 0; i < iterations; i++) {
+            capturedConnectionHandlers.message?.({ event: "pusher:pong", data: {} })
+            vi.advanceTimersByTime(TICK_MS)
+        }
+
+        expect(mockDisconnect).not.toHaveBeenCalled()
+
+        cleanup()
+    })
+
+    it("unbinds the transport message handler on cleanup", () => {
+        const connectionStore = useConnectionStore()
+        connectionStore.setReverbState("connected")
+
+        const { initializeBroadcasts, cleanup } = useBroadcasts()
+        initializeBroadcasts()
+        expect(capturedConnectionHandlers.message).toBeTypeOf("function")
+
+        cleanup()
+        expect(capturedConnectionHandlers.message).toBeUndefined()
     })
 
     it("skips disconnect when reverbState is not connected", () => {
