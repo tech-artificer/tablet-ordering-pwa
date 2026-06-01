@@ -158,6 +158,41 @@ export const useBroadcasts = () => {
     let boundStateChangeHandler: ((states: { current: string; previous: string }) => void) | null = null
     const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30, 60] // seconds, capped at 60s
 
+    // Silent-death watchdog: fires every 30s and forces a disconnect when the socket
+    // reports "connected" but has delivered no events for 3 minutes. Catches zombie
+    // transports that Pusher's own keepalive misses (no state_change fired).
+    const WATCHDOG_INTERVAL_MS = 30_000
+    const WATCHDOG_SILENCE_THRESHOLD_MS = 180_000
+    let watchdogTimer: number | null = null
+    let lastEventAt = 0
+
+    const touchLastEvent = () => { lastEventAt = Date.now() }
+
+    const startWatchdog = () => {
+        if (watchdogTimer !== null) { return }
+        watchdogTimer = window.setInterval(() => {
+            const connectionStore = useConnectionStore()
+            if (unref(connectionStore.reverbState) !== "connected") { return }
+            const silentMs = Date.now() - lastEventAt
+            if (silentMs < WATCHDOG_SILENCE_THRESHOLD_MS) { return }
+            logger.warn(`[🔍 Watchdog] ${Math.round(silentMs / 1000)}s silence on "connected" socket — forcing disconnect`)
+            touchLastEvent() // reset before disconnect to prevent rapid re-triggers
+            const pusherConn = (window as any).Echo?.connector?.pusher?.connection
+            if (pusherConn && typeof pusherConn.disconnect === "function") {
+                pusherConn.disconnect()
+            } else {
+                scheduleReconnection()
+            }
+        }, WATCHDOG_INTERVAL_MS)
+    }
+
+    const stopWatchdog = () => {
+        if (watchdogTimer !== null) {
+            window.clearInterval(watchdogTimer)
+            watchdogTimer = null
+        }
+    }
+
     const scheduleReconnection = () => {
         const connectionStore = useConnectionStore()
 
@@ -192,6 +227,7 @@ export const useBroadcasts = () => {
             reconnectTimer = null
         }
         reconnectAttempts = 0 // Reset on successful connection
+        lastEventAt = Date.now() // Reset watchdog clock on reconnect
         connectionStore.setReverbState("connected")
         connectionStore.setReconnectAttempt(0)
     }
@@ -206,6 +242,7 @@ export const useBroadcasts = () => {
 
     // Event Handlers
     const handleOrderCreated = (event: OrderCreatedEvent) => {
+        touchLastEvent()
         logger.debug("[📨 .order.created]", { order_id: event.order.id, order_number: event.order.order_number })
 
         ElNotification({
@@ -222,6 +259,7 @@ export const useBroadcasts = () => {
     }
 
     const handleOrderUpdated = (event: OrderUpdatedEvent) => {
+        touchLastEvent()
         const { order } = event
         logger.debug("[📨 .order.updated]", { order_id: order.order_id, status: order.status })
 
@@ -268,6 +306,7 @@ export const useBroadcasts = () => {
     }
 
     const handleOrderCompleted = (event: OrderCompletedEvent) => {
+        touchLastEvent()
         logger.debug("Order completed:", event.order)
 
         ElNotification({
@@ -290,6 +329,7 @@ export const useBroadcasts = () => {
     }
 
     const handleOrderCancelled = (event: OrderCancelledEvent) => {
+        touchLastEvent()
         logger.debug("Order cancelled:", event.order)
 
         ElNotification({
@@ -309,6 +349,7 @@ export const useBroadcasts = () => {
     }
 
     const handleServiceRequest = (event: ServiceRequestEvent) => {
+        touchLastEvent()
         logger.debug("Service request update:", event.service_request)
 
         const statusMessages: Record<string, string> = {
@@ -328,6 +369,7 @@ export const useBroadcasts = () => {
     }
 
     const handleDeviceControl = (event: DeviceControlEvent) => {
+        touchLastEvent()
         logger.debug("Device control command:", event.action)
 
         switch (event.action) {
@@ -519,6 +561,7 @@ export const useBroadcasts = () => {
         logger.debug("[Echo] Subscribing to session." + sessionId)
         sessionChannel = (window as any).Echo.channel(`session.${sessionId}`)
             .listen(".session.reset", (_event: { session_id: number; version: number }) => {
+                touchLastEvent()
                 logger.info("[Broadcasts] session.reset received — ending session", { session_id: _event.session_id })
                 triggerSessionEnd("unknown", { source: "broadcast" })
             })
@@ -676,6 +719,8 @@ export const useBroadcasts = () => {
         ensureSessionChannelAutoSubscription()
 
         bindConnectionStateHandler()
+        lastEventAt = Date.now()
+        startWatchdog()
     }
 
     // Cleanup on unmount
@@ -704,6 +749,7 @@ export const useBroadcasts = () => {
         }
         unsubscribeDeviceChannels()
         unbindConnectionStateHandler()
+        stopWatchdog()
         resetChannelStatus()
     }
 
