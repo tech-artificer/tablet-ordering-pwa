@@ -5,7 +5,7 @@ WORKDIR /app
 # breaking Nuxt modules (@element-plus/nuxt, @nuxt/icon, etc.) required at build time.
 ENV NITRO_PRESET=node-server
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 
 COPY . .
