@@ -901,6 +901,27 @@ export const useOrderStore = defineStore("order", () => {
         state.serverStatus = status
     }
 
+    function setServerOrderId (id: number | null) {
+        state.serverOrderId = id
+    }
+
+    function applyDetailsUpdate (details: {
+        order_id: number
+        guest_count: number | null
+        subtotal: string | null
+        tax: string | null
+        discount: string | null
+        total: string | null
+    }): void {
+        // POS is authoritative — assign directly, never recompute
+        if (details.guest_count !== undefined && details.guest_count !== null) {
+            state.guestCount = details.guest_count
+        }
+        if (details.total !== undefined && details.total !== null) {
+            state.serverTotal = Number(details.total)
+        }
+    }
+
     function clearPackage () { state.package = null }
 
     // Computed helpers — TypeScript-safe accessors that unwrap ref types for component consumers
@@ -953,6 +974,8 @@ export const useOrderStore = defineStore("order", () => {
         setOrderCreated,
         initializeFromSession,
         updateOrderStatus,
+        setServerOrderId,
+        applyDetailsUpdate,
         clearPackage,
         getServerOrderId,
         handleOrderError,
