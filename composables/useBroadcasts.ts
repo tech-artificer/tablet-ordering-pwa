@@ -14,7 +14,7 @@ type EchoChannel = Channel & { name: string }
 
 // ─── WebSocket event interfaces ────────────────────────────────────────────
 // Shapes MUST stay in sync with woosoo-nexus broadcast events.
-// Reference: docs/websocket-events.md
+// Reference: contracts/websocket-events.contract.md
 // Note: backend does NOT send `eventId` — removed from all interfaces.
 
 /** Single service request embedded in order events */
@@ -70,7 +70,7 @@ interface OrderUpdatedEvent {
     device_id: number
     table_id: number
     branch_id: number
-    status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled" | "voided"
+    status: "pending" | "confirmed" | "in_progress" | "ready" | "completed" | "cancelled" | "voided"
     is_printed: boolean
     total: string
     created_at: string
@@ -114,6 +114,17 @@ interface OrderCancelledEvent {
     order_number: string
     device_id: number
     status: "cancelled" | "voided"
+  }
+}
+
+interface OrderDetailsUpdatedEvent {
+  order: {
+    order_id: number
+    guest_count: number | null
+    subtotal: string | null
+    tax: string | null
+    discount: string | null
+    total: string | null
   }
 }
 
@@ -247,7 +258,7 @@ export const useBroadcasts = () => {
     // Event Handlers
     const handleOrderCreated = (event: OrderCreatedEvent) => {
         touchLastEvent()
-        logger.debug("[📨 .order.created]", { order_id: event.order.id, order_number: event.order.order_number })
+        logger.debug("[📨 .order.created]", { order_id: event.order.order_id, order_number: event.order.order_number })
 
         ElNotification({
             title: "Order Confirmed",
@@ -258,7 +269,7 @@ export const useBroadcasts = () => {
 
         // Update session order ID
         if (sessionStore.getSessionId() === event.order.session_id) {
-            sessionStore.setOrderId(event.order.id)
+            sessionStore.setOrderId(event.order.order_id)
         }
     }
 
@@ -268,7 +279,7 @@ export const useBroadcasts = () => {
         logger.debug("[📨 .order.updated]", { order_id: order.order_id, status: order.status })
 
         const statusMessages: Record<string, { title: string; message: string; type: "success" | "warning" | "info" | "error" }> = {
-            preparing: {
+            in_progress: {
                 title: "Order in Progress",
                 message: "Your order is being prepared by our kitchen!",
                 type: "info"
@@ -349,6 +360,16 @@ export const useBroadcasts = () => {
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(event.order.status)
             triggerSessionEnd(event.order.status as "cancelled" | "voided", { source: "broadcast", orderNumber: event.order.order_number ?? null })
+        }
+    }
+
+    const handleOrderDetailsUpdated = (event: OrderDetailsUpdatedEvent) => {
+        touchLastEvent()
+        logger.debug("[📨 .order.details.updated]", { order_id: event.order.order_id })
+
+        const currentOrderId = getCurrentOrderId()
+        if (currentOrderId != null && String(currentOrderId) === String(event.order.order_id)) {
+            orderStore.applyDetailsUpdate(event.order)
         }
     }
 
@@ -522,6 +543,9 @@ export const useBroadcasts = () => {
             })
             .listen(".order.voided", (event: OrderCancelledEvent) => {
                 handleOrderCancelled(event)
+            })
+            .listen(".order.details.updated", (event: OrderDetailsUpdatedEvent) => {
+                handleOrderDetailsUpdated(event)
             })
 
         channelStatus.value.order = true
