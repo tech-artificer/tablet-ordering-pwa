@@ -267,9 +267,12 @@ export const useBroadcasts = () => {
             duration: 5000
         })
 
-        // Update session order ID
+        // Sync both stores to the POS-canonical order_id so getCurrentOrderId()
+        // (which reads orderStore.serverOrderId) and the channel watcher both
+        // use the same canonical identifier for all subsequent match guards.
         if (sessionStore.getSessionId() === event.order.session_id) {
             sessionStore.setOrderId(event.order.order_id)
+            orderStore.setServerOrderId(event.order.order_id)
         }
     }
 

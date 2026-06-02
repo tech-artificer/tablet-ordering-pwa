@@ -901,6 +901,10 @@ export const useOrderStore = defineStore("order", () => {
         state.serverStatus = status
     }
 
+    function setServerOrderId (id: number | null) {
+        state.serverOrderId = id
+    }
+
     function applyDetailsUpdate (details: {
         order_id: number
         guest_count: number | null
@@ -970,6 +974,7 @@ export const useOrderStore = defineStore("order", () => {
         setOrderCreated,
         initializeFromSession,
         updateOrderStatus,
+        setServerOrderId,
         applyDetailsUpdate,
         clearPackage,
         getServerOrderId,
