@@ -21,6 +21,17 @@ export type OrderRoundKind = "initial" | "refill"
 export type OrderMode = "initial" | "refill"
 export type OrderServerStatus = "building" | "in-progress" | "completed" | "cancelled" | "voided" | string
 
+/** Nexus non-terminal statuses — must match `DeviceOrder::scopeActiveOrder` and contracts/order-state.contract.md */
+export const ACTIVE_ORDER_RECOVERY_STATUSES = [
+    "pending",
+    "confirmed",
+    "in_progress",
+    "ready",
+    "served",
+] as const
+
+export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM = ACTIVE_ORDER_RECOVERY_STATUSES.join(",")
+
 export interface OrderRound {
     kind: OrderRoundKind
     number: number // 1 = initial, 2..n = refill #N-1
@@ -804,7 +815,7 @@ export const useOrderStore = defineStore("order", () => {
                 const api = useApi()
                 const activeResp = await api.get(API_ENDPOINTS.DEVICE_ORDERS, {
                     params: {
-                        status: "pending,confirmed,ready",
+                        status: ACTIVE_ORDER_RECOVERY_STATUS_PARAM,
                         per_page: 1,
                     },
                 })
