@@ -4,7 +4,7 @@ import { useSessionEndStore } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
 import { logger } from "~/utils/logger"
 
-const TERMINAL_STATUSES = new Set(["completed", "cancelled", "voided"])
+const TERMINAL_STATUSES = new Set(["completed", "cancelled", "voided", "archived"])
 
 export function shouldAttemptActiveOrderRecovery () {
     const orderStore = useOrderStore()

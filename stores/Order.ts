@@ -824,7 +824,7 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "voided", "cancelled"].includes(activeStatus)) {
+                if (activeOrderId && !["completed", "voided", "cancelled", "archived"].includes(activeStatus)) {
                     const sessionStartedAt = (sessionStore.sessionStartedAt as unknown as number | null)
                     const orderCreatedAt = activeOrder?.created_at
                         ? new Date(activeOrder.created_at).getTime()
