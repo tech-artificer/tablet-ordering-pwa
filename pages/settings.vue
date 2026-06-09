@@ -603,32 +603,23 @@ const testBackendOrder = async () => {
             status: error.response?.status,
             statusText: error.response?.statusText,
             data: error.response?.data,
-            headers: error.response?.headers,
-            fullError: error
         }
 
         testOrderResponse.value = errorDetails
 
-        // Build detailed error message
-        let errorMsg = `HTTP ${error.response?.status || "ERROR"}: ${error.message}\n\n`
+        // Build operator-safe error message (no raw stack traces or debug instructions)
+        const status = error.response?.status || "ERROR"
+        let errorMsg = `HTTP ${status}: ${error.message}\n\n`
 
         if (error.response?.status === 500) {
-            errorMsg += "🔴 SERVER ERROR (500)\n"
-            errorMsg += "The Laravel backend crashed when processing this request.\n\n"
-            errorMsg += "📋 Next Steps:\n"
-            errorMsg += "1. Check Laravel logs: storage/logs/laravel.log\n"
-            errorMsg += "2. Enable debug mode: Set APP_DEBUG=true in .env\n"
-            errorMsg += "3. Check database connection and migrations\n"
-            errorMsg += "4. Verify OrderService and DeviceOrderApiController\n\n"
-            errorMsg += `Response data: ${JSON.stringify(error.response?.data, null, 2)}\n`
+            errorMsg += "Server error (500). Check backend logs or contact your system administrator.\n"
         } else if (error.response?.status === 401) {
-            errorMsg += "🔐 AUTHENTICATION ERROR\n"
-            errorMsg += "Token is invalid or expired.\n"
+            errorMsg += "Authentication error — token is invalid or expired.\n"
         } else if (error.response?.status === 422) {
-            errorMsg += "📝 VALIDATION ERROR\n"
+            errorMsg += "Validation error:\n"
             errorMsg += JSON.stringify(error.response?.data?.errors, null, 2)
         } else {
-            errorMsg += JSON.stringify(errorDetails, null, 2)
+            errorMsg += `${error.response?.statusText ?? "Request failed"}. Check backend logs or contact your system administrator.\n`
         }
 
         testOrderError.value = errorMsg
@@ -1199,11 +1190,8 @@ onMounted(async () => {
                             💡 How to Debug 500 Errors
                         </h3>
                         <ul class="text-sm text-yellow-200 space-y-1 list-disc list-inside">
-                            <li>Check Laravel logs: <code class="text-xs bg-black/30 px-1 rounded">storage/logs/laravel.log</code></li>
-                            <li>Enable debug mode: <code class="text-xs bg-black/30 px-1 rounded">APP_DEBUG=true</code> in <code class="text-xs bg-black/30 px-1 rounded">.env</code></li>
-                            <li>Run Laravel: <code class="text-xs bg-black/30 px-1 rounded">php artisan serve</code></li>
-                            <li>Check database: <code class="text-xs bg-black/30 px-1 rounded">php artisan migrate:status</code></li>
-                            <li>Clear cache: <code class="text-xs bg-black/30 px-1 rounded">php artisan cache:clear</code></li>
+                            <li>Check backend logs or contact your system administrator.</li>
+                            <li>Verify the backend is running and the device token is valid.</li>
                         </ul>
                     </div>
                 </div>
