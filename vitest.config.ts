@@ -23,6 +23,7 @@ export default defineConfig({
             "tests/**/*.test.tsx",
             "tests/**/*.test.js",
             "tests/**/*.ui.spec.ts",
-        ]
+        ],
+        exclude: ["tests/playwright/**"]
     }
 })
