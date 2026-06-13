@@ -106,7 +106,10 @@ const displayTable = computed(() => {
 
 const displayDeviceId = computed(() => displayDevice.value?.id ?? "Not registered")
 const displayDeviceCode = computed(() => displayDevice.value?.security_code ?? displayDevice.value?.device_uuid ?? "N/A")
-const displayIpAddress = computed(() => displayDevice.value?.ip_address ?? localIpAddress.value ?? "—")
+const displayIpAddress = computed(() => {
+    if (isPrivateLanIp(localIpAddress.value)) { return localIpAddress.value }
+    return displayDevice.value?.ip_address ?? localIpAddress.value ?? "—"
+})
 const displayTableName = computed(() => displayTable.value?.name ?? deviceStore.tableName ?? "")
 const displayIsAdmin = computed(() => !!(displayDevice.value && displayDevice.value.is_admin))
 const buildTime = computed(() => String(config.public.buildTime || "unknown"))
@@ -162,16 +165,18 @@ watch(collapsed, (val) => {
 const isValidIpv4 = (v: unknown): v is string =>
     typeof v === "string" && /^(\d{1,3}\.){3}\d{1,3}$/.test(v)
 
+const isPrivateLanIp = (v: unknown): v is string =>
+    typeof v === "string" && (
+        v.startsWith("10.") ||
+        v.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(v) ||
+        v.startsWith("169.254.")
+    )
+
 // Get local IP address
 const getLocalIpAddress = async () => {
     try {
-        // 1. Use stored IP from authenticated device (most reliable).
-        if (isValidIpv4(displayDevice.value?.last_ip_address)) {
-            localIpAddress.value = displayDevice.value!.last_ip_address!
-            return
-        }
-
-        // 2. WebRTC ICE candidate detection (works without network round-trip).
+        // 1. WebRTC ICE candidate detection — returns real LAN IP on physical clients.
         try {
             const { getLocalIp } = await import("~/utils/getLocalIp")
             const ip = await getLocalIp()
@@ -181,6 +186,12 @@ const getLocalIpAddress = async () => {
             }
         } catch (e) {
             logger.warn("[Settings] WebRTC local IP detection failed:", e)
+        }
+
+        // 2. Use stored IP from authenticated device (may be WSL gateway in dev).
+        if (isValidIpv4(displayDevice.value?.last_ip_address)) {
+            localIpAddress.value = displayDevice.value!.last_ip_address!
+            return
         }
 
         // 3. Server-side detection fallback: ask the API what IP it sees for this request.
