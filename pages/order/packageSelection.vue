@@ -56,8 +56,8 @@ function handleCardFocus (pkg: Package) {
 }
 
 function openModifierInspector (pkg: Package) {
-    activeInspectorPackage.value = pkg
-    featuredModifierId.value = ((pkg.modifiers || []) as Modifier[])[0]?.id ?? null
+    featuredModifierId.value = null
+    featuredModifierId.value = null
 }
 
 function closeInspector () {
@@ -93,7 +93,7 @@ const proceedToMenuForPackage = async (packageData: Package): Promise<void> => {
 }
 
 const inspectorGroups = computed(() => {
-    return groupPackageModifiers(((activeInspectorPackage.value?.modifiers || []) as Modifier[]))
+    return groupPackageModifiers((((activeInspectorPackage.value as any)?.allowed_menus || []) as Modifier[]))
 })
 
 const inspectorModifiers = computed(() => inspectorGroups.value.flatMap(group => group.items))

@@ -1,18 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive } from "vue"
-import { Clock, ChevronRight, Star, UtensilsCrossed } from "lucide-vue-next"
-import type { Package, Modifier } from "../types"
-import { displayMeatGroupLabel, groupPackageModifierPreviews } from "../utils/packageModifierGroups"
-
-// Tracks preview-circle images that 404'd. When an image fails to load,
-// NuxtImg renders a broken-image placeholder + alt text — and even with
-// overflow-hidden on the parent circle, the alt text leaks visually
-// (the "PlaiKajuVanCitru" stack seen in production was four broken alts).
-// We swap to the UtensilsCrossed icon fallback instead.
-const brokenPreviewSrcs = reactive(new Set<string>())
-const markPreviewBroken = (src: string | null | undefined) => {
-    if (src) { brokenPreviewSrcs.add(src) }
-}
+import { computed } from "vue"
+import { Clock, ChevronRight, UtensilsCrossed } from "lucide-vue-next"
+import type { Package } from "../types"
+import { displayMeatGroupLabel, groupAllowedMenuPreviews } from "../utils/packageModifierGroups"
 
 const props = defineProps<{
   pkg: Package
@@ -53,23 +43,21 @@ const packageDuration = computed(() => {
     return normalized
 })
 
-const modifierGroups = computed(() => {
-    return groupPackageModifierPreviews((props.pkg?.modifiers || []) as Modifier[], 4)
-})
+const allowedMenuGroups = computed(() => groupAllowedMenuPreviews(props.pkg?.allowed_menus ?? [], 4))
 
-const totalModifierCount = computed(() => modifierGroups.value.reduce((total, group) => total + group.items.length, 0))
-const previewItems = computed(() => modifierGroups.value.flatMap(group => group.previewItems).slice(0, 4))
-const hiddenPreviewCount = computed(() => Math.max(totalModifierCount.value - previewItems.value.length, 0))
+const totalMeatCount = computed(() => allowedMenuGroups.value.reduce((total, group) => total + group.menus.length, 0))
+const previewMenus = computed(() => allowedMenuGroups.value.flatMap(group => group.previewMenus).slice(0, 4))
+const hiddenPreviewCount = computed(() => Math.max(totalMeatCount.value - previewMenus.value.length, 0))
 
 const packageSubtitle = computed(() => {
-    const groups = modifierGroups.value.map(group => displayMeatGroupLabel(group.label).toLowerCase())
+    const groups = allowedMenuGroups.value.map(group => displayMeatGroupLabel(group.label).toLowerCase())
     return groups.length ? `${groups.join(" + ")} lineup` : "Unlimited Korean BBQ spread"
 })
 
 const inclusionChecklist = computed(() => {
-    const groupItems = modifierGroups.value.map(group => `${group.items.length} unlimited ${displayMeatGroupLabel(group.label).toLowerCase()} cuts`)
+    const meatItems = allowedMenuGroups.value.map(group => `${group.menus.length} unlimited ${displayMeatGroupLabel(group.label).toLowerCase()} cuts`)
     return [
-        ...groupItems.slice(0, 3),
+        ...meatItems.slice(0, 3),
         "Standard banchan set",
     ].slice(0, 4)
 })
@@ -97,7 +85,7 @@ const inclusionChecklist = computed(() => {
                     {{ pkg.name }}
                 </h2>
                 <div
-                    v-if="pkg.is_popular"
+                    v-if="pkg.is_most_popular"
                     class="mt-1 flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-[#ffbd72] px-2.5 py-0.5 font-raleway text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#140c06] shadow-[0_4px_12px_rgba(255,189,114,0.25)]"
                 >
                     <Star :size="8" stroke-width="0" fill="currentColor" />
@@ -111,10 +99,10 @@ const inclusionChecklist = computed(() => {
 
             <div class="mt-4 flex items-end gap-3">
                 <div class="font-kanit text-[2rem] font-extrabold leading-none text-white">
-                    {{ formatCurrency(Number(pkg.price) * guestCount) }}
+                    {{ formatCurrency(Number(pkg.base_price) * guestCount) }}
                 </div>
                 <div class="min-w-0 overflow-hidden pb-1 font-kanit text-xs font-medium text-[#ffbd72]/60">
-                    <span class="block truncate">{{ formatCurrency(pkg.price) }}/guest<span v-if="packageDuration"> · {{ packageDuration }}</span></span>
+                    <span class="block truncate">{{ formatCurrency(pkg.base_price) }}/guest<span v-if="packageDuration"> · {{ packageDuration }}</span></span>
                 </div>
             </div>
         </header>
@@ -149,19 +137,18 @@ const inclusionChecklist = computed(() => {
             >
                 <span class="flex min-w-[5.6rem] items-center">
                     <span
-                        v-for="item in previewItems"
+                        v-for="item in previewMenus"
                         :key="item.id"
                         class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)] text-[0px] leading-none"
                     >
                         <NuxtImg
-                            v-if="item.img_url && !brokenPreviewSrcs.has(item.img_url)"
-                            :src="item.img_url"
-                            :alt="item.name || 'Meat cut'"
+                            v-if="(item as any).img_url"
+                            :src="(item as any).img_url"
+                            :alt="(item as any).name || 'Meat cut'"
                             class="h-full w-full object-cover"
                             loading="lazy"
                             sizes="36px"
                             format="webp"
-                            @error="markPreviewBroken(item.img_url)"
                         />
                         <UtensilsCrossed v-else :size="15" class="text-[#ffbd72]/65" :stroke-width="1.6" />
                     </span>

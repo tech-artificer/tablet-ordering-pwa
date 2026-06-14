@@ -148,7 +148,7 @@ describe("stores/order - submitOrder", () => {
     it("fails cleanly when order creation response body is empty", async () => {
         const order = useOrderStore()
 
-        order.setPackage({ id: 1, name: "Combo", price: 100, is_taxable: false } as Package)
+        order.setPackage({ id: 1, name: "Combo", price: 100, is_taxable: false } as unknown as Package)
         order.setGuestCount(2)
         ;(order as any).draft = [
             { id: 9, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats", isUnlimited: false },

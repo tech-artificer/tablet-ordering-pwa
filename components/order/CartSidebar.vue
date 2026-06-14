@@ -368,7 +368,7 @@ const submitOrder = () => {
                     </div>
 
                     <div v-if="taxAmount > 0" class="flex justify-between text-white/60">
-                        <span>Tax ({{ selectedPackage?.tax?.percentage }}%)</span>
+                        <span>Tax ({{ (selectedPackage as any)?.tax?.percentage }}%)</span>
                         <span>{{ formatCurrency(taxAmount) }}</span>
                     </div>
 

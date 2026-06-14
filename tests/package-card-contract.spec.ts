@@ -25,7 +25,7 @@ describe("package card interaction contract", () => {
     it("uses the shared receipt-code modifier grouping helper", () => {
         const component = readProjectFile("components/PackageCard.vue")
 
-        expect(component).toContain("groupPackageModifierPreviews")
+        expect(component).toContain("groupAllowedMenuPreviews")
         expect(component).toContain("displayMeatGroupLabel")
         expect(component).not.toContain("const PRIORITY_ORDER")
         expect(component).not.toContain("label = \"PORK\"")
