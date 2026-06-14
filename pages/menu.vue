@@ -153,7 +153,7 @@ const meats = computed(() => menuStore.meats)
 // Compute which meats are allowed based on selected package
 const allowedMeatIds = computed(() => {
     const pkg = menuStore.packages.find(p => p.id === Number(selectedPackageId.value))
-    return new Set((pkg?.modifiers ?? []).map(m => m.id))
+    return new Set(((pkg as any)?.allowed_menus ?? []).filter((m: any) => m.menu_type === "meat" && m.is_active).map((m: any) => m.krypton_menu_id))
 })
 
 // Decorate meats with disabled state

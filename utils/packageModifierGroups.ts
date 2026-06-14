@@ -1,4 +1,4 @@
-import type { Modifier } from "../types"
+import type { Modifier, PackageAllowedMenu } from "../types"
 
 export type MeatGroupLabel = "PORK" | "BEEF" | "CHICKEN"
 
@@ -86,4 +86,51 @@ export function groupPackageModifierPreviews (modifiers: Modifier[], previewLimi
 
 export function displayMeatGroupLabel (label: MeatGroupLabel) {
     return label.charAt(0) + label.slice(1).toLowerCase()
+}
+
+// --- PackageAllowedMenu grouping (v2 API shape) ---
+
+const CATEGORY_CODE_TO_LABEL: Record<string, MeatGroupLabel> = {
+    P: "PORK",
+    B: "BEEF",
+    C: "CHICKEN",
+}
+
+export type PackageAllowedMenuGroup = {
+    label: MeatGroupLabel
+    menus: PackageAllowedMenu[]
+}
+
+export type PackageAllowedMenuPreviewGroup = PackageAllowedMenuGroup & {
+    previewMenus: PackageAllowedMenu[]
+    hiddenCount: number
+}
+
+export function groupAllowedMenusByCategoryCode (menus: PackageAllowedMenu[]): PackageAllowedMenuGroup[] {
+    const meatMenus = menus.filter(m => m.menu_type === "meat" && m.is_active)
+    const buckets = new Map<MeatGroupLabel, PackageAllowedMenu[]>()
+
+    for (const menu of meatMenus) {
+        const label = CATEGORY_CODE_TO_LABEL[String(menu.meat_category_code ?? "").toUpperCase()] ?? null
+        if (!label) { continue }
+        const existing = buckets.get(label)
+        if (existing) {
+            existing.push(menu)
+        } else {
+            buckets.set(label, [menu])
+        }
+    }
+
+    return MEAT_GROUPS.flatMap((label) => {
+        const items = buckets.get(label)
+        return items?.length ? [{ label, menus: items }] : []
+    })
+}
+
+export function groupAllowedMenuPreviews (menus: PackageAllowedMenu[], previewLimit = 3): PackageAllowedMenuPreviewGroup[] {
+    return groupAllowedMenusByCategoryCode(menus).map(group => ({
+        ...group,
+        previewMenus: group.menus.slice(0, previewLimit),
+        hiddenCount: Math.max(group.menus.length - previewLimit, 0),
+    }))
 }

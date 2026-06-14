@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue"
 import { ArrowLeft, ChevronLeft, ChevronRight, Inbox, UtensilsCrossed, X } from "lucide-vue-next"
-import type { Modifier, Package } from "../../types"
+import type { Package, PackageAllowedMenu } from "../../types"
 import { useMenuStore } from "../../stores/Menu"
 import { useOrderStore } from "../../stores/Order"
 import PackageCard from "../../components/PackageCard.vue"
-import { displayMeatGroupLabel, groupPackageModifiers } from "../../utils/packageModifierGroups"
+import { displayMeatGroupLabel, groupAllowedMenusByCategoryCode } from "../../utils/packageModifierGroups"
 
 definePageMeta({
     layout: "kiosk"
@@ -45,7 +45,7 @@ function onResize () {
 // Card selection and modifier inspector
 const selectedPackage = ref<Package | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
-const featuredModifierId = ref<number | null>(null)
+const featuredMenuId = ref<number | null>(null)
 
 function handleCardSelect (pkg: Package) {
     selectedPackage.value = pkg
@@ -57,12 +57,13 @@ function handleCardFocus (pkg: Package) {
 
 function openModifierInspector (pkg: Package) {
     activeInspectorPackage.value = pkg
-    featuredModifierId.value = ((pkg.modifiers || []) as Modifier[])[0]?.id ?? null
+    const meatMenus = (pkg.allowed_menus ?? []).filter(m => m.menu_type === "meat" && m.is_active)
+    featuredMenuId.value = meatMenus[0]?.id ?? null
 }
 
 function closeInspector () {
     activeInspectorPackage.value = null
-    featuredModifierId.value = null
+    featuredMenuId.value = null
 }
 
 function handleKeydown (event: KeyboardEvent) {
@@ -93,47 +94,49 @@ const proceedToMenuForPackage = async (packageData: Package): Promise<void> => {
 }
 
 const inspectorGroups = computed(() => {
-    return groupPackageModifiers(((activeInspectorPackage.value?.modifiers || []) as Modifier[]))
+    return groupAllowedMenusByCategoryCode(activeInspectorPackage.value?.allowed_menus ?? [])
 })
 
-const inspectorModifiers = computed(() => inspectorGroups.value.flatMap(group => group.items))
+const inspectorMenus = computed<PackageAllowedMenu[]>(() => inspectorGroups.value.flatMap(group => group.menus))
 
-const featuredModifier = computed<Modifier | null>(() => {
-    if (!inspectorModifiers.value.length) { return null }
-    return inspectorModifiers.value.find(item => item.id === featuredModifierId.value) ?? inspectorModifiers.value[0]
+const featuredMenu = computed<PackageAllowedMenu | null>(() => {
+    if (!inspectorMenus.value.length) { return null }
+    return inspectorMenus.value.find(m => m.id === featuredMenuId.value) ?? inspectorMenus.value[0]
 })
 
 const featuredIndex = computed(() => {
-    if (!featuredModifier.value) { return 0 }
-    return inspectorModifiers.value.findIndex(item => item.id === featuredModifier.value?.id)
+    if (!featuredMenu.value) { return 0 }
+    return inspectorMenus.value.findIndex(m => m.id === featuredMenu.value?.id)
 })
 
 const inspectorSummary = computed(() => {
-    const total = inspectorModifiers.value.length
-    const parts = inspectorGroups.value.map(group => `${group.items.length} ${displayMeatGroupLabel(group.label).toLowerCase()}`)
-    return `${total} unlimited meats${parts.length ? ` · ${parts.join(" · ")}` : ""}`
+    const total = inspectorMenus.value.length
+    const parts = inspectorGroups.value.map(group => `${group.menus.length} ${displayMeatGroupLabel(group.label).toLowerCase()}`)
+    return `${total} meat option${total !== 1 ? "s" : ""}${parts.length ? ` · ${parts.join(" · ")}` : ""}`
 })
 
 const featuredGroupLabel = computed(() => {
-    const selected = featuredModifier.value
+    const selected = featuredMenu.value
     if (!selected) { return "" }
-    const group = inspectorGroups.value.find(item => item.items.some(modifier => modifier.id === selected.id))
+    const group = inspectorGroups.value.find(g => g.menus.some(m => m.id === selected.id))
     return group ? displayMeatGroupLabel(group.label) : ""
 })
 
 const featuredDescription = computed(() => {
-    return String((featuredModifier.value as any)?.description || "Classic cut, lightly seasoned and grilled at your table.")
+    return featuredMenu.value?.menu_name
+        ? `${featuredMenu.value.menu_name} — unlimited refills included for all guests.`
+        : "Unlimited refills included for all guests."
 })
 
-function selectFeaturedModifier (modifier: Modifier) {
-    featuredModifierId.value = modifier.id
+function selectFeaturedMenu (menu: PackageAllowedMenu) {
+    featuredMenuId.value = menu.id
 }
 
-function shiftFeaturedModifier (direction: -1 | 1) {
-    if (!inspectorModifiers.value.length) { return }
+function shiftFeaturedMenu (direction: -1 | 1) {
+    if (!inspectorMenus.value.length) { return }
     const current = featuredIndex.value >= 0 ? featuredIndex.value : 0
-    const next = (current + direction + inspectorModifiers.value.length) % inspectorModifiers.value.length
-    featuredModifierId.value = inspectorModifiers.value[next]?.id ?? null
+    const next = (current + direction + inspectorMenus.value.length) % inspectorMenus.value.length
+    featuredMenuId.value = inspectorMenus.value[next]?.id ?? null
 }
 
 async function chooseActiveInspectorPackage () {
@@ -473,21 +476,13 @@ function handleTouchEnd () {
                             <section class="featured-meat-pane min-h-0 overflow-y-auto px-7 py-4">
                                 <div class="relative h-[36vh] min-h-[13rem] overflow-hidden rounded-2xl bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
                                     <span
-                                        v-if="featuredModifier?.receipt_name"
+                                        v-if="featuredMenu?.meat_category_code"
                                         class="absolute left-4 top-4 z-10 rounded-md border border-[#9c6832] bg-black/75 px-3 py-1 font-kanit text-[11px] font-black text-[#ffbd72]"
                                     >
-                                        {{ featuredModifier.receipt_name }}
+                                        {{ featuredMenu.meat_category_code }}
                                     </span>
 
-                                    <NuxtImg
-                                        v-if="featuredModifier?.img_url"
-                                        :src="featuredModifier.img_url"
-                                        :alt="featuredModifier.name || 'Featured meat cut'"
-                                        class="h-full w-full object-contain"
-                                        sizes="560px"
-                                        format="webp"
-                                    />
-                                    <div v-else class="flex h-full w-full items-center justify-center text-[#ffbd72]/45">
+                                    <div class="flex h-full w-full items-center justify-center text-[#ffbd72]/45">
                                         <UtensilsCrossed :size="76" :stroke-width="1.35" />
                                     </div>
 
@@ -495,7 +490,7 @@ function handleTouchEnd () {
                                         type="button"
                                         aria-label="Previous meat"
                                         class="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/68 text-white transition hover:border-[#ffbd72]/50 hover:text-[#ffbd72]"
-                                        @click="shiftFeaturedModifier(-1)"
+                                        @click="shiftFeaturedMenu(-1)"
                                     >
                                         <ChevronLeft :size="20" />
                                     </button>
@@ -503,13 +498,13 @@ function handleTouchEnd () {
                                         type="button"
                                         aria-label="Next meat"
                                         class="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/68 text-white transition hover:border-[#ffbd72]/50 hover:text-[#ffbd72]"
-                                        @click="shiftFeaturedModifier(1)"
+                                        @click="shiftFeaturedMenu(1)"
                                     >
                                         <ChevronRight :size="20" />
                                     </button>
 
                                     <span class="absolute bottom-4 right-4 rounded-full bg-black/75 px-3 py-1 font-kanit text-xs font-black text-white">
-                                        {{ featuredIndex + 1 }} / {{ inspectorModifiers.length }}
+                                        {{ featuredIndex + 1 }} / {{ inspectorMenus.length }}
                                     </span>
                                 </div>
 
@@ -519,7 +514,7 @@ function handleTouchEnd () {
                                         {{ featuredGroupLabel }}
                                     </p>
                                     <h2 class="mt-1 font-raleway text-2xl font-extrabold leading-tight text-white">
-                                        {{ featuredModifier?.name || "No meat selected" }}
+                                        {{ featuredMenu?.menu_name || "No meat selected" }}
                                     </h2>
                                     <p class="font-kanit mt-1 text-xs leading-snug text-white/85">
                                         {{ featuredDescription }}
@@ -533,7 +528,7 @@ function handleTouchEnd () {
                                         </span>
                                     </div>
                                     <p class="mt-2 text-xs text-white/55 tracking-wide font-kanit">
-                                        ← → browse cuts &middot; all sides included &middot; unlimited refills
+                                        ← → browse menus &middot; all sides included &middot; unlimited refills
                                     </p>
                                 </div>
                             </section>
@@ -550,42 +545,33 @@ function handleTouchEnd () {
                                             {{ displayMeatGroupLabel(group.label) }}
                                         </h3>
                                         <span class="font-kanit text-[11px] font-black uppercase tracking-[0.14em] text-white/40">
-                                            {{ group.items.length }} cuts
+                                            {{ group.menus.length }} menu{{ group.menus.length !== 1 ? 's' : '' }}
                                         </span>
                                         <span class="h-px flex-1 bg-[#3a2819]" />
                                     </div>
 
                                     <div class="grid grid-cols-3 gap-3">
                                         <button
-                                            v-for="modifier in group.items"
-                                            :key="modifier.id"
+                                            v-for="menu in group.menus"
+                                            :key="menu.id"
                                             type="button"
                                             class="meat-browser-card min-h-[10.5rem] overflow-hidden rounded-xl border bg-[#120d0a] text-left transition hover:border-[#ffbd72]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffbd72]/70"
-                                            :class="featuredModifier?.id === modifier.id ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.35),0_10px_32px_rgba(0,0,0,0.45)]' : 'border-white/10'"
-                                            @click="selectFeaturedModifier(modifier)"
+                                            :class="featuredMenu?.id === menu.id ? 'border-[#ffbd72] shadow-[0_0_0_1px_rgba(255,189,114,0.35),0_10px_32px_rgba(0,0,0,0.45)]' : 'border-white/10'"
+                                            @click="selectFeaturedMenu(menu)"
                                         >
                                             <div class="relative h-28 bg-black">
                                                 <span
-                                                    v-if="modifier.receipt_name"
+                                                    v-if="menu.meat_category_code"
                                                     class="absolute left-2 top-2 z-10 rounded bg-black/72 px-2 py-0.5 font-kanit text-[10px] font-black text-[#ffbd72]"
                                                 >
-                                                    {{ modifier.receipt_name }}
+                                                    {{ menu.meat_category_code }}
                                                 </span>
-                                                <NuxtImg
-                                                    v-if="modifier.img_url"
-                                                    :src="modifier.img_url"
-                                                    :alt="modifier.name || 'Meat cut'"
-                                                    class="h-full w-full object-contain"
-                                                    loading="lazy"
-                                                    sizes="180px"
-                                                    format="webp"
-                                                />
-                                                <div v-else class="flex h-full w-full items-center justify-center text-[#ffbd72]/38">
+                                                <div class="flex h-full w-full items-center justify-center text-[#ffbd72]/38">
                                                     <UtensilsCrossed :size="34" :stroke-width="1.35" />
                                                 </div>
                                             </div>
                                             <p class="font-kanit line-clamp-2 px-3 py-3 text-xs font-bold leading-tight text-white">
-                                                {{ modifier.name }}
+                                                {{ menu.menu_name }}
                                             </p>
                                         </button>
                                     </div>
