@@ -81,7 +81,7 @@ const isMeatsCategory = (category: unknown): boolean => {
 }
 
 const packageTotal = computed<number>(() => {
-    const price = Number((orderStore.package as any)?.price ?? 0)
+    const price = Number((orderStore.package as any)?.base_price ?? 0)
     const guests = Number(unref(orderStore.guestCount) ?? 1)
     return Number.isFinite(price * guests) ? price * guests : 0
 })

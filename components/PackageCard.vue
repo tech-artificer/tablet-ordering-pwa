@@ -76,7 +76,6 @@ const inclusionChecklist = computed(() => {
     >
         <!-- Header -->
         <header class="min-w-0">
-            <!-- Title row: name + badge inline on same row -->
             <div class="flex min-w-0 items-start gap-2">
                 <h2
                     class="font-raleway text-2xl font-extrabold tracking-normal leading-tight flex-1 min-w-0 transition-colors duration-200"
@@ -84,17 +83,10 @@ const inclusionChecklist = computed(() => {
                 >
                     {{ pkg.name }}
                 </h2>
-                <div
-                    v-if="pkg.is_most_popular"
-                    class="mt-1 flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-[#ffbd72] px-2.5 py-0.5 font-raleway text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#140c06] shadow-[0_4px_12px_rgba(255,189,114,0.25)]"
-                >
-                    <Star :size="8" stroke-width="0" fill="currentColor" />
-                    Most Popular
-                </div>
             </div>
 
             <p class="mt-1 line-clamp-2 font-kanit text-sm font-normal text-white/50">
-                {{ (pkg as any).description || packageSubtitle }}
+                {{ pkg.description || packageSubtitle }}
             </p>
 
             <div class="mt-4 flex items-end gap-3">
@@ -137,19 +129,11 @@ const inclusionChecklist = computed(() => {
             >
                 <span class="flex min-w-[5.6rem] items-center">
                     <span
-                        v-for="item in previewMenus"
-                        :key="item.id"
-                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)] text-[0px] leading-none"
+                        v-for="menu in previewMenus"
+                        :key="menu.id"
+                        class="-ml-2 first:ml-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#ffbd72]/25 bg-[#100c09] shadow-[0_5px_15px_rgba(0,0,0,0.45)] leading-none"
                     >
-                        <NuxtImg
-                            v-if="(item as any).img_url"
-                            :src="(item as any).img_url"
-                            :alt="(item as any).name || 'Meat cut'"
-                            class="h-full w-full object-cover"
-                            loading="lazy"
-                            sizes="36px"
-                            format="webp"
-                        />
+                        <span v-if="menu.meat_category_code" class="font-kanit text-[10px] font-black text-[#ffbd72]">{{ menu.meat_category_code }}</span>
                         <UtensilsCrossed v-else :size="15" class="text-[#ffbd72]/65" :stroke-width="1.6" />
                     </span>
                     <span

@@ -22,7 +22,7 @@ describe("package card interaction contract", () => {
         expect(component).not.toContain("Choose package")
     })
 
-    it("uses the shared receipt-code modifier grouping helper", () => {
+    it("uses the shared allowed-menu grouping helpers", () => {
         const component = readProjectFile("components/PackageCard.vue")
 
         expect(component).toContain("groupAllowedMenuPreviews")
