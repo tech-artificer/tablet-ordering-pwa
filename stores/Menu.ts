@@ -30,9 +30,9 @@ const extractArrayPayload = <T = any>(responseData: any): T[] => {
 
 const normalizePackage = (pkg: Package): Package => ({
     ...pkg,
-    base_price: toNumber((pkg as any).base_price),
-    allowed_menus: Array.isArray((pkg as any).allowed_menus)
-        ? (pkg as any).allowed_menus.map((m: any) => ({
+    base_price: toNumber(pkg.base_price),
+    allowed_menus: Array.isArray(pkg.allowed_menus)
+        ? pkg.allowed_menus.map(m => ({
             ...m,
             extra_price: toNumber(m.extra_price),
         }))
@@ -320,12 +320,12 @@ export const useMenuStore = defineStore("menu", {
         },
 
         extractModifierGroups (pkg: Package) {
-            const menus: any[] = (pkg as any)?.allowed_menus ?? []
-            const meatMenus = menus.filter((m: any) => m.menu_type === "meat" && m.is_active)
+            const menus = pkg.allowed_menus ?? []
+            const meatMenus = menus.filter(m => m.menu_type === "meat" && m.is_active)
             const result: string[] = []
-            if (meatMenus.some((m: any) => m.meat_category_code === "P")) { result.push("PORK") }
-            if (meatMenus.some((m: any) => m.meat_category_code === "B")) { result.push("BEEF") }
-            if (meatMenus.some((m: any) => m.meat_category_code === "C")) { result.push("CHICKEN") }
+            if (meatMenus.some(m => m.meat_category_code === "P")) { result.push("PORK") }
+            if (meatMenus.some(m => m.meat_category_code === "B")) { result.push("BEEF") }
+            if (meatMenus.some(m => m.meat_category_code === "C")) { result.push("CHICKEN") }
             return result
         },
 
