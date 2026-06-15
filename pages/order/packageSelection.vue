@@ -595,11 +595,6 @@ function handleTouchEnd () {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
-.pkg-touch-region {
-    touch-action: manipulation;
-    overscroll-behavior: contain;
-}
-
 .pkg-row-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(246, 181, 109, 0.45) rgba(255, 255, 255, 0.06);
