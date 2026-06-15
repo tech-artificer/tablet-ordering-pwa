@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import { useApi } from "../composables/useApi"
 import { logger } from "../utils/logger"
-import type { Menu, MenuItem, Package, Modifier } from "../types"
+import type { Menu, MenuItem, Package } from "../types"
 
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
 
@@ -29,16 +29,14 @@ const extractArrayPayload = <T = any>(responseData: any): T[] => {
 }
 
 const normalizePackage = (pkg: Package): Package => ({
-    ...(pkg as Package),
-    price: toNumber((pkg as Package).price),
-    is_popular: Boolean((pkg as Package).is_popular) || (pkg as Package).name?.toLowerCase().includes("noble"),
-    accent: String((pkg as Package).accent || ""),
-    color: String((pkg as Package).color || ""),
-    tax_amount: toNumber((pkg as Package).tax_amount),
-    modifiers: Array.isArray((pkg as Package).modifiers)
-        ? (pkg as Package).modifiers.map((m: Modifier) => normalizePrice(m))
+    ...pkg,
+    base_price: toNumber(pkg.base_price),
+    allowed_menus: Array.isArray(pkg.allowed_menus)
+        ? pkg.allowed_menus.map(m => ({
+            ...m,
+            extra_price: toNumber(m.extra_price),
+        }))
         : [],
-    tax: (pkg as Package).tax ? { ...(pkg as Package).tax, percentage: toNumber((pkg as Package).tax.percentage) } : (pkg as Package).tax,
 })
 
 export const useMenuStore = defineStore("menu", {
@@ -322,34 +320,13 @@ export const useMenuStore = defineStore("menu", {
         },
 
         extractModifierGroups (pkg: Package) {
-            if (!pkg?.modifiers) { return [] }
-
-            // Collect unique group names
-            const groups = [...new Set(pkg.modifiers.map(m => m.group || "Other"))]
-
-            // If any group looks like a 'meat' umbrella, split by meat keywords
-            const hasMeatGroup = groups.some(g => /meat/i.test(String(g)))
-
-            if (!hasMeatGroup) { return groups }
-
-            // Split modifiers into PORK / BEEF / CHICKEN where possible, otherwise fall back
-            const mods = pkg.modifiers || []
-            const byKeyword = {
-                PORK: mods.filter((m: any) => /pork/i.test(m.name || "")),
-                BEEF: mods.filter((m: any) => /beef/i.test(m.name || "")),
-                CHICKEN: mods.filter((m: any) => /chicken/i.test(m.name || "")),
-            } as Record<string, any[]>
-
-            const other = mods.filter((m: any) => !/pork|beef|chicken/i.test(m.name || ""))
-
+            const menus = pkg.allowed_menus ?? []
+            const meatMenus = menus.filter(m => m.menu_type === "meat" && m.is_active)
             const result: string[] = []
-            if (byKeyword.PORK.length) { result.push("PORK") }
-            if (byKeyword.BEEF.length) { result.push("BEEF") }
-            if (byKeyword.CHICKEN.length) { result.push("CHICKEN") }
-            if (other.length) { result.push("Other") }
-
-            // If splitting failed (no keywords matched), return the original groups
-            return result.length ? result : groups
+            if (meatMenus.some(m => m.meat_category_code === "P")) { result.push("PORK") }
+            if (meatMenus.some(m => m.meat_category_code === "B")) { result.push("BEEF") }
+            if (meatMenus.some(m => m.meat_category_code === "C")) { result.push("CHICKEN") }
+            return result
         },
 
         clearError (this: any, key: string) {

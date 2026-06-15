@@ -254,7 +254,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     const getPackage = computed(() => state.package)
-    const getPackageModifiers = computed(() => state.package?.modifiers ?? [])
+    const getPackageModifiers = computed(() => (state.package as any)?.allowed_menus ?? [])
 
     const refillTotal = computed(() =>
         state.draft.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0)
@@ -262,7 +262,7 @@ export const useOrderStore = defineStore("order", () => {
 
     const activeCart = computed(() => state.draft)
 
-    const packageTotal = computed(() => toMoney(Number(state.package?.price || 0) * Number(state.guestCount || 1)))
+    const packageTotal = computed(() => toMoney(Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)))
 
     const addOnsTotal = computed(() =>
         toMoney(state.draft
@@ -271,10 +271,10 @@ export const useOrderStore = defineStore("order", () => {
     )
 
     const taxAmount = computed(() => {
-        if (!state.package?.is_taxable) { return 0 }
-        const packageTotalVal = Number(state.package?.price || 0) * Number(state.guestCount || 1)
+        if (!(state.package as any)?.is_taxable) { return 0 }
+        const packageTotalVal = Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)
         const addOns = addOnsTotal.value
-        const taxRate = Number(state.package?.tax?.percentage || 0)
+        const taxRate = Number((state.package as any)?.tax?.percentage || 0)
         return toMoney(((packageTotalVal + addOns) * taxRate) / 100)
     })
 
@@ -372,22 +372,20 @@ export const useOrderStore = defineStore("order", () => {
         logger.debug("Validating payload structure...")
 
         const pkg = state.package as any
-        const kryptonMenuId = Number(pkg?.krypton_menu_id ?? pkg?.package_id ?? pkg?.id)
+        const packageId = Number(pkg?.id)
 
         logger.debug("Package selection for order", {
-            local_package_id: pkg?.id,
-            krypton_menu_id: pkg?.krypton_menu_id,
-            package_id_fallback: pkg?.package_id,
-            submitted_package_id: kryptonMenuId,
+            package_id: pkg?.id,
+            submitted_package_id: packageId,
         })
 
-        if (!Number.isFinite(kryptonMenuId) || kryptonMenuId <= 0) {
-            throw new Error("Invalid package_id: package must be selected with valid krypton_menu_id")
+        if (!Number.isFinite(packageId) || packageId <= 0) {
+            throw new Error("Invalid package_id: package must be selected with a valid id")
         }
 
         const payload = {
             guest_count: Number(state.guestCount),
-            package_id: kryptonMenuId,
+            package_id: packageId,
             items: normalizePayloadItems(state.draft),
         }
 
