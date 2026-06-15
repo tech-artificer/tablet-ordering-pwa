@@ -652,8 +652,10 @@ onMounted(async () => {
         // isValidIpv4 first — localIpAddress is always a truthy string
         // ("Unable to detect" on failure), so it can't be used as a bare fallback.
         const detectedIp = isValidIpv4(localIpAddress.value) ? localIpAddress.value : null
-        const ip = detectedIp || deviceStore.device?.value?.last_ip_address || null
-        const lookedUp = await fetchDeviceByIp(isValidIpv4(ip) ? ip : null)
+        const fallbackIp = isValidIpv4(displayDevice.value?.last_ip_address)
+            ? displayDevice.value!.last_ip_address!
+            : null
+        const lookedUp = await fetchDeviceByIp(detectedIp || fallbackIp)
         if (!lookedUp) {
             tokenMessage.value = "Register this tablet with the setup code above."
         }

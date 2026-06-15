@@ -32,6 +32,11 @@ export const ACTIVE_ORDER_RECOVERY_STATUSES = [
 
 export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM = ACTIVE_ORDER_RECOVERY_STATUSES.join(",")
 
+/** Terminal order statuses — orders that must not be recovered or modified. Single
+ *  source of truth shared with `initializeFromSession`, `submitRefill`, and
+ *  `useActiveOrderRecovery`. Keep in sync with contracts/order-state.contract.md. */
+export const TERMINAL_ORDER_STATUSES = ["completed", "voided", "cancelled", "archived"] as const
+
 export interface OrderRound {
     kind: OrderRoundKind
     number: number // 1 = initial, 2..n = refill #N-1
@@ -665,7 +670,7 @@ export const useOrderStore = defineStore("order", () => {
             const api = useApi()
             // Cross-store: called inside action body only (lazy, Pinia-safe)
             const sessionStore = useSessionStore()
-            const terminalStatuses = new Set(["completed", "voided", "cancelled"])
+            const terminalStatuses = new Set<string>(TERMINAL_ORDER_STATUSES)
 
             const currentOrderId = state.serverOrderId ?? sessionStore.getOrderId()
 
@@ -824,7 +829,7 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "voided", "cancelled", "archived"].includes(activeStatus)) {
+                if (activeOrderId && !TERMINAL_ORDER_STATUSES.includes(activeStatus as typeof TERMINAL_ORDER_STATUSES[number])) {
                     const sessionStartedAt = (sessionStore.sessionStartedAt as unknown as number | null)
                     const orderCreatedAt = activeOrder?.created_at
                         ? new Date(activeOrder.created_at).getTime()
