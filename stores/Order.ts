@@ -21,6 +21,22 @@ export type OrderRoundKind = "initial" | "refill"
 export type OrderMode = "initial" | "refill"
 export type OrderServerStatus = "building" | "in-progress" | "completed" | "cancelled" | "voided" | string
 
+/** Nexus non-terminal statuses — must match `DeviceOrder::scopeActiveOrder` and contracts/order-state.contract.md */
+export const ACTIVE_ORDER_RECOVERY_STATUSES = [
+    "pending",
+    "confirmed",
+    "in_progress",
+    "ready",
+    "served",
+] as const
+
+export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM = ACTIVE_ORDER_RECOVERY_STATUSES.join(",")
+
+/** Terminal order statuses — orders that must not be recovered or modified. Single
+ *  source of truth shared with `initializeFromSession`, `submitRefill`, and
+ *  `useActiveOrderRecovery`. Keep in sync with contracts/order-state.contract.md. */
+export const TERMINAL_ORDER_STATUSES = ["completed", "voided", "cancelled", "archived"] as const
+
 export interface OrderRound {
     kind: OrderRoundKind
     number: number // 1 = initial, 2..n = refill #N-1
@@ -238,7 +254,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     const getPackage = computed(() => state.package)
-    const getPackageModifiers = computed(() => state.package?.modifiers ?? [])
+    const getPackageModifiers = computed(() => (state.package as any)?.allowed_menus ?? [])
 
     const refillTotal = computed(() =>
         state.draft.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0)
@@ -246,7 +262,7 @@ export const useOrderStore = defineStore("order", () => {
 
     const activeCart = computed(() => state.draft)
 
-    const packageTotal = computed(() => toMoney(Number(state.package?.price || 0) * Number(state.guestCount || 1)))
+    const packageTotal = computed(() => toMoney(Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)))
 
     const addOnsTotal = computed(() =>
         toMoney(state.draft
@@ -255,10 +271,10 @@ export const useOrderStore = defineStore("order", () => {
     )
 
     const taxAmount = computed(() => {
-        if (!state.package?.is_taxable) { return 0 }
-        const packageTotalVal = Number(state.package?.price || 0) * Number(state.guestCount || 1)
+        if (!(state.package as any)?.is_taxable) { return 0 }
+        const packageTotalVal = Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)
         const addOns = addOnsTotal.value
-        const taxRate = Number(state.package?.tax?.percentage || 0)
+        const taxRate = Number((state.package as any)?.tax?.percentage || 0)
         return toMoney(((packageTotalVal + addOns) * taxRate) / 100)
     })
 
@@ -356,22 +372,20 @@ export const useOrderStore = defineStore("order", () => {
         logger.debug("Validating payload structure...")
 
         const pkg = state.package as any
-        const kryptonMenuId = Number(pkg?.krypton_menu_id ?? pkg?.package_id ?? pkg?.id)
+        const packageId = Number(pkg?.id)
 
         logger.debug("Package selection for order", {
-            local_package_id: pkg?.id,
-            krypton_menu_id: pkg?.krypton_menu_id,
-            package_id_fallback: pkg?.package_id,
-            submitted_package_id: kryptonMenuId,
+            package_id: pkg?.id,
+            submitted_package_id: packageId,
         })
 
-        if (!Number.isFinite(kryptonMenuId) || kryptonMenuId <= 0) {
-            throw new Error("Invalid package_id: package must be selected with valid krypton_menu_id")
+        if (!Number.isFinite(packageId) || packageId <= 0) {
+            throw new Error("Invalid package_id: package must be selected with a valid id")
         }
 
         const payload = {
             guest_count: Number(state.guestCount),
-            package_id: kryptonMenuId,
+            package_id: packageId,
             items: normalizePayloadItems(state.draft),
         }
 
@@ -654,7 +668,7 @@ export const useOrderStore = defineStore("order", () => {
             const api = useApi()
             // Cross-store: called inside action body only (lazy, Pinia-safe)
             const sessionStore = useSessionStore()
-            const terminalStatuses = new Set(["completed", "voided", "cancelled"])
+            const terminalStatuses = new Set<string>(TERMINAL_ORDER_STATUSES)
 
             const currentOrderId = state.serverOrderId ?? sessionStore.getOrderId()
 
@@ -804,7 +818,7 @@ export const useOrderStore = defineStore("order", () => {
                 const api = useApi()
                 const activeResp = await api.get(API_ENDPOINTS.DEVICE_ORDERS, {
                     params: {
-                        status: "pending,confirmed,ready",
+                        status: ACTIVE_ORDER_RECOVERY_STATUS_PARAM,
                         per_page: 1,
                     },
                 })
@@ -813,7 +827,7 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "voided", "cancelled"].includes(activeStatus)) {
+                if (activeOrderId && !TERMINAL_ORDER_STATUSES.includes(activeStatus as typeof TERMINAL_ORDER_STATUSES[number])) {
                     const sessionStartedAt = (sessionStore.sessionStartedAt as unknown as number | null)
                     const orderCreatedAt = activeOrder?.created_at
                         ? new Date(activeOrder.created_at).getTime()

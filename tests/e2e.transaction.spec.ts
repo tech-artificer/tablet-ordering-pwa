@@ -65,7 +65,7 @@ function seedDevice () {
 }
 
 function seedOrderState (order: ReturnType<typeof useOrderStore>) {
-    order.setPackage({ ...PACKAGE } as Package)
+    order.setPackage({ ...PACKAGE } as unknown as Package)
     order.setGuestCount(2)
     ;(order as any).draft = [{ ...MEAT_ITEM }, { ...SIDE_ITEM }] as CartItem[]
 }
@@ -129,7 +129,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
         it("throws \"Invalid items\" when cart is empty and no package id", () => {
             const order = useOrderStore()
-            order.setPackage({ ...PACKAGE } as Package)
+            order.setPackage({ ...PACKAGE } as unknown as Package)
             order.setGuestCount(2)
             ;(order as any).draft = []
             expect(() => order.buildPayload()).toThrow("Invalid items")
@@ -137,7 +137,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
         it("clamps guestCount to minimum of 2 when set to 0", () => {
             const order = useOrderStore()
-            order.setPackage({ ...PACKAGE } as Package)
+            order.setPackage({ ...PACKAGE } as unknown as Package)
             order.setGuestCount(0)
             ;(order as any).draft = [{ ...MEAT_ITEM }] as CartItem[]
             const payload = order.buildPayload()
@@ -146,7 +146,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
 
         it("allows non-meat menu rows and leaves inclusion/pricing to server", () => {
             const order = useOrderStore()
-            order.setPackage({ ...PACKAGE } as Package)
+            order.setPackage({ ...PACKAGE } as unknown as Package)
             order.setGuestCount(2)
             ;(order as any).draft = [{ ...SIDE_ITEM }] as CartItem[]
             const payload = order.buildPayload()
@@ -424,7 +424,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
         it("throws if no package is selected", async () => {
             const order = useOrderStore()
             seedDevice()
-            order.setPackage({} as Package)
+            order.setPackage({} as unknown as Package)
             order.setGuestCount(2)
             ;(order as any).draft = [{ ...MEAT_ITEM }] as CartItem[]
 

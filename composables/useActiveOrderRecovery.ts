@@ -1,10 +1,10 @@
 import { unref } from "vue"
-import { useOrderStore } from "~/stores/Order"
+import { useOrderStore, TERMINAL_ORDER_STATUSES } from "~/stores/Order"
 import { useSessionEndStore } from "~/stores/SessionEnd"
 import { useSessionStore } from "~/stores/Session"
 import { logger } from "~/utils/logger"
 
-const TERMINAL_STATUSES = new Set(["completed", "cancelled", "voided"])
+const TERMINAL_STATUSES = new Set<string>(TERMINAL_ORDER_STATUSES)
 
 export function shouldAttemptActiveOrderRecovery () {
     const orderStore = useOrderStore()
