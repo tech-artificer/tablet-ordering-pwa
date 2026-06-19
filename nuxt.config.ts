@@ -60,10 +60,6 @@ export default defineNuxtConfig({
 
     ssr: false,
 
-    router: {
-        middleware: ["auth"]
-    },
-
     css: [
         "./assets/css/input.css",
         "./assets/css/main.css"
