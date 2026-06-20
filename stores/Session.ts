@@ -2,6 +2,7 @@ import { defineStore } from "pinia"
 import { reactive, toRefs, unref } from "vue"
 import { useApi } from "../composables/useApi"
 import { logger } from "../utils/logger"
+import { API_ENDPOINTS } from "../config/api"
 import { useOrderStore } from "./Order"
 import { useDeviceStore } from "./Device"
 import { useMenuStore } from "./Menu"
@@ -174,7 +175,7 @@ export const useSessionStore = defineStore("session", () => {
             // Its start time is irrelevant; we do not compute any timer from it.
             // Tablet order session lifecycle (start/end) is driven entirely by
             // order status broadcasts (OrderCompleted / OrderVoided / OrderCancelled).
-            const response = await api.get("/api/session/latest")
+            const response = await api.get(API_ENDPOINTS.SESSION_LATEST)
             const responseData = response?.data ?? null
             if (!responseData?.data) {
                 logger.warn("[Session] syncFromServer: no open POS session returned")
@@ -188,7 +189,7 @@ export const useSessionStore = defineStore("session", () => {
         const api = useApi()
         const deviceStore = useDeviceStore()
         try {
-            const response = await api.get("/api/session/latest")
+            const response = await api.get(API_ENDPOINTS.SESSION_LATEST)
             const responseData = response?.data ?? null
             const sessionPayload = responseData?.data ?? responseData
 
