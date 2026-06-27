@@ -60,13 +60,17 @@ describe("store contract regressions", () => {
         })
     })
 
-    it("fetches desserts with the canonical plural category slug", async () => {
-        mockGet.mockResolvedValueOnce({ data: { data: [] } })
+    it("loads category menus via dynamic slug fetch", async () => {
+        mockGet
+            .mockResolvedValueOnce({ data: { data: [{ id: 1, slug: "sides", name: "Sides", menu_count: 1 }] } })
+            .mockResolvedValueOnce({ data: { data: [{ id: 10, name: "Kimchi", price: 0 }] } })
+
         const menuStore = useMenuStore()
+        await menuStore.fetchCategories()
+        await menuStore.fetchCategoryMenus("sides")
 
-        await menuStore.fetchDesserts()
-
-        expect(mockGet).toHaveBeenCalledWith("/api/v2/tablet/categories/desserts/menus", { signal: undefined })
-        expect(mockGet).not.toHaveBeenCalledWith("/api/v2/tablet/categories/dessert/menus", expect.anything())
+        expect(mockGet).toHaveBeenCalledWith("/api/v2/tablet/categories", { signal: undefined })
+        expect(mockGet).toHaveBeenCalledWith("/api/v2/tablet/categories/sides/menus", { signal: undefined })
+        expect(menuStore.categoryMenus.sides).toHaveLength(1)
     })
 })

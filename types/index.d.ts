@@ -263,6 +263,15 @@ export interface Package extends MenuItem {
   accent: string;
   color: string;
   is_popular: boolean;
+  base_price?: number;
+  allowed_menus?: Array<{
+    id: number;
+    krypton_menu_id: number;
+    menu_type: string;
+    meat_category_code?: string | null;
+    extra_price: number;
+    is_active: boolean;
+  }>;
   // modifiers: Modifier[];
   // modifier_groups?: ModifierGroup[];
 }
@@ -317,6 +326,15 @@ export interface Device {
 export interface Branch {
   id: number;
   name: string;
+}
+
+export interface CategoryTab {
+  id: number;
+  name: string;
+  slug: string;
+  icon?: string | null;
+  color?: string | null;
+  menu_count?: number;
 }
 
 export interface MenuItem {
