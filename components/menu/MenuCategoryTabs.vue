@@ -1,30 +1,30 @@
 <script setup lang="ts">
-type MenuCategory = "meats" | "sides" | "alacartes" | "desserts" | "drinks";
+import type { Component } from "vue"
 
 interface Category {
-  id: MenuCategory;
+  id: string;
   label: string;
 }
 
 const props = defineProps<{
   categories: readonly Category[];
-  activeCategory: MenuCategory;
+  activeCategory: string;
   sticky?: boolean;
   isRefillMode?: boolean;
-  refillAllowedCategories?: readonly MenuCategory[];
+  refillAllowedCategories?: readonly string[];
 }>()
 
 const emit = defineEmits<{
-  "select": [category: MenuCategory];
+  "select": [category: string];
 }>()
 
-const getRefillAllowed = () => props.refillAllowedCategories ?? (["meats", "sides"] as MenuCategory[])
+const getRefillAllowed = () => props.refillAllowedCategories ?? (["meats", "sides"] as string[])
 
-const isCategoryLocked = (category: MenuCategory) => {
+const isCategoryLocked = (category: string) => {
     return Boolean(props.isRefillMode && !getRefillAllowed().includes(category))
 }
 
-const selectCategory = (category: MenuCategory) => {
+const selectCategory = (category: string) => {
     if (isCategoryLocked(category)) { return }
     emit("select", category)
 }

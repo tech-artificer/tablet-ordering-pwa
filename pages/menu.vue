@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef, unref, watch } from "vue"
-import { ShoppingCart } from "lucide-vue-next"
+import { computed, onMounted, ref, toRef, unref, watch, type Component } from "vue"
+import { Beef, UtensilsCrossed, CakeSlice, Wine, ShoppingCart } from "lucide-vue-next"
 import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
 import { useGuestReset } from "../composables/useGuestReset"
@@ -110,17 +110,34 @@ watch(
     }
 )
 
-// Menu categories
-type MenuCategory = "meats" | "sides" | "desserts" | "drinks";
+// Menu categories — meats is always first; others from admin tablet categories API
+const REFILL_CATEGORY_SLUGS = ["meats", "sides"] as const
+const CUSTOMER_EMPTY_MESSAGE = "Nothing available in this section right now."
 
-const activeCategory = ref<MenuCategory>("meats")
+const activeCategory = ref<string>("meats")
 
-const categories = [
-    { id: "meats", label: "Meats" },
-    { id: "sides", label: "Sides" },
-    { id: "desserts", label: "Desserts" },
-    { id: "drinks", label: "Drinks" }
-] as const
+const categoryIconBySlug: Record<string, Component> = {
+    meats: Beef,
+    sides: UtensilsCrossed,
+    desserts: CakeSlice,
+    dessert: CakeSlice,
+    drinks: Wine,
+    beverage: Wine,
+}
+
+const defaultCategoryIcon = UtensilsCrossed
+
+const categories = computed(() => {
+    const meatTab = { id: "meats", label: "Meats", icon: Beef }
+    const dynamicTabs = menuStore.categories
+        .filter(cat => typeof cat.menu_count !== "number" || cat.menu_count > 0)
+        .map(cat => ({
+            id: cat.slug,
+            label: cat.name,
+            icon: categoryIconBySlug[cat.slug] ?? defaultCategoryIcon,
+        }))
+    return [meatTab, ...dynamicTabs]
+})
 
 // Check if refills are available (order placed AND we have a valid order ID)
 const canRequestRefill = computed(() => {
@@ -164,33 +181,23 @@ const decorateMeats = computed(() =>
 // Get items based on active category for MenuItemGrid
 const displayItems = computed(() => {
     const baseItems = (() => {
-        switch (activeCategory.value) {
-        case "meats":
+        if (activeCategory.value === "meats") {
             return decorateMeats.value
-        case "sides":
-            return menuStore.sides
-        case "desserts":
-            return menuStore.desserts
-        case "drinks":
-            return menuStore.drinks
-        default:
-            return []
         }
+        return menuStore.categoryMenus[activeCategory.value] ?? []
     })()
 
-    // In refill mode, only show unlimited items (meats and sides)
     if (orderStore.isRefillMode) {
-    // Filter out AllowedMenu types, only allow MenuItem or Modifier
         return baseItems.filter((item: any) => {
-            return (activeCategory.value === "meats" || activeCategory.value === "sides") && (item?.group || item?.category || item?.name || item?.img_url)
+            return REFILL_CATEGORY_SLUGS.includes(activeCategory.value as typeof REFILL_CATEGORY_SLUGS[number]) &&
+                (item?.group || item?.category || item?.name || item?.img_url)
         })
     }
 
-    // Filter out AllowedMenu types for menu-item-grid
     return baseItems.filter((item: any) => item?.group || item?.category || item?.name || item?.img_url)
 })
 
-const isUnlimitedCategory = computed(() => activeCategory.value === "meats" || activeCategory.value === "sides")
+const isUnlimitedCategory = computed(() => REFILL_CATEGORY_SLUGS.includes(activeCategory.value as typeof REFILL_CATEGORY_SLUGS[number]))
 
 // Totals are derived from the order store
 const packageTotal = computed(() => orderStore.packageTotal)
@@ -198,39 +205,30 @@ const addOnsTotal = computed(() => orderStore.addOnsTotal)
 const taxAmount = computed(() => orderStore.taxAmount)
 const grandTotal = computed(() => orderStore.grandTotal)
 
-const setCategory = (category: MenuCategory) => {
+const setCategory = (category: string) => {
     activeCategory.value = category
-    // All menu data is preloaded at welcome screen via AppBootstrap.preloadForOrdering()
-    // No on-demand fetching needed - category data is already in Pinia state
 }
 
-// Retry loading the current category (used by the error state UI)
 const reloadCategory = async () => {
     const category = activeCategory.value
     try {
-        switch (category) {
-        case "meats":
+        if (category === "meats") {
             meatError.value = null
-            break
-        case "desserts":
-            await menuStore.fetchDesserts()
-            break
-        case "sides":
-            await menuStore.fetchSides()
-            break
-        case "drinks":
-            await menuStore.fetchDrinks()
-            break
+            await menuStore.fetchMeats()
+        } else {
+            await menuStore.fetchCategoryMenus(category)
         }
-    } catch (e) {
-        if (category === "meats") { meatError.value = (e as Error).message || "Failed to load meats" }
-        logger.warn("[Menu] reloadCategory failed for", category, e)
+    } catch {
+        if (category === "meats") {
+            meatError.value = CUSTOMER_EMPTY_MESSAGE
+        }
+        logger.warn("[Menu] reloadCategory failed for", category)
     }
 }
 
 // Add item to order
 const addToOrder = (item: any) => {
-    const isUnlimited = activeCategory.value === "meats" || activeCategory.value === "sides"
+    const isUnlimited = REFILL_CATEGORY_SLUGS.includes(activeCategory.value as typeof REFILL_CATEGORY_SLUGS[number])
     const category = activeCategory.value
     orderStore.addToCart(item, { isUnlimited, category })
 }
@@ -364,37 +362,26 @@ const toggleRefillMode = () => {
 
 // Check if category is loading
 const isLoading = computed((): boolean => {
-    switch (activeCategory.value) {
-    case "meats":
+    if (activeCategory.value === "meats") {
         return Boolean(menuStore.isLoadingMeats)
-    case "sides":
-        return Boolean(menuStore.isLoadingSides)
-    case "desserts":
-        return Boolean(menuStore.isLoadingDesserts)
-    case "drinks":
-        return Boolean(menuStore.isLoadingDrinks)
-    default:
-        return Boolean(menuStore.isLoadingPackages)
     }
+    return Boolean(menuStore.categoryLoading[activeCategory.value])
 })
 
-// Per-category error tracking — meats uses local ref, others use store
 const meatError = ref<string | null>(null)
 
-// Check for errors
 const categoryError = computed(() => {
-    switch (activeCategory.value) {
-    case "meats":
-        return meatError.value
-    case "sides":
-        return menuStore.errors.sides
-    case "desserts":
-        return menuStore.errors.desserts
-    case "drinks":
-        return menuStore.errors.drinks
-    default:
-        return null
+    if (activeCategory.value === "meats") {
+        return meatError.value ?? menuStore.errors.meats
     }
+    return menuStore.categoryErrors[activeCategory.value] ?? null
+})
+
+const showEmptyCategory = computed(() => {
+    return !isLoading.value &&
+        !categoryError.value &&
+        activeCategory.value !== "meats" &&
+        displayItems.value.length === 0
 })
 
 </script>
@@ -426,6 +413,7 @@ const categoryError = computed(() => {
                             :active-category="activeCategory"
                             :sticky="true"
                             :is-refill-mode="orderStore.isRefillMode"
+                            :refill-allowed-categories="REFILL_CATEGORY_SLUGS"
                             @select="setCategory"
                         />
                     </div>
@@ -440,10 +428,10 @@ const categoryError = computed(() => {
                         </div>
 
                         <!-- Error State -->
-                        <div v-if="categoryError" class="flex justify-center">
-                            <div class="max-w-md rounded-2xl bg-red-500/15 border border-red-500/30 p-6">
+                        <div v-else-if="categoryError" class="flex justify-center">
+                            <div class="max-w-md rounded-2xl bg-red-500/15 border border-red-500/30 p-6 text-center">
                                 <p class="font-semibold text-red-300 mb-2">
-                                    Error Loading {{ activeCategory }}
+                                    Unable to load this section
                                 </p>
                                 <p class="text-sm text-red-200/80 mb-4">
                                     {{ categoryError }}
@@ -454,6 +442,15 @@ const categoryError = computed(() => {
                                 >
                                     Try Again
                                 </el-button>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div v-else-if="showEmptyCategory" class="flex justify-center">
+                            <div class="max-w-md rounded-2xl bg-white/5 border border-white/10 p-6 text-center">
+                                <p class="text-white/80">
+                                    {{ CUSTOMER_EMPTY_MESSAGE }}
+                                </p>
                             </div>
                         </div>
 

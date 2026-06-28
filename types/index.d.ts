@@ -343,6 +343,15 @@ export interface Branch {
   name: string;
 }
 
+export interface CategoryTab {
+  id: number;
+  name: string;
+  slug: string;
+  icon?: string | null;
+  color?: string | null;
+  menu_count?: number;
+}
+
 export interface MenuItem {
   id: number;
   group: string | null;

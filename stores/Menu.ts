@@ -1,9 +1,11 @@
 import { defineStore } from "pinia"
 import { useApi } from "../composables/useApi"
 import { logger } from "../utils/logger"
-import type { Menu, MenuItem, Package } from "../types"
+import type { CategoryTab, Menu, MenuItem, Package } from "../types"
 
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
+
+const CUSTOMER_SECTION_ERROR = "Nothing available in this section right now."
 
 const toNumber = (value: unknown): number => {
     const n = Number(value)
@@ -43,40 +45,46 @@ export const useMenuStore = defineStore("menu", {
     state: () => ({
         menus: [] as Menu[],
         meats: [] as MenuItem[],
-        desserts: [] as MenuItem[],
-        sides: [] as MenuItem[],
-        drinks: [] as MenuItem[],
+        categories: [] as CategoryTab[],
+        categoryMenus: {} as Record<string, MenuItem[]>,
         packages: [] as Package[],
         loading: {
             meats: false,
             packages: false,
-            desserts: false,
-            sides: false,
-            drinks: false,
+            categories: false,
         },
+        categoryLoading: {} as Record<string, boolean>,
         errors: {
             meats: null as string | null,
             packages: null as string | null,
-            desserts: null as string | null,
-            sides: null as string | null,
-            drinks: null as string | null,
+            categories: null as string | null,
         },
+        categoryErrors: {} as Record<string, string | null>,
         lastFetched: null as number | null,
     }),
 
     getters: {
-        activeMenu: (state: any) => state.menus.find(m => m.is_active),
-        isLoading: (state: any) => Object.values(state.loading).some(Boolean),
+        activeMenu: (state: any) => state.menus.find((m: Menu) => m.is_active),
+        isLoading: (state: any) => Object.values(state.loading).some(Boolean) ||
+            Object.values(state.categoryLoading).some(Boolean),
         isLoadingMeats: (state: any) => state.loading.meats,
         isLoadingPackages: (state: any) => state.loading.packages,
-        isLoadingDesserts: (state: any) => state.loading.desserts,
-        isLoadingSides: (state: any) => state.loading.sides,
-        isLoadingDrinks: (state: any) => state.loading.drinks,
-        hasErrors: (state: any) => Object.values(state.errors).some(error => error !== null),
+        isLoadingCategories: (state: any) => state.loading.categories,
+        hasErrors: (state: any) => Object.values(state.errors).some((error: unknown) => error !== null) ||
+            Object.values(state.categoryErrors).some((error: unknown) => error !== null),
+        visibleCategories: (state: any): CategoryTab[] => state.categories.filter((cat: CategoryTab) => {
+            if (typeof cat.menu_count === "number") {
+                return cat.menu_count > 0
+            }
+            return true
+        }),
         isCacheStale: (state: any) => {
             if (!state.lastFetched) { return true }
             return Date.now() - state.lastFetched > CACHE_DURATION
         },
+        isCategoryLoading: (state: any) => (slug: string) => Boolean(state.categoryLoading[slug]),
+        getCategoryError: (state: any) => (slug: string) => state.categoryErrors[slug] ?? null,
+        getCategoryMenus: (state: any) => (slug: string): MenuItem[] => state.categoryMenus[slug] ?? [],
     },
 
     actions: {
@@ -105,97 +113,53 @@ export const useMenuStore = defineStore("menu", {
             }
         },
 
-        /**
-         * Generic fetch function for all menu item types
-         * Eliminates code duplication across 6 fetch methods
-         */
-        async _fetchMenuItem (
-            this: any,
-            key: "packages" | "modifiers" | "meats" | "desserts" | "sides" | "alacartes" | "drinks",
-            endpoint: string,
-            params: Record<string, string> = {},
-            normalizer: (item: any) => any = normalizePrice
-        ) {
-            this.loading[key] = true
-            this.errors[key] = null
+        async fetchCategories (this: any, signal?: AbortSignal) {
+            this.loading.categories = true
+            this.errors.categories = null
             const api = useApi()
 
             try {
-                const response = await api.get(endpoint, { params })
-                const items = extractArrayPayload<any>(response?.data).map(normalizer)
-                this[key] = items
-                logger.debug(`✅ ${key.charAt(0).toUpperCase() + key.slice(1)} loaded:`, items.length)
-                return { success: true }
-            } catch (error) {
-                const errorMessage = (error as Error).message || `Failed to fetch ${key}`
-                this.errors[key] = errorMessage
-                logger.error(`❌ ${key.charAt(0).toUpperCase() + key.slice(1)} error:`, error)
-                throw new Error(errorMessage)
-            } finally {
-                this.loading[key] = false
-            }
-        },
-
-        async fetchDesserts (this: any, signal?: AbortSignal) {
-            this.loading.desserts = true
-            this.errors.desserts = null
-            const api = useApi()
-            try {
-                const response = await api.get("/api/v2/tablet/categories/desserts/menus", { signal })
-                const payload = extractPayload<any>(response?.data)
-
-                if (!Array.isArray(payload)) {
-                    logger.warn("⚠️ Desserts API returned non-array data:", payload)
-                    this.desserts = []
-                    return { success: true }
-                }
-
-                const filteredArr = payload.filter((item: any) => {
-                    if (item && typeof item === "object" && typeof (item as any).then === "function") {
-                        logger.warn("⚠️ Skipping promise-like object in desserts:", item)
-                        return false
-                    }
-                    return true
-                })
-
-                this.desserts = filteredArr.map(normalizePrice)
-                logger.debug("✅ Desserts loaded:", this.desserts.length)
+                const response = await api.get("/api/v2/tablet/categories", { signal })
+                this.categories = extractArrayPayload<CategoryTab>(response?.data)
+                logger.debug("✅ Categories loaded:", this.categories.length)
                 return { success: true }
             } catch (error) {
                 if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
-                    logger.debug("⏹ Desserts fetch aborted")
+                    logger.debug("⏹ Categories fetch aborted")
                     return { success: false, aborted: true }
                 }
-                const errorMessage = (error as Error).message || "Failed to fetch desserts"
-                this.errors.desserts = errorMessage
-                logger.error("❌ Desserts error:", error)
-                this.desserts = []
-                throw new Error(errorMessage)
+                logger.error("❌ Categories error:", error)
+                this.errors.categories = CUSTOMER_SECTION_ERROR
+                this.categories = []
+                throw new Error(CUSTOMER_SECTION_ERROR)
             } finally {
-                this.loading.desserts = false
+                this.loading.categories = false
             }
         },
 
-        async fetchSides (this: any, signal?: AbortSignal) {
-            this.loading.sides = true
-            this.errors.sides = null
+        async fetchCategoryMenus (this: any, slug: string, signal?: AbortSignal) {
+            const normalizedSlug = slug.trim().toLowerCase()
+            this.categoryLoading[normalizedSlug] = true
+            this.categoryErrors[normalizedSlug] = null
             const api = useApi()
+
             try {
-                const response = await api.get("/api/v2/tablet/categories/sides/menus", { signal })
-                this.sides = extractArrayPayload<MenuItem>(response?.data).map(normalizePrice)
-                logger.debug("✅ Sides loaded:", this.sides.length)
+                const response = await api.get(`/api/v2/tablet/categories/${normalizedSlug}/menus`, { signal })
+                const items = extractArrayPayload<MenuItem>(response?.data).map(normalizePrice)
+                this.categoryMenus[normalizedSlug] = items
+                logger.debug(`✅ Category '${normalizedSlug}' loaded:`, items.length)
                 return { success: true }
             } catch (error) {
                 if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
-                    logger.debug("⏹ Sides fetch aborted")
+                    logger.debug(`⏹ Category '${normalizedSlug}' fetch aborted`)
                     return { success: false, aborted: true }
                 }
-                const errorMessage = (error as Error).message || "Failed to fetch sides"
-                this.errors.sides = errorMessage
-                logger.error("❌ Sides error:", error)
-                throw new Error(errorMessage)
+                logger.error(`❌ Category '${normalizedSlug}' error:`, error)
+                this.categoryMenus[normalizedSlug] = []
+                this.categoryErrors[normalizedSlug] = CUSTOMER_SECTION_ERROR
+                throw new Error(CUSTOMER_SECTION_ERROR)
             } finally {
-                this.loading.sides = false
+                this.categoryLoading[normalizedSlug] = false
             }
         },
 
@@ -213,53 +177,21 @@ export const useMenuStore = defineStore("menu", {
                     logger.debug("⏹ Meats fetch aborted")
                     return { success: false, aborted: true }
                 }
-                const errorMessage = (error as Error).message || "Failed to fetch meats"
-                this.errors.meats = errorMessage
                 logger.error("❌ Meats error:", error)
-                throw new Error(errorMessage)
+                this.errors.meats = CUSTOMER_SECTION_ERROR
+                throw new Error(CUSTOMER_SECTION_ERROR)
             } finally {
                 this.loading.meats = false
             }
         },
 
-        async fetchDrinks (this: any, signal?: AbortSignal) {
-            this.loading.drinks = true
-            this.errors.drinks = null
-            const api = useApi()
-            try {
-                const response = await api.get("/api/v2/tablet/categories/drinks/menus", { signal })
-                const payload = extractPayload<any>(response?.data)
-
-                if (!Array.isArray(payload)) {
-                    logger.warn("⚠️ Drinks API returned non-array data:", payload)
-                    this.drinks = []
-                    return { success: true }
+        categoriesToPrefetch (this: any): CategoryTab[] {
+            return this.categories.filter((cat: CategoryTab) => {
+                if (typeof cat.menu_count === "number") {
+                    return cat.menu_count > 0
                 }
-
-                const filteredArr = payload.filter((item: any) => {
-                    if (item && typeof item === "object" && typeof (item as any).then === "function") {
-                        logger.warn("⚠️ Skipping promise-like object in drinks:", item)
-                        return false
-                    }
-                    return true
-                })
-
-                this.drinks = filteredArr.map(normalizePrice)
-                logger.debug("✅ Drinks loaded:", this.drinks.length)
-                return { success: true }
-            } catch (error) {
-                if ((error as Error).name === "AbortError" || (error as Error).name === "CanceledError") {
-                    logger.debug("⏹ Drinks fetch aborted")
-                    return { success: false, aborted: true }
-                }
-                const errorMessage = (error as Error).message || "Failed to fetch drinks"
-                this.errors.drinks = errorMessage
-                logger.error("❌ Drinks error:", error)
-                this.drinks = []
-                throw new Error(errorMessage)
-            } finally {
-                this.loading.drinks = false
-            }
+                return true
+            })
         },
 
         async loadAllMenus (this: any, forceRefresh = false) {
@@ -268,7 +200,6 @@ export const useMenuStore = defineStore("menu", {
                 return { success: true, fromCache: true }
             }
 
-            // Cancel any in-flight loadAllMenus call before starting a new one
             if (menuFetchController) {
                 menuFetchController.abort()
             }
@@ -277,24 +208,31 @@ export const useMenuStore = defineStore("menu", {
 
             logger.debug("🔄 Fetching fresh menu data...")
 
-            // Load all menu data in parallel
-            const fetches = [
+            const baseFetches = [
                 this.fetchPackages(signal),
                 this.fetchMeats(signal),
-                this.fetchDesserts(signal),
-                this.fetchSides(signal),
-                this.fetchDrinks(signal),
+                this.fetchCategories(signal),
             ]
 
-            const results = await Promise.allSettled(fetches)
+            const baseResults = await Promise.allSettled(baseFetches)
 
-            // Ignore results from an aborted request set
+            if (signal.aborted) {
+                return { success: false, fromCache: false, errors: [], aborted: true }
+            }
+
+            const menuFetches = this.categoriesToPrefetch().map((cat: CategoryTab) =>
+                this.fetchCategoryMenus(cat.slug, signal)
+            )
+
+            const menuResults = await Promise.allSettled(menuFetches)
+
             if (signal.aborted) {
                 return { success: false, fromCache: false, errors: [], aborted: true }
             }
 
             menuFetchController = null
-            const allSucceeded = results.every(r => r.status === "fulfilled")
+            const allResults = [...baseResults, ...menuResults]
+            const allSucceeded = allResults.every(r => r.status === "fulfilled")
 
             if (allSucceeded) {
                 this.lastFetched = Date.now()
@@ -303,7 +241,7 @@ export const useMenuStore = defineStore("menu", {
             return {
                 success: allSucceeded,
                 fromCache: false,
-                errors: results
+                errors: allResults
                     .filter((r): r is PromiseRejectedResult => r.status === "rejected")
                     .map(r => r.reason),
             }
@@ -314,8 +252,8 @@ export const useMenuStore = defineStore("menu", {
         },
 
         setActive (this: any, id: number) {
-            this.menus.forEach((menu) => {
-                menu.is_active = menu.id === id
+            this.menus.forEach((menu: Menu) => {
+                menu.is_active = String(menu.id) === String(id)
             })
         },
 
@@ -330,42 +268,41 @@ export const useMenuStore = defineStore("menu", {
         },
 
         clearError (this: any, key: string) {
-            this.errors[key] = null
+            if (key in this.errors) {
+                this.errors[key] = null
+            }
+            if (key in this.categoryErrors) {
+                this.categoryErrors[key] = null
+            }
         },
 
         clearAllErrors (this: any) {
             this.errors = {
                 packages: null,
                 meats: null,
-                modifiers: null,
-                alacartes: null,
-                desserts: null,
-                sides: null,
-                drinks: null,
+                categories: null,
             }
+            this.categoryErrors = {}
         },
 
         clear (this: any) {
             this.packages = []
             this.meats = []
-            this.sides = []
-            this.drinks = []
-            this.desserts = []
+            this.categories = []
+            this.categoryMenus = {}
             this.menus = []
             this.lastFetched = null
             this.errors = {
                 packages: null,
                 meats: null,
-                desserts: null,
-                sides: null,
-                drinks: null,
+                categories: null,
             }
+            this.categoryErrors = {}
+            this.categoryLoading = {}
             this.loading = {
                 packages: false,
                 meats: false,
-                desserts: false,
-                sides: false,
-                drinks: false,
+                categories: false,
             }
         },
 
@@ -380,7 +317,7 @@ export const useMenuStore = defineStore("menu", {
     persist: {
         key: "menu-store",
         storage: (typeof window !== "undefined") ? localStorage : undefined,
-        pick: ["menus", "packages", "meats", "drinks", "sides", "desserts", "lastFetched"],
-        version: 2,
+        pick: ["menus", "packages", "meats", "categories", "categoryMenus", "lastFetched"],
+        version: 3,
     },
 })
