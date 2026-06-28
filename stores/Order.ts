@@ -36,7 +36,6 @@ export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM = ACTIVE_ORDER_RECOVERY_STATUSES
  *  source of truth shared with `initializeFromSession`, `submitRefill`, and
  *  `useActiveOrderRecovery`. Keep in sync with contracts/order-state.contract.md. */
 export const TERMINAL_ORDER_STATUSES = ["completed", "voided", "cancelled", "archived"] as const
-
 export interface OrderRound {
     kind: OrderRoundKind
     number: number // 1 = initial, 2..n = refill #N-1
@@ -236,9 +235,9 @@ export const useOrderStore = defineStore("order", () => {
 
         collectIds(menuStore.packages || [])
         collectIds(menuStore.meats || [])
-        collectIds(menuStore.sides || [])
-        collectIds(menuStore.desserts || [])
-        collectIds(menuStore.drinks || [])
+        Object.values(menuStore.categoryMenus || {}).forEach((items) => {
+            collectIds(items || [])
+        })
 
         return menuIds
     }
