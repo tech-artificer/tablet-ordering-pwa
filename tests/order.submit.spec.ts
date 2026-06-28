@@ -41,6 +41,14 @@ vi.mock("../stores/Menu", () => ({
         get drinks () { return mockDrinks },
         get alacartes () { return mockAlacartes },
         get modifiers () { return mockModifiers },
+        get categoryMenus () {
+            return {
+                sides: mockSides,
+                desserts: mockDesserts,
+                drinks: mockDrinks,
+                alacartes: mockAlacartes,
+            }
+        },
     })
 }))
 
