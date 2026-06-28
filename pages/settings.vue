@@ -376,10 +376,10 @@ const verifyToken = async () => {
 
         logger.debug("Token verification response:", response.data)
 
-        // Check if backend returned success: false (authentication failed)
-        if (response.data?.success === false) {
+        // Check if backend returned valid: false (authentication failed)
+        if (response.data?.valid === false) {
             tokenStatus.value = "invalid"
-            tokenMessage.value = response.data?.debug?.message || "Authentication failed on server"
+            tokenMessage.value = response.data?.message || "Authentication failed on server"
             logger.error("❌ Token verification failed:", response.data)
             return
         }
