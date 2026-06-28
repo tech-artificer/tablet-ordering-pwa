@@ -36,11 +36,14 @@ vi.mock("../stores/Menu", () => ({
         loadAllMenus: mockLoadAllMenus,
         get packages () { return mockPackages },
         get meats () { return mockMeats },
-        get sides () { return mockSides },
-        get desserts () { return mockDesserts },
-        get drinks () { return mockDrinks },
-        get alacartes () { return mockAlacartes },
-        get modifiers () { return mockModifiers },
+        get categoryMenus () {
+            const result: Record<string, any[]> = {}
+            if (mockSides.length) { result.sides = mockSides }
+            if (mockDesserts.length) { result.desserts = mockDesserts }
+            if (mockDrinks.length) { result.drinks = mockDrinks }
+            if (mockAlacartes.length) { result.alacartes = mockAlacartes }
+            return result
+        },
     })
 }))
 

@@ -130,7 +130,7 @@ const defaultCategoryIcon = UtensilsCrossed
 const categories = computed(() => {
     const meatTab = { id: "meats", label: "Meats", icon: Beef }
     const dynamicTabs = menuStore.categories
-        .filter(cat => typeof cat.menu_count !== "number" || cat.menu_count > 0)
+        .filter(cat => cat.slug !== "meats" && (typeof cat.menu_count !== "number" || cat.menu_count > 0))
         .map(cat => ({
             id: cat.slug,
             label: cat.name,
