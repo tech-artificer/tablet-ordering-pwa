@@ -21,7 +21,10 @@ export default defineConfig({
     projects: [
         {
             name: "tablet-landscape",
-            use: { ...devices["Desktop Chrome"] },
+            // Re-apply the landscape viewport after the device spread — the
+            // "Desktop Chrome" preset carries its own 1280x720 viewport that
+            // would otherwise override the top-level use.viewport above.
+            use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
         },
     ],
     webServer: {

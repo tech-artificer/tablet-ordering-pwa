@@ -647,8 +647,15 @@ onMounted(async () => {
     // After detecting local IP, attempt to resolve device/table.
     // fetchDeviceByIp validates the IP itself — only sends if it's a real IPv4 address.
     try {
-        const ip = (deviceStore.device?.value?.last_ip_address) || localIpAddress.value
-        const lookedUp = await fetchDeviceByIp(isValidIpv4(ip) ? ip : null)
+        // Prefer the WebRTC-detected LAN IP (set by getLocalIpAddress) over the
+        // backend-stored value, which can be the WSL gateway in dev. Guard with
+        // isValidIpv4 first — localIpAddress is always a truthy string
+        // ("Unable to detect" on failure), so it can't be used as a bare fallback.
+        const detectedIp = isValidIpv4(localIpAddress.value) ? localIpAddress.value : null
+        const fallbackIp = isValidIpv4(displayDevice.value?.last_ip_address)
+            ? displayDevice.value!.last_ip_address!
+            : null
+        const lookedUp = await fetchDeviceByIp(detectedIp || fallbackIp)
         if (!lookedUp) {
             tokenMessage.value = "Register this tablet with the setup code above."
         }

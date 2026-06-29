@@ -32,6 +32,10 @@ export const ACTIVE_ORDER_RECOVERY_STATUSES = [
 
 export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM = ACTIVE_ORDER_RECOVERY_STATUSES.join(",")
 
+/** Terminal order statuses — orders that must not be recovered or modified. Single
+ *  source of truth shared with `initializeFromSession`, `submitRefill`, and
+ *  `useActiveOrderRecovery`. Keep in sync with contracts/order-state.contract.md. */
+export const TERMINAL_ORDER_STATUSES = ["completed", "voided", "cancelled", "archived"] as const
 export interface OrderRound {
     kind: OrderRoundKind
     number: number // 1 = initial, 2..n = refill #N-1
@@ -231,9 +235,9 @@ export const useOrderStore = defineStore("order", () => {
 
         collectIds(menuStore.packages || [])
         collectIds(menuStore.meats || [])
-        collectIds(menuStore.sides || [])
-        collectIds(menuStore.desserts || [])
-        collectIds(menuStore.drinks || [])
+        Object.values(menuStore.categoryMenus || {}).forEach((items) => {
+            collectIds(items || [])
+        })
 
         return menuIds
     }
@@ -366,8 +370,10 @@ export const useOrderStore = defineStore("order", () => {
     function buildPayload (): OrderPayload {
         logger.debug("Validating payload structure...")
 
-        const pkg = state.package as any
-        const packageId = Number(pkg?.id)
+        const pkg = state.package as Package | null
+        // package_id on the wire is always krypton_menu_id (krypton_woosoo.menus.id),
+        // never the nexus Package row's own id — see DeviceOrderApiController::expandIntentPayload().
+        const packageId = Number(pkg?.krypton_menu_id)
 
         logger.debug("Package selection for order", {
             package_id: pkg?.id,
@@ -375,7 +381,7 @@ export const useOrderStore = defineStore("order", () => {
         })
 
         if (!Number.isFinite(packageId) || packageId <= 0) {
-            throw new Error("Invalid package_id: package must be selected with a valid id")
+            throw new Error("Invalid package_id: package must be selected with a valid krypton_menu_id")
         }
 
         const payload = {
@@ -663,7 +669,7 @@ export const useOrderStore = defineStore("order", () => {
             const api = useApi()
             // Cross-store: called inside action body only (lazy, Pinia-safe)
             const sessionStore = useSessionStore()
-            const terminalStatuses = new Set(["completed", "voided", "cancelled"])
+            const terminalStatuses = new Set<string>(TERMINAL_ORDER_STATUSES)
 
             const currentOrderId = state.serverOrderId ?? sessionStore.getOrderId()
 
@@ -822,7 +828,7 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "voided", "cancelled", "archived"].includes(activeStatus)) {
+                if (activeOrderId && !TERMINAL_ORDER_STATUSES.includes(activeStatus as typeof TERMINAL_ORDER_STATUSES[number])) {
                     const sessionStartedAt = (sessionStore.sessionStartedAt as unknown as number | null)
                     const orderCreatedAt = activeOrder?.created_at
                         ? new Date(activeOrder.created_at).getTime()

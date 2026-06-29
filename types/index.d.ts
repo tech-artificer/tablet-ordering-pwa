@@ -274,17 +274,12 @@ export interface PackageAllowedMenu {
 
 export interface Package {
   id: number;
+  krypton_menu_id: number;
   name: string;
   description: string;
   base_price: number;
   min_meat: number;
   max_meat: number;
-  min_side: number;
-  max_side: number;
-  min_dessert: number;
-  max_dessert: number;
-  min_beverage: number;
-  max_beverage: number;
   is_active: boolean;
   is_most_popular: boolean;
   sort_order: number;
@@ -341,6 +336,15 @@ export interface Device {
 export interface Branch {
   id: number;
   name: string;
+}
+
+export interface CategoryTab {
+  id: number;
+  name: string;
+  slug: string;
+  icon?: string | null;
+  color?: string | null;
+  menu_count?: number;
 }
 
 export interface MenuItem {
