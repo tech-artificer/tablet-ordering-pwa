@@ -292,6 +292,11 @@ export const useBroadcasts = () => {
                 message: "Your delicious food is ready to be served!",
                 type: "success"
             },
+            served: {
+                title: "Order Served",
+                message: "Enjoy your meal!",
+                type: "success"
+            },
             completed: {
                 title: "Order Completed",
                 message: "Enjoy your meal!",
