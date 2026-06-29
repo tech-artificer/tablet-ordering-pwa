@@ -4,6 +4,7 @@ import type { Component } from "vue"
 interface Category {
   id: string;
   label: string;
+  icon?: Component;
 }
 
 const props = defineProps<{
@@ -63,6 +64,7 @@ const selectCategory = (category: string) => {
                         aria-hidden="true"
                     />
 
+                    <component :is="category.icon" v-if="category.icon" class="relative z-10 w-4 h-4 flex-shrink-0" aria-hidden="true" />
                     <span class="relative z-10">{{ category.label }}</span>
 
                     <!-- Lock icon for locked categories -->

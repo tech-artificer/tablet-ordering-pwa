@@ -36,7 +36,9 @@ vi.mock("../composables/useApi", () => ({ useApi: () => mockApiInvoke }))
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const PACKAGE = { id: 50, name: "Yakiniku Combo", price: 250, is_taxable: false }
+// id (local 50) deliberately differs from krypton_menu_id (POS 47) so the payload
+// assertions prove package_id is sourced from krypton_menu_id, not the local id.
+const PACKAGE = { id: 50, krypton_menu_id: 47, name: "Yakiniku Combo", price: 250, is_taxable: false }
 const MEAT_ITEM = { id: 10, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats" }
 const SIDE_ITEM = { id: 20, name: "Caesar Salad", price: 30, quantity: 2, category: "sides" }
 const REFILL_ITEM_1 = { id: 30, name: "Sliced Beef", price: 0, quantity: 2, category: "meats" }
@@ -118,7 +120,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
             const payload = order.buildPayload()
 
             expect(payload.guest_count).toBe(2)
-            expect(payload.package_id).toBe(50)
+            expect(payload.package_id).toBe(47) // krypton_menu_id (POS anchor), not local id 50
             expect(payload.items).toHaveLength(2)
 
             const meat = payload.items.find(i => i.menu_id === 10)
@@ -173,7 +175,7 @@ describe("E2E Transaction: Tablet Ordering PWA", () => {
                 "/api/devices/create-order",
                 expect.objectContaining({
                     guest_count: 2,
-                    package_id: 50,
+                    package_id: 47, // krypton_menu_id (POS anchor), not local id 50
                     items: expect.arrayContaining([
                         expect.objectContaining({ menu_id: 10, quantity: 1 }),
                     ]),
