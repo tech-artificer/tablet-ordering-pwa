@@ -22,6 +22,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         // Setup: Create a valid order scenario
         const mockPackage = {
             id: 1,
+            krypton_menu_id: 1,
             name: "Premium Package",
             price: 500,
             is_taxable: true,
@@ -110,7 +111,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
     it("normalizes singular meat categories into menu rows", () => {
         const store = useOrderStore()
 
-        store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
+        store.setPackage({ id: 1, krypton_menu_id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
         store.setGuestCount(2)
         store.addToCart({
             id: 10,
@@ -129,6 +130,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         // Setup: Package with no selected items
         const mockPackage = {
             id: 1,
+            krypton_menu_id: 1,
             name: "Premium Package",
             price: 500,
             is_taxable: false
@@ -144,7 +146,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
         const store = useOrderStore()
 
         // Setup: package required for buildPayload to produce items
-        store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
+        store.setPackage({ id: 1, krypton_menu_id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
 
         // setGuestCount(0) must clamp to 2 (store enforces minimum)
         store.setGuestCount(0)
@@ -185,7 +187,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
 
     it("should normalize duplicate menu rows by menu_id", () => {
         const store = useOrderStore()
-        store.setPackage({ id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
+        store.setPackage({ id: 1, krypton_menu_id: 1, name: "Premium Package", price: 500, is_taxable: false } as any)
         store.setGuestCount(2)
         ;(store as any).draft = [
             { id: 10, name: "Beef Brisket", price: 150, quantity: 1, category: "meats", isUnlimited: false },
@@ -201,6 +203,7 @@ describe("Contract: PWA → Backend (Order Submission)", () => {
 
         const mockPackage = {
             id: 1,
+            krypton_menu_id: 1,
             name: "Premium Package",
             price: 500,
             is_taxable: false

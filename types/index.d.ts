@@ -274,6 +274,7 @@ export interface PackageAllowedMenu {
 
 export interface Package {
   id: number;
+  krypton_menu_id: number;
   name: string;
   description: string;
   base_price: number;

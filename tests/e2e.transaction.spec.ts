@@ -36,7 +36,7 @@ vi.mock("../composables/useApi", () => ({ useApi: () => mockApiInvoke }))
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const PACKAGE = { id: 50, name: "Yakiniku Combo", price: 250, is_taxable: false }
+const PACKAGE = { id: 50, krypton_menu_id: 50, name: "Yakiniku Combo", price: 250, is_taxable: false }
 const MEAT_ITEM = { id: 10, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats" }
 const SIDE_ITEM = { id: 20, name: "Caesar Salad", price: 30, quantity: 2, category: "sides" }
 const REFILL_ITEM_1 = { id: 30, name: "Sliced Beef", price: 0, quantity: 2, category: "meats" }
