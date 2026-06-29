@@ -4,7 +4,7 @@ import type { Component } from "vue"
 interface Category {
   id: string;
   label: string;
-  icon: Component;
+  icon?: Component;
 }
 
 const props = defineProps<{
@@ -64,13 +64,7 @@ const selectCategory = (category: string) => {
                         aria-hidden="true"
                     />
 
-                    <component
-                        :is="category.icon"
-                        :size="18"
-                        stroke-width="2.2"
-                        class="relative z-10 flex-shrink-0 transition-transform duration-200"
-                        :class="activeCategory === category.id ? 'text-secondary' : 'text-white/50 group-hover:text-white/80'"
-                    />
+                    <component :is="category.icon" v-if="category.icon" class="relative z-10 w-4 h-4 flex-shrink-0" aria-hidden="true" />
                     <span class="relative z-10">{{ category.label }}</span>
 
                     <!-- Lock icon for locked categories -->

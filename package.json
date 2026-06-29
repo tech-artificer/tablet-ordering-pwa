@@ -10,6 +10,8 @@
     "dev": "npx nuxi dev --host 0.0.0.0",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:recovery": "playwright test tests/playwright/active-order-recovery.e2e.spec.ts",
     "build": "npx nuxi build",
     "generate": "npx nuxi generate",
     "analyze:bundle": "node scripts/analyze-bundle.js",
@@ -28,7 +30,6 @@
     "@vueuse/motion": "^3.0.3",
     "axios": "^1.15.0",
     "clsx": "^2.1.1",
-    "uuid": "^10.0.0",
     "dexie": "^4.4.2",
     "element-plus": "^2.3.0",
     "jwt-decode": "^4.0.0",
@@ -39,8 +40,10 @@
     "pinia-plugin-persistedstate": "^4.3.0",
     "pusher-js": "^8.4.0",
     "tailwind-merge": "^3.4.0",
+    "uuid": "^10.0.0",
     "vue": "^3.5.24",
-    "vue-router": "^4.5.1"
+    "vue-router": "^4.5.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@element-plus/nuxt": "^1.1.2",
@@ -50,6 +53,7 @@
     "@nuxt/image": "^1.10.0",
     "@nuxtjs/eslint-config-typescript": "^12.1.0",
     "@nuxtjs/tailwindcss": "^6.14.0",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^24.10.1",
     "@vite-pwa/nuxt": "^1.1.1",
     "@vitejs/plugin-vue": "^6.0.1",
@@ -60,7 +64,7 @@
     "husky": "^9.1.7",
     "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
-    "playwright": "^1.40.1",
+    "playwright": "^1.59.1",
     "sharp": "^0.34.5",
     "typescript": "^5.4.0",
     "vitest": "^4.1.4"

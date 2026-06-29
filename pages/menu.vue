@@ -397,21 +397,16 @@ const showEmptyCategory = computed(() => {
                     :table-name="(deviceStore.table as any)?.name || (deviceStore.table as any)?.table_number || 'The Grill'"
                     :has-placed-order="hasConfirmedInitialOrder"
                     :is-back-disabled="isBackButtonDisabled()"
+                    :is-refill-mode="orderStore.isRefillMode"
                     @back="handleBackButtonClick"
-                    @toggle-refill-mode="toggleRefillMode"
+                    @back-to-session="router.push('/order/in-session')"
                 />
 
                 <!-- Category Filter Tabs -->
                 <div class="sticky top-0 z-10">
                     <div>
                         <!-- Refill Mode Indicator -->
-                        <refill-mode-banner
-                            v-if="orderStore.isRefillMode"
-                            :has-placed-order="hasConfirmedInitialOrder"
-                            :is-refill-mode="orderStore.isRefillMode"
-                            @toggle-refill-mode="toggleRefillMode"
-                            @back-to-session="router.push('/order/in-session')"
-                        />
+                        <refill-mode-banner v-if="orderStore.isRefillMode" />
 
                         <menu-category-tabs
                             :categories="categories"

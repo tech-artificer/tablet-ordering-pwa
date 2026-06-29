@@ -14,13 +14,13 @@ type EchoChannel = Channel & { name: string }
 
 // ─── WebSocket event interfaces ────────────────────────────────────────────
 // Shapes MUST stay in sync with woosoo-nexus broadcast events.
-// Reference: docs/websocket-events.md
+// Reference: contracts/websocket-events.contract.md
 // Note: backend does NOT send `eventId` — removed from all interfaces.
 
 /** Single service request embedded in order events */
 interface ServiceRequest {
   id: number
-  order_id: string
+  order_id: number | null
   table_id: number
   device_id: number
   type: string
@@ -33,7 +33,7 @@ interface ServiceRequest {
 interface OrderCreatedEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     table_id: number
@@ -50,7 +50,7 @@ interface OrderCreatedEvent {
     total: string
     tax: string
     discount: string | null
-    sub_total: string
+    subtotal: string
     guest_count: number
     created_at: string
     updated_at: string
@@ -65,12 +65,12 @@ interface OrderCreatedEvent {
 interface OrderUpdatedEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     table_id: number
     branch_id: number
-    status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled" | "voided"
+    status: "pending" | "confirmed" | "in_progress" | "ready" | "completed" | "cancelled" | "voided"
     is_printed: boolean
     total: string
     created_at: string
@@ -85,7 +85,7 @@ interface OrderUpdatedEvent {
 interface OrderCompletedEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     table_id: number
@@ -96,7 +96,7 @@ interface OrderCompletedEvent {
     total: string
     tax: string
     discount: string | null
-    sub_total: string
+    subtotal: string
     guest_count: number
     created_at: string
     updated_at: string
@@ -110,10 +110,21 @@ interface OrderCompletedEvent {
 interface OrderCancelledEvent {
   order: {
     id: number
-    order_id: string
+    order_id: number | null
     order_number: string
     device_id: number
     status: "cancelled" | "voided"
+  }
+}
+
+interface OrderDetailsUpdatedEvent {
+  order: {
+    order_id: number
+    guest_count: number | null
+    subtotal: string | null
+    tax: string | null
+    discount: string | null
+    total: string | null
   }
 }
 
@@ -145,7 +156,6 @@ export const useBroadcasts = () => {
     let deviceChannel: EchoChannel | null = null
     let orderChannel: EchoChannel | null = null
     let serviceRequestChannel: EchoChannel | null = null
-    let deviceControlChannel: EchoChannel | null = null
     let sessionChannel: EchoChannel | null = null
     let subscribedSessionId: number | string | null = null
     let stopSessionIdWatcher: (() => void) | null = null
@@ -157,27 +167,51 @@ export const useBroadcasts = () => {
     let reconnectTimer: number | null = null
     let boundPusherConnection: unknown = null
     let boundStateChangeHandler: ((states: { current: string; previous: string }) => void) | null = null
-    const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30] // seconds, max 30s
-    const MAX_RECONNECTION_ATTEMPTS = 10
+    let boundMessageHandler: (() => void) | null = null
+    const RECONNECTION_BACKOFF = [1, 2, 4, 8, 16, 30, 60] // seconds, capped at 60s
+
+    // Silent-death watchdog: fires every 30s and forces a disconnect when the socket
+    // reports "connected" but has seen no *transport* activity for 3 minutes. Activity
+    // is fed by the Pusher connection's raw "message" frames (data events plus the
+    // server's periodic ping/pong keepalive), NOT app-level broadcasts — so an
+    // ordinarily quiet tablet with a healthy socket is left alone, and only genuinely
+    // zombie transports (no frames at all, which Pusher's own keepalive can miss) trip it.
+    const WATCHDOG_INTERVAL_MS = 30_000
+    const WATCHDOG_SILENCE_THRESHOLD_MS = 180_000
+    let watchdogTimer: number | null = null
+    let lastEventAt = 0
+
+    const touchLastEvent = () => { lastEventAt = Date.now() }
+
+    const startWatchdog = () => {
+        if (watchdogTimer !== null) { return }
+        watchdogTimer = window.setInterval(() => {
+            const connectionStore = useConnectionStore()
+            if (unref(connectionStore.reverbState) !== "connected") { return }
+            const silentMs = Date.now() - lastEventAt
+            if (silentMs < WATCHDOG_SILENCE_THRESHOLD_MS) { return }
+            logger.warn(`[🔍 Watchdog] ${Math.round(silentMs / 1000)}s silence on "connected" socket — forcing disconnect`)
+            touchLastEvent() // reset before disconnect to prevent rapid re-triggers
+            const pusherConn = (window as any).Echo?.connector?.pusher?.connection
+            if (pusherConn && typeof pusherConn.disconnect === "function") {
+                pusherConn.disconnect()
+            } else {
+                scheduleReconnection()
+            }
+        }, WATCHDOG_INTERVAL_MS)
+    }
+
+    const stopWatchdog = () => {
+        if (watchdogTimer !== null) {
+            window.clearInterval(watchdogTimer)
+            watchdogTimer = null
+        }
+    }
 
     const scheduleReconnection = () => {
         const connectionStore = useConnectionStore()
 
         if (reconnectTimer) { return } // Already scheduled
-        if (reconnectAttempts >= MAX_RECONNECTION_ATTEMPTS) {
-            logger.warn(`[🔴 WebSocket] Max reconnection attempts (${MAX_RECONNECTION_ATTEMPTS}) reached, giving up`)
-            logger.warn("WebSocket max reconnection attempts reached")
-            connectionStore.setReverbState("failed")
-            connectionStore.setReconnectAttempt(reconnectAttempts)
-            ElNotification({
-                title: "⚠️ Connection Lost",
-                message: "Please reload the page to reconnect",
-                type: "warning",
-                duration: 0, // Persistent until dismissed
-                position: "bottom-right"
-            })
-            return
-        }
 
         reconnectAttempts++
         connectionStore.setReverbState("disconnected")
@@ -185,7 +219,7 @@ export const useBroadcasts = () => {
         const backoffIndex = Math.min(reconnectAttempts - 1, RECONNECTION_BACKOFF.length - 1)
         const delaySeconds = RECONNECTION_BACKOFF[backoffIndex]
 
-        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts}/${MAX_RECONNECTION_ATTEMPTS})`)
+        logger.debug(`[🔄 WebSocket] Scheduling reconnection in ${delaySeconds}s (attempt ${reconnectAttempts})`)
 
         reconnectTimer = window.setTimeout(() => {
             reconnectTimer = null
@@ -208,6 +242,7 @@ export const useBroadcasts = () => {
             reconnectTimer = null
         }
         reconnectAttempts = 0 // Reset on successful connection
+        lastEventAt = Date.now() // Reset watchdog clock on reconnect
         connectionStore.setReverbState("connected")
         connectionStore.setReconnectAttempt(0)
     }
@@ -222,7 +257,8 @@ export const useBroadcasts = () => {
 
     // Event Handlers
     const handleOrderCreated = (event: OrderCreatedEvent) => {
-        logger.debug("[📨 .order.created]", { order_id: event.order.id, order_number: event.order.order_number })
+        touchLastEvent()
+        logger.debug("[📨 .order.created]", { order_id: event.order.order_id, order_number: event.order.order_number })
 
         ElNotification({
             title: "Order Confirmed",
@@ -231,18 +267,22 @@ export const useBroadcasts = () => {
             duration: 5000
         })
 
-        // Update session order ID
+        // Sync both stores to the POS-canonical order_id so getCurrentOrderId()
+        // (which reads orderStore.serverOrderId) and the channel watcher both
+        // use the same canonical identifier for all subsequent match guards.
         if (sessionStore.getSessionId() === event.order.session_id) {
-            sessionStore.setOrderId(event.order.id)
+            sessionStore.setOrderId(event.order.order_id)
+            orderStore.setServerOrderId(event.order.order_id)
         }
     }
 
     const handleOrderUpdated = (event: OrderUpdatedEvent) => {
+        touchLastEvent()
         const { order } = event
         logger.debug("[📨 .order.updated]", { order_id: order.order_id, status: order.status })
 
         const statusMessages: Record<string, { title: string; message: string; type: "success" | "warning" | "info" | "error" }> = {
-            preparing: {
+            in_progress: {
                 title: "Order in Progress",
                 message: "Your order is being prepared by our kitchen!",
                 type: "info"
@@ -277,19 +317,14 @@ export const useBroadcasts = () => {
 
         if (currentOrderId != null && eventOrderId != null && String(currentOrderId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(order.status)
-
-            // End session only on genuine terminal statuses — in_progress, ready, served are intermediate
             if (["completed", "voided", "cancelled"].includes(order.status)) {
-                logger.info("[Broadcasts] Terminal order status via broadcast — ending session", { status: order.status })
-                triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", {
-                    source: "broadcast",
-                    orderNumber: order.order_number,
-                })
+                triggerSessionEnd(order.status as "completed" | "voided" | "cancelled", { source: "broadcast" })
             }
         }
     }
 
     const handleOrderCompleted = (event: OrderCompletedEvent) => {
+        touchLastEvent()
         logger.debug("Order completed:", event.order)
 
         ElNotification({
@@ -307,15 +342,12 @@ export const useBroadcasts = () => {
 
         if (currentOrderId != null && (String(currentOrderId) === String(eventOrderId))) {
             orderStore.updateOrderStatus("completed")
-            logger.info("✅ Order completed via broadcast — ending session")
-            triggerSessionEnd("completed", {
-                source: "broadcast",
-                orderNumber: event.order.order_number,
-            })
+            triggerSessionEnd("completed", { source: "broadcast", orderNumber: event.order.order_number ?? null })
         }
     }
 
     const handleOrderCancelled = (event: OrderCancelledEvent) => {
+        touchLastEvent()
         logger.debug("Order cancelled:", event.order)
 
         ElNotification({
@@ -330,15 +362,22 @@ export const useBroadcasts = () => {
         const eventOrderId = getEventOrderId(event)
         if (currentId != null && eventOrderId != null && String(currentId) === String(eventOrderId)) {
             orderStore.updateOrderStatus(event.order.status)
-            logger.info("[Broadcasts] Order voided/cancelled via broadcast — ending session")
-            triggerSessionEnd(event.order.status, {
-                source: "broadcast",
-                orderNumber: event.order.order_number,
-            })
+            triggerSessionEnd(event.order.status as "cancelled" | "voided", { source: "broadcast", orderNumber: event.order.order_number ?? null })
+        }
+    }
+
+    const handleOrderDetailsUpdated = (event: OrderDetailsUpdatedEvent) => {
+        touchLastEvent()
+        logger.debug("[📨 .order.details.updated]", { order_id: event.order.order_id })
+
+        const currentOrderId = getCurrentOrderId()
+        if (currentOrderId != null && String(currentOrderId) === String(event.order.order_id)) {
+            orderStore.applyDetailsUpdate(event.order)
         }
     }
 
     const handleServiceRequest = (event: ServiceRequestEvent) => {
+        touchLastEvent()
         logger.debug("Service request update:", event.service_request)
 
         const statusMessages: Record<string, string> = {
@@ -358,6 +397,7 @@ export const useBroadcasts = () => {
     }
 
     const handleDeviceControl = (event: DeviceControlEvent) => {
+        touchLastEvent()
         logger.debug("Device control command:", event.action)
 
         switch (event.action) {
@@ -439,12 +479,6 @@ export const useBroadcasts = () => {
             }
             deviceChannel = null
             channelStatus.value.device = false
-        }
-        if (deviceControlChannel) {
-            if (canLeave) {
-                ;(window as any).Echo.leave(deviceControlChannel.name)
-            }
-            deviceControlChannel = null
             channelStatus.value.deviceControl = false
         }
     }
@@ -463,14 +497,18 @@ export const useBroadcasts = () => {
         // Tear down any existing subscriptions before creating new ones to prevent duplicate handlers
         unsubscribeDeviceChannels()
 
-        // Subscribe to device.{deviceId} for order updates
+        // Subscribe to device.{deviceId} for order updates and control events (single channel, chained listeners)
         logger.debug("[Echo] Subscribing to channel: device." + deviceId)
         deviceChannel = (window as any).Echo.channel(`device.${deviceId}`)
             .listen(".order.updated", (event: OrderUpdatedEvent) => {
                 handleOrderUpdated(event)
             })
+            .listen(".device.control", (event: DeviceControlEvent) => {
+                handleDeviceControl(event)
+            })
 
         channelStatus.value.device = true
+        channelStatus.value.deviceControl = true
         logger.debug("[Echo] ✅ Subscribed to channel: device." + deviceId)
         logger.debug(`✅ Subscribed to device.${deviceId}`)
 
@@ -481,16 +519,6 @@ export const useBroadcasts = () => {
             duration: 3000,
             position: "bottom-right"
         })
-
-        // Subscribe to device.{deviceId} for control events
-        logger.debug("[Echo] Subscribing to device." + deviceId)
-        deviceControlChannel = (window as any).Echo.channel(`device.${deviceId}`)
-            .listen(".device.control", (event: DeviceControlEvent) => {
-                handleDeviceControl(event)
-            })
-
-        channelStatus.value.deviceControl = true
-        logger.debug(`✅ Subscribed to device.${deviceId} (control)`)
     }
 
     // Subscribe to order-specific channels
@@ -518,6 +546,9 @@ export const useBroadcasts = () => {
             })
             .listen(".order.voided", (event: OrderCancelledEvent) => {
                 handleOrderCancelled(event)
+            })
+            .listen(".order.details.updated", (event: OrderDetailsUpdatedEvent) => {
+                handleOrderDetailsUpdated(event)
             })
 
         channelStatus.value.order = true
@@ -561,6 +592,7 @@ export const useBroadcasts = () => {
         logger.debug("[Echo] Subscribing to session." + sessionId)
         sessionChannel = (window as any).Echo.channel(`session.${sessionId}`)
             .listen(".session.reset", (_event: { session_id: number; version: number }) => {
+                touchLastEvent()
                 logger.info("[Broadcasts] session.reset received — ending session", { session_id: _event.session_id })
                 triggerSessionEnd("unknown", { source: "broadcast" })
             })
@@ -633,15 +665,26 @@ export const useBroadcasts = () => {
 
     const unbindConnectionStateHandler = () => {
         const conn = boundPusherConnection as Record<string, unknown> | null
-        if (conn && boundStateChangeHandler && typeof conn.unbind === "function") {
-            try {
-                (conn.unbind as (event: string, handler: unknown) => void)("state_change", boundStateChangeHandler)
-            } catch (e) {
-                logger.debug("[Broadcasts] unbind state_change failed", e)
+        if (conn && typeof conn.unbind === "function") {
+            const unbind = conn.unbind as (event: string, handler: unknown) => void
+            if (boundStateChangeHandler) {
+                try {
+                    unbind("state_change", boundStateChangeHandler)
+                } catch (e) {
+                    logger.debug("[Broadcasts] unbind state_change failed", e)
+                }
+            }
+            if (boundMessageHandler) {
+                try {
+                    unbind("message", boundMessageHandler)
+                } catch (e) {
+                    logger.debug("[Broadcasts] unbind message failed", e)
+                }
             }
         }
         boundPusherConnection = null
         boundStateChangeHandler = null
+        boundMessageHandler = null
     }
 
     const bindConnectionStateHandler = () => {
@@ -697,6 +740,15 @@ export const useBroadcasts = () => {
         }
 
         connection.bind("state_change", boundStateChangeHandler)
+
+        // Feed the silent-death watchdog from transport-level traffic. Every frame the
+        // server sends — real data events and the protocol ping/pong keepalive — fires
+        // "message", so a healthy-but-idle socket keeps the watchdog satisfied without
+        // any business broadcast. Only a transport that stops emitting entirely (a true
+        // zombie) goes silent long enough to trip the disconnect.
+        boundMessageHandler = () => { touchLastEvent() }
+        connection.bind("message", boundMessageHandler)
+
         boundPusherConnection = connection
     }
 
@@ -718,6 +770,8 @@ export const useBroadcasts = () => {
         ensureSessionChannelAutoSubscription()
 
         bindConnectionStateHandler()
+        lastEventAt = Date.now()
+        startWatchdog()
     }
 
     // Cleanup on unmount
@@ -746,6 +800,7 @@ export const useBroadcasts = () => {
         }
         unsubscribeDeviceChannels()
         unbindConnectionStateHandler()
+        stopWatchdog()
         resetChannelStatus()
     }
 

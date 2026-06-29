@@ -54,6 +54,10 @@ function normalizeTable (tbl: unknown): Table | null {
     return tbl as Table
 }
 
+function isObjectPayload (payload: unknown): payload is Record<string, any> {
+    return Boolean(payload && typeof payload === "object" && !Array.isArray(payload))
+}
+
 export const useDeviceStore = defineStore("device", () => {
     const state = reactive<DeviceStoreState>({
         device: null,
@@ -77,6 +81,7 @@ export const useDeviceStore = defineStore("device", () => {
     let pollStartedAt: number | null = null
     let detectedClientIp: string | null | undefined
     let refreshTimerId: ReturnType<typeof setInterval> | null = null
+    let refreshInFlight: Promise<boolean> | null = null
 
     const REFRESH_INTERVAL_MS = 10 * 60 * 1000 // check every 10 min
     const REFRESH_THRESHOLD_MS = 15 * 60 * 1000 // refresh if expiry < 15 min away
@@ -106,6 +111,21 @@ export const useDeviceStore = defineStore("device", () => {
         if (refreshTimerId !== null) {
             clearInterval(refreshTimerId)
             refreshTimerId = null
+        }
+    }
+
+    function checkTokenExpiry () {
+        if (!state.token) { return }
+        const expiryMs = parseExpiryMs(state.expiration)
+        if (expiryMs !== null && expiryMs - Date.now() <= REFRESH_THRESHOLD_MS) {
+            logger.info("[DeviceStore] Token expired or near expiry on boot; triggering refresh")
+            void refresh().then((ok) => {
+                if (!ok) {
+                    logger.warn("[DeviceStore] Boot-time token refresh failed; suppressing error banner")
+                    // Boot-time background checks should not surface errors to the user.
+                    state.errorMessage = null
+                }
+            })
         }
     }
 
@@ -161,7 +181,16 @@ export const useDeviceStore = defineStore("device", () => {
         }
     }
 
-    function applyAuthPayload (payload: any) {
+    function applyAuthPayload (payload: any, source: string): boolean {
+        if (!isObjectPayload(payload)) {
+            state.lastAuthResponse = null
+            state.errorMessage = "Device authentication returned an invalid response"
+            logger.warn(`[DeviceStore] ${source}: expected JSON auth payload`, {
+                payloadType: typeof payload,
+            })
+            return false
+        }
+
         const authToken = payload?.token
         const authDevice = payload?.device
         const authTable = payload?.table
@@ -201,6 +230,7 @@ export const useDeviceStore = defineStore("device", () => {
         }
 
         applyBroadcastConfig(payload)
+        return true
     }
 
     function syncWaitingForTable () {
@@ -223,22 +253,36 @@ export const useDeviceStore = defineStore("device", () => {
     }
 
     async function refresh (): Promise<boolean> {
-        state.isLoading = true
-        state.errorMessage = null
+        // Share a single in-flight refresh promise across concurrent callers so
+        // every caller gets the actual outcome of the refresh, not the value of
+        // `state.token` at the moment the second call arrived. That stale-read
+        // could otherwise make callers skip auth fallbacks while the token was
+        // still being replaced.
+        if (refreshInFlight) { return refreshInFlight }
 
-        try {
-            const api = useApi()
-            const response = await api.post("/api/devices/refresh")
-            applyAuthPayload(response.data)
-            syncWaitingForTable()
-            return Boolean(state.token)
-        } catch (error: any) {
-            logger.error("[DeviceStore] Token refresh failed:", error)
-            state.errorMessage = error?.response?.data?.message || "Token refresh failed"
-            return false
-        } finally {
-            state.isLoading = false
-        }
+        refreshInFlight = (async () => {
+            state.isLoading = true
+            state.errorMessage = null
+
+            try {
+                const api = useApi()
+                const response = await api.post("/api/devices/refresh")
+                if (!applyAuthPayload(response.data, "refresh")) {
+                    return false
+                }
+                syncWaitingForTable()
+                return Boolean(state.token)
+            } catch (error: any) {
+                logger.error("[DeviceStore] Token refresh failed:", error)
+                state.errorMessage = error?.response?.data?.message || "Token refresh failed"
+                return false
+            } finally {
+                state.isLoading = false
+                refreshInFlight = null
+            }
+        })()
+
+        return refreshInFlight
     }
 
     async function authenticate (clientIp?: string | null): Promise<boolean> {
@@ -253,7 +297,9 @@ export const useDeviceStore = defineStore("device", () => {
             const response = params
                 ? await api.get("/api/devices/login", { params })
                 : await api.get("/api/devices/login")
-            applyAuthPayload(response.data)
+            if (!applyAuthPayload(response.data, "authenticate")) {
+                return false
+            }
             syncWaitingForTable()
 
             if (state.device && state.token && state.table) {
@@ -358,7 +404,9 @@ export const useDeviceStore = defineStore("device", () => {
         try {
             const api = useApi()
             const response = await api.post("/api/devices/register", payload)
-            applyAuthPayload(response.data)
+            if (!applyAuthPayload(response.data, "register")) {
+                throw new Error(state.errorMessage || "Device authentication returned an invalid response")
+            }
             syncWaitingForTable()
 
             if (state.waitingForTable) {
@@ -496,6 +544,7 @@ export const useDeviceStore = defineStore("device", () => {
         setKioskUnlocked,
         startRefreshTimer,
         stopRefreshTimer,
+        checkTokenExpiry,
         clearError,
         setWaitingForTable,
     }

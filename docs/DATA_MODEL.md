@@ -45,8 +45,8 @@ menuStore = {
 }
 
 Package = {
-  id, name, price, img_url, accent, color, is_popular, tax, tax_amount,
-  modifiers: Modifier[]     // meat options for THIS package
+  id, name, description, base_price, min_meat, max_meat, is_active, is_most_popular,
+  sort_order, allowed_menus: PackageAllowedMenu[]
 }
 Modifier = { id, name, group, category, price, img_url, ... }
 MenuItem = { id, name, price, img_url, category, ... }
@@ -56,7 +56,7 @@ MenuItem = { id, name, price, img_url, category, ... }
 
 - `packageDetails[]` + `fetchPackageDetails()` — duplicated `package.modifiers`
 - `modifiers[]` (top-level) + `fetchModifiers()` — deprecated
-- `alacartes[]`, `meatCategories[]`, `tabletCategories[]` — unused
+- `alacartes[]`, `meatCategories[]` — unused
 
 ### `sessionStore` — session lifecycle
 

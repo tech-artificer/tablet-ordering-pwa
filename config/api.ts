@@ -17,11 +17,12 @@ export const API_ENDPOINTS = {
     // Order endpoints
     ORDERS: "/api/orders",
     ORDER_ITEMS: "/api/orders/items",
-    ORDER_CHECK: "/api/orders/check",
+
+    // Session endpoints
+    SESSION_LATEST: "/api/session/latest",
 
     // Device endpoints
     DEVICE_LOGIN: "/api/device/login",
-    DEVICE_SESSION: "/api/device/session",
     DEVICE_STATUS: "/api/device/status",
     DEVICE_CREATE_ORDER: "/api/devices/create-order",
     DEVICE_ORDERS: "/api/device-orders",

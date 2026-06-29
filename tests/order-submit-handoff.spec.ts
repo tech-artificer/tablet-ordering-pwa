@@ -56,7 +56,7 @@ function seedDevice () {
 }
 
 function seedOrderSelection (order: ReturnType<typeof useOrderStore>) {
-    order.setPackage({ id: 50, name: "Yakiniku Combo", price: 250, is_taxable: false } as Package)
+    order.setPackage({ id: 50, krypton_menu_id: 50, name: "Yakiniku Combo", price: 250, is_taxable: false } as unknown as Package)
     order.setGuestCount(2)
     ;(order as any).draft = [
         { id: 10, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats", isUnlimited: false } as CartItem,

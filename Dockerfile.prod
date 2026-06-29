@@ -17,7 +17,7 @@ ENV BUILD_BRANCH=${BUILD_BRANCH}
 ENV BUILD_TIME=${BUILD_TIME}
 ENV APP_VERSION=${APP_VERSION}
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci --frozen-lockfile
 
 COPY . .

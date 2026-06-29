@@ -258,22 +258,37 @@ export interface Session {
   // package: Package;
 }
 
-export interface Package extends MenuItem {
-  modifiers: Modifier[];
-  accent: string;
-  color: string;
-  is_popular: boolean;
-  base_price?: number;
-  allowed_menus?: Array<{
-    id: number;
-    krypton_menu_id: number;
-    menu_type: string;
-    meat_category_code?: string | null;
-    extra_price: number;
-    is_active: boolean;
-  }>;
-  // modifiers: Modifier[];
-  // modifier_groups?: ModifierGroup[];
+export interface PackageAllowedMenu {
+  id: number;
+  krypton_menu_id: number;
+  menu_name: string;
+  menu_type: 'meat' | 'side' | 'dessert' | 'drinks';
+  meat_category_code: string | null;
+  extra_price: number;
+  quantity_limit: number;
+  is_required: boolean;
+  is_default: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface Package {
+  id: number;
+  /**
+   * POS set-meal menu id (krypton_woosoo.menus.id). This — NOT the local `id` —
+   * is what the tablet submits as `package_id` in an order; the backend resolves
+   * the package by `krypton_menu_id` (CONTRACTS §3, DeviceOrderApiController).
+   */
+  krypton_menu_id: number;
+  name: string;
+  description: string;
+  base_price: number;
+  min_meat: number;
+  max_meat: number;
+  is_active: boolean;
+  is_most_popular: boolean;
+  sort_order: number;
+  allowed_menus: PackageAllowedMenu[];
 }
 
 export interface ModifierGroup {
@@ -503,32 +518,6 @@ export interface AllowedMenu {
   isMod?: boolean;
   isModOnly?: boolean;
   img_url?: string | null;
-}
-
-export interface PackageDetails {
-  package: {
-    id: number;
-    name: string;
-    description: string;
-    base_price: number;
-    limits: {
-      meat: { min: number; max: number };
-      side: { min: number; max: number };
-      dessert: { min: number; max: number };
-      drinks: { min: number; max: number };
-    };
-    has_limits: boolean;
-  };
-  allowed_menus: {
-    meat: AllowedMenu[];
-    side: AllowedMenu[];
-    dessert: AllowedMenu[];
-    drinks: AllowedMenu[];
-  };
-  default_selections: Array<{
-    menu_id: number;
-    type: string;
-  }>;
 }
 
 export interface PackageValidationResult {

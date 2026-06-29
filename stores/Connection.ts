@@ -15,6 +15,7 @@ export const useConnectionStore = defineStore("connection", () => {
     const reverbState = ref<ReverbState>("connected")
     const reconnectAttempt = ref(0)
     const phase = ref<ConnectionPhase>("ok")
+    const pollingActive = ref(false)
 
     // Debounce to prevent flashing overlays on brief disconnects
     const BLOCKING_DEBOUNCE_MS = 1500
@@ -101,6 +102,13 @@ export const useConnectionStore = defineStore("connection", () => {
     }
 
     /**
+   * Track whether HTTP polling fallback is active (set by usePollingFallback)
+   */
+    const setPollingActive = (value: boolean) => {
+        pollingActive.value = value
+    }
+
+    /**
    * Reset to fully connected state
    */
     const reset = () => {
@@ -112,6 +120,7 @@ export const useConnectionStore = defineStore("connection", () => {
         reverbState.value = "connected"
         reconnectAttempt.value = 0
         phase.value = "ok"
+        pollingActive.value = false
         debouncedBlockingState = false
         logger.debug("[Connection] Reset to initial state")
     }
@@ -121,10 +130,12 @@ export const useConnectionStore = defineStore("connection", () => {
         reverbState,
         reconnectAttempt,
         phase,
+        pollingActive,
         blocking,
         setOnline,
         setReverbState,
         setReconnectAttempt,
+        setPollingActive,
         reset,
     }
 })

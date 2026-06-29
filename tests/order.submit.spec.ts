@@ -36,13 +36,18 @@ vi.mock("../stores/Menu", () => ({
         loadAllMenus: mockLoadAllMenus,
         get packages () { return mockPackages },
         get meats () { return mockMeats },
+        get sides () { return mockSides },
+        get desserts () { return mockDesserts },
+        get drinks () { return mockDrinks },
+        get alacartes () { return mockAlacartes },
+        get modifiers () { return mockModifiers },
         get categoryMenus () {
-            const result: Record<string, any[]> = {}
-            if (mockSides.length) { result.sides = mockSides }
-            if (mockDesserts.length) { result.desserts = mockDesserts }
-            if (mockDrinks.length) { result.drinks = mockDrinks }
-            if (mockAlacartes.length) { result.alacartes = mockAlacartes }
-            return result
+            return {
+                sides: mockSides,
+                desserts: mockDesserts,
+                drinks: mockDrinks,
+                alacartes: mockAlacartes,
+            }
         },
     })
 }))
@@ -75,7 +80,7 @@ describe("stores/order - submitOrder", () => {
         const order = useOrderStore()
 
         // Prepare store state
-        order.setPackage({ id: 1, name: "Package", price: 100, is_taxable: false } as any)
+        order.setPackage({ id: 1, krypton_menu_id: 1, name: "Package", price: 100, is_taxable: false } as any)
         order.setGuestCount(2)
         ;(order as any).draft = [
             { id: 10, name: "Beef Brisket", price: 5, quantity: 2, category: "meats", isUnlimited: false },
@@ -109,7 +114,7 @@ describe("stores/order - submitOrder", () => {
     it("stores server order id, marks order placed, and allows entering refill mode after initial submit", async () => {
         const order = useOrderStore()
         const session = useSessionStore()
-        order.setPackage({ id: 7, name: "Package", price: 100, is_taxable: false } as any)
+        order.setPackage({ id: 7, krypton_menu_id: 7, name: "Package", price: 100, is_taxable: false } as any)
         order.setGuestCount(2)
         ;(order as any).draft = [
             { id: 10, name: "Beef Brisket", price: 5, quantity: 1, category: "meats", isUnlimited: false },
@@ -133,7 +138,7 @@ describe("stores/order - submitOrder", () => {
     it("propagates API errors and does not clear draft on failure", async () => {
         const order = useOrderStore()
 
-        order.setPackage({ id: 2, name: "Package", price: 50, is_taxable: false } as any)
+        order.setPackage({ id: 2, krypton_menu_id: 2, name: "Package", price: 50, is_taxable: false } as any)
         order.setGuestCount(2)
         ;(order as any).draft = [
             { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false },
@@ -151,7 +156,7 @@ describe("stores/order - submitOrder", () => {
     it("fails cleanly when order creation response body is empty", async () => {
         const order = useOrderStore()
 
-        order.setPackage({ id: 1, name: "Combo", price: 100, is_taxable: false } as Package)
+        order.setPackage({ id: 1, krypton_menu_id: 1, name: "Combo", price: 100, is_taxable: false } as unknown as Package)
         order.setGuestCount(2)
         ;(order as any).draft = [
             { id: 9, name: "Wagyu Beef", price: 0, quantity: 1, category: "meats", isUnlimited: false },
@@ -166,7 +171,7 @@ describe("stores/order - submitOrder", () => {
     it("handles MENU_ITEM_UNAVAILABLE by refreshing menus and removing unavailable cart items", async () => {
         const order = useOrderStore()
 
-        order.setPackage({ id: 2, name: "Package", price: 50, is_taxable: false } as any)
+        order.setPackage({ id: 2, krypton_menu_id: 2, name: "Package", price: 50, is_taxable: false } as any)
         order.setGuestCount(2)
         ;(order as any).draft = [
             { id: 12, name: "Pork Belly", price: 4, quantity: 1, category: "meats", isUnlimited: false },

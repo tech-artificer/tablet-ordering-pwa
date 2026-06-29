@@ -2,6 +2,7 @@
 import { ref } from "vue"
 import { useSessionStore } from "../../stores/Session"
 import { useOrderStore } from "../../stores/Order"
+import { useMenuStore } from "../../stores/Menu"
 import OrderingStep3ReviewSubmit from "~/components/order/OrderingStep3ReviewSubmit.vue"
 import OrderSubmittingOverlay from "~/components/order/OrderSubmittingOverlay.vue"
 import { logger } from "~/utils/logger"
@@ -11,6 +12,7 @@ definePageMeta({ layout: "kiosk" })
 const router = useRouter()
 const sessionStore = useSessionStore()
 const orderStore = useOrderStore()
+const menuStore = useMenuStore()
 const sessionStartError = ref<string | null>(null)
 const submitFormRef = ref<{ cancelSubmission:() => void } | null>(null)
 
@@ -27,6 +29,10 @@ const handleOrderSubmitted = async () => {
     const timestamp = new Date().toISOString()
     logger.info("[Order Review] Order confirmation received", { timestamp })
     sessionStartError.value = null
+
+    menuStore.refreshMenus().catch((e: unknown) => {
+        logger.warn("[Order Review] Background menu refresh failed (non-blocking)", e)
+    })
 
     try {
         if (!sessionStore.isActive) {
@@ -103,6 +109,7 @@ const handleOrderSubmitted = async () => {
 
         <OrderSubmittingOverlay
             v-if="orderStore.isSubmitting"
+            :cancellable="!orderStore.isRefillMode"
             @cancel="handleCancelSubmission"
         />
         <template #error="{ error, clearError }">

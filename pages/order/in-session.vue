@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, unref, watch } from "vue"
-import { ClipboardList, Receipt, RefreshCw, ShoppingBag, UtensilsCrossed } from "lucide-vue-next"
+import { ClipboardList, Receipt, RefreshCw, UtensilsCrossed } from "lucide-vue-next"
 import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
@@ -21,6 +21,42 @@ const orderStatus = computed<string>(() => String(unref(orderStore.serverStatus)
 const orderNumber = computed<string | null>(() => null)
 const orderId = computed<number | null>(() => unref(orderStore.serverOrderId) ?? sessionStore.getOrderId() ?? null)
 
+// ── Submitted items (restored from c2b3774 — append-only ledger from rounds[]) ─
+type DisplayedItem = {
+    id: number
+    name: string
+    quantity: number
+    price: number
+    isUnlimited: boolean
+    sourceRound: "initial" | "refill"
+    sourceRoundLabel: string
+}
+
+const displaySubmittedItems = computed<DisplayedItem[]>(() => {
+    const rounds = (unref(orderStore.rounds) ?? []) as any[]
+    if (!Array.isArray(rounds) || rounds.length === 0) { return [] }
+    const out: DisplayedItem[] = []
+    for (const round of rounds) {
+        const isRefill = round?.kind === "refill"
+        const label = isRefill
+            ? `Refill #${Math.max(1, Number(round?.number ?? 1) - 1)}`
+            : "Initial Order"
+        const items = Array.isArray(round?.items) ? round.items : []
+        for (const item of items) {
+            out.push({
+                id: Number(item?.id ?? item?.menu_id ?? 0),
+                name: String(item?.name ?? "Item"),
+                quantity: Number(item?.quantity ?? 0),
+                price: Number(item?.price ?? 0),
+                isUnlimited: Boolean(item?.isUnlimited),
+                sourceRound: isRefill ? "refill" : "initial",
+                sourceRoundLabel: label,
+            })
+        }
+    }
+    return out
+})
+
 const tableName = computed<string>(() => deviceStore.getTableName() ?? "—")
 const tableShort = computed<string>(() => {
     const name = tableName.value
@@ -35,18 +71,60 @@ const packageHeading = computed(() => {
 })
 
 // ── Totals (gold figures in the Order Summary sidebar) ────────────────────────
-const packageTotal = computed<number>(() => Number(unref(orderStore.packageTotal) ?? 0))
-const addOnsTotal = computed<number>(() => Number(unref(orderStore.addOnsTotal) ?? 0))
-const taxAmount = computed<number>(() => Number(unref(orderStore.taxAmount) ?? 0))
+// IMPORTANT: source from submitted rounds (orderStore.rounds), NOT from
+// orderStore.draft-backed getters. After appendRound() clears the draft,
+// store-level addOns/tax computeds collapse to 0 while the displayed Total
+// still comes from serverTotal — producing contradictory billing.
+const isMeatsCategory = (category: unknown): boolean => {
+    const normalized = String(category ?? "").trim().toLowerCase()
+    return normalized === "meat" || normalized === "meats"
+}
+
+const packageTotal = computed<number>(() => {
+    const price = Number((orderStore.package as any)?.base_price ?? 0)
+    const guests = Number(unref(orderStore.guestCount) ?? 1)
+    return Number.isFinite(price * guests) ? price * guests : 0
+})
+
+const addOnsTotal = computed<number>(() => {
+    const rounds = (unref(orderStore.rounds) ?? []) as any[]
+    if (!Array.isArray(rounds) || rounds.length === 0) { return 0 }
+    let sum = 0
+    for (const round of rounds) {
+        const items = Array.isArray(round?.items) ? round.items : []
+        for (const item of items) {
+            if (isMeatsCategory(item?.category)) { continue }
+            const price = Number(item?.price ?? 0)
+            const qty = Number(item?.quantity ?? 0)
+            if (Number.isFinite(price) && Number.isFinite(qty)) {
+                sum += price * qty
+            }
+        }
+    }
+    return sum
+})
+
+const taxAmount = computed<number>(() => {
+    const pkg = orderStore.package as any
+    if (!pkg?.is_taxable) { return 0 }
+    const rate = Number(pkg?.tax?.percentage ?? 0)
+    if (!Number.isFinite(rate) || rate <= 0) { return 0 }
+    const taxable = packageTotal.value + addOnsTotal.value
+    return (taxable * rate) / 100
+})
+
 const grandTotalDisplay = computed<number>(() => {
     const serverTotal = Number(unref(orderStore.serverTotal) ?? 0)
     if (Number.isFinite(serverTotal) && serverTotal > 0) { return serverTotal }
-    return Number(unref(orderStore.grandTotal) ?? 0)
+    return packageTotal.value + addOnsTotal.value + taxAmount.value
 })
 
-const taxRatePercent = computed<number>(() => {
-    const rate = Number((orderStore.package as any)?.tax?.percentage || 0)
-    return Number.isFinite(rate) && rate > 0 ? rate : 12
+const taxRatePercent = computed<number | null>(() => {
+    const pkg = orderStore.package as any
+    if (!pkg?.is_taxable) { return null }
+    const rate = Number(pkg?.tax?.percentage ?? 0)
+    if (!Number.isFinite(rate) || rate <= 0) { return null }
+    return rate
 })
 
 function formatPeso (value: number): string {
@@ -60,15 +138,15 @@ function formatPesoExact (value: number): string {
 }
 
 // ── Timer ─────────────────────────────────────────────────────────────────────
-const remainingMinutes = computed<number>(() => {
+const sessionMinutes = computed<number>(() => {
     const ms = Number(unref(sessionStore.remainingMs) ?? 0)
     return Math.max(0, Math.round(ms / 60000))
 })
 
 const timerPillLabel = computed<string>(() => {
-    const mins = remainingMinutes.value
+    const mins = sessionMinutes.value
     if (mins <= 0) { return "Active" }
-    return `Active · ~${mins} min remaining`
+    return `Active · Session ~${mins} min`
 })
 
 // ── Session-end ──────────────────────────────────────────────────────────────
@@ -122,15 +200,49 @@ const goToRefill = () => {
     navigateTo("/menu")
 }
 
-const endSession = () => {
-    // Customer-initiated exit — we have no signal the order was paid via
-    // this kiosk, so "cancelled" is the honest SessionEndReason.
-    // If the server later confirms payment, the orderStatus watcher above
-    // will fire the correct terminal reason and override.
-    triggerSessionEnd("cancelled", {
-        source: "in-session",
-        orderNumber: orderNumber.value ?? undefined,
-    })
+const isEndingSession = ref(false)
+
+const endSession = async () => {
+    if (isEndingSession.value) { return }
+
+    const currentOrderId = orderId.value
+    if (!currentOrderId) {
+        logger.warn("[in-session] endSession: no order ID")
+        ElMessage.error("No active order found. Please ask staff for help.")
+        return
+    }
+
+    isEndingSession.value = true
+    try {
+        const api = useApi()
+        const resp = await api.get(`/api/device-order/by-order-id/${currentOrderId}`)
+        const data = resp?.data ?? null
+        const liveOrder = data?.order || data?.data || data
+        const liveStatus = String(liveOrder?.status || "").toLowerCase()
+
+        if (!liveOrder || !liveStatus) {
+            logger.warn("[in-session] endSession: verify returned no status", { resp })
+            ElMessage.error("Cannot verify order status. Please try again or ask staff.")
+            return
+        }
+
+        if (["completed", "voided", "cancelled"].includes(liveStatus)) {
+            logger.info("[in-session] endSession: terminal status confirmed", { liveStatus })
+            triggerSessionEnd(liveStatus as "completed" | "voided" | "cancelled", {
+                source: "in-session",
+                orderNumber: orderNumber.value ?? undefined,
+            })
+            return
+        }
+
+        logger.warn("[in-session] endSession: order still active — refusing", { liveStatus })
+        ElMessage.warning("Your order is still active. Please ask staff to settle the bill before ending the session.")
+    } catch (e: any) {
+        logger.error("[in-session] endSession: verify failed", e?.message)
+        ElMessage.error("Cannot verify order status. Please try again or ask staff.")
+    } finally {
+        isEndingSession.value = false
+    }
 }
 
 // ── Service request modal (kept for parity; not wired to header yet) ──────────
@@ -221,11 +333,54 @@ definePageMeta({ layout: "kiosk" })
                         </div>
                     </section>
 
-                    <!-- Decorative spacer (intentionally empty: the per-item stream
-                         and "Current Orders" empty state were removed — the Order
-                         Summary sidebar carries the totals; the customer doesn't
-                         need a duplicate item list here). -->
-                    <div class="flex-1 min-h-0" />
+                    <!-- Submitted items stream — flattened from orderStore.rounds.
+                         Restored from c2b3774 (the known-working tip); markup re-styled
+                         to the gold palette of the redesigned in-session screen. -->
+                    <section class="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
+                        <div
+                            v-for="(item, index) in displaySubmittedItems"
+                            :key="`ordered-${item.sourceRoundLabel}-${item.id}-${index}`"
+                            class="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.05] px-3.5 py-3"
+                        >
+                            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="truncate text-sm font-medium text-white/90">{{ item.name }}</span>
+                                    <span
+                                        v-if="item.isUnlimited"
+                                        class="flex-shrink-0 rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary"
+                                        aria-label="Unlimited"
+                                    >∞</span>
+                                    <span
+                                        v-if="item.sourceRound === 'refill'"
+                                        class="flex-shrink-0 rounded border border-white/15 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white/55"
+                                    >
+                                        {{ item.sourceRoundLabel }}
+                                    </span>
+                                </div>
+                                <span v-if="item.price > 0" class="text-xs text-white/40">
+                                    {{ formatPesoExact(item.price) }} each
+                                </span>
+                            </div>
+
+                            <span class="flex-shrink-0 rounded-lg bg-white/[0.05] px-2.5 py-1 text-sm font-semibold tabular-nums text-white/85">
+                                ×{{ item.quantity }}
+                            </span>
+
+                            <span
+                                v-if="item.price > 0"
+                                class="w-20 flex-shrink-0 text-right text-sm font-semibold tabular-nums text-primary"
+                            >
+                                {{ formatPesoExact(item.price * item.quantity) }}
+                            </span>
+                        </div>
+
+                        <p
+                            v-if="!displaySubmittedItems.length"
+                            class="py-8 text-center text-sm text-white/40"
+                        >
+                            No items submitted yet.
+                        </p>
+                    </section>
                 </div>
 
                 <!-- ══ RIGHT COLUMN — Order Summary ══════════════════════════════ -->
@@ -247,7 +402,9 @@ definePageMeta({ layout: "kiosk" })
                             <span class="text-sm font-semibold text-white tabular-nums">{{ formatPeso(addOnsTotal) }}</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-sm text-white/65">Tax ({{ taxRatePercent }}%)</span>
+                            <span class="text-sm text-white/65">
+                                Tax<span v-if="taxRatePercent !== null"> ({{ taxRatePercent }}%)</span>
+                            </span>
                             <span class="text-sm font-semibold text-white tabular-nums">{{ formatPesoExact(taxAmount) }}</span>
                         </div>
                     </div>
@@ -272,14 +429,6 @@ definePageMeta({ layout: "kiosk" })
                         </button>
                         <button
                             type="button"
-                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.07] hover:border-white/25 active:scale-[0.98] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                            @click="goToRefill"
-                        >
-                            <ShoppingBag class="w-4 h-4" />
-                            + Add More Items
-                        </button>
-                        <button
-                            type="button"
                             :disabled="true"
                             :aria-disabled="true"
                             class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-white/45 cursor-not-allowed"
@@ -297,10 +446,11 @@ definePageMeta({ layout: "kiosk" })
 
                     <button
                         type="button"
-                        class="flex-shrink-0 mb-8 mx-auto text-xs font-semibold text-white/45 hover:text-white/70 underline-offset-4 hover:underline transition"
+                        :disabled="isEndingSession"
+                        class="flex-shrink-0 mb-8 mx-auto text-xs font-semibold text-white/45 hover:text-white/70 underline-offset-4 hover:underline transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
                         @click="endSession"
                     >
-                        End Session
+                        {{ isEndingSession ? "Checking…" : "End Session" }}
                     </button>
                 </aside>
             </div>

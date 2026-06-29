@@ -42,15 +42,15 @@ describe("composables/useRefillSubmit", () => {
         )
     })
 
-    it("network error passes idempotency key to orderStore.submitRefill", async () => {
+    it("composable does not pass idempotency key to orderStore.submitRefill — store owns it", async () => {
         mockSubmitRefill.mockRejectedValueOnce(new Error("Network Error"))
         const { submitRefill } = useRefillSubmit()
         await submitRefill(samplePayload).catch(() => {})
-        expect(mockSubmitRefill).toHaveBeenCalledWith(
-            samplePayload,
-            {
-                idempotencyKey: expect.any(String),
-            }
-        )
+        // Composable now forwards an opts object (with optional AbortSignal)
+        // through to the store — the contract being asserted is that no
+        // X-Idempotency-Key header is passed; that lifecycle is owned by the store.
+        expect(mockSubmitRefill).toHaveBeenCalledWith(samplePayload, expect.any(Object))
+        const [, opts] = mockSubmitRefill.mock.calls[0]
+        expect(opts?.headers).toBeUndefined()
     })
 })

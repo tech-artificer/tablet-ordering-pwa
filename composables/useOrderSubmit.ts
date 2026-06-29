@@ -12,7 +12,6 @@
 
 import { useOrderStore } from "~/stores/Order"
 import { useSubmitState } from "~/composables/useSubmitState"
-import { generateIdempotencyKey } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 
 export interface OrderSubmitResult {
@@ -22,6 +21,8 @@ export interface OrderSubmitResult {
   data?: unknown
   /** true when the submission was aborted client-side before the server accepted it */
   cancelled?: boolean
+  /** true when a duplicate call was ignored because the first submission is still in flight */
+  suppressed?: boolean
 }
 
 export interface OrderSubmitOptions {
@@ -33,11 +34,14 @@ export function useOrderSubmit () {
         const orderStore = useOrderStore()
         const submitState = useSubmitState()
 
-        const idempotencyKey = generateIdempotencyKey()
+        if (submitState.isTransitioning.value) {
+            logger.warn("[OrderSubmit] Already in progress — duplicate call ignored")
+            return { suppressed: true }
+        }
+
+        // signal is forwarded to the store so AbortController callers can cancel.
+        // Idempotency key is generated and persisted to sessionStorage by the store.
         const submitOptions = {
-            headers: {
-                "X-Idempotency-Key": idempotencyKey,
-            },
             signal: opts.signal,
         }
 

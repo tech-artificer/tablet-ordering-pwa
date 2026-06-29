@@ -10,6 +10,7 @@ import { ERROR_MENU_ITEM_UNAVAILABLE } from "../utils/errorCodes"
 import { useDeviceStore } from "./Device"
 import { useMenuStore } from "./Menu"
 import { useSessionStore } from "./Session"
+import { safeValidate, OrderCreateResponseSchema } from "~/schemas/api"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA MODEL (see docs/DATA_MODEL.md)
@@ -20,7 +21,7 @@ export type OrderRoundKind = "initial" | "refill"
 export type OrderMode = "initial" | "refill"
 export type OrderServerStatus = "building" | "in-progress" | "completed" | "cancelled" | "voided" | string
 
-/** Nexus non-terminal statuses — must match DeviceOrder::scopeActiveOrder and contracts/order-state.contract.md */
+/** Nexus non-terminal statuses — must match `DeviceOrder::scopeActiveOrder` and contracts/order-state.contract.md */
 export const ACTIVE_ORDER_RECOVERY_STATUSES = [
     "pending",
     "confirmed",
@@ -31,6 +32,10 @@ export const ACTIVE_ORDER_RECOVERY_STATUSES = [
 
 export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM = ACTIVE_ORDER_RECOVERY_STATUSES.join(",")
 
+/** Terminal order statuses — orders that must not be recovered or modified. Single
+ *  source of truth shared with `initializeFromSession`, `submitRefill`, and
+ *  `useActiveOrderRecovery`. Keep in sync with contracts/order-state.contract.md. */
+export const TERMINAL_ORDER_STATUSES = ["completed", "voided", "cancelled", "archived"] as const
 export interface OrderRound {
     kind: OrderRoundKind
     number: number // 1 = initial, 2..n = refill #N-1
@@ -89,6 +94,7 @@ type SubmitRefillOptions = {
     headers?: Record<string, string>
     idempotencyKey?: string
     clientSubmissionId?: string
+    signal?: AbortSignal
 }
 
 type MenuUnavailableError = Error & { code: string }
@@ -124,6 +130,10 @@ export const useOrderStore = defineStore("order", () => {
         respData: AppendRoundResponseData
     ): void {
         try {
+            // Runtime schema validation — warns on contract drift, never throws.
+            // The ?? fallback chain below remains the authoritative data extraction.
+            safeValidate(OrderCreateResponseSchema, respData, "appendRound")
+
             const orderObj = respData?.order ?? respData ?? {}
             const parentOrderId = Number(
                 orderObj?.order_id ??
@@ -243,7 +253,7 @@ export const useOrderStore = defineStore("order", () => {
     }
 
     const getPackage = computed(() => state.package)
-    const getPackageModifiers = computed(() => state.package?.modifiers ?? [])
+    const getPackageModifiers = computed(() => (state.package as any)?.allowed_menus ?? [])
 
     const refillTotal = computed(() =>
         state.draft.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0)
@@ -251,7 +261,7 @@ export const useOrderStore = defineStore("order", () => {
 
     const activeCart = computed(() => state.draft)
 
-    const packageTotal = computed(() => toMoney(Number(state.package?.price || 0) * Number(state.guestCount || 1)))
+    const packageTotal = computed(() => toMoney(Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)))
 
     const addOnsTotal = computed(() =>
         toMoney(state.draft
@@ -260,10 +270,10 @@ export const useOrderStore = defineStore("order", () => {
     )
 
     const taxAmount = computed(() => {
-        if (!state.package?.is_taxable) { return 0 }
-        const packageTotalVal = Number(state.package?.price || 0) * Number(state.guestCount || 1)
+        if (!(state.package as any)?.is_taxable) { return 0 }
+        const packageTotalVal = Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)
         const addOns = addOnsTotal.value
-        const taxRate = Number(state.package?.tax?.percentage || 0)
+        const taxRate = Number((state.package as any)?.tax?.percentage || 0)
         return toMoney(((packageTotalVal + addOns) * taxRate) / 100)
     })
 
@@ -360,23 +370,24 @@ export const useOrderStore = defineStore("order", () => {
     function buildPayload (): OrderPayload {
         logger.debug("Validating payload structure...")
 
-        const pkg = state.package as any
-        const kryptonMenuId = Number(pkg?.krypton_menu_id ?? pkg?.package_id ?? pkg?.id)
+        const pkg = state.package as Package | null
+        // package_id on the wire is always krypton_menu_id (krypton_woosoo.menus.id),
+        // never the nexus Package row's own id — see DeviceOrderApiController::expandIntentPayload().
+        const packageId = Number(pkg?.krypton_menu_id)
 
         logger.debug("Package selection for order", {
             local_package_id: pkg?.id,
             krypton_menu_id: pkg?.krypton_menu_id,
-            package_id_fallback: pkg?.package_id,
-            submitted_package_id: kryptonMenuId,
+            submitted_package_id: packageId,
         })
 
-        if (!Number.isFinite(kryptonMenuId) || kryptonMenuId <= 0) {
-            throw new Error("Invalid package_id: package must be selected with valid krypton_menu_id")
+        if (!Number.isFinite(packageId) || packageId <= 0) {
+            throw new Error("Invalid package_id: package must be selected with a valid krypton_menu_id")
         }
 
         const payload = {
             guest_count: Number(state.guestCount),
-            package_id: kryptonMenuId,
+            package_id: packageId,
             items: normalizePayloadItems(state.draft),
         }
 
@@ -534,6 +545,11 @@ export const useOrderStore = defineStore("order", () => {
                 return responseData
             } catch (error: any) {
                 logger.error("Order submission failed:", error.message)
+
+                // Abort: preserve identity so useOrderSubmit can detect cancel
+                const isAbort = error?.name === "CanceledError" || error?.name === "AbortError" || error?.code === "ERR_CANCELED"
+                if (isAbort) { throw error }
+
                 const errorResponse = extractErrorResponse(error)
 
                 // 401 - Session expired
@@ -654,7 +670,7 @@ export const useOrderStore = defineStore("order", () => {
             const api = useApi()
             // Cross-store: called inside action body only (lazy, Pinia-safe)
             const sessionStore = useSessionStore()
-            const terminalStatuses = new Set(["completed", "voided", "cancelled"])
+            const terminalStatuses = new Set<string>(TERMINAL_ORDER_STATUSES)
 
             const currentOrderId = state.serverOrderId ?? sessionStore.getOrderId()
 
@@ -713,7 +729,10 @@ export const useOrderStore = defineStore("order", () => {
                         try { sessionStorage.setItem(REFILL_IDEM_KEY_STORAGE, idempotencyKey) } catch (e) { logger.debug("Failed to persist refill idempotency key", e) }
                     }
                 }
-                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, { headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey } })
+                const resp = await api.post(API_ENDPOINTS.ORDER_REFILL(currentOrderId), payload ?? refillPayload, {
+                    headers: { ...(options?.headers ?? {}), "X-Idempotency-Key": idempotencyKey },
+                    signal: options?.signal,
+                })
                 const responseData = extractResponseData(resp)
                 if (!responseData) {
                     handleOrderError("Refill response missing body")
@@ -810,7 +829,7 @@ export const useOrderStore = defineStore("order", () => {
                 const activeOrderId = activeOrder?.order_id || activeOrder?.id
                 const activeStatus = String(activeOrder?.status || "").toLowerCase()
 
-                if (activeOrderId && !["completed", "voided", "cancelled"].includes(activeStatus)) {
+                if (activeOrderId && !TERMINAL_ORDER_STATUSES.includes(activeStatus as typeof TERMINAL_ORDER_STATUSES[number])) {
                     const sessionStartedAt = (sessionStore.sessionStartedAt as unknown as number | null)
                     const orderCreatedAt = activeOrder?.created_at
                         ? new Date(activeOrder.created_at).getTime()
@@ -898,6 +917,27 @@ export const useOrderStore = defineStore("order", () => {
         state.serverStatus = status
     }
 
+    function setServerOrderId (id: number | null) {
+        state.serverOrderId = id
+    }
+
+    function applyDetailsUpdate (details: {
+        order_id: number
+        guest_count: number | null
+        subtotal: string | null
+        tax: string | null
+        discount: string | null
+        total: string | null
+    }): void {
+        // POS is authoritative — assign directly, never recompute
+        if (details.guest_count !== undefined && details.guest_count !== null) {
+            state.guestCount = details.guest_count
+        }
+        if (details.total !== undefined && details.total !== null) {
+            state.serverTotal = Number(details.total)
+        }
+    }
+
     function clearPackage () { state.package = null }
 
     // Computed helpers — TypeScript-safe accessors that unwrap ref types for component consumers
@@ -922,6 +962,7 @@ export const useOrderStore = defineStore("order", () => {
         state.package = null
         state.guestCount = 2
         state.error = null
+        state.isSubmitting = false
     }
 
     return {
@@ -949,6 +990,8 @@ export const useOrderStore = defineStore("order", () => {
         setOrderCreated,
         initializeFromSession,
         updateOrderStatus,
+        setServerOrderId,
+        applyDetailsUpdate,
         clearPackage,
         getServerOrderId,
         handleOrderError,

@@ -24,7 +24,9 @@ const { isFullscreen, recover } = useKioskFullscreen()
 const progressPercent = computed(() => {
     if (props.isFinalizing) { return 0 }
     const total = props.totalCountdown > 0 ? props.totalCountdown : 5
-    return Math.max(0, Math.min(100, (props.countdown / total) * 100))
+    // Fill 0% → 100% as countdown elapses (left-to-right progress to home),
+    // not 100% → 0% which reads as the bar "flowing backwards".
+    return Math.max(0, Math.min(100, ((total - props.countdown) / total) * 100))
 })
 </script>
 

@@ -82,7 +82,7 @@ describe("order store — setOrderCreated and round ledger", () => {
         expect(order.serverOrderId).toBe(19561)
 
         // Attempt to submit a new order should throw due to serverOrderId guard
-        order.setPackage({ id: 1, price: 100 } as Package)
+        order.setPackage({ id: 1, krypton_menu_id: 1, price: 100 } as unknown as Package)
         ;(order as any).draft = [{ id: 10, name: "Extra", price: 5, quantity: 1 } as CartItem]
         order.setGuestCount(1)
 
@@ -96,7 +96,7 @@ describe("order store — setOrderCreated and round ledger", () => {
         // Simulate cold boot: no token yet and no active session id restored.
         session.setOrderId(null)
         order.setGuestCount(6)
-        order.setPackage({ id: 99, name: "Stale Package", price: 100 } as Package)
+        order.setPackage({ id: 99, krypton_menu_id: 99, name: "Stale Package", price: 100 } as unknown as Package)
         ;(order as any).draft = [{ id: 88, name: "Stale Item", price: 12, quantity: 2 } as CartItem]
         ;(order as any).rounds = [{ kind: "initial", number: 1, submittedAt: new Date().toISOString(), items: [], serverOrderId: 1234, serverTotal: 0 }]
         ;(order as any).serverOrderId = 1234

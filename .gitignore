@@ -23,6 +23,10 @@ logs
 # Test artifacts
 *.test.html
 .nuxt-dev-test.html
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
 # Local env files
 .env
@@ -40,3 +44,4 @@ public/
 # AI agent runtime files
 skills-lock.json
 .agents/
+.cursor/

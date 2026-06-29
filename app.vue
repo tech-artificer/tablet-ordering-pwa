@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { unref } from "vue"
+import { unref, watch } from "vue"
 import { useDeviceStore } from "~/stores/Device"
 import { useSessionStore } from "~/stores/Session"
 import { useAppUpdate } from "~/composables/useAppUpdate"
@@ -7,6 +7,8 @@ import { useBroadcasts } from "~/composables/useBroadcasts"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useKioskFullscreen } from "~/composables/useKioskFullscreen"
 import { useBuildVersion } from "~/composables/useBuildVersion"
+import { usePollingFallback } from "~/composables/usePollingFallback"
+import { useWakeLock } from "~/composables/useWakeLock"
 import { logger } from "~/utils/logger"
 
 const router = useRouter()
@@ -16,6 +18,8 @@ const sessionStore = useSessionStore()
 const { initializeBroadcasts, cleanup } = useBroadcasts()
 const { attachListener, requestFullscreen } = useKioskFullscreen()
 const { startPeriodicCheck, stopPeriodicCheck } = useBuildVersion()
+const { initialize: initPollingFallback } = usePollingFallback()
+const { acquireWakeLock, releaseWakeLock } = useWakeLock()
 
 // Kiosk auto-update: a pending PWA update is applied automatically, but ONLY
 // when no customer is mid-order (no active dining session). If an order is in
@@ -36,6 +40,18 @@ const FORCE_REINIT_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
 
 // Initialize network status monitoring
 useNetworkStatus()
+
+// Wire polling fallback (auto-starts when Reverb phase escalates)
+initPollingFallback()
+
+// Wake lock: keep screen on during active dining sessions
+watch(
+    () => sessionStore.isActive,
+    (active) => {
+        if (active) { acquireWakeLock() } else { releaseWakeLock() }
+    },
+    { immediate: true }
+)
 
 const PUBLIC_ROUTES = ["/", "/settings", "/auth/register"]
 

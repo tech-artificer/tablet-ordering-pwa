@@ -15,7 +15,7 @@ describe("OrderingStep3ReviewSubmit", () => {
     it("submits initial order and emits order-submitted", async () => {
         const order = useOrderStore()
         order.setGuestCount(2)
-        order.setPackage({ id: 1, name: "A-La-Carte", price: 199 } as any)
+        order.setPackage({ id: 1, krypton_menu_id: 1, name: "A-La-Carte", price: 199 } as any)
         ;(order as any).draft = [
             { id: 10, name: "Beef", quantity: 1, category: "meats", price: 0 },
         ]
@@ -58,7 +58,7 @@ describe("OrderingStep3ReviewSubmit", () => {
     it("shows blocker message and keeps submit disabled when meat selection is missing", async () => {
         const order = useOrderStore()
         order.setGuestCount(2)
-        order.setPackage({ id: 7, name: "Premium", price: 299 } as any)
+        order.setPackage({ id: 7, krypton_menu_id: 7, name: "Premium", price: 299 } as any)
         ;(order as any).draft = []
 
         const wrapper = mount(OrderingStep3ReviewSubmit)
