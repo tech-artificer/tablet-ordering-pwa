@@ -314,9 +314,24 @@ export const useDeviceStore = defineStore("device", () => {
             logger.warn(`[Device] Auth failed: incomplete response at ${new Date().toISOString()}`)
             return false
         } catch (error: any) {
+            const status: number | null = error?.response?.status ?? null
             logger.error(`[Device] Auth error ${error?.message} at ${new Date().toISOString()}`)
             logger.error("[DeviceStore] Authentication failed:", error)
-            state.errorMessage = error?.response?.data?.message || error?.response?.data?.error || "Authentication failed"
+
+            const message = error?.response?.data?.message || error?.response?.data?.error || "Authentication failed"
+
+            // Login-by-IP is the broadest "does this device still exist?" check.
+            // When the server authoritatively rejects the identity — device deleted
+            // (404), unclaimed (403), or token/identity revoked (401) — the persisted
+            // "registered" state is a zombie. Clear it so the tablet returns to
+            // device registration instead of fabricating a "registered but invalid"
+            // state. Transient failures (network error, 5xx) leave auth intact so a
+            // later recovery attempt can succeed.
+            if (status === 401 || status === 403 || status === 404) {
+                clearAuth()
+            }
+
+            state.errorMessage = message
             return false
         } finally {
             state.isLoading = false
