@@ -274,6 +274,11 @@ export interface PackageAllowedMenu {
 
 export interface Package {
   id: number;
+  /**
+   * POS set-meal menu id (krypton_woosoo.menus.id). This — NOT the local `id` —
+   * is what the tablet submits as `package_id` in an order; the backend resolves
+   * the package by `krypton_menu_id` (CONTRACTS §3, DeviceOrderApiController).
+   */
   krypton_menu_id: number;
   name: string;
   description: string;

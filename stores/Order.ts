@@ -376,7 +376,8 @@ export const useOrderStore = defineStore("order", () => {
         const packageId = Number(pkg?.krypton_menu_id)
 
         logger.debug("Package selection for order", {
-            package_id: pkg?.id,
+            local_package_id: pkg?.id,
+            krypton_menu_id: pkg?.krypton_menu_id,
             submitted_package_id: packageId,
         })
 
