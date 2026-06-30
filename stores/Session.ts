@@ -452,11 +452,17 @@ export const useSessionStore = defineStore("session", () => {
         state.orderId = Number(snapshot.order_id) || null
         state.sessionId = Number(snapshot.session_id) || null
         state.isActive = true
-        state.sessionStartedAt = snapshot.started_at
+        // Preserve the snapshot's start time rather than calling startTimer() which
+        // would overwrite sessionStartedAt with Date.now().
+        const startedAt = snapshot.started_at
             ? new Date(snapshot.started_at).getTime()
             : Date.now()
+        state.sessionStartedAt = startedAt
+        state.sessionEndsAt = startedAt + SESSION_DURATION_MS
+        state.timerExpired = false
         state.terminalHandled = false
-        startTimer()
+        updateRemaining()
+        startTimerInterval()
         startSyncResyncTimer()
         _registerVisibilitySync()
     }

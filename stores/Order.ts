@@ -956,7 +956,7 @@ export const useOrderStore = defineStore("order", () => {
     function hydrateFromSnapshot (snapshot: import("~/types").ActiveOrderSnapshot): void {
         state.rounds = (snapshot.rounds ?? []).map(r => ({
             ...r,
-            pos_originated: r.pos_originated ?? true,
+            pos_originated: true,
         }))
         state.serverOrderId = Number(snapshot.order_id) || null
         state.serverStatus = snapshot.status
