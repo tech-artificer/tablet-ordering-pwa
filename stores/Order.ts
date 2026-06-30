@@ -370,10 +370,9 @@ export const useOrderStore = defineStore("order", () => {
     function buildPayload (): OrderPayload {
         logger.debug("Validating payload structure...")
 
-        const pkg = state.package as any
-        // package_id is the POS anchor (krypton_menu_id), NOT the local package id.
-        // The backend resolves the package by krypton_menu_id (CONTRACTS §3); sending
-        // the local id makes order creation 422.
+        const pkg = state.package as Package | null
+        // package_id on the wire is always krypton_menu_id (krypton_woosoo.menus.id),
+        // never the nexus Package row's own id — see DeviceOrderApiController::expandIntentPayload().
         const packageId = Number(pkg?.krypton_menu_id)
 
         logger.debug("Package selection for order", {
@@ -383,7 +382,7 @@ export const useOrderStore = defineStore("order", () => {
         })
 
         if (!Number.isFinite(packageId) || packageId <= 0) {
-            throw new Error("Invalid package_id: selected package has no POS anchor (krypton_menu_id)")
+            throw new Error("Invalid package_id: package must be selected with a valid krypton_menu_id")
         }
 
         const payload = {

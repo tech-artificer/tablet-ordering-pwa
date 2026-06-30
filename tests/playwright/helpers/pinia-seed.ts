@@ -1,5 +1,4 @@
-export const ACTIVE_ORDER_RECOVERY_STATUS_PARAM =
-    "pending,confirmed,in_progress,ready,served"
+export { ACTIVE_ORDER_RECOVERY_STATUS_PARAM } from "../../../stores/Order"
 
 export const E2E_DEVICE_STORE = {
     token: "e2e-playwright-device-token",

@@ -285,12 +285,6 @@ export interface Package {
   base_price: number;
   min_meat: number;
   max_meat: number;
-  min_side: number;
-  max_side: number;
-  min_dessert: number;
-  max_dessert: number;
-  min_beverage: number;
-  max_beverage: number;
   is_active: boolean;
   is_most_popular: boolean;
   sort_order: number;

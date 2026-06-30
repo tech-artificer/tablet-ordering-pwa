@@ -166,7 +166,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 data: "<!DOCTYPE html><html><body>Nuxt shell</body></html>"
             })
 
-            const ok = await store.authenticate("192.168.100.7")
+            const ok = await store.authenticate()
 
             expect(ok).toBe(false)
             expect(store.lastAuthResponse).toBeNull()
@@ -370,5 +370,84 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 })
             }
         })
+    })
+})
+
+describe("Device Store — orphaned auth reaping (registered but invalid)", () => {
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        mockPost.mockReset()
+        mockGet.mockReset()
+        mockGetLocalIp.mockReset()
+    })
+
+    const seedRegisteredDevice = (store: ReturnType<typeof useDeviceStore>) => {
+        ;(store as any).token = "140|stale-token"
+        ;(store as any).device = { id: 140, name: "TestPlayright" }
+        ;(store as any).table = { id: 2, name: "T2" }
+    }
+
+    it("clears persisted device/token/table when login reports 404 (device deleted on server)", async () => {
+        const store = useDeviceStore()
+        seedRegisteredDevice(store)
+
+        mockGet.mockRejectedValueOnce({
+            response: { status: 404, data: { success: false, error: "Device not found" } }
+        })
+
+        const ok = await store.authenticate()
+
+        expect(ok).toBe(false)
+        expect(store.token).toBeNull()
+        expect(store.device).toBeNull()
+        expect(store.table).toBeNull()
+        // The operator-facing reason must survive the clear.
+        expect(store.errorMessage).toBe("Device not found")
+    })
+
+    it("clears orphaned auth when login reports 403 (device no longer registered)", async () => {
+        const store = useDeviceStore()
+        seedRegisteredDevice(store)
+
+        mockGet.mockRejectedValueOnce({
+            response: { status: 403, data: { error: "Device not yet registered with security code" } }
+        })
+
+        const ok = await store.authenticate()
+
+        expect(ok).toBe(false)
+        expect(store.token).toBeNull()
+        expect(store.device).toBeNull()
+        expect(store.table).toBeNull()
+    })
+
+    it("does NOT clear auth on a transient network error (no server response)", async () => {
+        const store = useDeviceStore()
+        seedRegisteredDevice(store)
+
+        mockGet.mockRejectedValueOnce({ message: "Network Error" })
+
+        const ok = await store.authenticate()
+
+        expect(ok).toBe(false)
+        // Server never authoritatively rejected the device — keep auth for later recovery.
+        expect(store.token).toBe("140|stale-token")
+        expect(store.device).toEqual({ id: 140, name: "TestPlayright" })
+        expect(store.table).toEqual({ id: 2, name: "T2" })
+    })
+
+    it("does NOT clear auth on a transient 5xx server error", async () => {
+        const store = useDeviceStore()
+        seedRegisteredDevice(store)
+
+        mockGet.mockRejectedValueOnce({
+            response: { status: 503, data: { message: "Service unavailable" } }
+        })
+
+        const ok = await store.authenticate()
+
+        expect(ok).toBe(false)
+        expect(store.token).toBe("140|stale-token")
+        expect(store.device).toEqual({ id: 140, name: "TestPlayright" })
     })
 })
