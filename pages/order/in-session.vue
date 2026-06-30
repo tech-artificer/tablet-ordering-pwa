@@ -5,6 +5,7 @@ import { ElDialog, ElButton, ElMessage } from "element-plus"
 import { useSessionStore } from "~/stores/Session"
 import { useOrderStore } from "~/stores/Order"
 import { useDeviceStore } from "~/stores/Device"
+import { useDiscountStore } from "~/stores/Discount"
 import { useApi } from "~/composables/useApi"
 import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
@@ -14,6 +15,7 @@ import { logger } from "~/utils/logger"
 const sessionStore = useSessionStore()
 const orderStore = useOrderStore()
 const deviceStore = useDeviceStore()
+const discountStore = useDiscountStore()
 const { isOnline } = useNetworkStatus()
 
 // ── Derived state ─────────────────────────────────────────────────────────────
@@ -30,6 +32,7 @@ type DisplayedItem = {
     isUnlimited: boolean
     sourceRound: "initial" | "refill"
     sourceRoundLabel: string
+    posOriginated?: boolean
 }
 
 const displaySubmittedItems = computed<DisplayedItem[]>(() => {
@@ -51,6 +54,7 @@ const displaySubmittedItems = computed<DisplayedItem[]>(() => {
                 isUnlimited: Boolean(item?.isUnlimited),
                 sourceRound: isRefill ? "refill" : "initial",
                 sourceRoundLabel: label,
+                posOriginated: Boolean(round?.pos_originated),
             })
         }
     }
@@ -125,6 +129,12 @@ const taxRatePercent = computed<number | null>(() => {
     const rate = Number(pkg?.tax?.percentage ?? 0)
     if (!Number.isFinite(rate) || rate <= 0) { return null }
     return rate
+})
+
+const discountTotal = computed<number>(() => {
+    const fromBroadcast = Number(unref(discountStore.discountTotal) ?? 0)
+    if (fromBroadcast > 0) { return fromBroadcast }
+    return Number(unref(orderStore.serverDiscountTotal) ?? 0)
 })
 
 function formatPeso (value: number): string {
@@ -356,6 +366,12 @@ definePageMeta({ layout: "kiosk" })
                                     >
                                         {{ item.sourceRoundLabel }}
                                     </span>
+                                    <span
+                                        v-if="item.posOriginated"
+                                        class="flex-shrink-0 rounded border border-white/20 bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white/50"
+                                    >
+                                        Added by staff
+                                    </span>
                                 </div>
                                 <span v-if="item.price > 0" class="text-xs text-white/40">
                                     {{ formatPesoExact(item.price) }} each
@@ -406,6 +422,10 @@ definePageMeta({ layout: "kiosk" })
                                 Tax<span v-if="taxRatePercent !== null"> ({{ taxRatePercent }}%)</span>
                             </span>
                             <span class="text-sm font-semibold text-white tabular-nums">{{ formatPesoExact(taxAmount) }}</span>
+                        </div>
+                        <div v-if="discountTotal > 0" class="flex items-center justify-between text-green-400">
+                            <span class="text-sm">Discount</span>
+                            <span class="text-sm font-semibold tabular-nums">−{{ formatPesoExact(discountTotal) }}</span>
                         </div>
                     </div>
 

@@ -38,6 +38,7 @@ export const API_ENDPOINTS = {
     // Dynamic order endpoints
     ORDER_REFILL: (orderId: number | string) => `/api/order/${orderId}/refill`,
     DEVICE_ORDER_BY_EXTERNAL_ID: (orderId: number | string) => `/api/device-order/by-order-id/${orderId}`,
+    TABLET_TABLE_ACTIVE_ORDER: (tableId: number | string) => `/api/v2/tablet/table/${tableId}/active-order`,
 } as const
 
 // HTTP Headers configuration

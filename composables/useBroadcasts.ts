@@ -4,10 +4,12 @@ import type { Channel } from "laravel-echo"
 import { useDeviceStore } from "~/stores/Device"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
+import { useDiscountStore } from "~/stores/Discount"
 import { useConnectionStore } from "~/stores/Connection"
 import { extractOrderId } from "~/utils/orderHelpers"
 import { logger } from "~/utils/logger"
 import { useSessionEndFlow } from "~/composables/useSessionEndFlow"
+import type { ActiveOrderSnapshot } from "~/types"
 
 /** Echo channel with the concrete `name` property exposed by all Pusher-backed channels */
 type EchoChannel = Channel & { name: string }
@@ -128,6 +130,15 @@ interface OrderDetailsUpdatedEvent {
   }
 }
 
+interface DiscountAppliedEvent {
+  order_id: number
+  totals: { subtotal: number; discount_total: number; total: number }
+}
+
+interface OrderStartedFromPosEvent {
+  snapshot: ActiveOrderSnapshot
+}
+
 interface ServiceRequestEvent {
   service_request: ServiceRequest
 }
@@ -157,6 +168,7 @@ export const useBroadcasts = () => {
     let orderChannel: EchoChannel | null = null
     let serviceRequestChannel: EchoChannel | null = null
     let sessionChannel: EchoChannel | null = null
+    let tableChannel: EchoChannel | null = null
     let subscribedSessionId: number | string | null = null
     let stopSessionIdWatcher: (() => void) | null = null
     let stopOrderIdWatcher: (() => void) | null = null
@@ -376,6 +388,24 @@ export const useBroadcasts = () => {
         }
     }
 
+    const handleDiscountApplied = (event: DiscountAppliedEvent) => {
+        touchLastEvent()
+        logger.debug("[📨 .discount.applied]", { order_id: event.order_id, discount_total: event.totals.discount_total })
+
+        const currentOrderId = getCurrentOrderId()
+        if (currentOrderId != null && String(currentOrderId) === String(event.order_id)) {
+            const discountStore = useDiscountStore()
+            discountStore.apply(event.totals.discount_total)
+            orderStore.updateTotals(event.totals)
+            ElNotification({
+                title: "Discount Applied",
+                message: "A discount has been applied to your order.",
+                type: "success",
+                duration: 6000,
+            })
+        }
+    }
+
     const handleServiceRequest = (event: ServiceRequestEvent) => {
         touchLastEvent()
         logger.debug("Service request update:", event.service_request)
@@ -550,6 +580,9 @@ export const useBroadcasts = () => {
             .listen(".order.details.updated", (event: OrderDetailsUpdatedEvent) => {
                 handleOrderDetailsUpdated(event)
             })
+            .listen(".discount.applied", (event: DiscountAppliedEvent) => {
+                handleDiscountApplied(event)
+            })
 
         channelStatus.value.order = true
         logger.debug(`✅ Subscribed to orders.${orderId}`)
@@ -609,6 +642,37 @@ export const useBroadcasts = () => {
         }
         sessionChannel = null
         subscribedSessionId = null
+    }
+
+    const subscribeToTableChannel = (tableId: string | number) => {
+        if (!tableId || !(window as any).Echo) { return }
+        if (tableChannel?.name === `table.${tableId}`) { return }
+        if (tableChannel) {
+            const canLeave = typeof (window as any).Echo?.leave === "function"
+            if (canLeave) { ;(window as any).Echo.leave(tableChannel.name) }
+        }
+        logger.debug("[Echo] Subscribing to table." + tableId)
+        tableChannel = (window as any).Echo.channel(`table.${tableId}`)
+            .listen(".order.started-from-pos", (event: OrderStartedFromPosEvent) => {
+                touchLastEvent()
+                logger.debug("[📨 .order.started-from-pos]", { order_id: event.snapshot?.order_id })
+                if (!sessionStore.getIsActive()) {
+                    const discountStore = useDiscountStore()
+                    orderStore.hydrateFromSnapshot(event.snapshot)
+                    sessionStore.hydrateFromSnapshot(event.snapshot)
+                    discountStore.hydrate(event.snapshot.discounts ?? [])
+                    navigateTo("/order/in-session")
+                }
+            })
+        logger.debug(`✅ Subscribed to table.${tableId}`)
+    }
+
+    const unsubscribeFromTableChannel = () => {
+        if (tableChannel) {
+            const canLeave = typeof (window as any).Echo?.leave === "function"
+            if (canLeave) { ;(window as any).Echo.leave(tableChannel.name) }
+            tableChannel = null
+        }
     }
 
     const ensureSessionChannelAutoSubscription = () => {
@@ -769,6 +833,12 @@ export const useBroadcasts = () => {
         // Keep session.{id} subscription in sync with session lifecycle.
         ensureSessionChannelAutoSubscription()
 
+        // Subscribe to table channel for POS-originated order events.
+        const tableId = deviceStore.getTableId()
+        if (tableId) {
+            subscribeToTableChannel(tableId)
+        }
+
         bindConnectionStateHandler()
         lastEventAt = Date.now()
         startWatchdog()
@@ -790,6 +860,7 @@ export const useBroadcasts = () => {
 
         unsubscribeFromOrderChannel()
         unsubscribeFromSessionChannel()
+        unsubscribeFromTableChannel()
         if (stopOrderIdWatcher) {
             stopOrderIdWatcher()
             stopOrderIdWatcher = null

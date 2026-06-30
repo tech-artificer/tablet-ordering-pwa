@@ -6,6 +6,8 @@ import { API_ENDPOINTS } from "../config/api"
 import { useOrderStore } from "./Order"
 import { useDeviceStore } from "./Device"
 import { useMenuStore } from "./Menu"
+import { useDiscountStore } from "./Discount"
+import type { ActiveOrderSnapshot } from "~/types"
 
 // BUG-13 Fix: Simple async mutex to prevent concurrent session operations
 class AsyncMutex {
@@ -378,6 +380,9 @@ export const useSessionStore = defineStore("session", () => {
         const orderStore = useOrderStore()
         orderStore.resetOrderState()
 
+        const discountStore = useDiscountStore()
+        discountStore.reset()
+
         logger.info(`[Session] State cleared at ${timestamp}`)
 
         // Remove lightweight active flag from localStorage (SSR-safe)
@@ -443,6 +448,19 @@ export const useSessionStore = defineStore("session", () => {
     function markTerminalHandled () { state.terminalHandled = true }
     function isTerminalHandled (): boolean { return state.terminalHandled }
 
+    function hydrateFromSnapshot (snapshot: ActiveOrderSnapshot): void {
+        state.orderId = Number(snapshot.order_id) || null
+        state.sessionId = Number(snapshot.session_id) || null
+        state.isActive = true
+        state.sessionStartedAt = snapshot.started_at
+            ? new Date(snapshot.started_at).getTime()
+            : Date.now()
+        state.terminalHandled = false
+        startTimer()
+        startSyncResyncTimer()
+        _registerVisibilitySync()
+    }
+
     return {
         ...toRefs(state),
         fetchLatestSession,
@@ -462,6 +480,7 @@ export const useSessionStore = defineStore("session", () => {
         getSessionId,
         markTerminalHandled,
         isTerminalHandled,
+        hydrateFromSnapshot,
     }
 }, {
     persist: {
