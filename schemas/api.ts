@@ -104,6 +104,7 @@ export const MenuItemSchema = z.object({
     price: coercedNumber.optional(),
     category: z.string().optional(),
     is_available: z.boolean().optional(),
+    is_featured: z.boolean().optional(),
 }).passthrough()
 
 export const PackageSchema = z.object({

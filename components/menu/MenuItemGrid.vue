@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElEmpty } from "element-plus"
-import { Lock, EyeOff, Plus } from "lucide-vue-next"
+import { Lock, EyeOff, Plus, Star } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
 import type { MenuItem, Modifier } from "../../types"
 
@@ -91,8 +91,12 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
                 {{ getItemQuantity(item.id) }}
             </div>
 
-            <!-- Unlimited / Locked badge -->
+            <!-- Unlimited / Locked / Featured badge -->
             <div class="absolute top-2.5 left-2.5 z-30 flex gap-1.5">
+                <div v-if="item.is_featured" class="featured-badge">
+                    <Star :size="10" stroke-width="3" />
+                    FEATURED
+                </div>
                 <div v-if="isUnlimitedCategory && !isLocked() && !isRuntimeUnavailable(item)" class="unlimited-badge">
                     <span class="unlimited-dot" aria-hidden="true" />
                     UNLIMITED
@@ -236,7 +240,8 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
 }
 
 .locked-badge,
-.upgrade-pill {
+.upgrade-pill,
+.featured-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -251,6 +256,12 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
   backdrop-filter: blur(4px);
   text-transform: uppercase;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.featured-badge {
+  color: #FFD700;
+  border-color: rgba(255, 215, 0, 0.45);
+  background: rgba(20, 16, 12, 0.85);
 }
 
 .locked-badge {

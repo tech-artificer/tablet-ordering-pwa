@@ -114,6 +114,34 @@ export const useOrderStore = defineStore("order", () => {
         serverTotal: 0 as number,
     })
 
+    function getItemQuantityLimit (itemId: number, isUnlimited: boolean): number {
+        const allowedMenus = (state.package as Package | null)?.allowed_menus ?? []
+        const allowedEntry = allowedMenus.find((m: any) => m.krypton_menu_id === itemId)
+        if (allowedEntry && Number(allowedEntry.quantity_limit) > 0) {
+            return Number(allowedEntry.quantity_limit)
+        }
+        return isUnlimited ? UNLIMITED_ITEM_CAP : 99
+    }
+
+    function validateRequiredMeats (): string | null {
+        const pkg = state.package as Package | null
+        if (!pkg?.allowed_menus?.length) { return null }
+        const requiredMeats = pkg.allowed_menus.filter((m: any) => m.menu_type === "meat" && m.is_required)
+        for (const required of requiredMeats) {
+            const qtyInCart = state.draft.find(i => i.id === required.krypton_menu_id)?.quantity ?? 0
+            if (qtyInCart < 1) {
+                return `Select at least one ${required.menu_name || "meat"}`
+            }
+        }
+        return null
+    }
+
+    function getMeatSelectionCount (): number {
+        return state.draft
+            .filter(i => normalizeCartCategory(i.category) === "meats")
+            .reduce((sum, i) => sum + Number(i.quantity), 0)
+    }
+
     function handleOrderError (message: string): void {
         state.error = message
         state.isSubmitting = false
@@ -293,21 +321,23 @@ export const useOrderStore = defineStore("order", () => {
 
         const existing = state.draft.find(i => i.id === item.id)
         const category = normalizeCartCategory(opts?.category ?? (item as any)?.category)
+        const isUnlimited = Boolean(opts?.isUnlimited)
 
         if (existing) {
-            const isUnlimited = Boolean(existing.isUnlimited || opts?.isUnlimited)
-            const max = isUnlimited ? UNLIMITED_ITEM_CAP : 99
+            const max = getItemQuantityLimit(item.id, isUnlimited)
             existing.quantity = Math.min(Number(existing.quantity) + 1, max)
             existing.category = normalizeCartCategory(existing.category ?? category)
         } else {
+            const max = getItemQuantityLimit(item.id, isUnlimited)
             state.draft.push({
                 id: Number(item.id),
                 name: item.name,
                 img_url: item.img_url || "",
                 price: Number(item.price || 0),
                 quantity: 1,
-                isUnlimited: Boolean(opts?.isUnlimited),
+                isUnlimited,
                 category,
+                quantity_limit: max,
             })
         }
     }
@@ -321,7 +351,7 @@ export const useOrderStore = defineStore("order", () => {
         const existing = state.draft.find(i => i.id === id)
         if (!existing) { return }
 
-        const max = existing.isUnlimited ? UNLIMITED_ITEM_CAP : 99
+        const max = getItemQuantityLimit(id, Boolean(existing.isUnlimited))
         const q = Math.min(Math.max(0, Number(quantity)), max)
         existing.quantity = q
         if (existing.quantity <= 0) { remove(id) }
@@ -407,6 +437,11 @@ export const useOrderStore = defineStore("order", () => {
                 throw new Error(`Invalid item[${index}].quantity: must be at least 1`)
             }
         })
+
+        const requiredMeatError = validateRequiredMeats()
+        if (requiredMeatError) {
+            throw new Error(requiredMeatError)
+        }
 
         logger.debug("Payload validation passed")
         return payload

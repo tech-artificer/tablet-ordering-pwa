@@ -366,6 +366,7 @@ export interface MenuItem {
   is_available: boolean;
   is_taxable: boolean;
   is_discountable: boolean;
+  is_featured?: boolean;
   tax: Tax;
   tax_amount: number;
 }
