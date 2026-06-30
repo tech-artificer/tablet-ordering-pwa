@@ -2,13 +2,14 @@
 
 ## Status
 
-Resolved. Frontend-only fix. No backend change.
+Open on `feat/welcome-screen-redesign`. Frontend-only fix. No backend change.
 
-## Scope
+> **Note:** This case file was rescued from the Pi checkout (PR #223). The full IP-display
+> fix (WebRTC-first, `isPrivateLanIp` gating) is already on `staging`/`main`. This branch
+> still has the pre-fix behavior documented under **Current behavior** below.
 
-- `utils/getLocalIp.ts`
-- `pages/settings.vue`
-- `docs/LESSONS.md` (new)
+## Scope (this PR cohort)
+
 - `docs/cases/tab-case-013-settings-device-ip-display.md` (this file)
 
 ## Symptom
@@ -17,37 +18,36 @@ The Settings page "IP Address" field shows `172.21.112.1` (the WSL2 NAT gateway)
 
 ## Root Cause
 
-Two compounding bugs:
+Two compounding bugs (still present on this branch):
 
-**1. `getLocalIp.ts` — `else` branch resolves immediately (contrary to comment)**
+**1. `getLocalIp.ts` — non-private candidates resolve immediately**
 
-The `onicecandidate` handler intended to buffer non-private IPs and only resolve immediately on private LAN IPs. The comment said "don't resolve immediately" but both branches called `handleIp(ip)` — which resolves the promise. A public/reflexive STUN candidate emitted before a private LAN candidate would win incorrectly.
+The `onicecandidate` handler comment says non-private IPs should be buffered, but both branches call `handleIp(ip)`, which resolves the promise. A public/reflexive STUN candidate emitted before a private LAN candidate can win incorrectly.
 
-**2. `settings.vue` — wrong priority order in `getLocalIpAddress` and `displayIpAddress`**
+**2. `settings.vue` — backend IP preferred over WebRTC**
 
-`getLocalIpAddress` tried `last_ip_address` (backend-stored) before WebRTC. In WSL2 dev, `last_ip_address` is always the gateway (`172.21.112.1`), so WebRTC never ran.
+`getLocalIpAddress` tries `last_ip_address` (backend-stored) before WebRTC. In WSL2 dev, `last_ip_address` is often the gateway (`172.21.112.1`), so WebRTC may never run.
 
-`displayIpAddress` always preferred `device.ip_address` (also the gateway) over `localIpAddress`, so even a correctly detected WebRTC IP was never shown.
+`displayIpAddress` is `displayDevice.value?.ip_address ?? localIpAddress.value ?? "—"`, so the backend-stored gateway wins over a WebRTC-detected LAN IP.
 
-## Fix
+## Current behavior (this branch)
 
-### `utils/getLocalIp.ts`
+| Helper | Behavior |
+|--------|----------|
+| `getLocalIpAddress` | `last_ip_address` → WebRTC (`getLocalIp`) → `GET /api/device/ip` |
+| `displayIpAddress` | `device.ip_address` → `localIpAddress` → `"—"` |
+| `getLocalIp` | Private and public ICE candidates both call `handleIp` immediately |
 
-Added `publicCandidate` closure variable. Private LAN IPs still resolve immediately. Non-private IPs are buffered in `publicCandidate` and only returned at timeout if no private IP was found.
+## Target fix (on `staging`/`main`)
 
-### `pages/settings.vue`
+- `getLocalIp.ts`: buffer non-private candidates; resolve private LAN IPs immediately.
+- `settings.vue`: add `isPrivateLanIp`; WebRTC first in `getLocalIpAddress`; prefer `localIpAddress` in `displayIpAddress` only when `isPrivateLanIp(localIpAddress)`.
 
-- Added `isPrivateLanIp` helper (same private-range regex as `getLocalIp.ts`).
-- Reordered `getLocalIpAddress`: WebRTC first → `last_ip_address` → `/api/device/ip`.
-- Updated `displayIpAddress`: prefers `localIpAddress` only when `isPrivateLanIp(localIpAddress.value)` is true, otherwise falls back to `device.ip_address`.
-
-## Behavior After Fix
-
-| Environment | WebRTC result | `displayIpAddress` |
+| Environment | WebRTC result | Expected display |
 |---|---|---|
-| Physical LAN (prod) | real LAN IP (e.g. `192.168.1.x`) | WebRTC LAN IP ✓ |
-| WSL2 dev | null or non-private | `device.ip_address` (gateway, dev-only limitation) |
-| WebRTC blocked | null | `device.ip_address` fallback ✓ |
+| Physical LAN (prod) | real LAN IP (e.g. `192.168.1.x`) | WebRTC LAN IP |
+| WSL2 dev | null or non-private | `device.ip_address` (gateway; dev limitation) |
+| WebRTC blocked | null | `device.ip_address` fallback |
 
 ## Verification
 
@@ -55,4 +55,4 @@ Added `publicCandidate` closure variable. Private LAN IPs still resolve immediat
 npm run typecheck && npm run lint
 ```
 
-Manual: open Settings in a desktop browser on a real LAN — "IP Address" should show the machine's LAN IP (e.g. `192.168.x.x`). "Detected Client IP" diagnostic row should match.
+Manual (after merging staging IP fix): open Settings on a real LAN — "IP Address" should show the machine's LAN IP.

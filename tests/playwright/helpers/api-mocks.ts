@@ -48,7 +48,7 @@ export async function installRecoveryApiMocks (
     await page.route("**/*", async (route) => {
         const url = new URL(route.request().url())
         if (!isBackendApiPath(url.pathname)) {
-            await route.continue()
+            await route.fallback()
             return
         }
 

@@ -3,9 +3,16 @@ import { logger } from "~/utils/logger"
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
-const coercedNumber = z.coerce.number().refine(Number.isFinite, {
-    error: "Expected a finite number",
-})
+const coercedNumber = z.preprocess(
+    (value) => {
+        if (value === null || value === undefined) { return value }
+        if (typeof value === "string" && value.trim() === "") { return Number.NaN }
+        return value
+    },
+    z.coerce.number().refine(Number.isFinite, {
+        error: "Expected a finite number",
+    })
+)
 const coercedString = z.union([z.string(), z.number(), z.null()]).transform(v => (v == null ? "" : String(v)))
 
 // ─── Order schemas ────────────────────────────────────────────────────────────
@@ -49,7 +56,14 @@ export const OrderStatusResponseSchema = z.object({
     }).passthrough().optional(),
     status: z.string().optional(),
     id: coercedNumber.optional(),
-}).passthrough()
+}).passthrough().refine(
+    value => Boolean(
+        value.order?.status ||
+        value.data?.status ||
+        value.status
+    ),
+    { message: "Expected order.status, data.status, or top-level status" }
+)
 
 // ─── Device schemas ───────────────────────────────────────────────────────────
 
