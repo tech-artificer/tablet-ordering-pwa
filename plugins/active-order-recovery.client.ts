@@ -31,7 +31,7 @@ export default defineNuxtPlugin(async () => {
     if (!tableId || !token) { return }
 
     // Skip when a session is already active and an order has been placed.
-    if (sessionStore.getIsActive() && orderStore.hasPlacedOrder.value) { return }
+    if (sessionStore.getIsActive() && orderStore.hasPlacedOrder) { return }
 
     try {
         const api = useApi()

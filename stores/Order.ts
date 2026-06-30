@@ -803,15 +803,7 @@ export const useOrderStore = defineStore("order", () => {
             if (!deviceStore.getToken()) {
                 if (shouldClearStaleState) {
                     logger.info("No token + no session.orderId: clearing stale transactional order state")
-                    state.rounds = []
-                    state.draft = []
-                    state.mode = "initial"
-                    state.serverOrderId = null
-                    state.serverStatus = "building"
-                    state.serverTotal = 0
-                    state.package = null
-                    state.guestCount = 2
-                    state.error = null
+                    resetOrderState()
                 } else if (shouldSkipResetDueToActiveSession) {
                     logger.debug("Session active & no order placed yet: preserving transactional state (menu browsing)")
                 }
@@ -867,15 +859,7 @@ export const useOrderStore = defineStore("order", () => {
                 // Cross-store: called inside action body only (lazy, Pinia-safe)
                 const refreshed = useSessionStore()
                 if (!refreshed.getOrderId()) {
-                    state.rounds = []
-                    state.draft = []
-                    state.mode = "initial"
-                    state.serverOrderId = null
-                    state.serverStatus = "building"
-                    state.serverTotal = 0
-                    state.package = null
-                    state.guestCount = 2
-                    state.error = null
+                    resetOrderState()
                 } else {
                     logger.debug("initializeFromSession: session.orderId appeared during grace, skipping clear")
                 }

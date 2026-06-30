@@ -172,6 +172,7 @@ export const useBroadcasts = () => {
     let subscribedSessionId: number | string | null = null
     let stopSessionIdWatcher: (() => void) | null = null
     let stopOrderIdWatcher: (() => void) | null = null
+    let stopTableIdWatcher: (() => void) | null = null
     let reloadTimeoutId: number | null = null
 
     // BUG-7 Fix: Exponential backoff for WebSocket reconnection
@@ -656,6 +657,8 @@ export const useBroadcasts = () => {
             .listen(".order.started-from-pos", (event: OrderStartedFromPosEvent) => {
                 touchLastEvent()
                 logger.debug("[📨 .order.started-from-pos]", { order_id: event.snapshot?.order_id })
+                const currentTableId = deviceStore.getTableId()
+                if (!event.snapshot || currentTableId == null || String(event.snapshot.table_id) !== String(currentTableId)) { return }
                 if (!sessionStore.getIsActive()) {
                     const discountStore = useDiscountStore()
                     orderStore.hydrateFromSnapshot(event.snapshot)
@@ -710,6 +713,23 @@ export const useBroadcasts = () => {
                     return
                 }
                 subscribeToOrderChannel(String(orderId))
+            },
+            { immediate: true }
+        )
+    }
+
+    const ensureTableChannelAutoSubscription = () => {
+        if (stopTableIdWatcher) { return }
+
+        stopTableIdWatcher = watch(
+            () => deviceStore.getTableId(),
+            (tableId) => {
+                if (!tableId) {
+                    unsubscribeFromTableChannel()
+                    return
+                }
+                if (tableChannel?.name === `table.${tableId}`) { return }
+                subscribeToTableChannel(tableId)
             },
             { immediate: true }
         )
@@ -833,11 +853,8 @@ export const useBroadcasts = () => {
         // Keep session.{id} subscription in sync with session lifecycle.
         ensureSessionChannelAutoSubscription()
 
-        // Subscribe to table channel for POS-originated order events.
-        const tableId = deviceStore.getTableId()
-        if (tableId) {
-            subscribeToTableChannel(tableId)
-        }
+        // Reactively subscribe to table channel so it tracks device table reassignment.
+        ensureTableChannelAutoSubscription()
 
         bindConnectionStateHandler()
         lastEventAt = Date.now()
@@ -868,6 +885,10 @@ export const useBroadcasts = () => {
         if (stopSessionIdWatcher) {
             stopSessionIdWatcher()
             stopSessionIdWatcher = null
+        }
+        if (stopTableIdWatcher) {
+            stopTableIdWatcher()
+            stopTableIdWatcher = null
         }
         unsubscribeDeviceChannels()
         unbindConnectionStateHandler()

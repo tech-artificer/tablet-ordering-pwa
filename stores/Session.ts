@@ -427,6 +427,9 @@ export const useSessionStore = defineStore("session", () => {
             const orderStore = useOrderStore()
             orderStore.resetOrderState()
 
+            const discountStore = useDiscountStore()
+            discountStore.reset()
+
             if (typeof window !== "undefined" && window.localStorage) {
                 try { window.localStorage.removeItem("session_active") } catch (e) { logger.debug("[SessionStore] failed to remove session_active", e) }
             }
@@ -453,10 +456,12 @@ export const useSessionStore = defineStore("session", () => {
         state.sessionId = Number(snapshot.session_id) || null
         state.isActive = true
         // Preserve the snapshot's start time rather than calling startTimer() which
-        // would overwrite sessionStartedAt with Date.now().
-        const startedAt = snapshot.started_at
+        // would overwrite sessionStartedAt with Date.now(). Guard against NaN from
+        // malformed but truthy started_at values.
+        const parsedStartedAt = snapshot.started_at
             ? new Date(snapshot.started_at).getTime()
-            : Date.now()
+            : NaN
+        const startedAt = Number.isFinite(parsedStartedAt) ? parsedStartedAt : Date.now()
         state.sessionStartedAt = startedAt
         state.sessionEndsAt = startedAt + SESSION_DURATION_MS
         state.timerExpired = false
