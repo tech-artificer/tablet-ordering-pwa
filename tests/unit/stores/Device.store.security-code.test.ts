@@ -166,7 +166,7 @@ describe("Device Store — Security Code Contract (Batch 3)", () => {
                 data: "<!DOCTYPE html><html><body>Nuxt shell</body></html>"
             })
 
-            const ok = await store.authenticate("192.168.100.7")
+            const ok = await store.authenticate()
 
             expect(ok).toBe(false)
             expect(store.lastAuthResponse).toBeNull()
@@ -395,7 +395,7 @@ describe("Device Store — orphaned auth reaping (registered but invalid)", () =
             response: { status: 404, data: { success: false, error: "Device not found" } }
         })
 
-        const ok = await store.authenticate("192.168.100.7")
+        const ok = await store.authenticate()
 
         expect(ok).toBe(false)
         expect(store.token).toBeNull()
@@ -413,7 +413,7 @@ describe("Device Store — orphaned auth reaping (registered but invalid)", () =
             response: { status: 403, data: { error: "Device not yet registered with security code" } }
         })
 
-        const ok = await store.authenticate("192.168.100.7")
+        const ok = await store.authenticate()
 
         expect(ok).toBe(false)
         expect(store.token).toBeNull()
@@ -427,7 +427,7 @@ describe("Device Store — orphaned auth reaping (registered but invalid)", () =
 
         mockGet.mockRejectedValueOnce({ message: "Network Error" })
 
-        const ok = await store.authenticate("192.168.100.7")
+        const ok = await store.authenticate()
 
         expect(ok).toBe(false)
         // Server never authoritatively rejected the device — keep auth for later recovery.
@@ -444,7 +444,7 @@ describe("Device Store — orphaned auth reaping (registered but invalid)", () =
             response: { status: 503, data: { message: "Service unavailable" } }
         })
 
-        const ok = await store.authenticate("192.168.100.7")
+        const ok = await store.authenticate()
 
         expect(ok).toBe(false)
         expect(store.token).toBe("140|stale-token")
