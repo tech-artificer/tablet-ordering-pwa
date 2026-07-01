@@ -301,10 +301,10 @@ export const useOrderStore = defineStore("order", () => {
     )
 
     const taxAmount = computed(() => {
-        if (!(state.package as any)?.is_taxable) { return 0 }
+        if (!(state.package as any)?.menu_item?.is_taxable) { return 0 }
         const packageTotalVal = Number((state.package as any)?.base_price || 0) * Number(state.guestCount || 1)
         const addOns = addOnsTotal.value
-        const taxRate = Number((state.package as any)?.tax?.percentage || 0)
+        const taxRate = Number((state.package as any)?.menu_item?.tax?.percentage || 0)
         return toMoney(((packageTotalVal + addOns) * taxRate) / 100)
     })
 
