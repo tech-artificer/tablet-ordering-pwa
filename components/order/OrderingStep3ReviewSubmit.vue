@@ -79,16 +79,6 @@ const hasMeatSelection = computed(() => activeCart.value.some((item: any) => {
     return (category === "meats" || category === "meat" || category.includes("meat")) && Number(item?.quantity) > 0
 }))
 
-const meatSelectionCount = computed(() => {
-    return activeCart.value.reduce((sum: number, item: any) => {
-        const category = String(item?.category || "").toLowerCase()
-        const isMeat = (category === "meats" || category === "meat" || category.includes("meat"))
-        return sum + (isMeat ? Number(item?.quantity || 0) : 0)
-    }, 0)
-})
-
-const packageMinMeat = computed(() => Number((orderStore.package as any)?.min_meat ?? 0))
-const packageMaxMeat = computed(() => Number((orderStore.package as any)?.max_meat ?? 0))
 const hasGuestCount = computed(() => Number(orderStore.guestCount) >= 2)
 const hasItems = computed(() => activeCart.value.some((item: any) => Number(item?.quantity) > 0))
 
@@ -185,12 +175,8 @@ const submitBlockers = computed(() => {
         blockers.push("Select a package")
     }
 
-    if (meatSelectionCount.value === 0) {
+    if (!hasMeatSelection.value) {
         blockers.push("Select at least one meat")
-    } else if (packageMinMeat.value > 0 && meatSelectionCount.value < packageMinMeat.value) {
-        blockers.push(`Select at least ${packageMinMeat.value} meat${packageMinMeat.value > 1 ? "s" : ""}`)
-    } else if (packageMaxMeat.value > 0 && meatSelectionCount.value > packageMaxMeat.value) {
-        blockers.push(`Maximum ${packageMaxMeat.value} meat${packageMaxMeat.value > 1 ? "s" : ""} allowed`)
     }
 
     return blockers

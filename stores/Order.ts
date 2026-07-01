@@ -139,12 +139,6 @@ export const useOrderStore = defineStore("order", () => {
         return null
     }
 
-    function getMeatSelectionCount (): number {
-        return state.draft
-            .filter(i => normalizeCartCategory(i.category) === "meats")
-            .reduce((sum, i) => sum + Number(i.quantity), 0)
-    }
-
     function handleOrderError (message: string): void {
         state.error = message
         state.isSubmitting = false
