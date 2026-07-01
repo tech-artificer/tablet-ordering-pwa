@@ -319,6 +319,7 @@ export interface Modifier {
   description: string;
   img_url: string;
   is_refillable?: true;
+  is_featured?: boolean;
 }
 
 export interface Device {
@@ -412,6 +413,7 @@ export interface CartItem {
   is_available?: boolean;
   tax?: Tax;
   tax_amount?: number;
+  quantity_limit?: number;
 }
 
 /** A snapshot of a submitted cart item kept for UI display after cart is cleared. */
