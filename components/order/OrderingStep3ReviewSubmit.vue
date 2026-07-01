@@ -141,7 +141,7 @@ const packagePriceDisplay = computed(() => Number((orderStore as any).packageTot
 const taxDisplay = computed(() => Number((orderStore as any).taxAmount ?? unref((orderStore as any).taxAmount) ?? 0))
 const totalDisplay = computed(() => Number((orderStore as any).grandTotal ?? unref((orderStore as any).grandTotal) ?? 0))
 const taxRateDisplay = computed(() => {
-    const rate = Number((orderStore.package as any)?.tax?.percentage || 0)
+    const rate = Number((orderStore.package as any)?.menu_item?.tax?.percentage || 0)
     return rate > 0 ? `${rate}%` : ""
 })
 

@@ -110,8 +110,8 @@ const addOnsTotal = computed<number>(() => {
 
 const taxAmount = computed<number>(() => {
     const pkg = orderStore.package as any
-    if (!pkg?.is_taxable) { return 0 }
-    const rate = Number(pkg?.tax?.percentage ?? 0)
+    if (!pkg?.menu_item?.is_taxable) { return 0 }
+    const rate = Number(pkg?.menu_item?.tax?.percentage ?? 0)
     if (!Number.isFinite(rate) || rate <= 0) { return 0 }
     const taxable = packageTotal.value + addOnsTotal.value
     return (taxable * rate) / 100
@@ -125,8 +125,8 @@ const grandTotalDisplay = computed<number>(() => {
 
 const taxRatePercent = computed<number | null>(() => {
     const pkg = orderStore.package as any
-    if (!pkg?.is_taxable) { return null }
-    const rate = Number(pkg?.tax?.percentage ?? 0)
+    if (!pkg?.menu_item?.is_taxable) { return null }
+    const rate = Number(pkg?.menu_item?.tax?.percentage ?? 0)
     if (!Number.isFinite(rate) || rate <= 0) { return null }
     return rate
 })
