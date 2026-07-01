@@ -319,6 +319,7 @@ export interface Modifier {
   description: string;
   img_url: string;
   is_refillable?: true;
+  is_featured?: boolean;
 }
 
 export interface Device {
@@ -366,6 +367,7 @@ export interface MenuItem {
   is_available: boolean;
   is_taxable: boolean;
   is_discountable: boolean;
+  is_featured?: boolean;
   tax: Tax;
   tax_amount: number;
 }
@@ -411,6 +413,7 @@ export interface CartItem {
   is_available?: boolean;
   tax?: Tax;
   tax_amount?: number;
+  quantity_limit?: number;
 }
 
 /** A snapshot of a submitted cart item kept for UI display after cart is cleared. */
@@ -444,6 +447,32 @@ export interface OrderApiResponse {
   order_number?: string;
   status?: string;
   total_amount?: number;
+}
+
+/** A discount applied by staff at the POS — totals only (no perk metadata in Nexus). */
+export interface AppliedDiscount {
+  discount_total: number;
+  applied_at: string;
+}
+
+/**
+ * Snapshot of an active POS-originated order returned by
+ * GET /api/v2/tablet/table/{tableId}/active-order and sent via
+ * order.started-from-pos broadcast. Used by the boot-time recovery plugin.
+ */
+export interface ActiveOrderSnapshot {
+  order_id: number | string;
+  order_number: string;
+  table_id: number | string;
+  session_id: number | string;
+  guest_count: number;
+  status: string;
+  rounds: import("~/stores/Order").OrderRound[];
+  discounts: AppliedDiscount[];
+  subtotal: number;
+  discount_total: number;
+  total: number;
+  started_at: string;
 }
 
 export interface OrderPayloadItem {

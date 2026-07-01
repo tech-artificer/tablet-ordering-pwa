@@ -160,6 +160,8 @@ const handleBackButtonClick = () => {
 // Order summary now uses the order store
 const UNLIMITED_ITEM_CAP = 5
 
+const packageMaxMeat = computed(() => Number((orderStore.package as any)?.max_meat ?? UNLIMITED_ITEM_CAP))
+
 const getItemQuantity = (itemId: number) => {
     return orderStore.getCartItemQuantity(Number(itemId))
 }
