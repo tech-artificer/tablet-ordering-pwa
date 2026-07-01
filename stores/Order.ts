@@ -44,6 +44,7 @@ export interface OrderRound {
     serverOrderId: number | null // parent order id (same across all rounds for one order)
     serverRefillId?: number | null // refill-specific id when applicable
     serverTotal: number // server-reported total for this round
+    pos_originated?: boolean // true = POS-created round; tablet may not add/remove items
 }
 
 const UNLIMITED_ITEM_CAP = 5
@@ -112,6 +113,8 @@ export const useOrderStore = defineStore("order", () => {
         serverOrderId: null as number | null,
         serverStatus: "building" as OrderServerStatus,
         serverTotal: 0 as number,
+        serverSubtotal: 0 as number,
+        serverDiscountTotal: 0 as number,
     })
 
     function getItemQuantityLimit (itemId: number, isUnlimited: boolean): number {
@@ -835,15 +838,7 @@ export const useOrderStore = defineStore("order", () => {
             if (!deviceStore.getToken()) {
                 if (shouldClearStaleState) {
                     logger.info("No token + no session.orderId: clearing stale transactional order state")
-                    state.rounds = []
-                    state.draft = []
-                    state.mode = "initial"
-                    state.serverOrderId = null
-                    state.serverStatus = "building"
-                    state.serverTotal = 0
-                    state.package = null
-                    state.guestCount = 2
-                    state.error = null
+                    resetOrderState()
                 } else if (shouldSkipResetDueToActiveSession) {
                     logger.debug("Session active & no order placed yet: preserving transactional state (menu browsing)")
                 }
@@ -899,15 +894,7 @@ export const useOrderStore = defineStore("order", () => {
                 // Cross-store: called inside action body only (lazy, Pinia-safe)
                 const refreshed = useSessionStore()
                 if (!refreshed.getOrderId()) {
-                    state.rounds = []
-                    state.draft = []
-                    state.mode = "initial"
-                    state.serverOrderId = null
-                    state.serverStatus = "building"
-                    state.serverTotal = 0
-                    state.package = null
-                    state.guestCount = 2
-                    state.error = null
+                    resetOrderState()
                 } else {
                     logger.debug("initializeFromSession: session.orderId appeared during grace, skipping clear")
                 }
@@ -971,6 +958,38 @@ export const useOrderStore = defineStore("order", () => {
         if (details.total !== undefined && details.total !== null) {
             state.serverTotal = Number(details.total)
         }
+        if (details.subtotal !== undefined && details.subtotal !== null) {
+            state.serverSubtotal = Number(details.subtotal)
+        }
+        if (details.discount !== undefined && details.discount !== null) {
+            state.serverDiscountTotal = Number(details.discount)
+        }
+    }
+
+    function updateTotals (totals: { subtotal: number; discount_total: number; total: number }): void {
+        state.serverSubtotal = totals.subtotal
+        state.serverDiscountTotal = totals.discount_total
+        state.serverTotal = totals.total
+    }
+
+    function hydrateFromSnapshot (snapshot: import("~/types").ActiveOrderSnapshot): void {
+        state.rounds = (snapshot.rounds ?? []).map(r => ({
+            ...r,
+            pos_originated: true,
+        }))
+        state.serverOrderId = Number(snapshot.order_id) || null
+        state.serverStatus = snapshot.status
+        state.serverTotal = Number(snapshot.total) || 0
+        state.serverSubtotal = Number(snapshot.subtotal) || 0
+        state.serverDiscountTotal = Number(snapshot.discount_total) || 0
+        state.guestCount = Number(snapshot.guest_count) || 2
+        state.mode = "refill"
+        state.draft = []
+    }
+
+    function appendPosRound (round: OrderRound): void {
+        const posRound: OrderRound = { ...round, pos_originated: true }
+        state.rounds = [...state.rounds, posRound]
     }
 
     function clearPackage () { state.package = null }
@@ -994,6 +1013,8 @@ export const useOrderStore = defineStore("order", () => {
         state.serverOrderId = null
         state.serverStatus = "building"
         state.serverTotal = 0
+        state.serverSubtotal = 0
+        state.serverDiscountTotal = 0
         state.package = null
         state.guestCount = 2
         state.error = null
@@ -1027,6 +1048,9 @@ export const useOrderStore = defineStore("order", () => {
         updateOrderStatus,
         setServerOrderId,
         applyDetailsUpdate,
+        updateTotals,
+        hydrateFromSnapshot,
+        appendPosRound,
         clearPackage,
         getServerOrderId,
         handleOrderError,
@@ -1040,6 +1064,6 @@ export const useOrderStore = defineStore("order", () => {
     persist: {
         key: "order-store",
         storage: (typeof localStorage !== "undefined") ? localStorage : undefined,
-        pick: ["package", "guestCount", "rounds", "draft", "serverOrderId", "serverStatus", "serverTotal", "mode"]
+        pick: ["package", "guestCount", "rounds", "draft", "serverOrderId", "serverStatus", "serverTotal", "serverSubtotal", "serverDiscountTotal", "mode"]
     }
 })
