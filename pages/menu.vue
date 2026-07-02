@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch, type Component } from "vue"
+import { storeToRefs } from "pinia"
 import { Beef, UtensilsCrossed, CakeSlice, Wine, ShoppingCart } from "lucide-vue-next"
 import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
@@ -17,6 +18,9 @@ definePageMeta({
 })
 
 const menuStore = useMenuStore()
+// TS can't infer these getters' return types when actions are also present on the
+// store (Pinia/TS ThisType inference quirk) — storeToRefs sidesteps it cleanly.
+const { visibleCategories, unlimitedCategorySlugs } = storeToRefs(menuStore)
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const route = useRoute()
@@ -113,7 +117,7 @@ watch(
 // Menu categories — fully admin-driven from the tablet categories API.
 // Refill-eligible (unlimited) tabs come from the admin is_unlimited flag,
 // with a legacy fallback handled inside the store getter.
-const refillCategorySlugs = computed<string[]>(() => menuStore.unlimitedCategorySlugs)
+const refillCategorySlugs = computed<string[]>(() => unlimitedCategorySlugs.value)
 const CUSTOMER_EMPTY_MESSAGE = "Nothing available in this section right now."
 
 const activeCategory = ref<string>("meats")
@@ -130,8 +134,7 @@ const categoryIconBySlug: Record<string, Component> = {
 const defaultCategoryIcon = UtensilsCrossed
 
 const categories = computed(() => {
-    const tabs = menuStore.categories
-        .filter(cat => typeof cat.menu_count !== "number" || cat.menu_count > 0)
+    const tabs = visibleCategories.value
         .map(cat => ({
             id: cat.slug,
             label: cat.name,

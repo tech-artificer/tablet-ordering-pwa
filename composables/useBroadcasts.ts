@@ -160,6 +160,7 @@ export const useBroadcasts = () => {
     const deviceStore = useDeviceStore()
     const orderStore = useOrderStore()
     const sessionStore = useSessionStore()
+    const menuStore = useMenuStore()
     const { triggerSessionEnd } = useSessionEndFlow()
 
     const getCurrentOrderId = (): string | number | null => unref(orderStore.serverOrderId)
@@ -509,7 +510,6 @@ export const useBroadcasts = () => {
 
         menuRefreshTimeoutId = window.setTimeout(() => {
             menuRefreshTimeoutId = null
-            const menuStore = useMenuStore()
             menuStore.refreshMenus()
                 .then(() => logger.info("[Broadcasts] Menu data refreshed after tablet_category.updated"))
                 .catch((err: unknown) => logger.warn("[Broadcasts] Menu refresh failed after tablet_category.updated", err))
@@ -893,6 +893,10 @@ export const useBroadcasts = () => {
         if (reloadTimeoutId) {
             try { window.clearTimeout(reloadTimeoutId) } catch (e) { logger.debug("[Broadcasts] cleanup clearTimeout failed", e) }
             reloadTimeoutId = null
+        }
+        if (menuRefreshTimeoutId) {
+            try { window.clearTimeout(menuRefreshTimeoutId) } catch (e) { logger.debug("[Broadcasts] cleanup menu refresh timeout failed", e) }
+            menuRefreshTimeoutId = null
         }
         // BUG-7 Fix: Clear reconnection timer on cleanup
         if (reconnectTimer) {
