@@ -74,4 +74,43 @@ describe("store contract regressions", () => {
         expect(mockGet).toHaveBeenCalledWith("/api/v2/tablet/categories/sides/menus", { signal: undefined })
         expect(menuStore.categoryMenus.sides).toHaveLength(1)
     })
+
+    it("derives unlimited slugs from is_unlimited flags when present", () => {
+        const menuStore = useMenuStore()
+
+        ;(menuStore as any).categories = [
+            { id: 0, slug: "meats", name: "Meats", is_unlimited: true },
+            { id: 2, slug: "sides", name: "Sides", is_unlimited: true, menu_count: 3 },
+            { id: 3, slug: "drinks", name: "Drinks", is_unlimited: false, menu_count: 5 },
+        ]
+
+        expect(menuStore.unlimitedCategorySlugs).toEqual(["meats", "sides"])
+    })
+
+    it("falls back to legacy unlimited slugs when flags are absent", () => {
+        const menuStore = useMenuStore()
+
+        // Older nexus payload — no is_unlimited field at all
+        ;(menuStore as any).categories = [
+            { id: 2, slug: "sides", name: "Sides", menu_count: 3 },
+            { id: 3, slug: "drinks", name: "Drinks", menu_count: 5 },
+        ]
+        expect(menuStore.unlimitedCategorySlugs).toEqual(["meats", "sides"])
+
+        // Categories not loaded yet
+        ;(menuStore as any).categories = []
+        expect(menuStore.unlimitedCategorySlugs).toEqual(["meats", "sides"])
+    })
+
+    it("excludes meats from prefetch (fetched via fetchMeats)", () => {
+        const menuStore = useMenuStore()
+
+        ;(menuStore as any).categories = [
+            { id: 0, slug: "meats", name: "Meats", is_unlimited: true },
+            { id: 2, slug: "sides", name: "Sides", menu_count: 3 },
+            { id: 3, slug: "empty", name: "Empty", menu_count: 0 },
+        ]
+
+        expect(menuStore.categoriesToPrefetch().map((cat: any) => cat.slug)).toEqual(["sides"])
+    })
 })

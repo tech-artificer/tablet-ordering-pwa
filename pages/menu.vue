@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, unref, watch, type Component } from "vue"
+import { storeToRefs } from "pinia"
 import { Beef, UtensilsCrossed, CakeSlice, Wine, ShoppingCart } from "lucide-vue-next"
 import { formatCurrency } from "../utils/formats"
 import { useApi } from "../composables/useApi"
@@ -17,6 +18,9 @@ definePageMeta({
 })
 
 const menuStore = useMenuStore()
+// TS can't infer these getters' return types when actions are also present on the
+// store (Pinia/TS ThisType inference quirk) — storeToRefs sidesteps it cleanly.
+const { visibleCategories, unlimitedCategorySlugs } = storeToRefs(menuStore)
 const orderStore = useOrderStore()
 const sessionStore = useSessionStore()
 const route = useRoute()
@@ -110,8 +114,10 @@ watch(
     }
 )
 
-// Menu categories — meats is always first; others from admin tablet categories API
-const REFILL_CATEGORY_SLUGS = ["meats", "sides"] as const
+// Menu categories — fully admin-driven from the tablet categories API.
+// Refill-eligible (unlimited) tabs come from the admin is_unlimited flag,
+// with a legacy fallback handled inside the store getter.
+const refillCategorySlugs = computed<string[]>(() => unlimitedCategorySlugs.value)
 const CUSTOMER_EMPTY_MESSAGE = "Nothing available in this section right now."
 
 const activeCategory = ref<string>("meats")
@@ -128,15 +134,18 @@ const categoryIconBySlug: Record<string, Component> = {
 const defaultCategoryIcon = UtensilsCrossed
 
 const categories = computed(() => {
-    const meatTab = { id: "meats", label: "Meats", icon: Beef }
-    const dynamicTabs = menuStore.categories
-        .filter(cat => cat.slug !== "meats" && (typeof cat.menu_count !== "number" || cat.menu_count > 0))
+    const tabs = visibleCategories.value
         .map(cat => ({
             id: cat.slug,
             label: cat.name,
             icon: categoryIconBySlug[cat.slug] ?? defaultCategoryIcon,
         }))
-    return [meatTab, ...dynamicTabs]
+    // Older nexus payloads (and the bootstrap fallback) carry no meats entry;
+    // the meats tab must always exist — packages depend on it.
+    if (!tabs.some(tab => tab.id === "meats")) {
+        tabs.unshift({ id: "meats", label: "Meats", icon: Beef })
+    }
+    return tabs
 })
 
 // Check if refills are available (order placed AND we have a valid order ID)
@@ -189,7 +198,7 @@ const displayItems = computed(() => {
 
     if (orderStore.isRefillMode) {
         return baseItems.filter((item: any) => {
-            return REFILL_CATEGORY_SLUGS.includes(activeCategory.value as typeof REFILL_CATEGORY_SLUGS[number]) &&
+            return refillCategorySlugs.value.includes(activeCategory.value) &&
                 (item?.group || item?.category || item?.name || item?.img_url)
         })
     }
@@ -197,7 +206,7 @@ const displayItems = computed(() => {
     return baseItems.filter((item: any) => item?.group || item?.category || item?.name || item?.img_url)
 })
 
-const isUnlimitedCategory = computed(() => REFILL_CATEGORY_SLUGS.includes(activeCategory.value as typeof REFILL_CATEGORY_SLUGS[number]))
+const isUnlimitedCategory = computed(() => refillCategorySlugs.value.includes(activeCategory.value))
 
 // Totals are derived from the order store
 const packageTotal = computed(() => orderStore.packageTotal)
@@ -228,7 +237,7 @@ const reloadCategory = async () => {
 
 // Add item to order
 const addToOrder = (item: any) => {
-    const isUnlimited = REFILL_CATEGORY_SLUGS.includes(activeCategory.value as typeof REFILL_CATEGORY_SLUGS[number])
+    const isUnlimited = refillCategorySlugs.value.includes(activeCategory.value)
     const category = activeCategory.value
     orderStore.addToCart(item, { isUnlimited, category })
 }
@@ -413,7 +422,7 @@ const showEmptyCategory = computed(() => {
                             :active-category="activeCategory"
                             :sticky="true"
                             :is-refill-mode="orderStore.isRefillMode"
-                            :refill-allowed-categories="REFILL_CATEGORY_SLUGS"
+                            :refill-allowed-categories="refillCategorySlugs"
                             @select="setCategory"
                         />
                     </div>
