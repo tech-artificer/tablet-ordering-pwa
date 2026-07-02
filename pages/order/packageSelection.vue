@@ -48,6 +48,7 @@ const selectedPackage = ref<Package | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
 const featuredMenuId = ref<number | null>(null)
 const featuredImgError = ref(false)
+const menuThumbImgErrors = reactive<Record<number, boolean>>({})
 
 function handleCardSelect (pkg: Package) {
     selectedPackage.value = pkg
@@ -583,13 +584,13 @@ function handleTouchEnd () {
                                                     {{ menu.meat_category_code }}
                                                 </span>
                                                 <NuxtImg
-                                                    v-if="menu.img_url"
+                                                    v-if="menu.img_url && !menuThumbImgErrors[menu.id]"
                                                     :src="resolveMediaUrl(menu.img_url)"
                                                     :alt="menu.menu_name || 'Meat'"
                                                     class="absolute inset-0 w-full h-full object-cover"
                                                     loading="lazy"
                                                     format="webp"
-                                                    @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
+                                                    @error="menuThumbImgErrors[menu.id] = true"
                                                 />
                                                 <div
                                                     v-else
