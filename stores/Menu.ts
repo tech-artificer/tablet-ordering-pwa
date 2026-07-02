@@ -91,11 +91,17 @@ export const useMenuStore = defineStore("menu", {
          * or the backend doesn't send the flag (older nexus).
          */
         unlimitedCategorySlugs: (state: any): string[] => {
+            const hasFlags = state.categories.some((cat: CategoryTab) => typeof cat.is_unlimited === "boolean")
+            if (!hasFlags) { return [...FALLBACK_UNLIMITED_SLUGS] }
+
             const flagged = state.categories
                 .filter((cat: CategoryTab) => cat.is_unlimited === true)
                 .map((cat: CategoryTab) => cat.slug)
-            const hasFlags = state.categories.some((cat: CategoryTab) => typeof cat.is_unlimited === "boolean")
-            return hasFlags ? flagged : [...FALLBACK_UNLIMITED_SLUGS]
+
+            // A payload without a meats entry (bootstrap fallback) means the Meats
+            // tab is client-injected — it is always refill-eligible.
+            const hasMeatsEntry = state.categories.some((cat: CategoryTab) => cat.slug === "meats")
+            return hasMeatsEntry ? flagged : ["meats", ...flagged]
         },
         isCategoryLoading: (state: any) => (slug: string) => Boolean(state.categoryLoading[slug]),
         getCategoryError: (state: any) => (slug: string) => state.categoryErrors[slug] ?? null,

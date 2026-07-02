@@ -13,8 +13,10 @@ document in code is a bug.
    "cartItems" / "history" trio. No validator that tries to reconcile them.
 4. **Server response is the only mutator of `rounds`.** Network failures roll back the
    draft; they do not corrupt history.
-5. **Eat-all-you-can:** meats (= `package.modifiers`) and sides are unlimited. Refills
-   are unbounded — design for 10+ rounds per session.
+5. **Eat-all-you-can:** refill-eligible categories are determined at runtime by the
+   `is_unlimited` flag on each `CategoryTab` (admin-managed). Falls back to
+   `["meats", "sides"]` when the API sends no flags (legacy nexus). Refills are
+   unbounded — design for 10+ rounds per session.
 
 ---
 
@@ -51,6 +53,13 @@ Package = {
 Modifier = { id, name, group, category, price, img_url, ... }
 MenuItem = { id, name, price, img_url, category, ... }
 ```
+
+CategoryTab = {
+  id: number, name: string, slug: string,
+  icon?: string | null, color?: string | null,
+  menu_count?: number,    // omitted for meats (POS-group-driven catalog)
+  is_unlimited?: boolean, // true = tab stays open in refill mode; admin-managed
+}
 
 **Removed (dead code):**
 
