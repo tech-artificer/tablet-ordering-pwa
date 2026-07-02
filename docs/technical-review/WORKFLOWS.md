@@ -62,6 +62,10 @@ flowchart TD
     Cart --> Submit[Submit order]
 ```
 
+### Meat quantity rule
+
+Every meat/modifier included in a package is selectable with no cap on the number of distinct types. The only enforced limit is a **per-item quantity cap of 5** for meats and sides (`UNLIMITED_ITEM_CAP` in `stores/Order.ts`), which can be overridden per item via `PackageAllowedMenu.quantity_limit`. There is no `min_meat`/`max_meat` total-count gate on the tablet — those fields exist on the nexus `Package` model for admin UI purposes but are not consumed by the ordering flow.
+
 ### Payload Contract
 
 The order payload is constructed with one top-level package item and meat items as nested modifiers. Add-ons are sent as separate top-level items.

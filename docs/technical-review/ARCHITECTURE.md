@@ -88,9 +88,13 @@ flowchart LR
 ### Pinia Stores
 
 - `Device.ts`: device token, device/table assignment, broadcast config, token refresh, table polling.
-- `Order.ts`: package/cart/refill state, order payload construction, order submission, idempotency key lifecycle, polling fallback.
+- `Order.ts`: package/cart/refill state, order payload construction, order submission, idempotency key lifecycle, polling fallback. Per-item quantity cap for meats/sides is `UNLIMITED_ITEM_CAP = 5`; there is no total-count gate across meat types — every meat/modifier included in a package is selectable.
 - `Session.ts`: active session/order metadata and session reset/end behavior.
 - `OfflineSync.ts`: offline sync state coordination.
+
+### Utilities
+
+- `utils/resolveMediaUrl.ts`: Rewrites same-hostname backend `img_url` values to the current `window.location` origin (protocol + port). The nexus backend stamps image URLs with its own `APP_URL` host/port; the tablet PWA runs on a different port, so passing raw URLs to `<NuxtImg>` causes cross-port requests. This utility is applied at every `<NuxtImg>` call site that renders backend-originated images (menu grid, cart items, order review, package inspector).
 
 ### Service Worker
 
