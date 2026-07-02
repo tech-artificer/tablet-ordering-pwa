@@ -56,7 +56,7 @@ MenuItem = { id, name, price, img_url, category, ... }
 
 CategoryTab = {
   id: number, name: string, slug: string,
-  icon?: string, color?: string,
+  icon?: string | null, color?: string | null,
   menu_count?: number,    // omitted for meats (POS-group-driven catalog)
   is_unlimited?: boolean, // true = tab stays open in refill mode; admin-managed
 }
