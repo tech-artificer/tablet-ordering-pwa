@@ -9,6 +9,7 @@ import { useNetworkStatus } from "~/composables/useNetworkStatus"
 import { classifyError } from "~/composables/useErrorClassifier"
 import SubmitStatusBanner from "~/components/ui/SubmitStatusBanner.vue"
 import { logger } from "~/utils/logger"
+import { resolveMediaUrl } from "~/utils/resolveMediaUrl"
 
 const emit = defineEmits<{
   "order-submitted": [];

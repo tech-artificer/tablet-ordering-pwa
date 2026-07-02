@@ -6,6 +6,7 @@ import { useMenuStore } from "../../stores/Menu"
 import { useOrderStore } from "../../stores/Order"
 import PackageCard from "../../components/PackageCard.vue"
 import { displayMeatGroupLabel, groupAllowedMenusByCategoryCode } from "../../utils/packageModifierGroups"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 
 definePageMeta({
     layout: "kiosk"

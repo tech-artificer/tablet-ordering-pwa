@@ -2,6 +2,7 @@
 import { ElEmpty } from "element-plus"
 import { Lock, EyeOff, Plus, Star } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 import type { MenuItem, Modifier } from "../../types"
 
 type CategoryType = "meats" | "sides" | "desserts" | "drinks";

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Plus, Minus, Trash2 } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 import type { CartItem } from "../../types"
 
 const props = defineProps<{
