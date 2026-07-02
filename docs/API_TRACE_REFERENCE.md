@@ -81,7 +81,7 @@ flowchart TD
 | Trace ID | Store method | Method | Endpoint | Auth | Backend handler | Verification | Notes |
 |---|---|---:|---|---|---|---|---|
 | M1 | `menuStore.fetchPackages()` | `GET` | `/api/v2/tablet/packages` | `auth:device` | `TabletApiController@packages` | ✅ route exists | Package carousel source. |
-| M2 | `menuStore.fetchPackageDetails(id)` | `GET` | `/api/v2/tablet/packages/{id}` | `auth:device` | `TabletApiController@packageDetails` | ✅ route exists | Includes package detail + meat selection context. |
+| M2 | `menuStore.fetchPackageDetails(id)` | `GET` | `/api/v2/tablet/packages/{id}` | `auth:device` | `TabletApiController@packageDetails` | ✅ route exists | Includes package detail + meat selection context. Response `allowed_menus[]` now includes `img_url: string\|null` used to render meat photos in the package inspector hero and thumbnail strip. |
 | M3 | `menuStore.fetchMeatCategories()` | `GET` | `/api/v2/tablet/meat-categories` | `auth:device` | `TabletApiController@meatCategories` | ✅ route exists | Meat tab data source. |
 | M4 | `menuStore.fetchTabletCategories()` | `GET` | `/api/v2/tablet/categories` | `auth:device` | `TabletApiController@categories` | ✅ route exists | Drives sides / desserts / drinks category resolution. |
 | M5 | `menuStore.fetchDesserts()` / `fetchSides()` / `fetchDrinks()` | `GET` | `/api/v2/tablet/categories/{slug}/menus` | `auth:device` | `TabletApiController@categoryMenus` | ✅ route exists | Category-specific menu list. |

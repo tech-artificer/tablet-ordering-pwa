@@ -3,6 +3,7 @@ import { computed, unref } from "vue"
 import { ElBadge, ElEmpty } from "element-plus"
 import { RefreshCw, Clock, ChefHat, CheckCircle, AlertCircle, Flame, X } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 import type { Package, CartItem } from "../../types"
 import { useSessionStore } from "../../stores/Session"
 import { useOrderStore } from "../../stores/Order"
@@ -211,7 +212,7 @@ const submitOrder = () => {
                         >
                             <NuxtImg
                                 v-if="item.img_url || item.image"
-                                :src="item.img_url || item.image"
+                                :src="resolveMediaUrl(item.img_url || item.image)"
                                 :alt="item.name || 'Order item'"
                                 class="w-10 h-10 object-cover rounded-lg flex-shrink-0"
                                 loading="lazy"

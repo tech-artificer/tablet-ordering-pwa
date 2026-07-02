@@ -2,6 +2,7 @@
 import { ElEmpty } from "element-plus"
 import { Lock, EyeOff, Plus, Star } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 import type { MenuItem, Modifier } from "../../types"
 
 type CategoryType = "meats" | "sides" | "desserts" | "drinks";
@@ -111,7 +112,7 @@ const isRuntimeUnavailable = (item: any) => !isAvailable(item)
             <div class="relative h-32 overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl">
                 <NuxtImg
                     v-if="item.img_url"
-                    :src="item.img_url"
+                    :src="resolveMediaUrl(item.img_url)"
                     :alt="item.name || 'Menu item'"
                     class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"

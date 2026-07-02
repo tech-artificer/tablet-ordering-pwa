@@ -6,6 +6,7 @@ import { useMenuStore } from "../../stores/Menu"
 import { useOrderStore } from "../../stores/Order"
 import PackageCard from "../../components/PackageCard.vue"
 import { displayMeatGroupLabel, groupAllowedMenusByCategoryCode } from "../../utils/packageModifierGroups"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 
 definePageMeta({
     layout: "kiosk"
@@ -46,6 +47,8 @@ function onResize () {
 const selectedPackage = ref<Package | null>(null)
 const activeInspectorPackage = ref<Package | null>(null)
 const featuredMenuId = ref<number | null>(null)
+const featuredImgError = ref(false)
+const menuThumbImgErrors = reactive<Record<number, boolean>>({})
 
 function handleCardSelect (pkg: Package) {
     selectedPackage.value = pkg
@@ -130,6 +133,7 @@ const featuredDescription = computed(() => {
 
 function selectFeaturedMenu (menu: PackageAllowedMenu) {
     featuredMenuId.value = menu.id
+    featuredImgError.value = false
 }
 
 function shiftFeaturedMenu (direction: -1 | 1) {
@@ -137,6 +141,7 @@ function shiftFeaturedMenu (direction: -1 | 1) {
     const current = featuredIndex.value >= 0 ? featuredIndex.value : 0
     const next = (current + direction + inspectorMenus.value.length) % inspectorMenus.value.length
     featuredMenuId.value = inspectorMenus.value[next]?.id ?? null
+    featuredImgError.value = false
 }
 
 async function chooseActiveInspectorPackage () {
@@ -482,7 +487,19 @@ function handleTouchEnd () {
                                         {{ featuredMenu.meat_category_code }}
                                     </span>
 
-                                    <div class="flex h-full w-full items-center justify-center text-[#ffbd72]/45">
+                                    <NuxtImg
+                                        v-if="featuredMenu?.img_url && !featuredImgError"
+                                        :src="resolveMediaUrl(featuredMenu.img_url)"
+                                        :alt="featuredMenu.menu_name || 'Meat'"
+                                        class="absolute inset-0 w-full h-full object-cover"
+                                        loading="lazy"
+                                        format="webp"
+                                        @error="featuredImgError = true"
+                                    />
+                                    <div
+                                        v-else
+                                        class="flex h-full w-full items-center justify-center text-[#ffbd72]/45"
+                                    >
                                         <UtensilsCrossed :size="76" :stroke-width="1.35" />
                                     </div>
 
@@ -566,7 +583,19 @@ function handleTouchEnd () {
                                                 >
                                                     {{ menu.meat_category_code }}
                                                 </span>
-                                                <div class="flex h-full w-full items-center justify-center text-[#ffbd72]/38">
+                                                <NuxtImg
+                                                    v-if="menu.img_url && !menuThumbImgErrors[menu.id]"
+                                                    :src="resolveMediaUrl(menu.img_url)"
+                                                    :alt="menu.menu_name || 'Meat'"
+                                                    class="absolute inset-0 w-full h-full object-cover"
+                                                    loading="lazy"
+                                                    format="webp"
+                                                    @error="menuThumbImgErrors[menu.id] = true"
+                                                />
+                                                <div
+                                                    v-else
+                                                    class="flex h-full w-full items-center justify-center text-[#ffbd72]/38"
+                                                >
                                                     <UtensilsCrossed :size="34" :stroke-width="1.35" />
                                                 </div>
                                             </div>

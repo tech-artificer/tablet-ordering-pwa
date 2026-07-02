@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Plus, Minus, Trash2 } from "lucide-vue-next"
 import { formatCurrency } from "../../utils/formats"
+import { resolveMediaUrl } from "../../utils/resolveMediaUrl"
 import type { CartItem } from "../../types"
 
 const props = defineProps<{
@@ -60,7 +61,7 @@ const fallbackEmoji = computed(() => {
             >
                 <NuxtImg
                     v-if="item.img_url"
-                    :src="item.img_url"
+                    :src="resolveMediaUrl(item.img_url)"
                     :alt="item.name || 'Cart item'"
                     class="w-full h-full object-cover"
                     loading="lazy"

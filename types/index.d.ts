@@ -259,17 +259,18 @@ export interface Session {
 }
 
 export interface PackageAllowedMenu {
-  id: number;
-  krypton_menu_id: number;
-  menu_name: string;
-  menu_type: 'meat' | 'side' | 'dessert' | 'drinks';
-  meat_category_code: string | null;
-  extra_price: number;
-  quantity_limit: number;
-  is_required: boolean;
-  is_default: boolean;
-  is_active: boolean;
-  sort_order: number;
+   id: number;
+   krypton_menu_id: number;
+   menu_name: string;
+   menu_type: 'meat' | 'side' | 'dessert' | 'drinks';
+   meat_category_code: string | null;
+   extra_price: number;
+   quantity_limit: number;
+   is_required: boolean;
+   is_default: boolean;
+   is_active: boolean;
+   sort_order: number;
+   img_url: string | null;
 }
 
 export interface Package {
