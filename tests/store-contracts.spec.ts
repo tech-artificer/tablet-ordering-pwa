@@ -87,6 +87,19 @@ describe("store contract regressions", () => {
         expect(menuStore.unlimitedCategorySlugs).toEqual(["meats", "sides"])
     })
 
+    it("keeps meats refill-eligible when the payload has flags but no meats entry", () => {
+        const menuStore = useMenuStore()
+
+        // Nexus bootstrap fallback: flags present, meats tab client-injected
+        ;(menuStore as any).categories = [
+            { id: 1, slug: "sides", name: "Sides", pos_category: "sides", is_unlimited: true },
+            { id: 2, slug: "dessert", name: "Dessert", pos_category: "dessert", is_unlimited: false },
+            { id: 3, slug: "beverage", name: "Beverage", pos_category: "drinks", is_unlimited: false },
+        ]
+
+        expect(menuStore.unlimitedCategorySlugs).toEqual(["meats", "sides"])
+    })
+
     it("falls back to legacy unlimited slugs when flags are absent", () => {
         const menuStore = useMenuStore()
 
