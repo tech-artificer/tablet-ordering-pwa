@@ -894,6 +894,10 @@ export const useBroadcasts = () => {
             try { window.clearTimeout(reloadTimeoutId) } catch (e) { logger.debug("[Broadcasts] cleanup clearTimeout failed", e) }
             reloadTimeoutId = null
         }
+        if (menuRefreshTimeoutId) {
+            try { window.clearTimeout(menuRefreshTimeoutId) } catch (e) { logger.debug("[Broadcasts] cleanup menuRefresh timer failed", e) }
+            menuRefreshTimeoutId = null
+        }
         // BUG-7 Fix: Clear reconnection timer on cleanup
         if (reconnectTimer) {
             try { window.clearTimeout(reconnectTimer) } catch (e) { logger.debug("[Broadcasts] cleanup reconnection timer failed", e) }
