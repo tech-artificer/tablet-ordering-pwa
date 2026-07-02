@@ -113,7 +113,8 @@ watch(
 // Menu categories — fully admin-driven from the tablet categories API.
 // Refill-eligible (unlimited) tabs come from the admin is_unlimited flag,
 // with a legacy fallback handled inside the store getter.
-const refillCategorySlugs = computed<string[]>(() => menuStore.unlimitedCategorySlugs)
+
+const refillCategorySlugs = computed<string[]>(() => (menuStore as any).unlimitedCategorySlugs)
 const CUSTOMER_EMPTY_MESSAGE = "Nothing available in this section right now."
 
 const activeCategory = ref<string>("meats")
