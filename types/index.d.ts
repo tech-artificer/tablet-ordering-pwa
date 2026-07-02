@@ -352,6 +352,7 @@ export interface CategoryTab {
   icon?: string | null;
   color?: string | null;
   menu_count?: number;
+  is_unlimited?: boolean;
 }
 
 export interface MenuItem {

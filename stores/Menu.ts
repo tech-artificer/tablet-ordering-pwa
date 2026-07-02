@@ -7,6 +7,9 @@ const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
 
 const CUSTOMER_SECTION_ERROR = "Nothing available in this section right now."
 
+/** Legacy refill tabs — used only when the API doesn't provide is_unlimited flags. */
+const FALLBACK_UNLIMITED_SLUGS = ["meats", "sides"]
+
 const toNumber = (value: unknown): number => {
     const n = Number(value)
     return isNaN(n) ? 0 : n
@@ -81,6 +84,18 @@ export const useMenuStore = defineStore("menu", {
         isCacheStale: (state: any) => {
             if (!state.lastFetched) { return true }
             return Date.now() - state.lastFetched > CACHE_DURATION
+        },
+        /**
+         * Slugs of refill-eligible (unlimited) categories, admin-driven via is_unlimited.
+         * Falls back to the legacy hardcoded pair when categories haven't loaded yet
+         * or the backend doesn't send the flag (older nexus).
+         */
+        unlimitedCategorySlugs: (state: any): string[] => {
+            const flagged = state.categories
+                .filter((cat: CategoryTab) => cat.is_unlimited === true)
+                .map((cat: CategoryTab) => cat.slug)
+            const hasFlags = state.categories.some((cat: CategoryTab) => typeof cat.is_unlimited === "boolean")
+            return hasFlags ? flagged : [...FALLBACK_UNLIMITED_SLUGS]
         },
         isCategoryLoading: (state: any) => (slug: string) => Boolean(state.categoryLoading[slug]),
         getCategoryError: (state: any) => (slug: string) => state.categoryErrors[slug] ?? null,
@@ -187,6 +202,10 @@ export const useMenuStore = defineStore("menu", {
 
         categoriesToPrefetch (this: any): CategoryTab[] {
             return this.categories.filter((cat: CategoryTab) => {
+                // Meats is fetched via fetchMeats(); prefetching it here would double-fetch.
+                if (cat.slug === "meats") {
+                    return false
+                }
                 if (typeof cat.menu_count === "number") {
                     return cat.menu_count > 0
                 }

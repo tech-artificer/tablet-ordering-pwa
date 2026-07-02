@@ -2,6 +2,7 @@ import { ref, unref, watch } from "vue"
 import { ElNotification, ElMessage } from "element-plus"
 import type { Channel } from "laravel-echo"
 import { useDeviceStore } from "~/stores/Device"
+import { useMenuStore } from "~/stores/Menu"
 import { useOrderStore } from "~/stores/Order"
 import { useSessionStore } from "~/stores/Session"
 import { useDiscountStore } from "~/stores/Discount"
@@ -174,6 +175,7 @@ export const useBroadcasts = () => {
     let stopOrderIdWatcher: (() => void) | null = null
     let stopTableIdWatcher: (() => void) | null = null
     let reloadTimeoutId: number | null = null
+    let menuRefreshTimeoutId: number | null = null
 
     // BUG-7 Fix: Exponential backoff for WebSocket reconnection
     let reconnectAttempts = 0
@@ -493,6 +495,27 @@ export const useBroadcasts = () => {
         }
     }
 
+    // Admin edited tablet categories — refetch the whole menu surface, bypassing
+    // the 30-min localStorage cache. Debounced: a burst of admin edits (reorder,
+    // multi-attach) emits one event per mutation but should trigger one refetch.
+    const handleTabletCategoryUpdated = () => {
+        touchLastEvent()
+        logger.info("[Broadcasts] tablet_category.updated received — scheduling menu refresh")
+
+        if (menuRefreshTimeoutId) {
+            try { window.clearTimeout(menuRefreshTimeoutId) } catch (e) { logger.debug("[Broadcasts] clearTimeout failed", e) }
+            menuRefreshTimeoutId = null
+        }
+
+        menuRefreshTimeoutId = window.setTimeout(() => {
+            menuRefreshTimeoutId = null
+            const menuStore = useMenuStore()
+            menuStore.refreshMenus()
+                .then(() => logger.info("[Broadcasts] Menu data refreshed after tablet_category.updated"))
+                .catch((err: unknown) => logger.warn("[Broadcasts] Menu refresh failed after tablet_category.updated", err))
+        }, 2000)
+    }
+
     const resetChannelStatus = () => {
         channelStatus.value = {
             device: false,
@@ -536,6 +559,9 @@ export const useBroadcasts = () => {
             })
             .listen(".device.control", (event: DeviceControlEvent) => {
                 handleDeviceControl(event)
+            })
+            .listen(".tablet_category.updated", () => {
+                handleTabletCategoryUpdated()
             })
 
         channelStatus.value.device = true
