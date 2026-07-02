@@ -496,12 +496,13 @@ export const useBroadcasts = () => {
         }
     }
 
-    // Admin edited tablet categories — refetch the whole menu surface, bypassing
-    // the 30-min localStorage cache. Debounced: a burst of admin edits (reorder,
-    // multi-attach) emits one event per mutation but should trigger one refetch.
-    const handleTabletCategoryUpdated = () => {
+    // Admin edited the tablet catalog (categories or packages) — refetch the
+    // whole menu surface, bypassing the 30-min localStorage cache. Debounced:
+    // a burst of admin edits (reorder, multi-attach) emits one event per
+    // mutation but should trigger one refetch.
+    const scheduleMenuRefresh = (sourceEvent: string) => {
         touchLastEvent()
-        logger.info("[Broadcasts] tablet_category.updated received — scheduling menu refresh")
+        logger.info(`[Broadcasts] ${sourceEvent} received — scheduling menu refresh`)
 
         if (menuRefreshTimeoutId) {
             try { window.clearTimeout(menuRefreshTimeoutId) } catch (e) { logger.debug("[Broadcasts] clearTimeout failed", e) }
@@ -511,8 +512,8 @@ export const useBroadcasts = () => {
         menuRefreshTimeoutId = window.setTimeout(() => {
             menuRefreshTimeoutId = null
             menuStore.refreshMenus()
-                .then(() => logger.info("[Broadcasts] Menu data refreshed after tablet_category.updated"))
-                .catch((err: unknown) => logger.warn("[Broadcasts] Menu refresh failed after tablet_category.updated", err))
+                .then(() => logger.info(`[Broadcasts] Menu data refreshed after ${sourceEvent}`))
+                .catch((err: unknown) => logger.warn(`[Broadcasts] Menu refresh failed after ${sourceEvent}`, err))
         }, 2000)
     }
 
@@ -561,7 +562,10 @@ export const useBroadcasts = () => {
                 handleDeviceControl(event)
             })
             .listen(".tablet_category.updated", () => {
-                handleTabletCategoryUpdated()
+                scheduleMenuRefresh("tablet_category.updated")
+            })
+            .listen(".package.updated", () => {
+                scheduleMenuRefresh("package.updated")
             })
 
         channelStatus.value.device = true
