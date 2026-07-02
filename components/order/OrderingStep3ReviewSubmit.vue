@@ -304,7 +304,7 @@ async function submit (): Promise<void> {
                         <div class="w-12 h-12 rounded-lg bg-accent-warm/60 border border-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
                             <img
                                 v-if="item?.img_url"
-                                :src="item.img_url"
+                                :src="resolveMediaUrl(item.img_url)"
                                 :alt="item?.name || 'Item'"
                                 class="w-full h-full object-cover"
                             >

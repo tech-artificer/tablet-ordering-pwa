@@ -211,7 +211,7 @@ const submitOrder = () => {
                         >
                             <NuxtImg
                                 v-if="item.img_url || item.image"
-                                :src="item.img_url || item.image"
+                                :src="resolveMediaUrl(item.img_url || item.image)"
                                 :alt="item.name || 'Order item'"
                                 class="w-10 h-10 object-cover rounded-lg flex-shrink-0"
                                 loading="lazy"
